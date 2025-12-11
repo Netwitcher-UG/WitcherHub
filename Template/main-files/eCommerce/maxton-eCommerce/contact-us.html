@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en" data-bs-theme="blue-theme">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maxton - Html5 eCommerce Template</title>
+  <!--favicon-->
+  <link rel="icon" href="assets/images/favicon-32x32.png" type="image/png">
+  <!-- loader-->
+  <link href="assets/css/pace.min.css" rel="stylesheet">
+                             
+  <!--bootstrap css-->
+  <link href="assets/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Material+Icons+Outlined" rel="stylesheet">
+  <!--main css-->
+  <link href="assets/css/bootstrap-extended.css" rel="stylesheet">
+  <link href="sass/main.css" rel="stylesheet">
+  <link href="assets/css/horizontal-menu.css" rel="stylesheet">
+  <link href="sass/dark-theme.css" rel="stylesheet">
+  <link href="sass/blue-theme.css" rel="stylesheet">
+  <link href="sass/semi-dark.css" rel="stylesheet">
+  <link href="sass/responsive.css" rel="stylesheet">
+
+</head>
+
+<body>
+
+  <!--start header-->
+  <header class="top-header">
+    <nav class="navbar navbar-expand align-items-center justify-content-between gap-4 container px-4">
+      <div class="logo-header d-none d-xl-flex align-items-center gap-2">
+        <div class="logo-icon">
+          <a href="index.html"><img src="assets/images/logo-icon.png" class="logo-img" width="45" alt=""></a>
+        </div>
+        <div class="logo-name">
+          <h5 class="mb-0">Maxton</h5>
+        </div>
+      </div>
+      <div class="btn-toggle d-xl-none" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar">
+        <a href="javascript:;"><i class="material-icons-outlined">menu</i></a>
+      </div>
+      <div class="search-bar d-lg-flex d-none">
+        <div class="position-relative w-100">
+          <input class="form-control form-control-lg rounded-5 px-5 search-control" type="text"
+            placeholder="Search">
+          <span class="material-icons-outlined position-absolute ms-3 translate-middle-y start-0 top-50">search</span>
+          <span class="material-icons-outlined position-absolute me-3 translate-middle-y end-0 top-50 mobile-search-close d-lg-none">close</span>
+        </div>
+      </div>
+      <ul class="navbar-nav gap-1 nav-right-links align-items-center">
+        <li class="nav-item d-lg-none mobile-search-btn">
+          <a class="nav-link" href="javascript:;"><i class="material-icons-outlined">search</i></a>
+        </li>
+        <li class="nav-item dropdown d-md-flex d-none">
+          <a class="nav-link dropdown-toggle dropdown-toggle-nocaret" href="avascript:;" data-bs-toggle="dropdown"><img
+              src="assets/images/county/02.png" width="22" alt="">
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/01.png" width="20" alt=""><span class="ms-2">English</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/02.png" width="20" alt=""><span class="ms-2">Catalan</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/03.png" width="20" alt=""><span class="ms-2">French</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/04.png" width="20" alt=""><span class="ms-2">Belize</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/05.png" width="20" alt=""><span class="ms-2">Colombia</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/06.png" width="20" alt=""><span class="ms-2">Spanish</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/07.png" width="20" alt=""><span class="ms-2">Georgian</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/08.png" width="20" alt=""><span class="ms-2">Hindi</span></a>
+            </li>
+          </ul>
+        </li>
+        <li class="nav-item dark-mode">
+          <a class="nav-link dark-mode-icon" href="javascript:;"><i class="material-icons-outlined">dark_mode</i></a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="account-my-profile.html"><i class="material-icons-outlined">account_circle</i></a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link position-relative" href="wishlist.html"><i
+              class="material-icons-outlined">favorite_border</i>
+            <span class="badge-notify">5</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link position-relative" data-bs-toggle="offcanvas" href="#offcanvasCart"><i
+              class="material-icons-outlined">shopping_cart</i>
+            <span class="badge-notify">8</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </header>
+  <!--end top header-->
+
+  <!--navigation-->
+  <div class="primary-menu">
+    <nav class="navbar navbar-expand-xl align-items-center container px-4 py-0 py-xl-2">
+      <div class="offcanvas offcanvas-start w-260" tabindex="-1" id="offcanvasNavbar"
+        >
+        <div class="offcanvas-header border-bottom h-70">
+          <div class="d-flex align-items-center gap-2">
+            <div class="">
+              <img src="assets/images/logo-icon.png" class="logo-icon" width="45" alt="logo icon">
+            </div>
+            <div class="">
+              <h4 class="logo-text">Maxton</h4>
+            </div>
+          </div>
+          <a href="javascript:;" class="primaery-menu-close" data-bs-dismiss="offcanvas">
+            <i class="material-icons-outlined">close</i>
+          </a>
+        </div>
+        <div class="offcanvas-body p-0">
+          <ul class="navbar-nav align-items-center flex-grow-1 gap-xl-2">
+            <li class="nav-item">
+              <a class="nav-link" href="index.html">
+                <div class="parent-icon"><i class="material-icons-outlined">home</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">Home</div>
+              </a>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle dropdown-toggle-nocaret" href="javascript:;" data-bs-toggle="dropdown">
+                <div class="parent-icon"><i class='material-icons-outlined'>local_mall</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">Shop</div>
+                <div class="ms-auto dropy-icon"><i class='material-icons-outlined'>expand_more</i></div>
+              </a>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="shop-grid-left-sidebar.html"><i
+                      class='material-icons-outlined'>circle</i>Shop Grid Leftside</a></li>
+                <li><a class="dropdown-item" href="shop-grid-right-sidebar.html"><i 
+                       class='material-icons-outlined'>circle</i>Shop Grid Rightside</a></li>
+                <li><a class="dropdown-item" href="shop-list-left-sidebar.html"><i
+                       class='material-icons-outlined'>circle</i>Shop List Leftside</a></li>
+                <li><a class="dropdown-item" href="shop-list-right-sidebar.html">
+                    <i class='material-icons-outlined'>circle</i>Shop List Rightside</a>
+                </li>
+                <li>
+                  <hr class="dropdown-divider">
+                </li>
+                <li><a class="dropdown-item" href="shop-grid-offcanvas-filter.html">
+                  <i class='material-icons-outlined'>circle</i>Shop Grid Offcanvas</a>
+                </li>
+                <li><a class="dropdown-item" href="shop-list-offcanvas-filter.html">
+                  <i class='material-icons-outlined'>circle</i>Shop List Offcanvas</a>
+                </li>
+                <li>
+                  <hr class="dropdown-divider">
+                </li>
+                <li class="nav-item dropend">
+                  <a class="dropdown-item dropdown-toggle dropdown-toggle-nocaret" href="javascript:;"><i
+                      class='material-icons-outlined'>circle</i>Shop Categories</a>
+                  <ul class="dropdown-menu submenu">
+                    <li><a class="dropdown-item" href="shop-circular-catgories.html"><i
+                          class='material-icons-outlined'>circle</i>Circular View</a></li>
+                    <li><a class="dropdown-item" href="shop-grid-catgories.html"><i
+                          class='material-icons-outlined'>circle</i>Grid View</a></li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle dropdown-toggle-nocaret" href="javascript:;" data-bs-toggle="dropdown">
+                <div class="parent-icon"><i class='material-icons-outlined'>storefront</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">Product</div>
+                <div class="ms-auto dropy-icon"><i class='material-icons-outlined'>expand_more</i></div>
+              </a>
+              <ul class="dropdown-menu">
+               <li><a class="dropdown-item" href="product-detail.html"><i
+                      class='material-icons-outlined'>circle</i>Product Details</a></li>
+                <li><a class="dropdown-item" href="product-detail-grid.html"><i
+                       class='material-icons-outlined'>circle</i>Product Details Grid</a></li>
+                <li><a class="dropdown-item" href="shopping-cart.html"><i
+                       class='material-icons-outlined'>circle</i>Shopping Cart</a></li>
+                <li><a class="dropdown-item" href="checkout.html"><i
+                      class='material-icons-outlined'>circle</i>Checkout</a></li>
+                <li><a class="dropdown-item" href="wishlist.html"><i
+                       class='material-icons-outlined'>circle</i>Wishlist</a></li>
+                <li><a class="dropdown-item" href="wishlist-2.html"><i
+                     class='material-icons-outlined'>circle</i>Wishlist 2</a></li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle dropdown-toggle-nocaret" href="javascript:;" data-bs-toggle="dropdown">
+                <div class="parent-icon"><i class='material-icons-outlined'>note_alt</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">Blog</div>
+                <div class="ms-auto dropy-icon"><i class='material-icons-outlined'>expand_more</i></div>
+              </a>
+              <ul class="dropdown-menu">
+                <li> <a class="dropdown-item" href="blog.html"><i
+                      class='material-icons-outlined'>circle</i>Blog Post</a>
+                </li>
+                <li> <a class="dropdown-item" href="blog-grid.html"><i
+                      class='material-icons-outlined'>circle</i>Blog Grid</a>
+                </li>
+                <li> <a class="dropdown-item" href="blog-details.html"><i
+                      class='material-icons-outlined'>circle</i>Blog Details</a>
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle dropdown-toggle-nocaret" href="javascript:;" data-bs-toggle="dropdown">
+                <div class="parent-icon"><i class='material-icons-outlined'>account_circle</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">Account</div>
+                <div class="ms-auto dropy-icon"><i class='material-icons-outlined'>expand_more</i></div>
+              </a>
+              <ul class="dropdown-menu">
+                <li> <a class="dropdown-item" href="account-orders.html"><i
+                      class='material-icons-outlined'>circle</i>Orders</a>
+                </li>
+                <li> <a class="dropdown-item" href="account-my-profile.html"><i
+                      class='material-icons-outlined'>circle</i>Profile</a>
+                </li>
+                <li> <a class="dropdown-item" href="account-addresses.html"><i
+                      class='material-icons-outlined'>circle</i>Addresses</a>
+                </li>
+                <li> <a class="dropdown-item" href="account-payment-methods.html"><i
+                      class='material-icons-outlined'>circle</i>Payment Methods</a>
+                </li>
+                <li> <a class="dropdown-item" href="wishlist.html"><i
+                      class='material-icons-outlined'>circle</i>Wishlist</a>
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="about-us.html">
+                <div class="parent-icon"><i class="material-icons-outlined">info</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">About</div>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="contact-us.html">
+                <div class="parent-icon"><i class="material-icons-outlined">phone</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">Contact</div>
+              </a>
+            </li>
+
+          </ul>
+        </div>
+      </div>
+    </nav>
+  </div>
+  <!--end navigation-->
+
+
+  <!--start main wrapper-->
+  <main class="main-wrapper">
+    <div class="main-content">
+        
+      <!--start breadcrumb-->
+      <section class="section-breadcrumb bg-img-page-header d-flex align-items-center justify-content-center">
+        <div class="container px-3 d-flex flex-column align-items-center justify-content-center">
+          <h2>Contact Us</h2>
+          <nav>
+            <ol class="breadcrumb mb-0 gap-2">
+              <li class="breadcrumb-item"><a href="javascript:;" class="breadcrumb-link">Home</a></li>
+              <li><i class="bi bi-chevron-right"></i></li>
+              <li class="breadcrumb-item breadcrumb-active">Contact Us</li>
+            </ol>
+          </nav>
+        </div>
+      </section>
+      <!--end breadcrumb-->
+
+       <section class="py-5">
+      <div class="container px-4">
+        <div class="row g-4 g-lg-5">
+           <div class="col-12 col-lg-8">
+              <div class="contact-map border rounded-3 p-3 overflow-x-auto">
+                <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d52914395.551108696!2d-161.66682312048917!3d35.95581471346889!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x54eab584e432360b%3A0x1c3bb99243deb742!2sUnited%20States!5e0!3m2!1sen!2sin!4v1741246206129!5m2!1sen!2sin" width="800" class="rounded-3" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+              </div>
+           </div>
+           <div class="col-12 col-lg-4">
+            <div class="contact-details">
+              <h4 class="mb-4">Information</h4>
+              <div class="contact-number">
+                <p class="mb-1 fw-semibold">Phone:</p>
+                <p class="mb-0">+91-8623XXXXXX</p>
+              </div>
+              <div class="border-top my-3"></div>
+              <div class="contact-number mt-3">
+                <p class="mb-1 fw-semibold">Email:</p>
+                <p class="mb-0">example@gmail.com</p>
+              </div>
+              <div class="border-top my-3"></div>
+              <div class="contact-number mt-3">
+                <p class="mb-1 fw-semibold">Address:</p>
+                <p class="mb-0">1600 Amphitheatre Parkway,<br> Mountain View, CA 94043</p>
+              </div>
+              <div class="border-top my-3"></div>
+              <div class="contact-number mt-3">
+                <p class="mb-1 fw-semibold">Open Time:</p>
+                <p class="mb-0">Mon - Sat: 10:30am - 9:00pm PST</p>
+                <p class="mb-0">Sunday: 8:00am - 4:00pm PST</p>
+              </div>
+            </div>
+           </div>
+        </div><!--end row-->
+        
+
+        <div class="card mt-5 border rounded-3">
+          <div class="card-body p-5">
+            <div class="text-center mb-5">
+              <h4>Get In Touch</h4>
+              <p>Fill out the form below to contact our sales team.</p>
+            </div>
+            <form class="contact-form">
+              <div class="row g-3">
+                 <div class="col-12 col-lg-6">
+                  <div>
+                    <label for="YourName" class="form-label">Your Name</label>
+                    <input type="text" class="form-control form-control-lg border-2" id="YourName" required placeholder="Enter your name">
+                  </div>
+                 </div>
+                 <div class="col-12 col-lg-6">
+                  <div>
+                    <label for="EmailAddress" class="form-label">Email Address</label>
+                    <input type="email" class="form-control form-control-lg border-2" id="EmailAddress" required placeholder="Enter Email Address">
+                  </div>
+                 </div>
+                 <div class="col-12 col-lg-12">
+                  <div>
+                    <label for="Message" class="form-label">Message</label>
+                    <textarea class="form-control form-control-lg border-2" rows="4" cols="5" id="Message" required placeholder="Message"></textarea>
+                  </div>
+                 </div>
+                 <div class="col-12 col-lg-12">
+                  <div>
+                    <button type="submit" class="btn btn-grd btn-grd-primary px-4 py-2">Send Message</button>
+                  </div>
+                 </div>
+
+              </div><!--end row-->
+            </form>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    </div>
+  </main>
+  <!--end main wrapper-->
+
+
+<!--footer widgets-->
+<section class="footer-widgets py-5 border-top">
+  <div class="container px-4">
+    <div class="row g-4">
+       <div class="col-12 col-lg-4">
+           <div class="footer-widget-1">
+              <div class="d-flex align-items-center gap-2">
+                <img src="assets/images/logo-icon.png" width="50" alt="">
+                <h4 class="mb-0">Maxton</h4>
+              </div>
+              <div class="mt-3">
+                <address>
+                  <strong>Address:</strong>
+                  84-A London Street, United Kingdom
+                </address>
+              </div>
+              <p><button type="button" class="btn btn-sm btn-grd btn-grd-primary px-3">Get Darection<i class="bi bi-arrow-up-right ms-2"></i></button></p>
+              <p><span><i class="bi bi-envelope me-2"></i></span>example@gmail.com</p>
+              <p><span><i class="bi bi-telephone me-2"></i></span>648-378-2255</p>
+              <p><span><i class="bi bi-globe me-2"></i></span>www.codervent.com</p>
+              <div class="social-link d-flex align-items-center gap-2">
+                <a href="javascript:;" class="btn btn-grd btn-grd-info"><i class="bi bi-facebook"></i></a>
+                <a href="javascript:;" class="btn btn-grd btn-grd-primary"><i class="bi bi-twitter-x"></i></a>
+                <a href="javascript:;" class="btn btn-grd btn-grd-branding"><i class="bi bi-instagram"></i></a>
+                <a href="javascript:;" class="btn btn-grd btn-grd-danger"><i class="bi bi-youtube"></i></a>
+                <a href="javascript:;" class="btn btn-grd btn-grd-warning"><i class="bi bi-amazon"></i></a>
+              </div>
+           </div>
+       </div>
+       <div class="col-12 col-lg-3">
+          <div class="d-flex align-items-start justify-content-between gap-4">
+            <div class="">
+              <h5 class="mb-3">Top Categories</h5>
+              <ul class="list-unstyled d-flex flex-column gap-2">
+                  <li><a href="shop-circular-catgories.html" class="footer-link">Topwear</a></li>
+                  <li><a href="shop-list-left-sidebar.html" class="footer-link">Accessories</a></li>
+                  <li><a href="shop-grid-offcanvas-filter.html" class="footer-link">Men Fashion</a></li>
+                  <li><a href="shop-list-right-sidebar.html" class="footer-link">Gym Fitness</a></li>
+                  <li><a href="shop-list-ofcanvas-filter.html" class="footer-link">Sunglass</a></li>
+                  <li><a href="shop-grid-left-sidebar.html" class="footer-link">Jeans</a></li>
+                  <li><a href="shop-grid-left-sidebar.html" class="footer-link">Formal Pants</a></li>
+                  <li><a href="shop-grid-left-sidebar.html" class="footer-link">Lingerie</a></li>
+              </ul>
+             </div>
+              <div class="footer-widget-3">
+                <h5 class="mb-3">Account</h5>
+                <ul class="list-unstyled d-flex flex-column gap-2">
+                   <li><a href="checkout.html" class="footer-link">Order tracking</a></li>
+                   <li><a href="javascript:;" class="footer-link">Shipping policy</a></li>
+                   <li><a href="account-my-profile.html" class="footer-link">Your account</a></li>
+                   <li><a href="account-addresses.html" class="footer-link">Delivery info</a></li>
+                   <li><a href="javascript:;" class="footer-link">Taxes & fees</a></li>
+                   <li><a href="javascript:;" class="footer-link">Refunds policy</a></li>
+                </ul>
+              </div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-4 offset-lg-1">
+          <div class="footer-widget-4">
+            <h5 class="mb-3">Newletter</h5>
+            <p class="news-letter-caption">Subscribe to our newsletter and enjoy 10% off your first order</p>
+     <form method="post">
+      <div class="input-group input-group-lg mt-3">
+        <input type="email" class="form-control border border-2" placeholder="Enter your email" required>
+        <button class="btn btn-grd btn-grd-primary" type="submit"><i class="bi bi-arrow-up-right"></i></button>
+      </div>
+     </form>
+            <p class="news-letter-caption mt-4 mb-2">Download Mobile Application</p>
+            <div class="d-flex align-items-center gap-3">
+              <a href="javascript:;"><img src="assets/images/icons/app-store.svg" width="140" class="rounded-3" alt=""></a>
+              <a href="javascript:;"><img src="assets/images/icons/play-store.svg" width="140" class="rounded-3" alt=""></a>
+            </div>
+          </div>
+        </div>
+    </div><!--end row-->  
+</div>
+</section>
+<!--end footer widgets-->
+
+
+<!--start footer strip-->
+<footer class="footer-strip py-3 border-top">
+  <div class="container px-4">
+    <div class="row g-4 align-items-center">
+      <div class="col-12 col-lg-auto">
+        <p class="mb-0 font-12">@All rights reserved. Made by Codervent</p>
+      </div>
+      <div class="col-12 col-lg-auto">
+        <div class="d-flex align-items-center gap-3">
+          <a href="javascript:;" class="font-12 text-secondary">Privacy</a>
+          <a href="javascript:;" class="font-12 text-secondary">Affiliates</a>
+          <a href="javascript:;" class="font-12 text-secondary">Terms of use</a>
+        </div>
+     </div>
+     <div class="col-12 col-lg-auto ms-lg-auto">
+      <div class="d-flex align-items-center gap-3">
+        <a href="javascript:;"><img src="assets/images/payment/paypal.png" class="p-2 border rounded-3" width="80" alt=""></a>
+        <a href="javascript:;"><img src="assets/images/payment/visa.png" class="p-2 border rounded-3" width="60" alt=""></a>
+        <a href="javascript:;"><img src="assets/images/payment/money.png" class="p-2 border rounded-3" width="50" alt=""></a>
+        <a href="javascript:;"><img src="assets/images/payment/stripe.png" class="p-2 border rounded-3" width="60" alt=""></a>
+      </div>
+     </div>
+   </div><!--end row-->
+  </div>
+</footer>
+<!--end footer strip-->
+
+  <!--start cart-->
+  <div class="offcanvas offcanvas-end offcanvas-cart" tabindex="-1" id="offcanvasCart">
+    <div class="offcanvas-header border-bottom h-70">
+      <h5 class="mb-0" id="offcanvasRightLabel">Shopping cart</h5>
+      <a href="javascript:;" class="primaery-menu-close" data-bs-dismiss="offcanvas">
+        <i class="material-icons-outlined">close</i>
+      </a>
+    </div>
+    <div class="offcanvas-body p-0">
+      <div class="order-list">
+        <div class="order-item d-flex align-items-start gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/01.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">White Men Shoes</h5>
+            <p class="mb-0 order-price">$69</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/04.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Red Airpods</h5>
+            <p class="mb-0 order-price">$19</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/03.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Men Polo Tshirt</h5>
+            <p class="mb-0 order-price">$39</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/06.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Blue Jeans Casual</h5>
+            <p class="mb-0 order-price">$85</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/12.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Fancy Shirts</h5>
+            <p class="mb-0 order-price">$58</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/02.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Home Sofa Set </h5>
+            <p class="mb-0 order-price">$46</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/13.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Black iPhone</h5>
+            <p class="mb-0 order-price">$49</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/11.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Goldan Watch</h5>
+            <p class="mb-0 order-price">$89</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="offcanvas-footer p-3 border-top">
+      <div class="cart-product-checout">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <p class="mb-0">Subtotal</p>
+        <h5 class="mb-0">$378.5</h5>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <a href="shopping-cart.html" class="btn btn-light border px-4 py-2 flex-fill">View Cart</a>
+        <a href="checkout.html" class="btn btn-grd btn-grd-primary px-4 py-2 border border-dark flex-fill">Checkout</a>
+    </div> 
+    </div>
+    </div>
+  </div>
+  <!--end cart-->
+
+
+
+  <!--start switcher-->
+  <button class="btn btn-grd btn-grd-primary btn-switcher m-3 d-flex align-items-center gap-2"
+    type="button" data-bs-toggle="offcanvas" data-bs-target="#staticBackdrop">
+    <i class="material-icons-outlined">tune</i>Customize
+  </button>
+
+  <div class="offcanvas offcanvas-end" data-bs-scroll="true" tabindex="-1" id="staticBackdrop">
+    <div class="offcanvas-header border-bottom h-70">
+      <div class="">
+        <h5 class="mb-0">Theme Customizer</h5>
+        <p class="mb-0">Customize your theme</p>
+      </div>
+      <a href="javascript:;" class="primaery-menu-close" data-bs-dismiss="offcanvas">
+        <i class="material-icons-outlined">close</i>
+      </a>
+    </div>
+    <div class="offcanvas-body">
+      <div>
+        <p>Theme variation</p>
+
+        <div class="row g-3">
+          <div class="col-12 col-xl-6">
+            <input type="radio" class="btn-check" name="theme-options" id="BlueTheme" checked>
+            <label
+              class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4"
+              for="BlueTheme">
+              <span class="material-icons-outlined">contactless</span>
+              <span>Blue</span>
+            </label>
+          </div>
+          <div class="col-12 col-xl-6">
+            <input type="radio" class="btn-check" name="theme-options" id="LightTheme">
+            <label
+              class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4"
+              for="LightTheme">
+              <span class="material-icons-outlined">light_mode</span>
+              <span>Light</span>
+            </label>
+          </div>
+          <div class="col-12 col-xl-6">
+            <input type="radio" class="btn-check" name="theme-options" id="DarkTheme">
+            <label
+              class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4"
+              for="DarkTheme">
+              <span class="material-icons-outlined">dark_mode</span>
+              <span>Dark</span>
+            </label>
+          </div>
+          <div class="col-12 col-xl-6">
+            <input type="radio" class="btn-check" name="theme-options" id="SemiDarkTheme">
+            <label
+              class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4"
+              for="SemiDarkTheme">
+              <span class="material-icons-outlined">contrast</span>
+              <span>Semi Dark</span>
+            </label>
+          </div>
+        </div><!--end row-->
+
+      </div>
+    </div>
+  </div>
+  <!--end switcher-->
+
+  <!--back to top button-->
+    <a href="javaScript:;" class="back-to-top"><i class="bi bi-arrow-up"></i></a>
+  <!--end back to top button-->
+
+  <!--bootstrap js-->
+  <script src="assets/js/bootstrap.bundle.min.js"></script>
+  <!--loader js-->
+  <script src="assets/js/pace.min.js"></script>
+  <!--plugins-->
+  <script src="assets/js/jquery.min.js"></script>
+  <script src="assets/js/main.js"></script>
+</body>
+
+</html>

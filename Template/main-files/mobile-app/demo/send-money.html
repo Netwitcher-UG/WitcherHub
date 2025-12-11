@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en" data-bs-theme="blue-theme">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maxton - Digital Payment Mobile Application</title>
+  <!--favicon-->
+  <link rel="icon" href="assets/images/favicon-32x32.png" type="image/png">
+  <!-- loader-->
+  <link href="assets/css/pace.min.css" rel="stylesheet">
+  <script src="assets/js/pace.min.js"></script>
+
+  <!-- Link Swiper's CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
+
+  <!--bootstrap css-->
+  <link href="assets/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Material+Icons+Outlined" rel="stylesheet">
+  <!--main css-->
+  <link href="assets/css/bootstrap-extended.css" rel="stylesheet">
+  <link href="sass/main.css" rel="stylesheet">
+  <link href="sass/dark-theme.css" rel="stylesheet">
+  <link href="sass/blue-theme.css" rel="stylesheet">
+  <link href="sass/responsive.css" rel="stylesheet">
+
+</head>
+
+<body>
+
+ <!--start header--> 
+<header class="mobile-top-header border-bottom position-fixed top-0 start-0 end-0 d-flex align-items-center justify-content-between px-3 bg-grd-primary">
+  <div class="d-flex align-items-center gap-3">
+    <a href="javascript:;" class="btn-back" onclick="history.back()"><i class="material-icons-outlined">arrow_back</i></a>
+    <h6 class="back-title mb-0">Scan QR Code</h6>
+  </div>
+</header>
+<!--end header--> 
+
+
+<!--main content--> 
+<main class="main-content">
+
+  <!--send money-->
+  <section class="send-money py-3">
+    <div class="d-flex flex-column align-items-center gap-3">
+      <div class="">
+        <img src="https://placehold.co/110x110" class="rounded-circle" width="80" height="80" alt="">
+      </div>
+      <div class="text-center">
+        <h4>Jhon Samsun</h4>
+        <p class="mb-0 fs-6 fw-bold">+91-89475126</p>
+      </div>
+    </div>
+  </section>
+  <!--send money-->
+
+  <!--start amount input-->
+  <section class="py-3">
+      <div class="">
+        <input type="text" class="form-control form-control-lg amount-input" placeholder="Enter Amount" value="$580">
+      </div>
+      <div class="amount-keywords d-flex justify-content-center align-items-center gap-3 mt-2">
+         <button class="btn bg-light border rounded-5">medicine</button>
+         <button class="btn bg-light border rounded-5">hotel</button>
+         <button class="btn bg-light border rounded-5">grocery</button>
+      </div>
+  </section>
+  <!--end amount input-->
+
+  
+  <!--start amount input-->
+  <section class="py-3">
+    <div class="d-flex align-items-center justify-content-center">
+      <div class="dropdown">
+       <a href="javascript:;" class="btn border-0 dropdown-toggle-nocaret dropdown-toggle d-flex align-items-center gap-2" data-bs-toggle="dropdown">
+         <span>From HDFC Bank</span>
+         <span class="material-icons-outlined fs-6">expand_more</span>
+       </a>
+       <ul class="dropdown-menu">
+         <li><a class="dropdown-item" href="javascript:;">Morgan Bank</a></li>
+         <li><a class="dropdown-item" href="javascript:;">Bank of America</a></li>
+         <li><a class="dropdown-item" href="javascript:;">Something else here</a></li>
+       </ul>
+      </div>
+     </div>
+    <div class="amount-keywords d-flex justify-content-center align-items-center mt-2">
+      <button data-bs-toggle="offcanvas" data-bs-target="#pay_amount" class="btn btn-grd btn-grd-primary rounded-5 px-5 py-2">Pay <span>$580</span></button>
+    </div>
+  </section>
+  <!--end amount input-->
+
+  
+</main>
+<!--main content--> 
+
+  <!--start fetching bank offcanvas -->
+  <div class="offcanvas offcanvas-bottom rounded-5 rounded-bottom-0 h-100" tabindex="-1" id="pay_amount">
+    <div class="offcanvas-header">
+      <a href="javascript:;" class="primaery-menu-close ms-auto" data-bs-dismiss="offcanvas">
+        <span class="material-icons-outlined">close</span>
+      </a>
+    </div>
+    <div class="offcanvas-body">
+        <div class="d-flex flex-row justify-content-between align-items-center text-center">
+             <img src="assets/images/gallery/citybank-logo-large.png" width="100" alt="">
+             <img src="assets/images/gallery/upi-logo.png" width="70" alt="">
+        </div>
+        <div class="d-flex flex-column align-items-center gap-3 mt-4">
+          <div class="">
+            <img src="https://placehold.co/110x110" class="rounded-circle" width="80" height="80" alt="">
+          </div>
+          <div class="text-center">
+            <h6>Jhon Samsun</h6>
+            <p class="mb-0 fs-1 fw-bold">$580</p>
+          </div>
+          <div class="enter-upi-pin text-center">
+            <h5 class="text-uppercase mb-3">Enter UPI Pin</h5>
+            <div class="upipin-controls d-flex align-items-center justify-content-center gap-3">
+              <div class="">
+                <input type="password" class="form-control form-control-lg text-center border-0 border-bottom rounded-0" placeholder="0" maxlength="1" value="6">
+              </div>
+              <div class="">
+                <input type="password" class="form-control form-control-lg text-center border-0 border-bottom rounded-0" placeholder="0" maxlength="1" value="8">
+              </div>
+              <div class="">
+                <input type="password" class="form-control form-control-lg text-center border-0 border-bottom rounded-0" placeholder="0" maxlength="1" value="2">
+              </div>
+              <div class="">
+                <input type="password" class="form-control form-control-lg text-center border-0 border-bottom rounded-0" placeholder="0" maxlength="1" value="9">
+              </div>
+            </div>
+            <div class="d-block mt-5">
+              <a href="payment-success-mesg.html" class="btn btn-grd btn-grd-primary px-5 rounded-5">Submit</a>
+            </div>
+          </div>
+        </div>
+    </div>
+  </div>
+<!--end fetching bank offcanvas -->
+
+<!--start bottom menu-->
+<ul class="nav bottom-menu border-top position-fixed bottom-0 start-0 end-0 h-70 d-flex align-items-center justify-content-between px-3">
+  <li class="nav-item">
+    <a class="nav-link d-flex flex-column gap-0 align-items-center" href="home.html">
+      <span class="menu-icon material-icons-outlined">home</span>
+      <span class="menu-name">Home</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link d-flex flex-column gap-0 align-items-center" href="my-wallet.html">
+      <span class="menu-icon material-icons-outlined">account_balance</span>
+      <span class="menu-name">Wallet</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link d-flex flex-column gap-0 align-items-center" href="account-details.html">
+      <span class="menu-icon material-icons-outlined">account_circle</span>
+      <span class="menu-name">Account</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link d-flex flex-column gap-0 align-items-center" href="history.html">
+      <span class="menu-icon material-icons-outlined">history</span>
+      <span class="menu-name">History</span>
+    </a>
+  </li>
+</ul>
+<!--end bottom menu-->
+
+<!--start switcher-->
+<button class="btn btn-grd btn-grd-primary btn-switcher raised position-fixed bottom-50 end-0 d-flex align-items-center gap-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#themeSwitcher">
+  <i class="material-icons-outlined">tune</i>
+</button>
+
+<div class="offcanvas offcanvas-end" data-bs-scroll="true" tabindex="-1" id="themeSwitcher">
+  <div class="offcanvas-header border-bottom h-70">
+    <div class="">
+      <h5 class="mb-0">Theme Customizer</h5>
+      <p class="mb-0">Customize your theme</p>
+    </div>
+    <a href="javascript:;" class="primaery-menu-close" data-bs-dismiss="offcanvas">
+      <i class="material-icons-outlined">close</i>
+    </a>
+  </div>
+  <div class="offcanvas-body">
+    <div>
+      <p>Theme variation</p>
+
+      <div class="row g-3">
+        <div class="col-12 col-xl-6">
+          <input type="radio" class="btn-check" name="theme-options" id="BlueTheme" checked>
+          <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="BlueTheme">
+            <span class="material-icons-outlined">contactless</span>
+            <span>Blue</span>
+          </label>
+        </div>
+        <div class="col-12 col-xl-6">
+          <input type="radio" class="btn-check" name="theme-options" id="LightTheme">
+          <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="LightTheme">
+            <span class="material-icons-outlined">light_mode</span>
+            <span>Light</span>
+          </label>
+        </div>
+        <div class="col-12 col-xl-6">
+          <input type="radio" class="btn-check" name="theme-options" id="DarkTheme">
+          <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="DarkTheme">
+            <span class="material-icons-outlined">dark_mode</span>
+            <span>Dark</span>
+          </label>
+        </div>
+      </div><!--end row-->
+
+    </div>
+  </div>
+</div>
+<!--start switcher-->
+
+  <!--bootstrap js-->
+  <script src="assets/js/bootstrap.bundle.min.js"></script>
+
+  <!--jquery-->
+  <script src="assets/js/jquery.min.js"></script>
+ 
+  <!-- Swiper JS -->
+  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+  <!-- Initialize Swiper -->
+  <script>
+    var swiper = new Swiper(".Slider1", {
+      slidesPerView: 4,
+      spaceBetween: 20,
+      freeMode: true,
+    });
+  </script>
+  <script src="assets/js/main.js"></script>
+
+
+
+
+</body>
+
+</html>

@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/docker/">
+    <File Path="docker-compose.yml" />
+    <File Path="Dockerfile" />
+  </Folder>
+  <Project Path="WitcherHub.Application/WitcherHub.Application.csproj" />
+  <Project Path="WitcherHub.Domain/WitcherHub.Domain.csproj" />
+  <Project Path="WitcherHub.Infrastructure/WitcherHub.Infrastructure.csproj" />
+  <Project Path="WitcherHub/WitcherHub.csproj" />
+</Solution>

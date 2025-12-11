@@ -1,0 +1,37 @@
+﻿using Serilog;
+using WitcherHub.Configuration.Extensions;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog((context, services, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)  
+        .ReadFrom.Services(services)                    
+        .Enrich.FromLogContext();                       
+});
+builder.Services.AddPresentation(builder.Configuration);
+
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+    app.UseSwaggerDocumentation();
+}
+else
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
+app.UseSerilogRequestLogging();
+app.UseHttpsRedirection();
+app.UseRouting();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapStaticAssets();
+app.MapRazorPages().WithStaticAssets();
+app.MapControllers();
+
+app.Run();

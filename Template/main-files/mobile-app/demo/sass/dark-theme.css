@@ -1,0 +1,108 @@
+[data-bs-theme=dark] body {
+  --bs-light-bg-subtle: #343a40;
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg-2);
+  background-image: linear-gradient(310deg, #181c1f, #181c1f);
+  /* aligns */
+  /* utilities */
+  /* Mobile Top Header */
+  /* Bottom Menu */
+}
+[data-bs-theme=dark] body input::-moz-placeholder {
+  color: #fff !important;
+}
+[data-bs-theme=dark] body input::placeholder {
+  color: #fff !important;
+}
+[data-bs-theme=dark] body .bg-light {
+  background-color: #32363b !important;
+}
+[data-bs-theme=dark] body .card-title {
+  color: #dee2e6;
+}
+[data-bs-theme=dark] body .separator .line {
+  background-color: var(--bs-border-color);
+}
+[data-bs-theme=dark] body .searchbar .search-close {
+  color: var(--bs-emphasis-color);
+  background-color: var(--bs-light-bg-subtle);
+}
+[data-bs-theme=dark] body .primaery-menu-close {
+  color: #dee2e6;
+  color: var(--bs-body-color);
+  background-color: var(--bs-light-bg-subtle);
+}
+[data-bs-theme=dark] body .primaery-menu-close:hover, [data-bs-theme=dark] body .primaery-menu-close:focus {
+  color: #ffffff;
+  background-color: #383c40;
+}
+[data-bs-theme=dark] body .theme-icons {
+  background-color: var(--bs-body-bg);
+}
+[data-bs-theme=dark] body .mobile-top-header {
+  background-image: linear-gradient(127.09deg, #212529 19.41%, #212529 76.65%) !important;
+  background-color: #212529;
+  height: 70px;
+  z-index: 10;
+  box-shadow: none;
+}
+[data-bs-theme=dark] body .mobile-top-header .back-title {
+  color: #fff;
+}
+[data-bs-theme=dark] body .inner-link {
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg);
+}
+[data-bs-theme=dark] body .inner-link:hover, [data-bs-theme=dark] body .inner-link:focus {
+  background-color: var(--bs-light-bg-subtle);
+  color: var(--bs-emphasis-color);
+}
+[data-bs-theme=dark] body .iner-link-title {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=dark] body .section-title h5 {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=dark] body .options {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=dark] body .side-menu-icon {
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg);
+}
+[data-bs-theme=dark] body .amount-input {
+  color: var(--bs-emphasis-color);
+}
+[data-bs-theme=dark] body .amount-input:focus {
+  color: var(--bs-emphasis-color);
+}
+[data-bs-theme=dark] body .account-number {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=dark] body .bank-name {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=dark] body .menu-arrow {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=dark] body .qr-code-img {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+[data-bs-theme=dark] body .auth-bg {
+  background-image: none !important;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+[data-bs-theme=dark] body .btn-proceed {
+  color: #191c23;
+  background-image: linear-gradient(310deg, #ffffff, #ffffff);
+}
+[data-bs-theme=dark] body .bottom-menu {
+  background-color: var(--bs-body-bg);
+}
+[data-bs-theme=dark] body .bottom-menu .nav-link {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=dark] body .bottom-menu .nav-link .menu-icon {
+  background-color: var(--bs-body-bg-2);
+}/*# sourceMappingURL=dark-theme.css.map */

@@ -1,0 +1,1339 @@
+<!doctype html>
+<html lang="en" data-bs-theme="blue-theme">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maxton - Html5 eCommerce Template</title>
+  <!--favicon-->
+  <link rel="icon" href="assets/images/favicon-32x32.png" type="image/png">
+  <!-- loader-->
+  <link href="assets/css/pace.min.css" rel="stylesheet">
+
+  <!--plugins-->
+  <link rel="stylesheet" href="assets/plugins/swiper/css/swiper-bundle.min.css">
+  <!--bootstrap css-->
+  <link href="assets/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Material+Icons+Outlined" rel="stylesheet">
+  <!--main css-->
+  <link href="assets/css/bootstrap-extended.css" rel="stylesheet">
+  <link href="sass/main.css" rel="stylesheet">
+  <link href="assets/css/horizontal-menu.css" rel="stylesheet">
+  <link href="sass/dark-theme.css" rel="stylesheet">
+  <link href="sass/blue-theme.css" rel="stylesheet">
+  <link href="sass/semi-dark.css" rel="stylesheet">
+  <link href="sass/responsive.css" rel="stylesheet">
+
+</head>
+
+<body>
+
+  <!--start header-->
+  <header class="top-header">
+    <nav class="navbar navbar-expand align-items-center justify-content-between gap-4 container px-4">
+      <div class="logo-header d-none d-xl-flex align-items-center gap-2">
+        <div class="logo-icon">
+          <a href="index.html"><img src="assets/images/logo-icon.png" class="logo-img" width="45" alt=""></a>
+        </div>
+        <div class="logo-name">
+          <h5 class="mb-0">Maxton</h5>
+        </div>
+      </div>
+      <div class="btn-toggle d-xl-none" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar">
+        <a href="javascript:;"><i class="material-icons-outlined">menu</i></a>
+      </div>
+      <div class="search-bar d-lg-flex d-none">
+        <div class="position-relative w-100">
+          <input class="form-control form-control-lg rounded-5 px-5 search-control" type="text"
+            placeholder="Search">
+          <span class="material-icons-outlined position-absolute ms-3 translate-middle-y start-0 top-50">search</span>
+          <span class="material-icons-outlined position-absolute me-3 translate-middle-y end-0 top-50 mobile-search-close d-lg-none">close</span>
+        </div>
+      </div>
+      <ul class="navbar-nav gap-1 nav-right-links align-items-center">
+        <li class="nav-item d-lg-none mobile-search-btn">
+          <a class="nav-link" href="javascript:;"><i class="material-icons-outlined">search</i></a>
+        </li>
+        <li class="nav-item dropdown d-md-flex d-none">
+          <a class="nav-link dropdown-toggle dropdown-toggle-nocaret" href="avascript:;" data-bs-toggle="dropdown"><img
+              src="assets/images/county/02.png" width="22" alt="">
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/01.png" width="20" alt=""><span class="ms-2">English</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/02.png" width="20" alt=""><span class="ms-2">Catalan</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/03.png" width="20" alt=""><span class="ms-2">French</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/04.png" width="20" alt=""><span class="ms-2">Belize</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/05.png" width="20" alt=""><span class="ms-2">Colombia</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/06.png" width="20" alt=""><span class="ms-2">Spanish</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/07.png" width="20" alt=""><span class="ms-2">Georgian</span></a>
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img
+                  src="assets/images/county/08.png" width="20" alt=""><span class="ms-2">Hindi</span></a>
+            </li>
+          </ul>
+        </li>
+        <li class="nav-item dark-mode">
+          <a class="nav-link dark-mode-icon" href="javascript:;"><i class="material-icons-outlined">dark_mode</i></a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="account-my-profile.html"><i class="material-icons-outlined">account_circle</i></a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link position-relative" href="wishlist.html"><i
+              class="material-icons-outlined">favorite_border</i>
+            <span class="badge-notify">5</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link position-relative" data-bs-toggle="offcanvas" href="#offcanvasCart"><i
+              class="material-icons-outlined">shopping_cart</i>
+            <span class="badge-notify">8</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </header>
+  <!--end top header-->
+
+  <!--navigation-->
+  <div class="primary-menu">
+    <nav class="navbar navbar-expand-xl align-items-center container px-4 py-0 py-xl-2">
+      <div class="offcanvas offcanvas-start w-260" tabindex="-1" id="offcanvasNavbar"
+        >
+        <div class="offcanvas-header border-bottom h-70">
+          <div class="d-flex align-items-center gap-2">
+            <div class="">
+              <img src="assets/images/logo-icon.png" class="logo-icon" width="45" alt="logo icon">
+            </div>
+            <div class="">
+              <h4 class="logo-text">Maxton</h4>
+            </div>
+          </div>
+          <a href="javascript:;" class="primaery-menu-close" data-bs-dismiss="offcanvas">
+            <i class="material-icons-outlined">close</i>
+          </a>
+        </div>
+        <div class="offcanvas-body p-0">
+          <ul class="navbar-nav align-items-center flex-grow-1 gap-xl-2">
+            <li class="nav-item">
+              <a class="nav-link" href="index.html">
+                <div class="parent-icon"><i class="material-icons-outlined">home</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">Home</div>
+              </a>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle dropdown-toggle-nocaret" href="javascript:;" data-bs-toggle="dropdown">
+                <div class="parent-icon"><i class='material-icons-outlined'>local_mall</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">Shop</div>
+                <div class="ms-auto dropy-icon"><i class='material-icons-outlined'>expand_more</i></div>
+              </a>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="shop-grid-left-sidebar.html"><i
+                      class='material-icons-outlined'>circle</i>Shop Grid Leftside</a></li>
+                <li><a class="dropdown-item" href="shop-grid-right-sidebar.html"><i 
+                       class='material-icons-outlined'>circle</i>Shop Grid Rightside</a></li>
+                <li><a class="dropdown-item" href="shop-list-left-sidebar.html"><i
+                       class='material-icons-outlined'>circle</i>Shop List Leftside</a></li>
+                <li><a class="dropdown-item" href="shop-list-right-sidebar.html">
+                    <i class='material-icons-outlined'>circle</i>Shop List Rightside</a>
+                </li>
+                <li>
+                  <hr class="dropdown-divider">
+                </li>
+                <li><a class="dropdown-item" href="shop-grid-offcanvas-filter.html">
+                  <i class='material-icons-outlined'>circle</i>Shop Grid Offcanvas</a>
+                </li>
+                <li><a class="dropdown-item" href="shop-list-offcanvas-filter.html">
+                  <i class='material-icons-outlined'>circle</i>Shop List Offcanvas</a>
+                </li>
+                <li>
+                  <hr class="dropdown-divider">
+                </li>
+                <li class="nav-item dropend">
+                  <a class="dropdown-item dropdown-toggle dropdown-toggle-nocaret" href="javascript:;"><i
+                      class='material-icons-outlined'>circle</i>Shop Categories</a>
+                  <ul class="dropdown-menu submenu">
+                    <li><a class="dropdown-item" href="shop-circular-catgories.html"><i
+                          class='material-icons-outlined'>circle</i>Circular View</a></li>
+                    <li><a class="dropdown-item" href="shop-grid-catgories.html"><i
+                          class='material-icons-outlined'>circle</i>Grid View</a></li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle dropdown-toggle-nocaret" href="javascript:;" data-bs-toggle="dropdown">
+                <div class="parent-icon"><i class='material-icons-outlined'>storefront</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">Product</div>
+                <div class="ms-auto dropy-icon"><i class='material-icons-outlined'>expand_more</i></div>
+              </a>
+              <ul class="dropdown-menu">
+               <li><a class="dropdown-item" href="product-detail.html"><i
+                      class='material-icons-outlined'>circle</i>Product Details</a></li>
+                <li><a class="dropdown-item" href="product-detail-grid.html"><i
+                       class='material-icons-outlined'>circle</i>Product Details Grid</a></li>
+                <li><a class="dropdown-item" href="shopping-cart.html"><i
+                       class='material-icons-outlined'>circle</i>Shopping Cart</a></li>
+                <li><a class="dropdown-item" href="checkout.html"><i
+                      class='material-icons-outlined'>circle</i>Checkout</a></li>
+                <li><a class="dropdown-item" href="wishlist.html"><i
+                       class='material-icons-outlined'>circle</i>Wishlist</a></li>
+                <li><a class="dropdown-item" href="wishlist-2.html"><i
+                     class='material-icons-outlined'>circle</i>Wishlist 2</a></li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle dropdown-toggle-nocaret" href="javascript:;" data-bs-toggle="dropdown">
+                <div class="parent-icon"><i class='material-icons-outlined'>note_alt</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">Blog</div>
+                <div class="ms-auto dropy-icon"><i class='material-icons-outlined'>expand_more</i></div>
+              </a>
+              <ul class="dropdown-menu">
+                <li> <a class="dropdown-item" href="blog.html"><i
+                      class='material-icons-outlined'>circle</i>Blog Post</a>
+                </li>
+                <li> <a class="dropdown-item" href="blog-grid.html"><i
+                      class='material-icons-outlined'>circle</i>Blog Grid</a>
+                </li>
+                <li> <a class="dropdown-item" href="blog-details.html"><i
+                      class='material-icons-outlined'>circle</i>Blog Details</a>
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle dropdown-toggle-nocaret" href="javascript:;" data-bs-toggle="dropdown">
+                <div class="parent-icon"><i class='material-icons-outlined'>account_circle</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">Account</div>
+                <div class="ms-auto dropy-icon"><i class='material-icons-outlined'>expand_more</i></div>
+              </a>
+              <ul class="dropdown-menu">
+                <li> <a class="dropdown-item" href="account-orders.html"><i
+                      class='material-icons-outlined'>circle</i>Orders</a>
+                </li>
+                <li> <a class="dropdown-item" href="account-my-profile.html"><i
+                      class='material-icons-outlined'>circle</i>Profile</a>
+                </li>
+                <li> <a class="dropdown-item" href="account-addresses.html"><i
+                      class='material-icons-outlined'>circle</i>Addresses</a>
+                </li>
+                <li> <a class="dropdown-item" href="account-payment-methods.html"><i
+                      class='material-icons-outlined'>circle</i>Payment Methods</a>
+                </li>
+                <li> <a class="dropdown-item" href="wishlist.html"><i
+                      class='material-icons-outlined'>circle</i>Wishlist</a>
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="about-us.html">
+                <div class="parent-icon"><i class="material-icons-outlined">info</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">About</div>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="contact-us.html">
+                <div class="parent-icon"><i class="material-icons-outlined">phone</i>
+                </div>
+                <div class="menu-title d-flex align-items-center">Contact</div>
+              </a>
+            </li>
+
+          </ul>
+        </div>
+      </div>
+    </nav>
+  </div>
+  <!--end navigation-->
+
+
+  <!--start main wrapper-->
+  <main class="main-wrapper">
+    <div class="main-content">
+        
+        <!--start breadcrumb-->
+        <section class="py-4 section-breadcrumb">
+          <div class="container px-4">
+            <h2 class="d-none">Product Details</h2>
+            <nav>
+              <ol class="breadcrumb mb-0 gap-2">
+                <li class="breadcrumb-item"><a href="javascript:;" class="breadcrumb-link">Home</a></li>
+                <li><i class="bi bi-chevron-right"></i></li>
+                <li class="breadcrumb-item"><a href="javascript:;" class="breadcrumb-link">Women</a></li>
+                <li><i class="bi bi-chevron-right"></i></li>
+                <li class="breadcrumb-item breadcrumb-active">Dark grey shirt</li>
+              </ol>
+            </nav>
+          </div>
+        </section>
+        <!--end breadcrumb-->
+
+        <!--start product details-->
+    <section class="py-5 product-details">
+      <div class="container px-4">
+        <div class="row g-4 g-lg-5">
+           <div class="col-12 col-lg-6">
+              <div class="product-images">
+                <div class="swiper product-images-swiper">
+                  <div class="swiper-wrapper">
+                    <div class="swiper-slide">
+                      <img src="assets/images/product-images/01.png" class="rounded-3" alt="">
+                    </div>
+                    <div class="swiper-slide">
+                      <img src="assets/images/product-images/02.png" class="rounded-3" alt="">
+                    </div>
+                    <div class="swiper-slide">
+                      <img src="assets/images/product-images/03.png" class="rounded-3" alt="">
+                    </div>
+                    <div class="swiper-slide">
+                      <img src="assets/images/product-images/04.png" class="rounded-3" alt="">
+                    </div>
+                    <div class="swiper-slide">
+                      <img src="assets/images/product-images/05.png" class="rounded-3" alt="">
+                    </div>
+                    <div class="swiper-slide">
+                      <img src="assets/images/product-images/02.png" class="rounded-3" alt="">
+                    </div>
+                  </div>
+                </div>
+                <div class="swiper product-images-swiper-thumbnail mt-3">
+                  <div class="swiper-wrapper">
+                    <div class="swiper-slide">
+                      <img src="assets/images/product-images/01.png" class="rounded-3" alt="">
+                    </div>
+                    <div class="swiper-slide">
+                      <img src="assets/images/product-images/02.png" class="rounded-3" alt="">
+                    </div>
+                    <div class="swiper-slide">
+                      <img src="assets/images/product-images/03.png" class="rounded-3" alt="">
+                    </div>
+                    <div class="swiper-slide">
+                      <img src="assets/images/product-images/04.png" class="rounded-3" alt="">
+                    </div>
+                    <div class="swiper-slide">
+                      <img src="assets/images/product-images/05.png" class="rounded-3" alt="">
+                    </div>
+                    <div class="swiper-slide">
+                      <img src="assets/images/product-images/02.png" class="rounded-3" alt="">
+                    </div>
+                  </div>
+                </div>
+              </div>
+           </div>
+           <div class="col-12 col-lg-6">
+              <div class="product-details">
+                <p class="mb-1">Women Topwar</p>
+                <h2 class="mb-0">Solid Round Neck T-shirt</h2>
+                <div class="d-flex align-items-center gap-2 my-3">  
+                  <span class="ratings text-warning">
+                    <i class="bi bi-star-fill"></i>
+                    <i class="bi bi-star-fill"></i>
+                    <i class="bi bi-star-fill"></i>
+                    <i class="bi bi-star-fill"></i>
+                    <i class="bi bi-star-fill"></i>
+                  </span>      
+                  <span class="font-14">(568 reviews)</span>                            
+                </div>
+                 <div class="product-price d-flex align-items-center gap-2">
+                    <span class="fs-3 fw-semibold">$357.89</span>
+                    <span class="fs-6 text-decoration-line-through text-body-tertiary text-opacity-50">$864.99</span>
+                    <span class="badge badge-pill bg-danger rounded-5">-25%</span>
+                 </div>
+                 <p class="product-short-desc mt-3 mb-0">A solid round neck T-shirt offers a timeless, versatile style perfect for casual or layered looks.
+                   Made from soft, breathable fabric, it provides all-day comfort and effortless fashion.</p>
+
+                  <div class="product-colors mt-4">
+                    <p class="mb-2">Select Color</p>
+                    <div class="product-color-list d-flex align-items-center gap-3">
+                       <div class="product-color-list-item">
+                         <input type="radio" class="btn-check" name="options-color" id="color-option1">
+                         <label class="btn btn-product-color bg-grd-info" for="color-option1"></label>
+                       </div>
+                       <div class="product-color-list-item">
+                        <input type="radio" class="btn-check" name="options-color" id="color-option2" checked>
+                        <label class="btn btn-product-color bg-grd-danger" for="color-option2"></label>
+                      </div>
+                      <div class="product-color-list-item">
+                        <input type="radio" class="btn-check" name="options-color" id="color-option3">
+                        <label class="btn btn-product-color bg-grd-voilet" for="color-option3"></label>
+                      </div>
+                      <div class="product-color-list-item">
+                        <input type="radio" class="btn-check" name="options-color" id="color-option4">
+                        <label class="btn btn-product-color bg-grd-warning" for="color-option4"></label>
+                      </div>
+                      <div class="product-color-list-item">
+                        <input type="radio" class="btn-check" name="options-color" id="color-option5">
+                        <label class="btn btn-product-color bg-grd-success" for="color-option5"></label>
+                      </div>
+                    </div>
+                  </div> 
+
+                  <div class="product-size mt-4">
+                    <p class="mb-2 d-flex align-items-center justify-content-between">Select Size <a href="javascript:;" class="btn btn-sm text-decoration-underline" data-bs-toggle="modal" data-bs-target="#sizeGuidehModal">Size Guide</a></p>
+                    <div class="product-size-list d-flex align-items-center gap-3">
+                       <div class="product-size-list-item">
+                         <input type="radio" class="btn-check" name="options-size" id="size-option1">
+                         <label class="btn btn-product-size" for="size-option1">S</label>
+                       </div>
+                       <div class="product-size-list-item">
+                        <input type="radio" class="btn-check" name="options-size" id="size-option2" checked>
+                        <label class="btn btn-product-size" for="size-option2">M</label>
+                      </div>
+                      <div class="product-size-list-item">
+                        <input type="radio" class="btn-check" name="options-size" id="size-option3">
+                        <label class="btn btn-product-size" for="size-option3">L</label>
+                      </div>
+                      <div class="product-size-list-item">
+                        <input type="radio" class="btn-check" name="options-size" id="size-option4">
+                        <label class="btn btn-product-size" for="size-option4">XL</label>
+                      </div>
+                      <div class="product-size-list-item">
+                        <input type="radio" class="btn-check" name="options-size" id="size-option5">
+                        <label class="btn btn-product-size" for="size-option5">XXL</label>
+                      </div>
+                    </div>
+                  </div> 
+
+                  <div class="product-quantity mt-4">
+                    <p class="mb-2">Quantity</p>
+                    <div class="input-group input-group-lg">
+                      <button class="btn border border-2 border-end-0" data-decrement type="button"><span class="material-icons-outlined fs-5">remove</span></button>
+                      <input type="number" class="form-control border-2 text-center" min="0" value="1" readonly>
+                      <button class="btn border border-2 border-start-0" data-increment type="button"><i class="bi bi-plus"></i></button>
+                    </div>
+                  </div>
+
+                  <div class="product-cart-buttons d-grid d-md-flex align-items-center gap-3 mt-4">
+                     <button type="button" class="btn btn-grd btn-grd-primary rounded-5 py-2 px-5 d-flex align-items-center justify-content-center gap-2 w-100"><span class="material-icons-outlined">shopping_cart</span>Add to cart</button>
+                     <button type="button" class="btn border border-2 py-2 px-5 rounded-5 d-flex align-items-center justify-content-center gap-2"><span class="material-icons-outlined">favorite_border</span>wishlist</button>    
+                  </div>
+
+                  <div class="mt-4">
+                    <p class="mb-2 d-flex align-items-center gap-2 font-14"><span class="material-icons-outlined fs-5">local_shipping</span>
+                      <span><span class="fw-semibold">Free shipping & returns:</span> Enjoy free shipping and returns on all orders over $200!</span></p>
+                    <p class="mb-2 d-flex align-items-center gap-2 font-14"><span class="material-icons-outlined fs-5">alarm</span><span><span class="fw-semibold">Estimated Delivery:</span> International: 10-15 days | United States: 8-10 days</span></p>
+                    <p class="mb-0 mt-3 d-flex align-items-center gap-2 font-14"><span class="material-icons-outlined fs-5">share</span><span>Share this product</span></p>
+                    <div class="mt-2 d-flex align-items-center gap-2 product-share-link">
+                       <a href="javascript:;" class="btn btn-sm btn-grd btn-grd-info"><i class="bi bi-facebook"></i></a>
+                       <a href="javascript:;" class="btn btn-sm btn-dark"><i class="bi bi-twitter-x"></i></a>
+                       <a href="javascript:;" class="btn btn-sm btn-grd btn-grd-deep-blue"><i class="bi bi-linkedin"></i></a>
+                       <a href="javascript:;" class="btn btn-sm btn-grd btn-grd-danger"><i class="bi bi-instagram"></i></a>
+                       <a href="javascript:;" class="btn btn-sm btn-grd btn-grd-warning"><i class="bi bi-snapchat"></i></a>
+                    </div>
+                  </div>
+                  <hr class="my-4 border-dark border-opacity-50">
+                  <div class="">
+                    <p class="mb-2 font-14"><span class="fw-semibold">SKU:</span> BA584726</p>
+                    <p class="mb-2 font-14"><span class="fw-semibold">Vendor:</span> Michle Deo</p>
+                    <p class="mb-2 font-14"><span class="fw-semibold">Available:</span> Instock</p>
+                    <p class="mb-2 font-14"><span class="fw-semibold">Categories:</span>
+                       <a href="javascript:;" class="link-secondary">Fashion</a>,
+                       <a href="javascript:;" class="link-secondary">Jeans</a>,
+                       <a href="javascript:;" class="link-secondary">Clothes</a>
+                      </p>
+                  </div>
+              </div>
+           </div>
+        </div><!--end row-->
+ 
+        <div class="tabular-product-details mt-5">
+          <div class="table-responsive">
+            <ul class="nav nav-pills mb-4 overflow-x-auto justify-content-center gap-3">
+              <li class="nav-item">
+                <button class="nav-link rounded-5 px-5 fw-semibold" data-bs-toggle="pill" data-bs-target="#description"
+                  type="button">Description</button>
+              </li>
+              <li class="nav-item">
+                <button class="nav-link active rounded-5 px-5 fw-semibold" data-bs-toggle="pill" data-bs-target="#customer-reviews"
+                  type="button">Customer Reviews</button>
+              </li>
+              <li class="nav-item">
+                <button class="nav-link rounded-5 px-5 fw-semibold" data-bs-toggle="pill" data-bs-target="#shipping-returns"
+                  type="button">Shipping Returns</button>
+              </li>
+              <li class="nav-item">
+                <button class="nav-link rounded-5 px-5 fw-semibold" data-bs-toggle="pill" data-bs-target="#return-policy"
+                  type="button">Return Policy</button>
+              </li>
+            </ul>
+          </div>
+          <div class="tab-content border p-4 rounded-3">
+            <div class="tab-pane fade show" id="description">
+              <h5>Solid Round Neck T-shirt – Classic Comfort & Style</h5>
+              <p class="text-para">Upgrade your wardrobe with our Solid Round Neck T-shirt, a must-have staple for everyday wear.
+                 Designed for both comfort and versatility, this t-shirt is crafted from premium-quality fabric, ensuring a soft and breathable feel against your skin. Whether you're dressing up for a casual outing or layering
+                 it under a jacket for a stylish look, this t-shirt is the perfect choice.</p>
+               <p class="text-para">With its minimalist design and classic round neckline, this t-shirt offers a timeless appeal that suits all occasions.
+                 The high-quality stitching provides durability, making it ideal for daily use. It pairs effortlessly with jeans, joggers, or shorts, giving you a relaxed yet trendy look.
+                 The fabric is moisture-wicking, keeping you cool and comfortable throughout the day.</p>  
+                <p class="text-para">Available in multiple colors and sizes, the Solid Round Neck T-shirt is a wardrobe essential
+                   for men and women alike. Whether you're hitting the gym, going for a casual hangout, or just lounging at home,
+                   this t-shirt delivers both style and functionality.</p> 
+                   <h6>Features:</h6>
+                   <ul>
+                    <li class="text-para">Premium cotton/polyester blend for comfort</li>
+                    <li class="text-para">Breathable and lightweight fabric</li>
+                    <li class="text-para">Classic round neck design for a timeless look</li>
+                    <li class="text-para">Durable stitching for long-lasting wear</li>
+                    <li class="text-para">Available in multiple colors and sizes</li>
+                    <li class="text-para">Easy to wash and maintain</li>
+                   </ul>
+               </div>
+               <div class="tab-pane fade show active" id="customer-reviews">
+                <div>
+                  <h5 class="mb-4">Customer Reviews</h5>
+                  <div class="hstack gap-md-5 gap-4 flex-column flex-lg-row">
+                    <div class="text-center flex-shrink-0">
+                      <div id="rating-number">
+                          <h2 class="mb-2">4.8</h2>
+                          <div class="rating-star">
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                          </div>
+                          <p class="mb-0">(759 Ratings)</p>
+                      </div>
+                    </div>
+                    <div class="vr d-none d-lg-flex"></div>
+                    <div class="w-100">
+                        <div class="d-flex align-items-center gap-2">
+                          <i class="bi bi-star-fill text-warning"></i>
+                          <span>5</span>
+                          <div class="progress w-100" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" style="height: 7px;">
+                            <div class="progress-bar bg-grd-primary" style="width: 75%;"></div>
+                          </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                          <i class="bi bi-star-fill text-warning"></i>
+                          <span>4</span>
+                          <div class="progress w-100" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" style="height: 7px;">
+                            <div class="progress-bar bg-grd-primary" style="width: 55%;"></div>
+                          </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                          <i class="bi bi-star-fill text-warning"></i>
+                          <span>3</span>
+                          <div class="progress w-100" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" style="height: 7px;">
+                            <div class="progress-bar bg-grd-primary" style="width: 35%;"></div>
+                          </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                          <i class="bi bi-star-fill text-warning"></i>
+                          <span>2</span>
+                          <div class="progress w-100" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" style="height: 7px;">
+                            <div class="progress-bar bg-grd-primary" style="width: 15%;"></div>
+                          </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                          <i class="bi bi-star-fill text-warning"></i>
+                          <span>1</span>
+                          <div class="progress w-100" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" style="height: 7px;">
+                            <div class="progress-bar bg-grd-primary" style="width: 10%;"></div>
+                          </div>
+                        </div> 
+                    </div>
+                    <div class="vr d-none d-lg-flex"></div>
+                    <div class="leave-a-rating flex-shrink-0">
+                      <a href="javascript:;" data-bs-toggle="modal" data-bs-target="#reviewModal" class="btn btn-grd btn-grd-primary px-4 py-2">Write a Review</a>
+                    </div>
+                  </div>
+                  
+                  <div class="customer-reviews-list mt-5">
+                    <div class="customer-reviews-list-item border-top py-4">
+                       <div class="d-flex align-items-start gap-3">
+                        <div class="customer-pic">
+                          <span>M</span>
+                        </div>
+                        <div class="flex-grow-1">
+                          <div class="rating-star font-14 mb-1">
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                            <i class="bi bi-star-fill text-warning"></i>
+                          </div>
+                          <h6 class="mb-0 customer-name">Michle Jhon</h6>
+                        </div>
+                        <div class="review-date">
+                          <span>15 january 2025</span>
+                        </div>
+                      </div>
+                      <div class="review-description mt-2">
+                         <p class="mb-0">I recently purchased the Solid Round Neck T-shirt, and I must say, I’m absolutely impressed!
+                           The fabric is incredibly soft, breathable, and feels amazing on the skin. It’s lightweight yet durable,
+                            making it perfect for everyday wear. The stitching is top-notch, and even after multiple washes, the t-shirt retains
+                           its shape and color without any fading or shrinking.</p>
+                           <div class="d-flex align-items-center justify-content-end gap-3">
+                             <span>Helpful?</span>
+                             <button type="button" class="btn btn-sm btn-light rounded-3 border d-flex align-items-center gap-1"><i class="bi bi-hand-thumbs-up"></i><span>6</span></button>
+                           </div>
+                      </div>
+                    </div>
+                    <div class="customer-reviews-list-item border-top py-4">
+                      <div class="d-flex align-items-start gap-3">
+                       <div class="customer-pic">
+                         <span>J</span>
+                       </div>
+                       <div class="flex-grow-1">
+                         <div class="rating-star font-14 mb-1">
+                           <i class="bi bi-star-fill text-warning"></i>
+                           <i class="bi bi-star-fill text-warning"></i>
+                           <i class="bi bi-star-fill text-warning"></i>
+                           <i class="bi bi-star-fill text-warning"></i>
+                           <i class="bi bi-star-fill text-warning"></i>
+                         </div>
+                         <h6 class="mb-0 customer-name">James</h6>
+                       </div>
+                       <div class="review-date">
+                         <span>18 january 2025</span>
+                       </div>
+                     </div>
+                     <div class="review-description mt-2">
+                        <p class="mb-0">The fit is just right—not too tight, not too loose—giving a comfortable and stylish look.
+                           The classic round neck design makes it easy to pair with jeans, joggers, or even layer under a jacket.
+                           Whether for casual outings, gym sessions, or lounging at home, this t-shirt never disappoints.</p>
+                           <div class="d-flex align-items-center justify-content-end gap-3">
+                            <span>Helpful?</span>
+                            <button type="button" class="btn btn-sm btn-light rounded-3 border d-flex align-items-center gap-1"><i class="bi bi-hand-thumbs-up"></i><span>8</span></button>
+                          </div>
+                     </div>
+                   </div>
+                   <div class="customer-reviews-list-item border-top py-4 border-bottom">
+                    <div class="d-flex align-items-start gap-3">
+                     <div class="customer-pic">
+                       <span>T</span>
+                     </div>
+                     <div class="flex-grow-1">
+                       <div class="rating-star font-14 mb-1">
+                         <i class="bi bi-star-fill text-warning"></i>
+                         <i class="bi bi-star-fill text-warning"></i>
+                         <i class="bi bi-star-fill text-warning"></i>
+                         <i class="bi bi-star-fill text-warning"></i>
+                         <i class="bi bi-star-fill text-warning"></i>
+                       </div>
+                       <h6 class="mb-0 customer-name">Thomas</h6>
+                     </div>
+                     <div class="review-date">
+                       <span>20 january 2025</span>
+                     </div>
+                   </div>
+                   <div class="review-description mt-2">
+                      <p class="mb-0">Overall, this is a high-quality, stylish, and versatile t-shirt that
+                         I’d highly recommend to anyone looking for a perfect blend of comfort and durability.
+                         Definitely a must-have in every wardrobe! Will be buying more colors soon! 🎉🔥</p>
+                         <div class="d-flex align-items-center justify-content-end gap-3">
+                          <span>Helpful?</span>
+                          <button type="button" class="btn btn-sm btn-light rounded-3 border d-flex align-items-center gap-1"><i class="bi bi-hand-thumbs-up"></i><span>9</span></button>
+                        </div>
+                   </div>
+                 </div>
+                  <div class="text-center mt-4">
+                    <a href="javascript:;" class="btn btn-grd btn-grd-primary px-4 py-2">See All Reviews</a>
+                   </div>
+                  </div>
+                </div>
+            </div>
+            <div class="tab-pane fade show" id="shipping-returns">
+                <h5 class="mb-3">Shipping Information:</h5>
+                <ul>
+                  <li><b>Processing Time:</b>Orders are processed within 1-2 business days.</li>
+                  <li><b>Delivery Time:</b>Standard shipping takes 5-7 business days, while express shipping takes 2-3 business days.</li>
+                  <li><b>Shipping Charges:</b>Shipping costs are calculated at checkout based on your location and selected shipping method.</li>
+                  <li><b>Tracking:</b>Once your order is shipped, you will receive a tracking number via email.</li>
+                </ul>
+                <h5 class="mb-3">Return & Exchange Policy:</h5>
+                <ul class="mb-0">
+                  <li><b>Eligibility:</b>Returns and exchanges are accepted within 7 days of delivery. The item must be unworn, unwashed, and in its original packaging with tags intact..</li>
+                  <li><b>Refund Process:</b>Once we receive and inspect the returned item, refunds will be processed within 5-7 business days. Refunds will be issued to the original payment method.</li>
+                  <li><b>Exchange:</b>If you received a defective or incorrect product, we will replace it at no extra cost.</li>
+                  <li><b>Return Shipping:</b>Customers are responsible for return shipping costs unless the item is defective or incorrect.</li>
+                </ul>
+            </div>
+            <div class="tab-pane fade show" id="return-policy">
+              <h5>Return Policy</h5>
+              <p>We want you to be completely satisfied with your purchase! If you're not happy with your order, we offer 
+                a hassle-free return policy.</p>
+
+              <h5 class="mb-3">Eligibility for Returns:</h5>
+              <ul>
+                <li>Returns are accepted within 7 days of delivery.</li>
+                <li>Items must be unused, unwashed, and in their original packaging with all tags intact.</li>
+                <li>Returns are not accepted for final sale or clearance items unless they arrive damaged or defective.</li>
+              </ul>
+
+              <h5 class="mb-3">How to Initiate a Return:</h5>
+              <ol>
+                <li>Contact our support team at [Your Email/Support Page].</li>
+                <li>Provide your order number and reason for the return.</li>
+                <li>We will guide you through the return shipping process.</li>
+              </ol>
+
+              <h5 class="mb-3">Refund & Exchange Process:</h5>
+              <ul>
+                <li>Once we receive and inspect the item, we will process your refund within 5-7 business days.</li>
+                <li>Refunds will be issued to the original payment method.</li>
+                <li>If you prefer an exchange, we will ship the replacement item once the return is approved.</li>
+              </ul>
+
+              <h5 class="mb-3">Return Shipping:</h5>
+              <ul>
+                <li>Customers are responsible for return shipping costs unless the item is defective or incorrect.</li>
+                <li>We recommend using a trackable shipping method to ensure safe delivery.</li>
+                <li>For any assistance, feel free to reach out to our customer support team.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!--end product details-->
+
+    <!--start Recommended product-->
+    <section class="py-5">
+      <div class="container px-4">
+        <div class="d-flex align-items-center justify-content-between mb-5">
+          <h2 class="section-title">Recommended Products</h2>
+          <div class="recommended-products-swiper-nav d-flex align-items-center gap-3">
+            <div class="slide-icon recommended-products-slider-icon-left"><i class="bi bi-arrow-left"></i></div>
+            <div class="slide-icon recommended-products-slider-icon-right"><i class="bi bi-arrow-right"></i></div>
+          </div>
+        </div>
+        <div class="recommended-products">
+          <div class="swiper recommended-products-slider">
+            <div class="swiper-wrapper">
+              <div class="swiper-slide">
+                <div class="product-card position-relative">
+                  <div class="product-img p-4 rounded-4 position-relative text-center overflow-hidden">
+                    <div class="product-wishlist position-absolute top-0 end-0 m-3 border alignContent">
+                      <i class="material-icons-outlined fs-5">favorite_border</i>
+                    </div>
+                    <a href="javascript:;">
+                      <img src="assets/images/products/01.png" class="img-fluid mt-4" alt="">
+                    </a>
+                    <div class="btn-add-to-cart position-absolute bottom-0 start-0 end-0 p-3">
+                      <button type="button" class="btn btn-grd btn-grd-primary rounded-5 w-100">Add to Cart</button>
+                    </div>
+                  </div>
+                  <div class="product-info mt-3">
+                    <a href="javascript:;">
+                      <h5 class="product-name">Neck Cotton Oversized T-shirt</h5>
+                    </a>
+                    <div class="d-flex align-items-center gap-2">
+                      <h5 class="mb-0 product-price">$248.50</h5>
+                      <h6 class="mb-0 product-old-price">$426.96</h6>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="swiper-slide">
+                <div class="product-card position-relative">
+                  <div class="product-img p-4 rounded-4 position-relative text-center overflow-hidden">
+                    <div class="product-wishlist position-absolute top-0 end-0 m-3 border alignContent">
+                      <i class="material-icons-outlined fs-5">favorite_border</i>
+                    </div>
+                    <a href="javascript:;">
+                      <img src="assets/images/products/03.png" class="img-fluid mt-4" alt="">
+                    </a>
+                    <div class="btn-add-to-cart position-absolute bottom-0 start-0 end-0 p-3">
+                      <button type="button" class="btn btn-grd btn-grd-primary rounded-5 w-100">Add to Cart</button>
+                    </div>
+                  </div>
+                  <div class="product-info mt-3">
+                    <a href="javascript:;">
+                      <h5 class="product-name">Neck Cotton Oversized T-shirt</h5>
+                    </a>
+                    <div class="d-flex align-items-center gap-2">
+                      <h5 class="mb-0 product-price">$248.50</h5>
+                      <h6 class="mb-0 product-old-price">$426.96</h6>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="swiper-slide">
+                <div class="product-card position-relative">
+                  <div class="product-img p-4 rounded-4 position-relative text-center overflow-hidden">
+                    <div class="product-wishlist position-absolute top-0 end-0 m-3 border alignContent">
+                      <i class="material-icons-outlined fs-5">favorite_border</i>
+                    </div>
+                    <a href="javascript:;">
+                      <img src="assets/images/products/08.png" class="img-fluid mt-4" alt="">
+                    </a>
+                    <div class="btn-add-to-cart position-absolute bottom-0 start-0 end-0 p-3">
+                      <button type="button" class="btn btn-grd btn-grd-primary rounded-5 w-100">Add to Cart</button>
+                    </div>
+                  </div>
+                  <div class="product-info mt-3">
+                    <a href="javascript:;">
+                      <h5 class="product-name">Neck Cotton Oversized T-shirt</h5>
+                    </a>
+                    <div class="d-flex align-items-center gap-2">
+                      <h5 class="mb-0 product-price">$248.50</h5>
+                      <h6 class="mb-0 product-old-price">$426.96</h6>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="swiper-slide">
+                <div class="product-card position-relative">
+                  <div class="product-img p-4 rounded-4 position-relative text-center overflow-hidden">
+                    <div class="product-wishlist position-absolute top-0 end-0 m-3 border alignContent">
+                      <i class="material-icons-outlined fs-5">favorite_border</i>
+                    </div>
+                    <a href="javascript:;">
+                      <img src="assets/images/products/02.png" class="img-fluid mt-4" alt="">
+                    </a>
+                    <div class="btn-add-to-cart position-absolute bottom-0 start-0 end-0 p-3">
+                      <button type="button" class="btn btn-grd btn-grd-primary rounded-5 w-100">Add to Cart</button>
+                    </div>
+                  </div>
+                  <div class="product-info mt-3">
+                    <a href="javascript:;">
+                      <h5 class="product-name">Neck Cotton Oversized T-shirt</h5>
+                    </a>
+                    <div class="d-flex align-items-center gap-2">
+                      <h5 class="mb-0 product-price">$248.50</h5>
+                      <h6 class="mb-0 product-old-price">$426.96</h6>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="swiper-slide">
+                <div class="product-card position-relative">
+                  <div class="product-img p-4 rounded-4 position-relative text-center overflow-hidden">
+                    <div class="product-wishlist position-absolute top-0 end-0 m-3 border alignContent">
+                      <i class="material-icons-outlined fs-5">favorite_border</i>
+                    </div>
+                    <a href="javascript:;">
+                      <img src="assets/images/products/05.png" class="img-fluid mt-4" alt="">
+                    </a>
+                    <div class="btn-add-to-cart position-absolute bottom-0 start-0 end-0 p-3">
+                      <button type="button" class="btn btn-grd btn-grd-primary rounded-5 w-100">Add to Cart</button>
+                    </div>
+                  </div>
+                  <div class="product-info mt-3">
+                    <a href="javascript:;">
+                      <h5 class="product-name">Neck Cotton Oversized T-shirt</h5>
+                    </a>
+                    <div class="d-flex align-items-center gap-2">
+                      <h5 class="mb-0 product-price">$248.50</h5>
+                      <h6 class="mb-0 product-old-price">$426.96</h6>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="swiper-slide">
+                <div class="product-card position-relative">
+                  <div class="product-img p-4 rounded-4 position-relative text-center overflow-hidden">
+                    <div class="product-wishlist position-absolute top-0 end-0 m-3 border alignContent">
+                      <i class="material-icons-outlined fs-5">favorite_border</i>
+                    </div>
+                    <a href="javascript:;">
+                      <img src="assets/images/products/07.png" class="img-fluid mt-4" alt="">
+                    </a>
+                    <div class="btn-add-to-cart position-absolute bottom-0 start-0 end-0 p-3">
+                      <button type="button" class="btn btn-grd btn-grd-primary rounded-5 w-100">Add to Cart</button>
+                    </div>
+                  </div>
+                  <div class="product-info mt-3">
+                    <a href="javascript:;">
+                      <h5 class="product-name">Neck Cotton Oversized T-shirt</h5>
+                    </a>
+                    <div class="d-flex align-items-center gap-2">
+                      <h5 class="mb-0 product-price">$248.50</h5>
+                      <h6 class="mb-0 product-old-price">$426.96</h6>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!--end Recommended product-->
+
+    <!-- start size guide modal -->
+  <div class="modal fade search-modal" id="sizeGuidehModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+      <div class="modal-content p-lg-2 p-0">
+        <div class="modal-body p-4">
+          <div class="d-flex align-items-center justify-content-between">
+            <h1 class="modal-title fs-5 mb-0">Size Guide</h1>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="table-responsive mt-3">
+            <table class="table table-striped mb-0">
+              <thead>
+                <tr>
+                  <th>Size</th>
+                  <th>US</th>
+                  <th>Bust</th>
+                  <th>Waist</th>
+                  <th>Low hip</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>XS</td>
+                  <td>4</td>
+                  <td>28</td>
+                  <td>26-27</td>
+                  <td>31-32</td>
+                </tr>
+                <tr>
+                  <td>S</td>
+                  <td>8</td>
+                  <td>32</td>
+                  <td>26-27</td>
+                  <td>31-32</td>
+                </tr>
+                <tr>
+                  <td>M</td>
+                  <td>7</td>
+                  <td>30</td>
+                  <td>26-27</td>
+                  <td>31-32</td>
+                </tr>
+                <tr>
+                  <td>L</td>
+                  <td>6</td>
+                  <td>32</td>
+                  <td>26-27</td>
+                  <td>31-32</td>
+                </tr>
+                <tr>
+                  <td>XL</td>
+                  <td>5</td>
+                  <td>34</td>
+                  <td>26-27</td>
+                  <td>31-32</td>
+                </tr>
+                <tr>
+                  <td>XXL</td>
+                  <td>9</td>
+                  <td>36</td>
+                  <td>26-27</td>
+                  <td>31-32</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- end size guide modal -->
+
+
+  <!-- start reviw modal -->
+  <div class="modal" id="reviewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+      <div class="modal-content p-lg-2 p-0">
+        <div class="modal-body p-4">
+          <div class="d-flex align-items-center justify-content-between">
+            <h1 class="modal-title fs-5 mb-0">Write a review</h1>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form class="write-review mt-4">
+             <div class="row g-4">
+                <div class="col-12">
+                  <label for="yourname" class="form-label">Name</label>
+                  <input type="text" class="form-control py-2 border-2" id="yourname" placeholder="Enter Your Name">
+                </div>
+                <div class="col-12">
+                  <label for="youremail" class="form-label">Email</label>
+                  <input type="text" class="form-control py-2 border-2" id="youremail" placeholder="Enter Your Email">
+                </div>
+                <div class="col-12">
+                  <label for="chooserating" class="form-label">Choose Rating</label>
+                  <select class="form-select py-2 border-2" id="chooserating">
+                    <option>1</option>
+                    <option>2</option>
+                    <option>3</option>
+                    <option>4</option>
+                    <option>5</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label for="Review" class="form-label">Review</label>
+                  <textarea class="form-control py-2 border-2" rows="4" cols="5" id="Review" placeholder="Write your comment"></textarea>
+                </div>
+                <div class="col-12">
+                  <div class="d-grid">
+                    <button type="button" class="btn btn-dark py-2 border-2">Submit Review</button>
+                  </div>
+                </div>
+
+             </div><!--end row-->
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- end review modal -->
+
+
+
+    </div>
+  </main>
+  <!--end main wrapper-->
+
+
+<!--footer widgets-->
+<section class="footer-widgets py-5 border-top">
+  <div class="container px-4">
+    <div class="row g-4">
+       <div class="col-12 col-lg-4">
+           <div class="footer-widget-1">
+              <div class="d-flex align-items-center gap-2">
+                <img src="assets/images/logo-icon.png" width="50" alt="">
+                <h4 class="mb-0">Maxton</h4>
+              </div>
+              <div class="mt-3">
+                <address>
+                  <strong>Address:</strong>
+                  84-A London Street, United Kingdom
+                </address>
+              </div>
+              <p><button type="button" class="btn btn-sm btn-grd btn-grd-primary px-3">Get Darection<i class="bi bi-arrow-up-right ms-2"></i></button></p>
+              <p><span><i class="bi bi-envelope me-2"></i></span>example@gmail.com</p>
+              <p><span><i class="bi bi-telephone me-2"></i></span>648-378-2255</p>
+              <p><span><i class="bi bi-globe me-2"></i></span>www.codervent.com</p>
+              <div class="social-link d-flex align-items-center gap-2">
+                <a href="javascript:;" class="btn btn-grd btn-grd-info"><i class="bi bi-facebook"></i></a>
+                <a href="javascript:;" class="btn btn-grd btn-grd-primary"><i class="bi bi-twitter-x"></i></a>
+                <a href="javascript:;" class="btn btn-grd btn-grd-branding"><i class="bi bi-instagram"></i></a>
+                <a href="javascript:;" class="btn btn-grd btn-grd-danger"><i class="bi bi-youtube"></i></a>
+                <a href="javascript:;" class="btn btn-grd btn-grd-warning"><i class="bi bi-amazon"></i></a>
+              </div>
+           </div>
+       </div>
+       <div class="col-12 col-lg-3">
+          <div class="d-flex align-items-start justify-content-between gap-4">
+            <div class="">
+              <h5 class="mb-3">Top Categories</h5>
+              <ul class="list-unstyled d-flex flex-column gap-2">
+                  <li><a href="shop-circular-catgories.html" class="footer-link">Topwear</a></li>
+                  <li><a href="shop-list-left-sidebar.html" class="footer-link">Accessories</a></li>
+                  <li><a href="shop-grid-offcanvas-filter.html" class="footer-link">Men Fashion</a></li>
+                  <li><a href="shop-list-right-sidebar.html" class="footer-link">Gym Fitness</a></li>
+                  <li><a href="shop-list-ofcanvas-filter.html" class="footer-link">Sunglass</a></li>
+                  <li><a href="shop-grid-left-sidebar.html" class="footer-link">Jeans</a></li>
+                  <li><a href="shop-grid-left-sidebar.html" class="footer-link">Formal Pants</a></li>
+                  <li><a href="shop-grid-left-sidebar.html" class="footer-link">Lingerie</a></li>
+              </ul>
+             </div>
+              <div class="footer-widget-3">
+                <h5 class="mb-3">Account</h5>
+                <ul class="list-unstyled d-flex flex-column gap-2">
+                   <li><a href="checkout.html" class="footer-link">Order tracking</a></li>
+                   <li><a href="javascript:;" class="footer-link">Shipping policy</a></li>
+                   <li><a href="account-my-profile.html" class="footer-link">Your account</a></li>
+                   <li><a href="account-addresses.html" class="footer-link">Delivery info</a></li>
+                   <li><a href="javascript:;" class="footer-link">Taxes & fees</a></li>
+                   <li><a href="javascript:;" class="footer-link">Refunds policy</a></li>
+                </ul>
+              </div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-4 offset-lg-1">
+          <div class="footer-widget-4">
+            <h5 class="mb-3">Newletter</h5>
+            <p class="news-letter-caption">Subscribe to our newsletter and enjoy 10% off your first order</p>
+     <form method="post">
+      <div class="input-group input-group-lg mt-3">
+        <input type="email" class="form-control border border-2" placeholder="Enter your email" required>
+        <button class="btn btn-grd btn-grd-primary" type="submit"><i class="bi bi-arrow-up-right"></i></button>
+      </div>
+     </form>
+            <p class="news-letter-caption mt-4 mb-2">Download Mobile Application</p>
+            <div class="d-flex align-items-center gap-3">
+              <a href="javascript:;"><img src="assets/images/icons/app-store.svg" width="140" class="rounded-3" alt=""></a>
+              <a href="javascript:;"><img src="assets/images/icons/play-store.svg" width="140" class="rounded-3" alt=""></a>
+            </div>
+          </div>
+        </div>
+    </div><!--end row-->  
+</div>
+</section>
+<!--end footer widgets-->
+
+
+<!--start footer strip-->
+<footer class="footer-strip py-3 border-top">
+  <div class="container px-4">
+    <div class="row g-4 align-items-center">
+      <div class="col-12 col-lg-auto">
+        <p class="mb-0 font-12">@All rights reserved. Made by Codervent</p>
+      </div>
+      <div class="col-12 col-lg-auto">
+        <div class="d-flex align-items-center gap-3">
+          <a href="javascript:;" class="font-12 text-secondary">Privacy</a>
+          <a href="javascript:;" class="font-12 text-secondary">Affiliates</a>
+          <a href="javascript:;" class="font-12 text-secondary">Terms of use</a>
+        </div>
+     </div>
+     <div class="col-12 col-lg-auto ms-lg-auto">
+      <div class="d-flex align-items-center gap-3">
+        <a href="javascript:;"><img src="assets/images/payment/paypal.png" class="p-2 border rounded-3" width="80" alt=""></a>
+        <a href="javascript:;"><img src="assets/images/payment/visa.png" class="p-2 border rounded-3" width="60" alt=""></a>
+        <a href="javascript:;"><img src="assets/images/payment/money.png" class="p-2 border rounded-3" width="50" alt=""></a>
+        <a href="javascript:;"><img src="assets/images/payment/stripe.png" class="p-2 border rounded-3" width="60" alt=""></a>
+      </div>
+     </div>
+   </div><!--end row-->
+  </div>
+</footer>
+<!--end footer strip-->
+
+  <!--start cart-->
+  <div class="offcanvas offcanvas-end offcanvas-cart" tabindex="-1" id="offcanvasCart">
+    <div class="offcanvas-header border-bottom h-70">
+      <h5 class="mb-0" id="offcanvasRightLabel">Shopping cart</h5>
+      <a href="javascript:;" class="primaery-menu-close" data-bs-dismiss="offcanvas">
+        <i class="material-icons-outlined">close</i>
+      </a>
+    </div>
+    <div class="offcanvas-body p-0">
+      <div class="order-list">
+        <div class="order-item d-flex align-items-start gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/01.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">White Men Shoes</h5>
+            <p class="mb-0 order-price">$69</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/04.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Red Airpods</h5>
+            <p class="mb-0 order-price">$19</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/03.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Men Polo Tshirt</h5>
+            <p class="mb-0 order-price">$39</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/06.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Blue Jeans Casual</h5>
+            <p class="mb-0 order-price">$85</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/12.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Fancy Shirts</h5>
+            <p class="mb-0 order-price">$58</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/02.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Home Sofa Set </h5>
+            <p class="mb-0 order-price">$46</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/13.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Black iPhone</h5>
+            <p class="mb-0 order-price">$49</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+
+        <div class="order-item d-flex align-items-center gap-3 p-3 border-bottom">
+          <div class="order-img">
+            <img src="assets/images/products/11.png" class="img-fluid rounded-3 bg-light p-1" width="80" alt="">
+          </div>
+          <div class="order-info flex-grow-1">
+            <h5 class="mb-1 order-title">Goldan Watch</h5>
+            <p class="mb-0 order-price">$89</p>
+            <p class="mb-0 order-qty">Qty 1</p>
+          </div>
+          <div class="d-flex align-self-end">
+            <a class="order-delete"><span class="material-icons-outlined">delete</span></a>
+            <a class="order-delete"><span class="material-icons-outlined">visibility</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="offcanvas-footer p-3 border-top">
+      <div class="cart-product-checout">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <p class="mb-0">Subtotal</p>
+        <h5 class="mb-0">$378.5</h5>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <a href="shopping-cart.html" class="btn btn-light border px-4 py-2 flex-fill">View Cart</a>
+        <a href="checkout.html" class="btn btn-grd btn-grd-primary px-4 py-2 border border-dark flex-fill">Checkout</a>
+    </div> 
+    </div>
+    </div>
+  </div>
+  <!--end cart-->
+
+
+
+  <!--start switcher-->
+  <button class="btn btn-grd btn-grd-primary btn-switcher m-3 d-flex align-items-center gap-2"
+    type="button" data-bs-toggle="offcanvas" data-bs-target="#staticBackdrop">
+    <i class="material-icons-outlined">tune</i>Customize
+  </button>
+
+  <div class="offcanvas offcanvas-end" data-bs-scroll="true" tabindex="-1" id="staticBackdrop">
+    <div class="offcanvas-header border-bottom h-70">
+      <div class="">
+        <h5 class="mb-0">Theme Customizer</h5>
+        <p class="mb-0">Customize your theme</p>
+      </div>
+      <a href="javascript:;" class="primaery-menu-close" data-bs-dismiss="offcanvas">
+        <i class="material-icons-outlined">close</i>
+      </a>
+    </div>
+    <div class="offcanvas-body">
+      <div>
+        <p>Theme variation</p>
+
+        <div class="row g-3">
+          <div class="col-12 col-xl-6">
+            <input type="radio" class="btn-check" name="theme-options" id="BlueTheme" checked>
+            <label
+              class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4"
+              for="BlueTheme">
+              <span class="material-icons-outlined">contactless</span>
+              <span>Blue</span>
+            </label>
+          </div>
+          <div class="col-12 col-xl-6">
+            <input type="radio" class="btn-check" name="theme-options" id="LightTheme">
+            <label
+              class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4"
+              for="LightTheme">
+              <span class="material-icons-outlined">light_mode</span>
+              <span>Light</span>
+            </label>
+          </div>
+          <div class="col-12 col-xl-6">
+            <input type="radio" class="btn-check" name="theme-options" id="DarkTheme">
+            <label
+              class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4"
+              for="DarkTheme">
+              <span class="material-icons-outlined">dark_mode</span>
+              <span>Dark</span>
+            </label>
+          </div>
+          <div class="col-12 col-xl-6">
+            <input type="radio" class="btn-check" name="theme-options" id="SemiDarkTheme">
+            <label
+              class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4"
+              for="SemiDarkTheme">
+              <span class="material-icons-outlined">contrast</span>
+              <span>Semi Dark</span>
+            </label>
+          </div>
+        </div><!--end row-->
+
+      </div>
+    </div>
+  </div>
+  <!--end switcher-->
+
+  <!--back to top button-->
+    <a href="javaScript:;" class="back-to-top"><i class="bi bi-arrow-up"></i></a>
+  <!--end back to top button-->
+
+  <!--bootstrap js-->
+  <script src="assets/js/bootstrap.bundle.min.js"></script>
+  <!--loader js-->
+  <script src="assets/js/pace.min.js"></script>
+  <!--plugins-->
+  <script src="assets/js/jquery.min.js"></script>
+  <!-- Swiper JS -->
+  <script src="assets/plugins/swiper/js/swiper-bundle.min.js"></script>
+  <!-- Initialize Swiper -->
+  <script src="assets/js/product-details.js"></script>
+  <script src="assets/js/main.js"></script>
+</body>
+
+</html>

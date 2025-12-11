@@ -1,0 +1,165 @@
+/* Responsive */
+@media screen and (max-width: 1280px) {
+  .email-header {
+    height: auto;
+  }
+  .email-content {
+    padding: 100px 0 0 0;
+  }
+}
+@media screen and (max-width: 1024px) {
+  .email-header {
+    border-top-right-radius: 0.25rem;
+  }
+  .email-sidebar {
+    right: -280px;
+  }
+  .email-content {
+    margin-right: 0;
+  }
+  .email-header {
+    right: 0;
+  }
+  .email-toggled .email-sidebar {
+    right: 0;
+  }
+  .email-toggled .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 250px;
+    background: #000;
+    opacity: 0.5;
+    z-index: 9;
+    display: block;
+    cursor: move;
+    transition: all 0.3s ease-out;
+  }
+  .chat-header {
+    border-top-right-radius: 0.25rem;
+  }
+  .chat-footer {
+    border-bottom-right-radius: 0.25rem;
+  }
+  .chat-sidebar {
+    right: -370px;
+  }
+  .chat-content {
+    margin-right: 0;
+  }
+  .chat-header {
+    right: 0;
+  }
+  .chat-footer {
+    right: 0;
+  }
+  .chat-toggled .chat-sidebar {
+    right: 0;
+  }
+  .chat-toggled .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 340px;
+    background: #000;
+    opacity: 0.5;
+    z-index: 11;
+    display: block;
+    cursor: move;
+    transition: all 0.3s ease-out;
+  }
+}
+/* Toogle in responsive */
+@media only screen and (max-width: 1199px) {
+  .table-responsive {
+    white-space: nowrap;
+  }
+  .sidebar-wrapper {
+    right: -260px;
+  }
+  .sidebar-wrapper .sidebar-header .sidebar-close {
+    display: flex;
+  }
+  .top-header .navbar {
+    right: 0;
+  }
+  .page-content {
+    margin-right: 0;
+  }
+  .toggled .sidebar-wrapper {
+    width: 260px;
+    right: 0px;
+  }
+  .toggled .sidebar-wrapper .sidebar-header {
+    width: 260px;
+  }
+  .toggled .sidebar-wrapper .sidebar-bottom {
+    width: 260px;
+  }
+  .toggled .logo-name {
+    display: block;
+  }
+  .toggled .top-header .navbar {
+    right: 0px;
+  }
+  .toggled .page-footer {
+    right: 0px;
+  }
+  .toggled .main-wrapper {
+    margin-right: 0;
+  }
+  .toggled .overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: #000;
+    opacity: 0.5;
+    z-index: 11;
+    display: block;
+    cursor: move;
+    transition: all 0.23s ease-out;
+  }
+}
+@media only screen and (max-width: 1199px) {
+  .top-header .navbar {
+    right: 0;
+  }
+  .top-header .navbar .dropdown {
+    position: static;
+  }
+  .top-header .navbar .dropdown .dropdown-menu {
+    width: 100%;
+  }
+  .top-header .navbar .dropdown .dropdown-menu::after {
+    display: none;
+  }
+  .top-header .navbar .mega-menu-widgets {
+    padding: 1rem;
+    position: relative;
+    height: 480px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .main-wrapper {
+    margin-right: 0;
+  }
+  /*page footer*/
+  .page-footer {
+    right: 0px;
+  }
+  /*mini sidebar*/
+  .mini-sidebar {
+    right: -70px;
+  }
+}
+@media only screen and (max-width: 992px) {
+  .search-popup {
+    position: fixed !important;
+    top: 0 !important;
+    z-index: 10;
+  }
+}

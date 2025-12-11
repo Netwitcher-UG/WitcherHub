@@ -1,0 +1,161 @@
+[data-bs-theme=dark] body {
+  --bs-light-bg-subtle: #343a40;
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg-2);
+  background-image: linear-gradient(310deg, #181c1f, #181c1f);
+
+  $headingColor: #d5d5d5;
+  $headerbg: #212529;
+
+  input::placeholder {
+    color: #fff !important;
+  }
+
+  .bg-light {
+    background-color: #32363b !important;
+  }
+
+  .card-title {
+    color: #dee2e6;
+  }
+
+  /* aligns */
+
+  @mixin sidelinks {
+
+    color: #dee2e6;
+
+    &:hover,
+    &:focus {
+      color: #ffffff;
+      background-color: #383c40;
+    }
+
+  }
+
+
+  .separator {
+    .line {
+      background-color: var(--bs-border-color);
+    }
+
+  }
+
+  .searchbar {
+    .search-close {
+      color: var(--bs-emphasis-color);
+      background-color: var(--bs-light-bg-subtle);
+    }
+  }
+
+  /* utilities */
+
+  .primaery-menu-close {
+    @include sidelinks();
+    color: var(--bs-body-color);
+    background-color: var(--bs-light-bg-subtle);
+  }
+
+
+  .theme-icons {
+    background-color: var(--bs-body-bg);
+  }
+
+  
+/* Mobile Top Header */
+
+.mobile-top-header {
+  background-image: linear-gradient(127.09deg, #212529 19.41%, #212529 76.65%) !important;
+  background-color: #212529;
+  height: 70px;
+  z-index: 10;
+  box-shadow: none;
+
+.back-title {
+  color: #fff
+ }
+
+}
+
+
+.inner-link {
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg);
+  &:hover,
+  &:focus {
+      background-color: var(--bs-light-bg-subtle);
+      color: var(--bs-emphasis-color);
+  }
+}
+
+
+.iner-link-title {
+  color: var(--bs-body-color);
+} 
+
+
+.section-title {
+  h5 {
+    color: var(--bs-body-color);
+  }
+}
+
+.options {
+  color: var(--bs-body-color);
+}
+
+.side-menu-icon {
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg);
+} 
+
+.amount-input {
+  color: var(--bs-emphasis-color);
+  &:focus {
+    color: var(--bs-emphasis-color);
+  }
+}
+
+.account-number {
+  color: var(--bs-body-color);
+}
+
+.bank-name {
+  color: var(--bs-body-color);
+}
+
+.menu-arrow {
+  color: var(--bs-body-color);
+}
+
+.qr-code-img {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+.auth-bg {
+  background-image: none !important;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+.btn-proceed {
+	color: #191c23;
+	background-image: linear-gradient(310deg, #ffffff, #ffffff);
+}
+
+/* Bottom Menu */
+
+.bottom-menu {
+  background-color: var(--bs-body-bg);
+  .nav-link {
+      color: var(--bs-body-color);
+      .menu-icon {
+          background-color: var(--bs-body-bg-2);
+      }
+  }
+}
+
+
+
+
+}

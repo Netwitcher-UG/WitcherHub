@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en" data-bs-theme="blue-theme">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maxton - Digital Payment Mobile Application</title>
+  <!--favicon-->
+  <link rel="icon" href="assets/images/favicon-32x32.png" type="image/png">
+  <!-- loader-->
+  <link href="assets/css/pace.min.css" rel="stylesheet">
+  <script src="assets/js/pace.min.js"></script>
+
+  <!-- Link Swiper's CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
+
+  <!--bootstrap css-->
+  <link href="assets/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Material+Icons+Outlined" rel="stylesheet">
+  <!--main css-->
+  <link href="assets/css/bootstrap-extended.css" rel="stylesheet">
+  <link href="sass/main.css" rel="stylesheet">
+  <link href="sass/dark-theme.css" rel="stylesheet">
+  <link href="sass/blue-theme.css" rel="stylesheet">
+  <link href="sass/responsive.css" rel="stylesheet">
+
+</head>
+
+<body>
+
+ <!--start header--> 
+<header class="mobile-top-header position-fixed top-0 start-0 end-0 d-flex align-items-center justify-content-between px-3 border-bottom">
+  <div class="user-avatar d-flex align-items-center gap-3" data-bs-toggle="offcanvas" data-bs-target="#pay_amount">
+    <img src="https://placehold.co/110x110" class="rounded-circle" width="42" height="42" alt="">
+    <div class="user-details">
+       <h6 class="mb-0 fw-600 text-white">Hi, Jhon Deo</h6> 
+    </div>
+  </div>
+  <div class="">
+     <ul class="navbar-nav flex-row d-flex align-items-center gap-2 mobile-right-links">
+          <li class="nav-item">
+            <a class="nav-link btn-search" href="javascript:;">
+              <i class="material-icons-outlined">search</i>
+            </a>
+        </li>
+        <li class="nav-item">
+           <a class="nav-link position-relative" href="notifications.html">
+            <i class="material-icons-outlined">notifications</i>
+            <span class="badge-notify">5</span>
+          </a>
+        </li>
+      </ul>
+  </div>
+</header>
+<!--end header--> 
+
+<!--start search control-->
+   <div class="searchbar position-fixed top-0 start-0 end-0 bg-light h-70 d-flex align-items-center justify-content-center d-none">
+    <div class="position-relative w-100">
+      <span class="material-icons-outlined position-absolute top-50 start-0 translate-middle ms-4">search</span>
+      <input type="text" class="form-control form-control-lg ps-5" id="enterMobile" placeholder="Type here to search">
+      <span class="material-icons-outlined position-absolute top-50 end-0 translate-middle search-close fs-6">close</span>
+    </div>
+   </div> 
+<!--end search control-->
+
+<!--start sidebar menu offcanvas -->
+<div class="offcanvas offcanvas-bottom h-100" tabindex="-1" id="pay_amount">
+  <div class="offcanvas-header border-bottom h-70">
+    <div class="d-flex flex-row align-items-center gap-3">
+      <div class="">
+        <img src="https://placehold.co/110x110" class="rounded-circle bg-grd-primary p-1" width="60" height="60" alt="">
+      </div>
+      <div class="text-start">
+        <h6 class="mb-0 fw-bold">Jhon Samsun</h6>
+        <p class="mb-0">+91-8675493524</p>
+      </div>
+    </div>
+    <a href="javascript:;" class="primaery-menu-close ms-auto" data-bs-dismiss="offcanvas">
+      <span class="material-icons-outlined">close</span>
+    </a>
+  </div>
+  <div class="offcanvas-body">
+    <div class="scan-img text-center">
+      <h6 class="mb-4">My QR Code</h6>
+      <img src="assets/images/gallery/qr-code.png" class="qr-code-img" width="140" alt="">
+    </div>
+
+  <!--start menu-->
+    <div class="list-group list-group-flush py-4">
+      <a href="javascript:;" class="list-group-item bg-transparent mb-0 rounded-0 d-flex align-items-center gap-3">
+        <span class="side-menu-icon material-icons-outlined">settings</span>
+        <span class="menu-name">Payment Setting</span>
+        <span class="menu-arrow ms-auto material-icons-outlined">chevron_right</span>
+      </a>
+      <a href="javascript:;" class="list-group-item bg-transparent mb-0 rounded-0 d-flex align-items-center gap-3">
+        <span class="side-menu-icon material-icons-outlined">person</span>
+        <span class="menu-name">Personal Details</span>
+        <span class="menu-arrow ms-auto material-icons-outlined">chevron_right</span>
+      </a>
+      <a href="javascript:;" class="list-group-item bg-transparent mb-0 rounded-0 d-flex align-items-center gap-3">
+        <span class="side-menu-icon material-icons-outlined">credit_card</span>
+        <span class="menu-name">My Cards</span>
+        <span class="menu-arrow ms-auto material-icons-outlined">chevron_right</span>
+      </a>
+      <a href="javascript:;" class="list-group-item bg-transparent mb-0 rounded-0 d-flex align-items-center gap-3">
+        <span class="side-menu-icon material-icons-outlined">privacy_tip</span>
+        <span class="menu-name">Privacy & Security</span>
+        <span class="menu-arrow ms-auto material-icons-outlined">chevron_right</span>
+      </a>
+      <a href="javascript:;" class="list-group-item bg-transparent mb-0 rounded-0 d-flex align-items-center gap-3">
+        <span class="side-menu-icon material-icons-outlined">question_mark</span>
+        <span class="menu-name">Help Center</span>
+        <span class="menu-arrow ms-auto material-icons-outlined">chevron_right</span>
+      </a>
+    </div>
+    <!--end menu-->
+
+    <div class="text-center">
+      <a href="login.html" class="btn btn-grd btn-grd-primary rounded-5 px-5 py-2">Logout</a>
+    </div>
+      
+  </div>
+</div>
+<!--end sidebar menu offcanvas -->
+
+
+<!--main content--> 
+<main class="main-content">
+  
+  <!--start Swiper -->
+  <div class="swiper Slider1">
+    <div class="swiper-wrapper">
+      <div class="swiper-slide">
+        <img src="https://placehold.co/1026x463" class="img-fluid rounded-4" alt="">
+      </div>
+      <div class="swiper-slide">
+        <img src="https://placehold.co/1026x463" class="img-fluid rounded-4" alt="">
+      </div>
+      <div class="swiper-slide">
+        <img src="https://placehold.co/1026x463" class="img-fluid rounded-4" alt="">
+      </div>
+    </div>
+    <div class="swiper-scrollbar"></div>
+  </div>
+   <!-- End Swiper -->
+
+
+  <!--end money transfer-->
+  <section class="money-transfer py-3">
+    <div class="section-title">
+      <h5 class="mb-3">Money Transfer</h5>
+    </div>
+    <div class="row row-cols-4 g-3">
+      <div class="col">
+        <div class="d-flex flex-column gap-2 align-items-center text-center">
+          <a href="scan-qr-code.html" class="inner-link bg-grd-info text-white"><span class="material-icons-outlined">qr_code_scanner</span></a>
+          <h5 class="iner-link-title">Scan & Pay</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-2 align-items-center">
+          <a href="accounts.html" class="inner-link bg-grd-danger text-white"><span class="material-icons-outlined">account_balance</span></a>
+          <h5 class="iner-link-title">UPI / Bank</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-2 align-items-center text-center">
+          <a href="javascript:;" class="inner-link bg-grd-success text-white"><span class="material-icons-outlined">arrow_circle_down</span></a>
+          <h5 class="iner-link-title">Self Transfer</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-2 align-items-center">
+          <a href="my-wallet.html" class="inner-link bg-grd-warning text-white"><span class="material-icons-outlined">account_balance_wallet</span></a>
+          <h5 class="iner-link-title">Wallet</h5>
+        </div>
+      </div>
+    </div><!--end row-->
+  </section>
+  <!--end money transfer-->
+
+
+  <!--check bank balance-->
+    <section class="money-transfer py-3">
+       <h5 class="mb-3 d-none">Check Bank Balance</h5>
+        <div class="card border shadow-none rounded-4 mb-0">
+         <div class="card-body">
+           <div class="d-flex align-items-center justify-content-between">
+              <div class="d-flex align-items-center gap-2">
+                <a href="check-bank-balance.html" class="inner-link"><span class="material-icons-outlined">arrow_circle_down</span></a>
+                  <p class="mb-0 lh-1">Check Your<br> Bank Balance</p>
+              </div>
+              <a href="check-bank-balance.html" class="btn btn-grd btn-grd-primary rounded-5 btn-sm border-0 px-3 py-2">Check Balance</a>
+           </div>
+         </div>
+       </div>
+    </section>
+  <!--end check bank balance-->
+
+
+  <!--start features-->
+  <section class="features py-3">
+    <div class="section-title">
+      <h5 class="mb-3">Features</h5>
+    </div>
+    <div class="row row-cols-4 g-3">
+      <div class="col">
+        <div class="d-flex flex-column gap-2 align-items-center text-center">
+          <a href="javascript:;" class="inner-link"><span class="material-icons-outlined">phone_android</span></a>
+          <h5 class="iner-link-title">Recharge</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-2 align-items-center">
+          <a href="pay-bills.html" class="inner-link"><span class="material-icons-outlined">account_balance</span></a>
+          <h5 class="iner-link-title">Pay / Bills</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-2 align-items-center text-center">
+          <a href="tickets.html" class="inner-link"><span class="material-icons-outlined">arrow_circle_down</span></a>
+          <h5 class="iner-link-title">Tickets</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-2 align-items-center">
+          <a href="insurance.html" class="inner-link"><span class="material-icons-outlined">account_balance_wallet</span></a>
+          <h5 class="iner-link-title">Insurance</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-2 align-items-center">
+          <a href="investment.html" class="inner-link"><span class="material-icons-outlined">leaderboard</span></a>
+          <h5 class="iner-link-title">Invstment</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-2 align-items-center">
+          <a href="javascript:;" class="inner-link"><span class="material-icons-outlined">shopping_bag</span></a>
+          <h5 class="iner-link-title">Shop</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-2 align-items-center">
+          <a href="javascript:;" class="inner-link"><span class="material-icons-outlined">bloodtype</span></a>
+          <h5 class="iner-link-title">Donate</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-2 align-items-center">
+          <a href="javascript:;" class="inner-link"><span class="material-icons-outlined">grid_view</span></a>
+          <h5 class="iner-link-title">More</h5>
+        </div>
+      </div>
+    </div><!--end row-->
+  </section>
+  <!--end features-->
+
+
+ <!--start Sponsored-->
+ <section class="features py-3">
+  <div class="section-title">
+    <h5 class="mb-3">Sponsored Links</h5>
+  </div>
+  <div class="row row-cols-4 g-3">
+    <div class="col">
+      <div class="d-flex flex-column gap-2 align-items-center text-center">
+        <a href="https://www.iplt20.com/" target="_blank" class="inner-link border">
+          <img src="assets/images/sponsared/01.png" width="25" alt="">
+        </a>
+        <h5 class="iner-link-title">Tata IPL</h5>
+      </div>
+    </div>
+    <div class="col">
+      <div class="d-flex flex-column gap-2 align-items-center">
+        <a href="https://www.rummycircle.com/" target="_blank" class="inner-link border">
+          <img src="assets/images/sponsared/02.png" width="25" alt="">
+        </a>
+        <h5 class="iner-link-title">Play Rummy</h5>
+      </div>
+    </div>
+    <div class="col">
+      <div class="d-flex flex-column gap-2 align-items-center text-center">
+        <a href="https://www.mpl.live/" target="_blank" class="inner-link border">
+          <img src="assets/images/sponsared/03.png" width="25" alt="">
+        </a>
+        <h5 class="iner-link-title">MPL Team</h5>
+      </div>
+    </div>
+    <div class="col">
+      <div class="d-flex flex-column gap-2 align-items-center text-center">
+        <a href="https://www.cnbc.com/" target="_blank" class="inner-link border">
+          <img src="assets/images/sponsared/04.png" width="25" alt="">
+        </a>
+        <h5 class="iner-link-title">CNBC</h5>
+      </div>
+    </div>
+    <div class="col">
+      <div class="d-flex flex-column gap-2 align-items-center text-center">
+        <a href="https://www.adidas.co.in/" target="_blank" class="inner-link border">
+          <img src="assets/images/sponsared/05.png" width="25" alt="">
+        </a>
+        <h5 class="iner-link-title">Adidas</h5>
+      </div>
+    </div>
+    <div class="col">
+      <div class="d-flex flex-column gap-2 align-items-center text-center">
+        <a href="https://www.hdfcbank.com/" target="_blank" class="inner-link border">
+          <img src="assets/images/sponsared/06.png" width="25" alt="">
+        </a>
+        <h5 class="iner-link-title">HDFC Bank</h5>
+      </div>
+    </div>
+    <div class="col">
+      <div class="d-flex flex-column gap-2 align-items-center text-center">
+        <a href="https://rupeek.com/" target="_blank" class="inner-link border">
+          <img src="assets/images/sponsared/08.png" width="25" alt="">
+        </a>
+        <h5 class="iner-link-title">Gold Loan</h5>
+      </div>
+    </div>
+    <div class="col">
+      <div class="d-flex flex-column gap-2 align-items-center text-center">
+        <a href="https://ludoking.com/" target="_blank" class="inner-link border">
+          <img src="assets/images/sponsared/07.png" width="22" alt="">
+        </a>
+        <h5 class="iner-link-title">Ludo King</h5>
+      </div>
+    </div>
+  </div><!--end row-->
+</section>
+<!--end Sponsored-->
+
+
+<!--start Swiper -->
+<div class="swiper Slider2 py-3">
+  <div class="swiper-wrapper">
+    <div class="swiper-slide">
+      <img src="https://placehold.co/1026x463" class="img-fluid rounded-4" alt="">
+    </div>
+    <div class="swiper-slide">
+      <img src="https://placehold.co/1026x463" class="img-fluid rounded-4" alt="">
+    </div>
+    <div class="swiper-slide">
+      <img src="https://placehold.co/1026x463" class="img-fluid rounded-4" alt="">
+    </div>
+  </div>
+  <div class="swiper-scrollbar"></div>
+</div>
+ <!-- End Swiper -->
+
+
+   <!--start people-->
+   <section class="money-transfer py-3">
+    <div class="section-title">
+      <h5 class="mb-3">People</h5>
+    </div>
+    <div class="row row-cols-4 g-3">
+      <div class="col">
+        <div class="d-flex flex-column gap-1 align-items-center text-center">
+           <a href="javascript:;">
+             <img src="https://placehold.co/110x110" width="42" height="42" class="rounded-circle" alt="">
+           </a>
+          <h5 class="iner-link-title">Jhonson</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-1 align-items-center text-center">
+          <a href="javascript:;">
+            <img src="https://placehold.co/110x110" width="42" height="42" class="rounded-circle" alt="">
+          </a>
+          <h5 class="iner-link-title">David</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-1 align-items-center text-center">
+          <a href="javascript:;" class="inner-link bg-warning">
+             <p class="mb-0 fs-2 text-dark">M</p>
+          </a>
+          <h5 class="iner-link-title">Karan</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-1 align-items-center text-center">
+          <a href="javascript:;">
+            <img src="https://placehold.co/110x110" width="42" height="42" class="rounded-circle" alt="">
+          </a>
+          <h5 class="iner-link-title">Michle</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-1 align-items-center text-center">
+          <a href="javascript:;" class="inner-link bg-danger">
+            <p class="mb-0 fs-2 text-white">C</p>
+          </a>
+          <h5 class="iner-link-title">Commins</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-1 align-items-center text-center">
+          <a href="javascript:;">
+            <img src="https://placehold.co/110x110" width="42" height="42" class="rounded-circle" alt="">
+          </a>
+          <h5 class="iner-link-title">Buckley</h5>
+        </div>
+      </div>
+      <div class="col">
+        <div class="d-flex flex-column gap-1 align-items-center text-center">
+          <a href="javascript:;" class="inner-link bg-primary">
+            <p class="mb-0 fs-2 text-white">R</p>
+          </a>
+          <h5 class="iner-link-title">Ralph</h5>
+        </div>
+      </div>
+       
+        <div class="col transaction-avatar d-none">
+          <div class="d-flex flex-column gap-1 align-items-center text-center">
+            <a href="javascript:;">
+              <img src="https://placehold.co/110x110" width="42" height="42" class="rounded-circle" alt="">
+            </a>
+            <h5 class="iner-link-title">Sujain</h5>
+          </div>
+        </div>
+        <div class="col transaction-avatar d-none">
+          <div class="d-flex flex-column gap-1 align-items-center text-center">
+            <a href="javascript:;">
+              <img src="https://placehold.co/110x110" width="42" height="42" class="rounded-circle" alt="">
+            </a>
+            <h5 class="iner-link-title">Mandira</h5>
+          </div>
+        </div>
+        <div class="col transaction-avatar d-none">
+          <div class="d-flex flex-column gap-1 align-items-center text-center">
+            <a href="javascript:;" class="inner-link bg-success">
+               <p class="mb-0 fs-2 text-dark">M</p>
+            </a>
+            <h5 class="iner-link-title">Jackkson</h5>
+          </div>
+        </div>
+        <div class="col transaction-avatar d-none">
+          <div class="d-flex flex-column gap-1 align-items-center text-center">
+             <a href="javascript:;">
+               <img src="https://placehold.co/110x110" width="42" height="42" class="rounded-circle" alt="">
+             </a>
+            <h5 class="iner-link-title">Jhonson</h5>
+          </div>
+        </div>
+        <div class="col">
+          <div class="d-flex flex-column gap-1 align-items-center text-center">
+            <a href="javascript:;" class="inner-link btn-show-less">
+              <span class="material-icons-outlined rond-icon">expand_more</span>
+            </a>
+            <h5 class="iner-link-title more-text">More</h5>
+            <h5 class="iner-link-title less-text">Less</h5>
+          </div>
+        </div>
+    
+    </div><!--end row-->
+  </section>
+  <!--end people-->
+
+</main>
+<!--main content--> 
+
+
+<!--start bottom menu-->
+<ul class="nav bottom-menu border-top position-fixed bottom-0 start-0 end-0 h-70 d-flex align-items-center justify-content-between px-3">
+  <li class="nav-item">
+    <a class="nav-link d-flex flex-column gap-0 align-items-center" href="home.html">
+      <span class="menu-icon material-icons-outlined active">home</span>
+      <span class="menu-name">Home</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link d-flex flex-column gap-0 align-items-center" href="my-wallet.html">
+      <span class="menu-icon material-icons-outlined">account_balance</span>
+      <span class="menu-name">Wallet</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link d-flex flex-column gap-0 align-items-center" href="account-details.html">
+      <span class="menu-icon material-icons-outlined">account_circle</span>
+      <span class="menu-name">Account</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link d-flex flex-column gap-0 align-items-center" href="history.html">
+      <span class="menu-icon material-icons-outlined">history</span>
+      <span class="menu-name">History</span>
+    </a>
+  </li>
+</ul>
+<!--end bottom menu-->
+
+
+<!--start switcher-->
+<button class="btn btn-grd btn-grd-primary btn-switcher raised position-fixed bottom-50 end-0 d-flex align-items-center gap-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#themeSwitcher">
+  <i class="material-icons-outlined">tune</i>
+</button>
+
+<div class="offcanvas offcanvas-end" data-bs-scroll="true" tabindex="-1" id="themeSwitcher">
+  <div class="offcanvas-header border-bottom h-70">
+    <div class="">
+      <h5 class="mb-0">Theme Customizer</h5>
+      <p class="mb-0">Customize your theme</p>
+    </div>
+    <a href="javascript:;" class="primaery-menu-close" data-bs-dismiss="offcanvas">
+      <i class="material-icons-outlined">close</i>
+    </a>
+  </div>
+  <div class="offcanvas-body">
+    <div>
+      <p>Theme variation</p>
+
+      <div class="row g-3">
+        <div class="col-12 col-xl-6">
+          <input type="radio" class="btn-check" name="theme-options" id="BlueTheme" checked>
+          <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="BlueTheme">
+            <span class="material-icons-outlined">contactless</span>
+            <span>Blue</span>
+          </label>
+        </div>
+        <div class="col-12 col-xl-6">
+          <input type="radio" class="btn-check" name="theme-options" id="LightTheme">
+          <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="LightTheme">
+            <span class="material-icons-outlined">light_mode</span>
+            <span>Light</span>
+          </label>
+        </div>
+        <div class="col-12 col-xl-6">
+          <input type="radio" class="btn-check" name="theme-options" id="DarkTheme">
+          <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="DarkTheme">
+            <span class="material-icons-outlined">dark_mode</span>
+            <span>Dark</span>
+          </label>
+        </div>
+      </div><!--end row-->
+
+    </div>
+  </div>
+</div>
+<!--start switcher-->
+
+  <!--bootstrap js-->
+  <script src="assets/js/bootstrap.bundle.min.js"></script>
+
+  <!--jquery-->
+  <script src="assets/js/jquery.min.js"></script>
+  <script>
+    /* show less button */
+    $(".inner-link").on("click", function () {
+      $(".rond-icon").toggleClass("transform180"),
+
+      $(".more-text").toggleClass("d-none"),
+      $(".less-text").toggleClass("d-block")
+
+    })
+  </script>
+  <!-- Swiper JS -->
+  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+  <!-- Initialize Swiper -->
+  <script>
+    var swiper = new Swiper(".Slider1", {
+      scrollbar: {
+        el: ".swiper-scrollbar",
+        hide: true,
+      },
+    });
+
+    var swiper = new Swiper(".Slider2", {
+      scrollbar: {
+        el: ".swiper-scrollbar",
+        hide: true,
+      },
+    });
+
+  </script>
+  <script src="assets/js/main.js"></script>
+
+</body>
+
+</html>

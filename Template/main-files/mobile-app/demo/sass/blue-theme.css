@@ -1,0 +1,244 @@
+[data-bs-theme=blue-theme] body {
+  --bs-heading-color: #e6ecf0;
+  --bs-body-color: #d3d7dc;
+  --bs-body-bg: #0f1535;
+  --bs-body-bg-2: #181f4a;
+  --bs-transparent-bg: rgba(255, 255, 255, 0.10);
+  --bs-border-color-translucent: rgba(226, 232, 240, 0.15);
+  --bs-border-color: rgba(255, 255, 255, 0.15);
+  --sticky-header-bg: rgba(255, 255, 255, 0.45);
+  --bs-disabled-bg: #4b5481;
+  --bs-tertiary-bg: #181f4a;
+  --bs-card-bg: #070c29;
+  --bs-emphasis-color: #fff;
+  background-image: url(../assets/images/bg-themes/body-background-1.webp);
+  background-attachment: fixed;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg-2);
+  /* aligns */
+  /* Mobile Top Header */
+  /* Bottom Menu */
+  /* utilities */
+}
+[data-bs-theme=blue-theme] body .form-control:hover:not(:disabled):not([readonly])::file-selector-button {
+  background-color: var(--bs-tertiary-bg);
+}
+[data-bs-theme=blue-theme] body textarea::-moz-placeholder {
+  color: #fff !important;
+  opacity: 0.5;
+}
+[data-bs-theme=blue-theme] body textarea::placeholder {
+  color: #fff !important;
+  opacity: 0.5;
+}
+[data-bs-theme=blue-theme] body input::-moz-placeholder {
+  color: #fff !important;
+}
+[data-bs-theme=blue-theme] body input::placeholder {
+  color: #fff !important;
+}
+[data-bs-theme=blue-theme] body .bg-light {
+  background-color: #171e44 !important;
+}
+[data-bs-theme=blue-theme] body .bg-none {
+  background-image: none !important;
+}
+[data-bs-theme=blue-theme] body .card {
+  background-image: linear-gradient(127.09deg, rgba(6, 11, 40, 0.94) 19.41%, rgba(10, 14, 35, 0.49) 76.65%);
+}
+[data-bs-theme=blue-theme] body .card-title {
+  color: #dee2e6;
+}
+[data-bs-theme=blue-theme] body .dropdown-menu {
+  border: 1px solid var(--bs-border-color-translucent);
+}
+[data-bs-theme=blue-theme] body .form-select:disabled,
+[data-bs-theme=blue-theme] body .form-control:disabled {
+  background-color: var(--bs-disabled-bg);
+}
+[data-bs-theme=blue-theme] body .separator .line {
+  background-color: var(--bs-border-color);
+}
+[data-bs-theme=blue-theme] body .mobile-top-header {
+  background-image: linear-gradient(127.09deg, rgba(6, 11, 40, 0.94) 19.41%, rgba(10, 14, 35, 0.49) 76.65%) !important;
+  background-color: #070c29;
+  height: 70px;
+  z-index: 10;
+  box-shadow: none;
+}
+[data-bs-theme=blue-theme] body .mobile-top-header .back-title {
+  color: #fff;
+}
+[data-bs-theme=blue-theme] body .inner-link {
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg);
+}
+[data-bs-theme=blue-theme] body .inner-link:hover, [data-bs-theme=blue-theme] body .inner-link:focus {
+  background-color: var(--bs-body-bg);
+}
+[data-bs-theme=blue-theme] body .iner-link-title {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=blue-theme] body .section-title h5 {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=blue-theme] body .options {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=blue-theme] body .side-menu-icon {
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg);
+}
+[data-bs-theme=blue-theme] body .amount-input {
+  color: var(--bs-emphasis-color);
+}
+[data-bs-theme=blue-theme] body .amount-input:focus {
+  color: var(--bs-emphasis-color);
+}
+[data-bs-theme=blue-theme] body .account-number {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=blue-theme] body .bank-name {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=blue-theme] body .menu-arrow {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=blue-theme] body .qr-code-img {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+[data-bs-theme=blue-theme] body .auth-bg {
+  background-image: none !important;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+[data-bs-theme=blue-theme] body .btn-proceed {
+  color: #fff;
+  background-image: linear-gradient(310deg, #7928ca, #ff0080);
+}
+[data-bs-theme=blue-theme] body .bottom-menu {
+  background-color: #070c29;
+}
+[data-bs-theme=blue-theme] body .bottom-menu .nav-link {
+  color: var(--bs-body-color);
+}
+[data-bs-theme=blue-theme] body .bottom-menu .nav-link .menu-icon {
+  background-color: var(--bs-body-bg-2);
+}
+[data-bs-theme=blue-theme] body .searchbar .search-close {
+  color: var(--bs-emphasis-color);
+  background-color: var(--bs-body-bg-2);
+}
+[data-bs-theme=blue-theme] body .primaery-menu-close {
+  color: #dee2e6;
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg-2);
+}
+[data-bs-theme=blue-theme] body .primaery-menu-close:hover, [data-bs-theme=blue-theme] body .primaery-menu-close:focus {
+  color: #ffffff;
+  background-color: var(--bs-body-bg-2);
+}
+[data-bs-theme=blue-theme] body .theme-icons {
+  background-color: var(--bs-body-bg);
+}
+[data-bs-theme=blue-theme] body .error {
+  color: #fe1010;
+}
+[data-bs-theme=blue-theme] body .dash-lable {
+  background-color: #f3f3f3;
+}
+[data-bs-theme=blue-theme] body .dropdown-item:hover {
+  background-color: var(--bs-body-bg-2);
+}
+[data-bs-theme=blue-theme] body .dropdown-item:focus {
+  background-color: var(--bs-body-bg-2);
+}
+[data-bs-theme=blue-theme] body .progress {
+  background-color: var(--bs-transparent-bg);
+}
+[data-bs-theme=blue-theme] body .bs-stepper-circle {
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg);
+}
+[data-bs-theme=blue-theme] body .active .bs-stepper-circle {
+  color: #ffffff;
+  background-color: #007bff;
+  background-image: linear-gradient(310deg, #7928ca, #ff0080) !important;
+}
+[data-bs-theme=blue-theme] body .bs-stepper.vertical .bs-stepper-header {
+  background-color: var(--bs-body-bg);
+  border-right: 1px solid var(--bs-border-color-translucent);
+}
+[data-bs-theme=blue-theme] body .imageuploadify {
+  background-color: var(--bs-body-bg);
+}
+[data-bs-theme=blue-theme] body .select2-container--bootstrap-5 .select2-selection {
+  background-color: var(--bs-body-bg);
+  border-color: var(--bs-border-color-translucent);
+}
+[data-bs-theme=blue-theme] body .select2-selection__rendered {
+  color: var(--bs-body-color) !important;
+}
+[data-bs-theme=blue-theme] body .select2-selection__choice {
+  color: var(--bs-body-color) !important;
+  border-color: var(--bs-border-color-translucent) !important;
+}
+[data-bs-theme=blue-theme] body .select2-dropdown {
+  color: #ffffff;
+  background-color: #0f1535;
+}
+[data-bs-theme=blue-theme] body .select2-search__field {
+  color: var(--bs-body-color) !important;
+  border-color: var(--bs-border-color-translucent) !important;
+  background-color: var(--bs-body-bg);
+}
+[data-bs-theme=blue-theme] body .btn-light {
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg-2);
+  border-color: var(--bs-border-color-translucent);
+}
+
+.table {
+  --bs-table-color: var(--bs-body-color);
+  --bs-table-bg: var(--bs-table-bg);
+  --bs-table-border-color: var(--bs-border-color);
+  --bs-table-striped-color: var(--bs-body-color);
+  --bs-table-striped-bg: rgba(255, 255, 255, 0.05);
+  --bs-table-active-color: var(--bs-body-color);
+  --bs-table-active-bg: rgba(255, 255, 255, 0.1);
+  --bs-table-hover-color: var(--bs-body-color);
+  --bs-table-hover-bg: rgba(255, 255, 255, 0.075);
+  border-color: var(--bs-table-border-color);
+}
+
+.list-group {
+  --bs-list-group-color: var(--bs-body-color);
+  --bs-list-group-bg: var(--bs-card-bg) ;
+  --bs-list-group-border-color: var(--bs-border-color);
+  --bs-list-group-border-width: var(--bs-border-width);
+  --bs-list-group-border-radius: var(--bs-border-radius);
+  --bs-list-group-item-padding-x: 1rem;
+  --bs-list-group-item-padding-y: 0.5rem;
+  --bs-list-group-action-color: var(--bs-secondary-color);
+  --bs-list-group-action-hover-color: var(--bs-emphasis-color);
+  --bs-list-group-action-hover-bg: var(--bs-tertiary-bg);
+  --bs-list-group-action-active-color: var(--bs-body-color);
+  --bs-list-group-action-active-bg: var(--bs-secondary-bg);
+  --bs-list-group-disabled-color: var(--bs-secondary-color);
+  --bs-list-group-disabled-bg: var(--bs-body-bg);
+  --bs-list-group-active-color: #fff;
+  --bs-list-group-active-bg: #0d6efd;
+  --bs-list-group-active-border-color: #0d6efd;
+  border-radius: var(--bs-list-group-border-radius);
+}
+
+.card-lable {
+  font-size: 13px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  width: -moz-max-content;
+  width: max-content;
+}/*# sourceMappingURL=blue-theme.css.map */

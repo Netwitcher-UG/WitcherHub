@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en" data-bs-theme="blue-theme">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maxton - Digital Payment Mobile Application</title>
+  <!--favicon-->
+  <link rel="icon" href="assets/images/favicon-32x32.png" type="image/png">
+  <!-- loader-->
+  <link href="assets/css/pace.min.css" rel="stylesheet">
+  <script src="assets/js/pace.min.js"></script>
+
+  <!-- Link Swiper's CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
+
+  <!--bootstrap css-->
+  <link href="assets/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Material+Icons+Outlined" rel="stylesheet">
+  <!--main css-->
+  <link href="assets/css/bootstrap-extended.css" rel="stylesheet">
+  <link href="sass/main.css" rel="stylesheet">
+  <link href="sass/dark-theme.css" rel="stylesheet">
+  <link href="sass/blue-theme.css" rel="stylesheet">
+  <link href="sass/responsive.css" rel="stylesheet">
+
+</head>
+
+<body>
+
+<!--start header-->
+<header
+  class="mobile-top-header border-bottom position-fixed top-0 start-0 end-0 d-flex align-items-center justify-content-between px-3 bg-grd-primary">
+  <div class="d-flex align-items-center gap-3">
+    <a href="javascript:;" class="btn-back" onclick="history.back()"><i class="material-icons-outlined">arrow_back</i></a>
+    <h6 class="back-title mb-0">My Wallet</h6>
+  </div>
+</header>
+<!--end header-->
+
+
+<!--main content--> 
+<main class="main-content">
+
+<!--start card details-->
+<section class="card-details py-3">
+  <div class="d-flex align-items-center gap-3">
+     <div class="bank-logo border p-2 rounded-4">
+       <img src="assets/images/banks/08.png" width="45" alt="">
+     </div>
+     <div class="bank-details">
+         <p class="mb-0">Wallet Balance</p>  
+         <h4 class="mb-0">$78,452</h4>
+     </div>                 
+     <div class="dropdown ms-auto">
+       <a href="javascript:;" class="dropdown-toggle-nocaret options dropdown-toggle"
+         data-bs-toggle="dropdown">
+         <span class="material-icons-outlined fs-5">more_vert</span>
+       </a>
+       <ul class="dropdown-menu">
+         <li><a class="dropdown-item" href="javascript:;">Action</a></li>
+         <li><a class="dropdown-item" href="javascript:;">Another action</a></li>
+         <li><a class="dropdown-item" href="javascript:;">Something else here</a></li>
+       </ul>
+     </div>
+  </div>
+ </section>
+<!--end card details-->
+
+
+<!--start menu-->
+<div class="list-group list-group-flush py-3">
+  <a href="javascript:;" class="list-group-item bg-transparent mb-0 rounded-0 d-flex align-items-center gap-3">
+    <span class="side-menu-icon material-icons-outlined">add_circle_outline</span>
+    <span class="menu-name">Add Money to Wallet</span>
+    <span class="menu-arrow ms-auto material-icons-outlined">chevron_right</span>
+  </a>
+  <a href="javascript:;" class="list-group-item bg-transparent mb-0 rounded-0 d-flex align-items-center gap-3">
+    <span class="side-menu-icon material-icons-outlined">send</span>
+    <span class="menu-name">Send Money to bank</span>
+    <span class="menu-arrow ms-auto material-icons-outlined">chevron_right</span>
+  </a>
+  <a href="javascript:;" class="list-group-item bg-transparent mb-0 rounded-0 d-flex align-items-center gap-3">
+    <span class="side-menu-icon material-icons-outlined">file_download</span>
+    <span class="menu-name">Download Statment</span>
+    <span class="menu-arrow ms-auto material-icons-outlined">chevron_right</span>
+  </a>
+  <a href="javascript:;" class="list-group-item bg-transparent mb-0 rounded-0 d-flex align-items-center gap-3">
+    <span class="side-menu-icon material-icons-outlined">insights</span>
+    <span class="menu-name">Spend Analytics</span>
+    <span class="menu-arrow ms-auto material-icons-outlined">chevron_right</span>
+  </a>
+  <a href="javascript:;" class="list-group-item bg-transparent mb-0 rounded-0 d-flex align-items-center gap-3">
+    <span class="side-menu-icon material-icons-outlined">add_alert</span>
+    <span class="menu-name">Payment Reminder</span>
+    <span class="menu-arrow ms-auto material-icons-outlined">chevron_right</span>
+  </a>
+</div>
+<!--end menu-->
+
+  <!--start transactions-->
+    <section class="transactions">
+       <div class="d-flex align-items-center justify-content-between">
+           <h5 class="mb-0">Transactions</h5>
+           <div class="dropdown">
+            <a href="javascript:;" class="btn border dropdown-toggle-nocaret dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown">
+              <span>Recent</span>
+              <span class="material-icons-outlined fs-6">expand_more</span>
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="javascript:;">Action</a></li>
+              <li><a class="dropdown-item" href="javascript:;">Another action</a></li>
+              <li><a class="dropdown-item" href="javascript:;">Something else here</a></li>
+            </ul>
+          </div>
+       </div>
+       <div class="history-list d-flex flex-column gap-0 mt-3">
+        
+          <div class="history-list-item d-flex align-items-center gap-3 border-bottom rounded-0 p-3">
+             <div class="wh-48 d-flex align-items-center justify-content-center rounded-circle bg-success">
+                <span class="material-icons-outlined text-white">payments</span>
+             </div>
+             <div class="history-info">
+                <h6 class="mb-0">Clothing</h6>
+                <p class="mb-0">Today 4:30 PM</p>   
+             </div>
+             <div class="paid-amount ms-auto">
+                <p class="mb-0 fw-bold text-danger">-$840</p>
+             </div>
+          </div>
+          <div class="history-list-item d-flex align-items-center gap-3 border-bottom rounded-0 p-3">
+            <div class="history-avatar">
+               <img src="https://placehold.co/110x110" width="48" height="48" class="rounded-circle" alt="">
+            </div>
+            <div class="history-info">
+               <h6 class="mb-0">David Jhon</h6>
+               <p class="mb-0">5 Aug 6:47 PM</p>   
+            </div>
+            <div class="paid-amount ms-auto">
+               <p class="mb-0 fw-bold text-success">+$246</p>
+            </div>
+         </div>
+         <div class="history-list-item d-flex align-items-center gap-3 border-bottom rounded-0 p-3">
+          <div class="history-avatar">
+             <img src="https://placehold.co/110x110" width="48" height="48" class="rounded-circle" alt="">
+          </div>
+          <div class="history-info">
+             <h6 class="mb-0">Warner hussay</h6>
+             <p class="mb-0">8 Aug 7:34 AM</p>   
+          </div>
+          <div class="paid-amount ms-auto">
+             <p class="mb-0 fw-bold text-success">+$187</p>
+          </div>
+       </div>
+         <div class="history-list-item d-flex align-items-center gap-3 border-bottom rounded-0 p-3">
+          <div class="wh-48 d-flex align-items-center justify-content-center rounded-circle bg-primary">
+             <span class="text-white fs-2">M</span>
+          </div>
+          <div class="history-info">
+             <h6 class="mb-0">Akshay Kumar</h6>
+             <p class="mb-0">15 Oct 9:45 PM</p>   
+          </div>
+          <div class="paid-amount ms-auto">
+             <p class="mb-0 fw-bold text-danger">-$148</p>
+          </div>
+       </div>
+       <div class="history-list-item d-flex align-items-center gap-3 border-bottom rounded-0 p-3">
+        <div class="history-avatar">
+           <img src="https://placehold.co/110x110" width="48" height="48" class="rounded-circle" alt="">
+        </div>
+        <div class="history-info">
+           <h6 class="mb-0">Brandom</h6>
+           <p class="mb-0">10 Dec 3:52 AM</p>   
+        </div>
+        <div class="paid-amount ms-auto">
+           <p class="mb-0 fw-bold text-success">+$279</p>
+        </div>
+     </div>
+     <div class="history-list-item d-flex align-items-center gap-3 p-3">
+      <div class="wh-48 d-flex align-items-center justify-content-center rounded-circle bg-danger">
+         <span class="text-white fs-2">A</span>
+      </div>
+      <div class="history-info">
+         <h6 class="mb-0">Akshay Kumar</h6>
+         <p class="mb-0">22 Nov 7:34 AM</p>   
+      </div>
+      <div class="paid-amount ms-auto">
+         <p class="mb-0 fw-bold text-danger">+$129</p>
+      </div>
+   </div>
+
+       </div>
+    </section>
+  <!--start transactions-->
+  
+</main>
+<!--main content--> 
+
+
+<!--start bottom menu-->
+<ul class="nav bottom-menu border-top position-fixed bottom-0 start-0 end-0 h-70 d-flex align-items-center justify-content-between px-3">
+  <li class="nav-item">
+    <a class="nav-link d-flex flex-column gap-0 align-items-center" href="home.html">
+      <span class="menu-icon material-icons-outlined">home</span>
+      <span class="menu-name">Home</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link d-flex flex-column gap-0 align-items-center" href="my-wallet.html">
+      <span class="menu-icon material-icons-outlined active">account_balance</span>
+      <span class="menu-name">Wallet</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link d-flex flex-column gap-0 align-items-center" href="account-details.html">
+      <span class="menu-icon material-icons-outlined">account_circle</span>
+      <span class="menu-name">Account</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link d-flex flex-column gap-0 align-items-center" href="history.html">
+      <span class="menu-icon material-icons-outlined">history</span>
+      <span class="menu-name">History</span>
+    </a>
+  </li>
+</ul>
+<!--end bottom menu-->
+
+<!--start switcher-->
+<button class="btn btn-grd btn-grd-primary btn-switcher raised position-fixed bottom-50 end-0 d-flex align-items-center gap-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#themeSwitcher">
+  <i class="material-icons-outlined">tune</i>
+</button>
+
+<div class="offcanvas offcanvas-end" data-bs-scroll="true" tabindex="-1" id="themeSwitcher">
+  <div class="offcanvas-header border-bottom h-70">
+    <div class="">
+      <h5 class="mb-0">Theme Customizer</h5>
+      <p class="mb-0">Customize your theme</p>
+    </div>
+    <a href="javascript:;" class="primaery-menu-close" data-bs-dismiss="offcanvas">
+      <i class="material-icons-outlined">close</i>
+    </a>
+  </div>
+  <div class="offcanvas-body">
+    <div>
+      <p>Theme variation</p>
+
+      <div class="row g-3">
+        <div class="col-12 col-xl-6">
+          <input type="radio" class="btn-check" name="theme-options" id="BlueTheme" checked>
+          <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="BlueTheme">
+            <span class="material-icons-outlined">contactless</span>
+            <span>Blue</span>
+          </label>
+        </div>
+        <div class="col-12 col-xl-6">
+          <input type="radio" class="btn-check" name="theme-options" id="LightTheme">
+          <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="LightTheme">
+            <span class="material-icons-outlined">light_mode</span>
+            <span>Light</span>
+          </label>
+        </div>
+        <div class="col-12 col-xl-6">
+          <input type="radio" class="btn-check" name="theme-options" id="DarkTheme">
+          <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="DarkTheme">
+            <span class="material-icons-outlined">dark_mode</span>
+            <span>Dark</span>
+          </label>
+        </div>
+      </div><!--end row-->
+
+    </div>
+  </div>
+</div>
+<!--start switcher-->
+
+  <!--bootstrap js-->
+  <script src="assets/js/bootstrap.bundle.min.js"></script>
+
+  <!--jquery-->
+  <script src="assets/js/jquery.min.js"></script>
+  <script>
+    /* show less button */
+    $(".inner-link").on("click", function () {
+      $(".rond-icon").toggleClass("transform180"),
+
+      $(".more-text").toggleClass("d-none"),
+      $(".less-text").toggleClass("d-block")
+
+    })
+  </script>
+  <!-- Swiper JS -->
+  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+  <!-- Initialize Swiper -->
+  <script>
+    var swiper = new Swiper(".Slider1", {
+      slidesPerView: 3,
+      spaceBetween: 30,
+      freeMode: true,
+    });
+  </script>
+  <script src="assets/js/main.js"></script>
+
+
+
+
+</body>
+
+</html>
