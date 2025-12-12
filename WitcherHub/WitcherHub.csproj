@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -7,6 +7,10 @@
     <UserSecretsId>cd0935cf-1dce-4462-a1f2-151a5ee3f80e</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
   </PropertyGroup>
+
+	<ItemGroup>
+		<Content Remove="$(NuGetPackageRoot)**\BuildHost-net472\**;$(NuGetPackageRoot)**\BuildHost-netcore\**" />
+	</ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
