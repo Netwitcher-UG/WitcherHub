@@ -37,6 +37,8 @@
 
   <ItemGroup>
     <Folder Include="Configuration\Middleware\" />
+    <Folder Include="wwwroot\theme\assets\" />
+    <Folder Include="wwwroot\theme\sass\" />
   </ItemGroup>
 
 </Project>
