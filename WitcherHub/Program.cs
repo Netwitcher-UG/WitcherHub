@@ -7,7 +7,8 @@ builder.Host.UseSerilog((context, services, configuration) =>
     configuration
         .ReadFrom.Configuration(context.Configuration)  
         .ReadFrom.Services(services)                    
-        .Enrich.FromLogContext();                       
+        .Enrich.FromLogContext()  
+        .WriteTo.Console();
 });
 builder.Services.AddPresentation(builder.Configuration);
 
