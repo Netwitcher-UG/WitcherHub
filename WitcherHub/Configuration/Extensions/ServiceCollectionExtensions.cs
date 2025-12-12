@@ -53,8 +53,34 @@ namespace WitcherHub.Configuration.Extensions
                             }
 
                             return Task.CompletedTask;
+                        },
+
+                        OnChallenge = context =>
+                        {
+                            if (!context.Request.Path.StartsWithSegments("/api") &&
+                                !context.Request.Path.StartsWithSegments("/swagger"))
+                            {
+                                context.HandleResponse(); 
+                                var returnUrl = Uri.EscapeDataString(context.Request.Path + context.Request.QueryString);
+                                context.Response.Redirect($"/Auth/Login?returnUrl={returnUrl}");
+                            }
+
+                            return Task.CompletedTask;
+                        },
+
+                        OnForbidden = context =>
+                        {
+                            if (!context.Request.Path.StartsWithSegments("/api") &&
+                                !context.Request.Path.StartsWithSegments("/swagger"))
+                            {
+                                var returnUrl = Uri.EscapeDataString(context.Request.Path + context.Request.QueryString);
+                                context.Response.Redirect($"/Auth/Login?returnUrl={returnUrl}");
+                            }
+
+                            return Task.CompletedTask;
                         }
                     };
+
 
                 });
             services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
@@ -64,6 +90,8 @@ namespace WitcherHub.Configuration.Extensions
             services.AddInfrastructure(configuration);
 
             services.AddSwaggerDocumentation();
+            
+
 
             return services;
         }
