@@ -423,3 +423,4 @@ FodyWeavers.xsd
 # Razor/BuildHost generated folders
 **/BuildHost-net472/
 **/BuildHost-netcore/
+/WitcherHub/appsettings.json
