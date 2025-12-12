@@ -30,8 +30,13 @@ RUN dotnet publish "WitcherHub.csproj" -c $BUILD_CONFIGURATION -o /app/publish /
 FROM base AS final
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgssapi-krb5-2 libkrb5-3 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=publish /app/publish .
 COPY WitcherHub/libs/linux/libwkhtmltox.so /app/libs/linux/libwkhtmltox.so
 
+ENV LD_LIBRARY_PATH="/app/libs/linux:${LD_LIBRARY_PATH}"
 
 ENTRYPOINT ["dotnet", "WitcherHub.dll"]
