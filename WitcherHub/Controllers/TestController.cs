@@ -10,13 +10,16 @@ namespace WitcherHub.Controllers
     {
         private readonly ILexwareClient _lexwareClient;
         private readonly IAiTextGenerator _aiTextGenerator;
+        private readonly IAuthService _auth;
 
         public TestController(
             ILexwareClient lexwareClient,
-            IAiTextGenerator aiTextGenerator)
+            IAiTextGenerator aiTextGenerator,
+            IAuthService auth)
         {
             _lexwareClient = lexwareClient;
             _aiTextGenerator = aiTextGenerator;
+            _auth = auth;
         }
 
         /// <summary>
@@ -42,6 +45,32 @@ namespace WitcherHub.Controllers
                 Prompt = prompt,
                 Response = response
             });
+        }
+
+        
+
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct)
+        {
+            var result = await _auth.LoginAsync(request, ct);
+
+            Response.Cookies.Append("access_token", result.AccessToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = result.ExpiresAtUtc
+            });
+
+            return Ok(result);
+        }
+
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            Response.Cookies.Delete("access_token");
+            return Ok();
         }
     }
 }

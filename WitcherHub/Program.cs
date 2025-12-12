@@ -12,7 +12,7 @@ builder.Host.UseSerilog((context, services, configuration) =>
 builder.Services.AddPresentation(builder.Configuration);
 
 var app = builder.Build();
-
+await app.SeedAsync();
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();

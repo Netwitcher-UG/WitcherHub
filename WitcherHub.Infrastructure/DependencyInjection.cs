@@ -8,8 +8,10 @@ using OpenAI.Chat;
 using System;
 using System.Net.Http.Headers;
 using WitcherHub.Application.Interfaces;
+using WitcherHub.Infrastructure.Authentication;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
+using WitcherHub.Infrastructure.Seeding;
 using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Infrastructure.Services.OpenAI;
 
@@ -84,8 +86,8 @@ namespace WitcherHub.Infrastructure
             });
 
             services.AddScoped<IAiTextGenerator, OpenAiTextGenerator>();
-
-           
+            services.AddScoped<IDataSeeder, IdentityDataSeeder>();
+            services.AddScoped<IAuthService, AuthService>();
 
             return services;
         }

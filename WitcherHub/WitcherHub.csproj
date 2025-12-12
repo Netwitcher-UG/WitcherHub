@@ -10,7 +10,7 @@
 
 	<ItemGroup>
 		<Content Remove="$(NuGetPackageRoot)**\BuildHost-net472\**;$(NuGetPackageRoot)**\BuildHost-netcore\**" />
-		<None    Remove="$(NuGetPackageRoot)**\BuildHost-net472\**;$(NuGetPackageRoot)**\BuildHost-netcore\**" />
+		<None Remove="$(NuGetPackageRoot)**\BuildHost-net472\**;$(NuGetPackageRoot)**\BuildHost-netcore\**" />
 	</ItemGroup>
 
 
@@ -21,6 +21,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.OpenApi" Version="2.3.0" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
