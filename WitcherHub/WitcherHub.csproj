@@ -10,9 +10,11 @@
 
 	<ItemGroup>
 		<Content Remove="$(NuGetPackageRoot)**\BuildHost-net472\**;$(NuGetPackageRoot)**\BuildHost-netcore\**" />
+		<None    Remove="$(NuGetPackageRoot)**\BuildHost-net472\**;$(NuGetPackageRoot)**\BuildHost-netcore\**" />
 	</ItemGroup>
 
-  <ItemGroup>
+
+	<ItemGroup>
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.1">

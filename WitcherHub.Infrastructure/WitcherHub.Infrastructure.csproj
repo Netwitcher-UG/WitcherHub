@@ -6,7 +6,13 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
+	<ItemGroup>
+		<Content Remove="$(NuGetPackageRoot)**\BuildHost-net472\**;$(NuGetPackageRoot)**\BuildHost-netcore\**" />
+		<None    Remove="$(NuGetPackageRoot)**\BuildHost-net472\**;$(NuGetPackageRoot)**\BuildHost-netcore\**" />
+	</ItemGroup>
+
+
+	<ItemGroup>
     <ProjectReference Include="..\WitcherHub.Application\WitcherHub.Application.csproj" />
     <ProjectReference Include="..\WitcherHub.Domain\WitcherHub.Domain.csproj" />
   </ItemGroup>
