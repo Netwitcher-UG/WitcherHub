@@ -1,0 +1,67 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace WitcherHub.Infrastructure.Data.Models
+{
+    public class ServiceCatalogItem
+    {
+        // نص ثابت مثل: svc_web_basic
+        [Key, MaxLength(80)]
+        public string Id { get; set; } = default!;
+
+        [MaxLength(250)]
+        public string Name { get; set; } = default!;
+
+        public ServiceType ServiceType { get; set; } = ServiceType.Other;
+        public PricingModel PricingModel { get; set; } = PricingModel.Fixed;
+
+        [Column(TypeName = "numeric(12,2)")]
+        public decimal BasePrice { get; set; }
+
+        [MaxLength(10)]
+        public string DefaultCurrency { get; set; } = "EUR";
+
+        public bool IsActive { get; set; } = true;
+
+        [Column(TypeName = "jsonb")]
+        public JsonDocument? ConfigSchema { get; set; }
+
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+        public ICollection<PricingRule> PricingRules { get; set; } = new List<PricingRule>();
+
+    }
+
+
+    public class PricingRule : BaseEntity
+    {
+        [MaxLength(80)]
+        public string ServiceId { get; set; } = default!;
+        public ServiceCatalogItem Service { get; set; } = default!;
+
+        [MaxLength(200)]
+        public string Name { get; set; } = default!;
+
+        public int Priority { get; set; } = 100;
+
+        [MaxLength(2000)]
+        public string ConditionExpr { get; set; } = "true";
+
+        public RuleAction Action { get; set; }
+
+        [MaxLength(2000)]
+        public string ValueExpr { get; set; } = "0";
+
+        [MaxLength(200)]
+        public string? Label { get; set; }
+
+        [MaxLength(30)]
+        public string Scope { get; set; } = "LINE_ITEM"; // LINE_ITEM / INVOICE
+
+        public bool IsActive { get; set; } = true;
+
+        public DateOnly? ValidFrom { get; set; }
+        public DateOnly? ValidTo { get; set; }
+    }
+}
