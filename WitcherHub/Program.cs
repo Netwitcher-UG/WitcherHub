@@ -17,17 +17,27 @@ await app.SeedAsync();
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
-    app.UseSwaggerDocumentation();
 }
 else
 {
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
+
+
 app.UseSerilogRequestLogging();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+
+var enableSwagger = app.Environment.IsDevelopment()
+                 || app.Environment.IsStaging()
+                 || app.Configuration.GetValue<bool>("Swagger:Enabled");
+
+if (enableSwagger)
+{
+    app.UseSwaggerDocumentation();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
