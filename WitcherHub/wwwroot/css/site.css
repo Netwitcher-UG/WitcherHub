@@ -1,4 +1,4 @@
-html {
+﻿html {
   font-size: 14px;
 }
 
@@ -29,3 +29,90 @@ body {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
   text-align: start;
 }
+
+.page-content {
+    padding-top: 140px; 
+}
+
+:root {
+    --top-header-h: 70px; 
+    --primary-menu-h: 70px;
+}
+
+body {
+    padding-top: calc(var(--top-header-h) + var(--primary-menu-h) + 16px);
+}
+
+/* wrapper spacing so table doesn't hug card edges */
+.maxton-table-wrap {
+    padding: .25rem .75rem .75rem;
+}
+
+/* fixed layout + nicer spacing between rows */
+.maxton-table {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: separate !important;
+    border-spacing: 0 .65rem; /* space between rows (card-like rows) */
+}
+
+    /* header */
+    .maxton-table thead th {
+        padding: .85rem 1rem;
+        font-weight: 600;
+        font-size: .8rem;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        border: 0 !important;
+        opacity: .9;
+    }
+
+    /* body cells */
+    .maxton-table tbody td {
+        padding: 1rem 1rem;
+        border: 0 !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        background: rgba(255,255,255,.03); /* works nicely on dark theme */
+    }
+
+    /* rounded row corners (apply on first/last td because tables) */
+    .maxton-table tbody tr td:first-child {
+        border-top-left-radius: 14px;
+        border-bottom-left-radius: 14px;
+        padding-left: 1.25rem; /* important: prevents "sticking" to left edge */
+    }
+
+    .maxton-table tbody tr td:last-child {
+        border-top-right-radius: 14px;
+        border-bottom-right-radius: 14px;
+        padding-right: 1.25rem; /* important: prevents "sticking" to right edge */
+    }
+
+    /* subtle row hover */
+    .maxton-table tbody tr:hover td {
+        background: rgba(255,255,255,.05);
+    }
+
+    /* optional: softer separator line feel (like premium dashboards) */
+    .maxton-table tbody tr td {
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+    }
+
+    /* keep actions aligned and not wrapping */
+    .maxton-table td.text-end {
+        overflow: visible; /* so buttons are not clipped */
+        text-overflow: initial;
+    }
+
+    /* optional: make action buttons look more premium */
+    .maxton-table .btn.rounded-circle {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
