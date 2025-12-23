@@ -116,3 +116,41 @@ body {
         justify-content: center;
     }
 
+.form-section {
+    margin-top: 28px;
+}
+
+    .form-section:first-of-type {
+        margin-top: 0;
+    }
+
+.form-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: .2px;
+    color: rgba(34, 211, 238, .95);
+    text-transform: none;
+}
+
+    .form-section-header i {
+        font-size: 18px;
+        opacity: .95;
+    }
+
+.form-section-divider {
+    height: 1px;
+    background: rgba(255,255,255,.10);
+    margin: 10px 0 16px;
+}
+
+.form-section-sub {
+    font-size: 12px;
+    color: rgba(255,255,255,.55);
+    margin-top: -10px;
+    margin-bottom: 12px;
+}
+
+
