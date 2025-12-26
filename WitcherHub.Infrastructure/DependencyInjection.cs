@@ -1,4 +1,4 @@
-﻿
+
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -11,6 +11,7 @@ using WitcherHub.Application.Interfaces;
 using WitcherHub.Infrastructure.Authentication;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
+using WitcherHub.Infrastructure.Repositories.Implementations;
 using WitcherHub.Infrastructure.Seeding;
 using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Infrastructure.Services.OpenAI;
@@ -88,6 +89,11 @@ namespace WitcherHub.Infrastructure
             services.AddScoped<IAiTextGenerator, OpenAiTextGenerator>();
             services.AddScoped<IDataSeeder, IdentityDataSeeder>();
             services.AddScoped<IAuthService, AuthService>();
+
+         
+
+            // UnitOfWork
+            services.AddScoped<IUnitOfWork, UnitOfWork>();
 
             return services;
         }

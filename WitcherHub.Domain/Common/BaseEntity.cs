@@ -1,8 +1,11 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Text;
 
-namespace WitcherHub.Infrastructure.Data.Models
+namespace WitcherHub.Domain.Commen
 {
-    public class BaseEntity
+    public abstract class BaseEntity
     {
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();

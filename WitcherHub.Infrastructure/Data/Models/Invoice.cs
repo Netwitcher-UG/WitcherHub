@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
+using WitcherHub.Domain.Commen;
 namespace WitcherHub.Infrastructure.Data.Models
 {
 
@@ -54,7 +55,7 @@ namespace WitcherHub.Infrastructure.Data.Models
         public Invoice Invoice { get; set; } = default!;
 
         [MaxLength(80)]
-        public string? ServiceId { get; set; }
+        public Guid? ServiceId { get; set; }
         public ServiceCatalogItem? Service { get; set; }
 
         [MaxLength(250)]

@@ -2,15 +2,14 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json;
+using WitcherHub.Domain.Commen;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Infrastructure.Data.Models
 {
-    public class ServiceCatalogItem
+    public class ServiceCatalogItem : BaseEntity
     {
-        // نص ثابت مثل: svc_web_basic
-        [Key, MaxLength(80)]
-        public string Id { get; set; } = default!;
+        
 
         [MaxLength(250)]
         public string Name { get; set; } = default!;
@@ -39,7 +38,7 @@ namespace WitcherHub.Infrastructure.Data.Models
     public class PricingRule : BaseEntity
     {
         [MaxLength(80)]
-        public string ServiceId { get; set; } = default!;
+        public Guid ServiceId { get; set; } = default!;
         public ServiceCatalogItem Service { get; set; } = default!;
 
         [MaxLength(200)]

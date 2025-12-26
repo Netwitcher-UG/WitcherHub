@@ -19,7 +19,6 @@
 
   <ItemGroup>
     <Folder Include="ManageData\" />
-    <Folder Include="Repositories\Implementations\" />
     <Folder Include="Services\cache\" />
     <Folder Include="Services\Email Sender\" />
     <Folder Include="Services\Mapping\" />
