@@ -9,8 +9,12 @@
   </PropertyGroup>
 
 	<ItemGroup>
+		<Compile Remove="Configuration\Middleware\**" />
 		<Content Remove="$(NuGetPackageRoot)**\BuildHost-net472\**;$(NuGetPackageRoot)**\BuildHost-netcore\**" />
+		<Content Remove="Configuration\Middleware\**" />
+		<EmbeddedResource Remove="Configuration\Middleware\**" />
 		<None Remove="$(NuGetPackageRoot)**\BuildHost-net472\**;$(NuGetPackageRoot)**\BuildHost-netcore\**" />
+		<None Remove="Configuration\Middleware\**" />
 	</ItemGroup>
 
 
@@ -36,7 +40,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Configuration\Middleware\" />
     <Folder Include="wwwroot\theme\assets\" />
   </ItemGroup>
 

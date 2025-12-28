@@ -54,8 +54,65 @@
                     </table>
                 </div>
 
+                @* ✅ Pagination (Working with icons) *@
+                @if (Model.Pagination?.HasPages == true)
+                {
+                    var p = Model.Pagination;
+
+                    <div class="d-flex align-items-center justify-content-between mt-3 flex-wrap gap-2">
+                        <div class="text-muted small ms-2">
+                            Page @p.Page of @p.TotalPages
+                            <span class="mx-1">•</span>
+                            Total @p.TotalItems
+                        </div>
+
+                        <nav aria-label="Table pagination">
+                            <ul class="pagination mb-0">
+
+                                @* Prev *@
+                                <li class="page-item @(p.HasPrev ? "" : "disabled")">
+                                    <a class="page-link"
+                                       aria-label="Previous"
+                                       href="@(p.HasPrev ? $"?{p.PageParam}={p.PrevPage}&{p.PageSizeParam}={p.PageSize}{(string.IsNullOrWhiteSpace(p.SearchQuery) ? "" : $"&{p.SearchParam}={Uri.EscapeDataString(p.SearchQuery)}")}" : "javascript:;")">
+                                        <span aria-hidden="true">«</span>
+                                    </a>
+                                </li>
+
+                                @* Numbers + ellipsis *@
+                                @foreach (var it in p.BuildItems())
+                                {
+                                    if (it.IsEllipsis)
+                                    {
+                                        <li class="page-item disabled">
+                                            <a class="page-link" href="javascript:;">…</a>
+                                        </li>
+                                    }
+                                    else
+                                    {
+                                        <li class="page-item @(it.IsActive ? "active" : "")">
+                                            <a class="page-link"
+                                               href="?@p.PageParam=@it.Page&@p.PageSizeParam=@p.PageSize@(string.IsNullOrWhiteSpace(p.SearchQuery) ? "" : $"&{p.SearchParam}={Uri.EscapeDataString(p.SearchQuery)}")">
+                                                @it.Text
+                                            </a>
+                                        </li>
+                                    }
+                                }
+
+                                @* Next *@
+                                <li class="page-item @(p.HasNext ? "" : "disabled")">
+                                    <a class="page-link"
+                                       aria-label="Next"
+                                       href="@(p.HasNext ? $"?{p.PageParam}={p.NextPage}&{p.PageSizeParam}={p.PageSize}{(string.IsNullOrWhiteSpace(p.SearchQuery) ? "" : $"&{p.SearchParam}={Uri.EscapeDataString(p.SearchQuery)}")}" : "javascript:;")">
+                                        <span aria-hidden="true">»</span>
+                                    </a>
+                                </li>
+
+                            </ul>
+                        </nav>
+                    </div>
+                }
+
             </div>
         </div>
     </div>
 </div>
-

@@ -55,6 +55,20 @@ namespace WitcherHub.Infrastructure.Repositories.Implementations
 
             return await q.FirstOrDefaultAsync(predicate, ct);
         }
+        public IQueryable<TEntity> Query(
+    bool asNoTracking = true,
+    params Expression<Func<TEntity, object>>[] includes)
+        {
+            IQueryable<TEntity> q = _set;
+
+            if (includes is { Length: > 0 })
+                foreach (var inc in includes)
+                    q = q.Include(inc);
+
+            if (asNoTracking) q = q.AsNoTracking();
+
+            return q;
+        }
 
         public async Task<IReadOnlyList<TEntity>> ListAsync(
             Expression<Func<TEntity, bool>>? predicate = null,

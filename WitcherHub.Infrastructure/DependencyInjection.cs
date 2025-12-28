@@ -13,6 +13,7 @@ using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
 using WitcherHub.Infrastructure.Repositories.Implementations;
 using WitcherHub.Infrastructure.Seeding;
+using WitcherHub.Infrastructure.Services.Caching;
 using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Infrastructure.Services.OpenAI;
 
@@ -35,7 +36,11 @@ namespace WitcherHub.Infrastructure
             {
                 options.UseNpgsql(connectionString);
             });
+            // Memory cache (in-process)
+            services.AddMemoryCache();
 
+            // Cache service wrapper (tags + stampede protection)
+            services.AddScoped<ICacheService, CacheService>();
             // ===== Identity =====
             services.AddIdentityCore<AppUser>(options =>
             {

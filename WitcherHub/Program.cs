@@ -2,6 +2,7 @@
 using WitcherHub.Configuration.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddAppExceptionHandling();
 builder.Host.UseSerilog((context, services, configuration) =>
 {
     configuration
@@ -20,7 +21,7 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
-    app.UseExceptionHandler("/Error");
+    app.UseAppExceptionHandling();
     app.UseHsts();
 }
 

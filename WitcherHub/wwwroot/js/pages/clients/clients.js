@@ -1,0 +1,717 @@
+﻿(function () {
+    'use strict';
+    window.UI = window.UI || {};
+    const UI = window.UI;
+    // ---------- Helpers ----------
+    function esc(s) {
+        return (s ?? '').toString()
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+    function $(id) { return document.getElementById(id); }
+    function setText(id, value) { const el = $(id); if (el) el.textContent = value ?? '—'; }
+    function setHtml(id, html) { const el = $(id); if (el) el.innerHTML = html ?? ''; }
+
+    function toastSuccess(msg, title) { UI?.toast?.success ? UI.toast.success(msg, title) : alert((title ? title + ": " : "") + msg); }
+    function toastInfo(msg, title) { UI?.toast?.info ? UI.toast.info(msg, title) : alert((title ? title + ": " : "") + msg); }
+    function toastError(msg, title) { UI?.toast?.error ? UI.toast.error(msg, title) : alert((title ? title + ": " : "") + msg); }
+
+    async function confirmBox(message, title) {
+        if (UI?.confirm?.basic) return await UI.confirm.basic(message, { title: title ?? 'Confirm', okText: 'Yes', cancelText: 'No' });
+        return window.confirm(message);
+    }
+
+    function typeBadgeHtml(type) {
+        const isCompany = type === 'Company';
+        const cls = isCompany ? "badge bg-success bg-opacity-10 text-success" : "badge bg-info bg-opacity-10 text-info";
+        return `<span class="${cls}">${esc(type)}</span>`;
+    }
+
+    function closeAllCollapses() {
+        const ids = ['vc-deleteClientCollapse', 'vc-addLocationCollapse', 'vc-addContactCollapse'];
+        ids.forEach(id => {
+            const el = $(id);
+            if (!el) return;
+            bootstrap.Collapse.getOrCreateInstance(el, { toggle: false }).hide();
+        });
+    }
+
+    // ---------- Mock Data (demo) ----------
+    const mockClients = {
+        "demo-individual": {
+            id: "demo-individual",
+            type: "Individual",
+            name: "Anas Sadek",
+            email: "anas@email.com",
+            phone: "+49 174 234 5678",
+            taxId: "—",
+            notes: "VIP customer, prefers email.",
+            addresses: [
+                { label: "Home", isDefault: true, street: "Alexanderplatz", streetNr: "1", city: "Berlin", country: "Germany", postalCode: "10178", addressLine2: "" }
+            ],
+            contacts: [],
+            projects: [
+                { name: "Website Redesign", status: "Active" },
+                { name: "Maintenance", status: "Planned" }
+            ]
+        },
+        "demo-company": {
+            id: "demo-company",
+            type: "Company",
+            name: "ACME LLC",
+            email: "finance@acme.com",
+            phone: "+1 212 555 0199",
+            taxId: "CR-123456",
+            notes: "Company account. Multiple locations.",
+            addresses: [
+                { label: "Billing", isDefault: true, street: "5th Avenue", streetNr: "500", city: "New York", country: "USA", postalCode: "10018", addressLine2: "Floor 12" },
+                { label: "Shipping", isDefault: false, street: "Industrial Rd", streetNr: "77", city: "Newark", country: "USA", postalCode: "07102", addressLine2: "" }
+            ],
+            contacts: [
+                { isPrimary: true, name: "Sara Ahmed", position: "Manager", email: "sara@acme.com", phone: "+1 212 555 0101" },
+                { isPrimary: false, name: "John Finch", position: "Finance", email: "john@acme.com", phone: "+1 212 555 0102" }
+            ],
+            projects: [
+                { name: "ERP Integration", status: "Active" },
+                { name: "Invoice Portal", status: "Planned" }
+            ]
+        }
+    };
+
+    // ---------- Modal Session State ----------
+    let currentClientId = null;
+    let editingLocationIndex = null;
+    let editingContactIndex = null;
+    let editingBasic = false;
+
+    // ---------- Render Projects ----------
+    function renderProjects(list) {
+        const body = $('vc-projects');
+        const countEl = $('vc-projectCount');
+        if (countEl) countEl.textContent = (list?.length ?? 0);
+        if (!body) return;
+
+        if (!list || !list.length) {
+            body.innerHTML = `<tr><td colspan="3" class="text-muted">No projects.</td></tr>`;
+            return;
+        }
+
+        body.innerHTML = list.map(p => `
+                <tr>
+                    <td class="fw-semibold">${esc(p.name)}</td>
+                    <td><span class="badge bg-secondary bg-opacity-10 text-secondary">${esc(p.status)}</span></td>
+                    <td class="text-end">
+                        <button type="button" class="btn p-0 border-0 bg-transparent text-secondary" title="View">
+                            <i class="material-icons-outlined">visibility</i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+    }
+
+    // ---------- Render Locations (inline edit) ----------
+    function renderAddresses(list) {
+        const wrap = $('vc-addressList');
+        const count = $('vc-addressCount');
+        if (count) count.textContent = (list?.length ?? 0);
+        if (!wrap) return;
+
+        if (!list || !list.length) {
+            wrap.innerHTML = `<div class="text-muted">No locations.</div>`;
+            return;
+        }
+
+        wrap.innerHTML = list.map((a, idx) => {
+            const isEditing = (editingLocationIndex === idx);
+
+            const line1 = [a.street, a.streetNr].filter(Boolean).join(' ');
+            const line2 = a.addressLine2 ? ` • ${esc(a.addressLine2)}` : '';
+            const addressText = (line1 || a.addressLine2) ? `${esc(line1)}${line2}` : '—';
+            const cityText = `${esc(a.postalCode ?? '')} ${esc(a.city ?? '')}${(a.city || a.country) ? ', ' : ''}${esc(a.country ?? '')}`.trim() || '—';
+
+            const defaultBadge = a.isDefault ? `<span class="badge bg-primary bg-opacity-10 text-primary ms-2">Default</span>` : '';
+            const starIcon = a.isDefault ? 'star' : 'star_border';
+
+            return `
+                    <div class="card rounded-4 border bg-transparent shadow-none mb-0">
+                        <div class="card-body py-3">
+                            <div class="d-flex align-items-start justify-content-between gap-3">
+                                <div class="flex-grow-1">
+
+                                    <!-- VIEW -->
+                                    <div class="${isEditing ? 'd-none' : ''}">
+                                        <div class="fw-semibold">
+                                            ${esc(a.label ?? 'Location')}
+                                            ${defaultBadge}
+                                        </div>
+                                        <div class="text-muted small">${addressText}</div>
+                                        <div class="text-muted small">${cityText}</div>
+                                    </div>
+
+                                    <!-- EDIT (inline, replaces text) -->
+                                    <div class="${isEditing ? '' : 'd-none'}">
+                                        <div class="row g-2">
+                                            <div class="col-12 col-md-4">
+                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-label" value="${esc(a.label ?? '')}" placeholder="Label" />
+                                            </div>
+                                            <div class="col-12 col-md-4">
+                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-country" value="${esc(a.country ?? '')}" placeholder="Country" />
+                                            </div>
+                                            <div class="col-12 col-md-4">
+                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-city" value="${esc(a.city ?? '')}" placeholder="City" />
+                                            </div>
+
+                                            <div class="col-12 col-md-6">
+                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-street" value="${esc(a.street ?? '')}" placeholder="Street" />
+                                            </div>
+                                            <div class="col-12 col-md-2">
+                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-nr" value="${esc(a.streetNr ?? '')}" placeholder="Nr" />
+                                            </div>
+                                            <div class="col-12 col-md-4">
+                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-postal" value="${esc(a.postalCode ?? '')}" placeholder="Postal" />
+                                            </div>
+
+                                            <div class="col-12">
+                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-line2" value="${esc(a.addressLine2 ?? '')}" placeholder="Address Line 2" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                                <!-- Actions (icons only, no circle) -->
+                                <div class="d-flex align-items-start gap-3">
+
+                                    <button type="button"
+                                            class="btn p-0 border-0 bg-transparent text-primary"
+                                            title="Set default"
+                                            data-vc-action="set-default-location"
+                                            data-index="${idx}">
+                                        <i class="material-icons-outlined">${starIcon}</i>
+                                    </button>
+
+                                    <button type="button"
+                                            class="btn p-0 border-0 bg-transparent text-info ${isEditing ? 'd-none' : ''}"
+                                            title="Edit"
+                                            data-vc-action="edit-location"
+                                            data-index="${idx}">
+                                        <i class="material-icons-outlined">edit</i>
+                                    </button>
+
+                                    <button type="button"
+                                            class="btn p-0 border-0 bg-transparent text-success ${isEditing ? '' : 'd-none'}"
+                                            title="Save"
+                                            data-vc-action="save-location"
+                                            data-index="${idx}">
+                                        <i class="material-icons-outlined">check</i>
+                                    </button>
+
+                                    <button type="button"
+                                            class="btn p-0 border-0 bg-transparent text-muted ${isEditing ? '' : 'd-none'}"
+                                            title="Cancel"
+                                            data-vc-action="cancel-location"
+                                            data-index="${idx}">
+                                        <i class="material-icons-outlined">close</i>
+                                    </button>
+
+                                    <button type="button"
+                                            class="btn p-0 border-0 bg-transparent text-danger"
+                                            title="Delete"
+                                            data-vc-action="delete-location"
+                                            data-index="${idx}">
+                                        <i class="material-icons-outlined">delete</i>
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                `;
+        }).join('');
+    }
+
+    // ---------- Render Contacts (inline edit) ----------
+    function renderContacts(list) {
+        const wrap = $('vc-contactList');
+        const count = $('vc-contactCount');
+        if (count) count.textContent = (list?.length ?? 0);
+        if (!wrap) return;
+
+        if (!list || !list.length) {
+            wrap.innerHTML = `<div class="text-muted">No contacts.</div>`;
+            return;
+        }
+
+        wrap.innerHTML = list.map((c, idx) => {
+            const isEditing = (editingContactIndex === idx);
+            const primaryBadge = c.isPrimary ? `<span class="badge bg-warning bg-opacity-10 text-warning ms-2">Primary</span>` : '';
+            const starIcon = c.isPrimary ? 'star' : 'star_border';
+
+            return `
+                    <div class="card rounded-4 border bg-transparent shadow-none mb-0">
+                        <div class="card-body py-3">
+                            <div class="d-flex align-items-start justify-content-between gap-3">
+                                <div class="flex-grow-1">
+
+                                    <!-- VIEW -->
+                                    <div class="${isEditing ? 'd-none' : ''}">
+                                        <div class="fw-semibold">
+                                            ${esc(c.name ?? '—')}
+                                            ${primaryBadge}
+                                        </div>
+                                        <div class="text-muted small">${esc(c.position ?? '')}</div>
+                                        <div class="text-muted small">
+                                            <span class="material-icons-outlined align-middle me-1" style="font-size:18px">send</span>${esc(c.email ?? '—')}
+                                        </div>
+                                        <div class="text-muted small">
+                                            <span class="material-icons-outlined align-middle me-1" style="font-size:18px">call</span>${esc(c.phone ?? '—')}
+                                        </div>
+                                    </div>
+
+                                    <!-- EDIT -->
+                                    <div class="${isEditing ? '' : 'd-none'}">
+                                        <div class="row g-2">
+                                            <div class="col-12 col-md-6">
+                                                <input class="form-control form-control-sm" id="vc-c-${idx}-name" value="${esc(c.name ?? '')}" placeholder="Name" />
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <input class="form-control form-control-sm" id="vc-c-${idx}-position" value="${esc(c.position ?? '')}" placeholder="Position" />
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <input class="form-control form-control-sm" id="vc-c-${idx}-email" value="${esc(c.email ?? '')}" placeholder="Email" />
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <input class="form-control form-control-sm" id="vc-c-${idx}-phone" value="${esc(c.phone ?? '')}" placeholder="Phone" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                                <!-- Actions -->
+                                <div class="d-flex align-items-start gap-3">
+
+                                    <button type="button"
+                                            class="btn p-0 border-0 bg-transparent text-primary"
+                                            title="Set primary"
+                                            data-vc-action="set-primary-contact"
+                                            data-index="${idx}">
+                                        <i class="material-icons-outlined">${starIcon}</i>
+                                    </button>
+
+                                    <button type="button"
+                                            class="btn p-0 border-0 bg-transparent text-info ${isEditing ? 'd-none' : ''}"
+                                            title="Edit"
+                                            data-vc-action="edit-contact"
+                                            data-index="${idx}">
+                                        <i class="material-icons-outlined">edit</i>
+                                    </button>
+
+                                    <button type="button"
+                                            class="btn p-0 border-0 bg-transparent text-success ${isEditing ? '' : 'd-none'}"
+                                            title="Save"
+                                            data-vc-action="save-contact"
+                                            data-index="${idx}">
+                                        <i class="material-icons-outlined">check</i>
+                                    </button>
+
+                                    <button type="button"
+                                            class="btn p-0 border-0 bg-transparent text-muted ${isEditing ? '' : 'd-none'}"
+                                            title="Cancel"
+                                            data-vc-action="cancel-contact"
+                                            data-index="${idx}">
+                                        <i class="material-icons-outlined">close</i>
+                                    </button>
+
+                                    <button type="button"
+                                            class="btn p-0 border-0 bg-transparent text-danger"
+                                            title="Delete"
+                                            data-vc-action="delete-contact"
+                                            data-index="${idx}">
+                                        <i class="material-icons-outlined">delete</i>
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                `;
+        }).join('');
+    }
+
+    // ---------- Basic mode toggle ----------
+    function setBasicMode(isEdit) {
+        editingBasic = !!isEdit;
+        const view = $('vc-basicView');
+        const edit = $('vc-basicEdit');
+        if (view) view.classList.toggle('d-none', editingBasic);
+        if (edit) edit.classList.toggle('d-none', !editingBasic);
+    }
+
+    // ---------- Render Client ----------
+    function renderClient(client) {
+        setText('vc-name', client?.name ?? '—');
+        setText('vc-subtitle', client?.type === 'Company' ? 'Company account' : 'Individual account');
+        setHtml('vc-typeBadge', typeBadgeHtml(client?.type ?? '—'));
+        setText('vc-idText', client?.id ? `ID: ${client.id}` : '—');
+
+        setText('vc-email', client?.email || '—');
+        setText('vc-phone', client?.phone || '—');
+        setText('vc-taxId', client?.taxId || '—');
+        setText('vc-notes', client?.notes || '—');
+
+        // Fill basic edit inputs (for your existing markup)
+        const typeSel = $('vc-basic-type'); if (typeSel) typeSel.value = client?.type ?? 'Individual';
+        const nameInp = $('vc-basic-name'); if (nameInp) nameInp.value = client?.name ?? '';
+        const emailInp = $('vc-basic-email'); if (emailInp) emailInp.value = client?.email ?? '';
+        const phoneInp = $('vc-basic-phone'); if (phoneInp) phoneInp.value = client?.phone ?? '';
+        const taxInp = $('vc-basic-taxId'); if (taxInp) taxInp.value = client?.taxId ?? '';
+        const notesInp = $('vc-basic-notes'); if (notesInp) notesInp.value = client?.notes ?? '';
+
+        // default: view mode
+        setBasicMode(false);
+
+        // addresses
+        renderAddresses(client?.addresses ?? []);
+
+        // contacts (Company only)
+        const companySection = $('vc-companyContactSection');
+        const isCompany = client?.type === 'Company';
+        if (companySection) {
+            if (!isCompany) {
+                companySection.classList.add('d-none');
+                renderContacts([]);
+            } else {
+                companySection.classList.remove('d-none');
+                renderContacts(client?.contacts ?? []);
+            }
+        }
+
+        // projects
+        renderProjects(client?.projects ?? []);
+
+        // hidden ids (server forms)
+        const delClient = $('vc-clientId-deleteClient'); if (delClient) delClient.value = client?.id ?? '';
+        const basicId = $('vc-clientId-basic'); if (basicId) basicId.value = client?.id ?? '';
+
+
+        // hidden ids (add forms)
+        const a1 = $('vc-clientId-addLocation'); if (a1) a1.value = client?.id ?? '';
+        const a2 = $('vc-clientId-addContact'); if (a2) a2.value = client?.id ?? '';
+
+        currentClientId = client?.id ?? null;
+    }
+
+    // ---------- Modal Open ----------
+    const viewModalEl = $('ViewClientModal');
+    if (viewModalEl) {
+        viewModalEl.addEventListener('show.bs.modal', function (event) {
+            closeAllCollapses();
+            editingLocationIndex = null;
+            editingContactIndex = null;
+
+            const btn = event.relatedTarget;
+            const id = btn?.getAttribute('data-client-id');
+            const client = mockClients[id];
+
+            if (!client) {
+                toastInfo('Client not found in mock data.', 'Info');
+                renderClient({ id, type: '—', name: 'Client not found', addresses: [], contacts: [], projects: [] });
+                return;
+            }
+
+            renderClient(client);
+        });
+    }
+    // ---------- Create Modal (FormModal) : show/hide contact section ----------
+    document.addEventListener('DOMContentLoaded', function () {
+        const modalEl = document.getElementById('FormModal');
+        if (!modalEl) return;
+
+        const typeSelect = modalEl.querySelector('#type');
+        const contactSection = modalEl.querySelector('#contactSection');
+        const modalTitle = modalEl.querySelector('.modal-title'); // optional
+
+        if (!typeSelect || !contactSection) return;
+
+        function updateCreateModalUI() {
+            const isCompany = typeSelect.value === 'Company';
+
+            // ✅ show contact only for Company
+            contactSection.classList.toggle('d-none', !isCompany);
+            // أو لو تفضّل ستايل display:
+            // contactSection.style.display = isCompany ? '' : 'none';
+
+            // optional: change title
+            if (modalTitle) modalTitle.textContent = isCompany ? 'Add Company' : 'Add Individual';
+        }
+
+        typeSelect.addEventListener('change', updateCreateModalUI);
+
+        // also run when modal opens (important)
+        modalEl.addEventListener('shown.bs.modal', updateCreateModalUI);
+
+        updateCreateModalUI();
+    });
+
+    // ---------- Delegated actions (Basic + Locations + Contacts) ----------
+    document.addEventListener('click', async function (e) {
+        const b = e.target.closest('[data-vc-action]');
+        if (!b) return;
+
+        const action = b.getAttribute('data-vc-action');
+        const idx = Number(b.getAttribute('data-index') ?? -1);
+
+        if (!currentClientId || !mockClients[currentClientId]) return;
+        const client = mockClients[currentClientId];
+
+        // ✅ ---- Basic actions FIRST ----
+        if (action === 'edit-basic') { setBasicMode(true); return; }
+        if (action === 'cancel-basic') { setBasicMode(false); return; }
+
+        if (action === 'save-basic') {
+            const c = mockClients[currentClientId];
+            c.type = $('vc-basic-type')?.value ?? c.type;
+            c.name = $('vc-basic-name')?.value?.trim() ?? c.name;
+            c.email = $('vc-basic-email')?.value?.trim() ?? '';
+            c.phone = $('vc-basic-phone')?.value?.trim() ?? '';
+            c.taxId = $('vc-basic-taxId')?.value?.trim() ?? '';
+            c.notes = $('vc-basic-notes')?.value?.trim() ?? '';
+            renderClient(c);
+            toastSuccess('Basic info updated.', 'Success');
+            return;
+        }
+
+
+
+        // ---- Location actions ----
+        if (action === 'edit-location') {
+            editingLocationIndex = idx;
+            renderAddresses(client.addresses ?? []);
+            return;
+        }
+
+        if (action === 'cancel-location') {
+            editingLocationIndex = null;
+            renderAddresses(client.addresses ?? []);
+            return;
+        }
+
+        if (action === 'save-location') {
+            if (!client.addresses || idx < 0 || idx >= client.addresses.length) return;
+
+            const a = client.addresses[idx];
+            a.label = $('vc-loc-' + idx + '-label')?.value?.trim() || a.label || 'Location';
+            a.country = $('vc-loc-' + idx + '-country')?.value?.trim() || '';
+            a.city = $('vc-loc-' + idx + '-city')?.value?.trim() || '';
+            a.street = $('vc-loc-' + idx + '-street')?.value?.trim() || '';
+            a.streetNr = $('vc-loc-' + idx + '-nr')?.value?.trim() || '';
+            a.postalCode = $('vc-loc-' + idx + '-postal')?.value?.trim() || '';
+            a.addressLine2 = $('vc-loc-' + idx + '-line2')?.value?.trim() || '';
+
+            editingLocationIndex = null;
+            renderAddresses(client.addresses);
+            toastSuccess('Location updated.', 'Success');
+            return;
+        }
+
+        if (action === 'set-default-location') {
+            if (!client.addresses || idx < 0 || idx >= client.addresses.length) return;
+            client.addresses.forEach((x, i) => x.isDefault = (i === idx));
+            renderAddresses(client.addresses);
+            toastSuccess('Default location updated.', 'Success');
+            return;
+        }
+
+        if (action === 'delete-location') {
+            if (!client.addresses || idx < 0 || idx >= client.addresses.length) return;
+
+            const ok = await confirmBox('Delete this location?', 'Confirm');
+            if (!ok) return;
+
+            const wasDefault = !!client.addresses[idx]?.isDefault;
+            client.addresses.splice(idx, 1);
+
+            if (wasDefault && client.addresses.length) client.addresses[0].isDefault = true;
+
+            editingLocationIndex = null;
+            renderAddresses(client.addresses);
+            toastSuccess('Location deleted.', 'Success');
+            return;
+        }
+
+        // ---- Contact actions (Company only) ----
+        if (action === 'edit-contact' || action === 'save-contact' || action === 'cancel-contact'
+            || action === 'delete-contact' || action === 'set-primary-contact') {
+
+            if (client.type !== 'Company') {
+                toastError('Contacts are available for Company clients only.', 'Error');
+                return;
+            }
+        }
+
+        if (action === 'edit-contact') {
+            editingContactIndex = idx;
+            renderContacts(client.contacts ?? []);
+            return;
+        }
+
+        if (action === 'cancel-contact') {
+            editingContactIndex = null;
+            renderContacts(client.contacts ?? []);
+            return;
+        }
+
+        if (action === 'save-contact') {
+            if (!client.contacts || idx < 0 || idx >= client.contacts.length) return;
+
+            const c = client.contacts[idx];
+            c.name = $('vc-c-' + idx + '-name')?.value?.trim() || c.name || 'Contact';
+            c.position = $('vc-c-' + idx + '-position')?.value?.trim() || '';
+            c.email = $('vc-c-' + idx + '-email')?.value?.trim() || '';
+            c.phone = $('vc-c-' + idx + '-phone')?.value?.trim() || '';
+
+            editingContactIndex = null;
+            renderContacts(client.contacts);
+            toastSuccess('Contact updated.', 'Success');
+            return;
+        }
+
+        if (action === 'set-primary-contact') {
+            if (!client.contacts || idx < 0 || idx >= client.contacts.length) return;
+            client.contacts.forEach((x, i) => x.isPrimary = (i === idx));
+            renderContacts(client.contacts);
+            toastSuccess('Primary contact updated.', 'Success');
+            return;
+        }
+
+        if (action === 'delete-contact') {
+            if (!client.contacts || idx < 0 || idx >= client.contacts.length) return;
+
+            const ok = await confirmBox('Delete this contact?', 'Confirm');
+            if (!ok) return;
+
+            const wasPrimary = !!client.contacts[idx]?.isPrimary;
+            client.contacts.splice(idx, 1);
+
+            if (wasPrimary && client.contacts.length) client.contacts[0].isPrimary = true;
+
+            editingContactIndex = null;
+            renderContacts(client.contacts);
+            toastSuccess('Contact deleted.', 'Success');
+            return;
+        }
+    });
+
+    // ---------- Add Location (mock) ----------
+    const addLocForm = $('vcAddLocationForm');
+    if (addLocForm) {
+        addLocForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (!currentClientId || !mockClients[currentClientId]) return;
+
+            const client = mockClients[currentClientId];
+            client.addresses = client.addresses || [];
+
+            const obj = {
+                label: $('vc-add-loc-label')?.value?.trim() || 'Location',
+                country: $('vc-add-loc-country')?.value?.trim() || '',
+                city: $('vc-add-loc-city')?.value?.trim() || '',
+                postalCode: $('vc-add-loc-postal')?.value?.trim() || '',
+                street: $('vc-add-loc-street')?.value?.trim() || '',
+                streetNr: $('vc-add-loc-nr')?.value?.trim() || '',
+                addressLine2: $('vc-add-loc-line2')?.value?.trim() || '',
+                isDefault: !!$('vc-add-loc-default')?.checked
+            };
+
+            if (obj.isDefault) client.addresses.forEach(a => a.isDefault = false);
+            if (client.addresses.length === 0) obj.isDefault = true;
+
+            client.addresses.push(obj);
+            addLocForm.reset();
+
+            const c = $('vc-addLocationCollapse');
+            if (c) bootstrap.Collapse.getOrCreateInstance(c, { toggle: false }).hide();
+
+            renderAddresses(client.addresses);
+            toastSuccess('Location added.', 'Success');
+        });
+    }
+
+    // ---------- Add Contact (mock) ----------
+    const addContactForm = $('vcAddContactForm');
+    if (addContactForm) {
+        addContactForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (!currentClientId || !mockClients[currentClientId]) return;
+
+            const client = mockClients[currentClientId];
+            if (client.type !== 'Company') {
+                toastError('Contacts are available for Company clients only.', 'Error');
+                return;
+            }
+
+            client.contacts = client.contacts || [];
+
+            const obj = {
+                name: $('vc-add-c-name')?.value?.trim() || 'Contact',
+                position: $('vc-add-c-position')?.value?.trim() || '',
+                email: $('vc-add-c-email')?.value?.trim() || '',
+                phone: $('vc-add-c-phone')?.value?.trim() || '',
+                isPrimary: !!$('vc-add-c-primary')?.checked
+            };
+
+            if (obj.isPrimary) client.contacts.forEach(x => x.isPrimary = false);
+            if (client.contacts.length === 0) obj.isPrimary = true;
+
+            client.contacts.push(obj);
+            addContactForm.reset();
+
+            const c = $('vc-addContactCollapse');
+            if (c) bootstrap.Collapse.getOrCreateInstance(c, { toggle: false }).hide();
+
+            renderContacts(client.contacts);
+            toastSuccess('Contact added.', 'Success');
+        });
+    }
+
+    // ---------- Confirm for server forms (data-vc-confirm) ----------
+    document.addEventListener('click', async function (e) {
+        const btn = e.target.closest('[data-vc-confirm]');
+        if (!btn) return;
+
+        const type = btn.getAttribute('data-vc-confirm');
+        let msg = 'Are you sure?';
+
+        if (type === 'delete-client') msg = 'Are you sure you want to delete this client?';
+
+        e.preventDefault();
+        const ok = await confirmBox(msg, 'Confirm');
+        if (!ok) return;
+
+        btn.closest('form')?.submit();
+    });
+
+    // ---------- Table Delete (server) ----------
+    document.addEventListener('click', async function (e) {
+        const btn = e.target.closest('[data-vc-action="table-delete"]');
+        if (!btn) return;
+
+        e.preventDefault();
+
+        const id = btn.getAttribute('data-client-id');
+
+        const ok = await confirmBox('Are you sure you want to delete this client?', 'Confirm');
+        if (!ok) return;
+
+        const hid = document.getElementById('tblDeleteClientId');
+        const form = document.getElementById('tblDeleteForm');
+        if (!hid || !form) return;
+
+        hid.value = id;
+        form.submit();
+    });
+})();

@@ -28,7 +28,7 @@ namespace WitcherHub.Infrastructure.Data.Models
         [Column(TypeName = "jsonb")]
         public JsonDocument? ConfigSchema { get; set; }
 
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public new DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
         public ICollection<PricingRule> PricingRules { get; set; } = new List<PricingRule>();
 

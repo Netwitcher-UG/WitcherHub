@@ -10,21 +10,21 @@ namespace WitcherHub.Pages
 {
     public class IndexModel : PageModel
     {
-        private readonly IValidator<CreateCustomerDto> _createCustomerValidator;
+        private readonly IValidator<CustomerDTOs> _customerDTOsValidator;
 
-        public IndexModel(IValidator<CreateCustomerDto> createCustomerValidator)
+        public IndexModel(IValidator<CustomerDTOs> customerDTOsValidator)
         {
-            _createCustomerValidator = createCustomerValidator;
+            _customerDTOsValidator = customerDTOsValidator;
         }
 
         public TableCardVm ClientsTable { get; private set; } = new();
 
-        // BindProperties اللي تتطابق مع asp-for في _CreateCustomerFields
+        // ✅ اربط الفورم على الـ DTOs اللي موجودة داخل form
+        // (asp-for="Customer.Name" , asp-for="Address.City" ... إلخ)
         [BindProperty] public CustomerDto Customer { get; set; } = new();
         [BindProperty] public AddressDto Address { get; set; } = new();
         [BindProperty] public ContactDto Contact { get; set; } = new();
 
-        // هذا هو مودال الـ Template
         public ModalVm CreateCustomerModal { get; private set; } = new();
 
         public void OnGet()
@@ -37,26 +37,27 @@ namespace WitcherHub.Pages
         {
             LoadTable();
 
-            var dto = new CreateCustomerDto
+            // ✅ هنا كان الخطأ: CustomerDTO غير موجود
+            // الصح: CustomerDTOs
+            var dto = new CustomerDTOs
             {
                 Customer = Customer,
                 Address = Address,
                 Contact = Contact
             };
 
-            var result = await _createCustomerValidator.ValidateAsync(dto);
+            var result = await _customerDTOsValidator.ValidateAsync(dto);
 
             if (!result.IsValid)
             {
                 foreach (var err in result.Errors)
                     ModelState.AddModelError(err.PropertyName, err.ErrorMessage);
 
-                // رجّع الصفحة وافتح المودال تلقائياً + خليه يحتفظ بالقيم
                 BuildCreateCustomerModal(autoOpen: true);
                 return Page();
             }
 
-            // TODO: هنا لاحقاً ترسل Command عبر MediatR أو تحفظ في DB
+            // TODO: Save (MediatR/Service)
             return RedirectToPage();
         }
 
@@ -92,6 +93,13 @@ namespace WitcherHub.Pages
                 PrimaryButtonText = "Add Client",
                 PrimaryButtonTarget = "#FormModal",
                 SearchPlaceholder = "Search clients...",
+                Pagination = new PaginationVm
+                {
+                    Page = 2,
+                    PageSize = 10,
+                    TotalItems = 57,
+                    SearchQuery = null
+                },
                 Columns =
             {
                 new() { Header="Name", HeaderClass="ps-4", CellClass="ps-4 fw-semibold" },
