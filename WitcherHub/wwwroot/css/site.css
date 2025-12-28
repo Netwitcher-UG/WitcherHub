@@ -154,3 +154,29 @@ body {
 }
 
 
+/* Icon-only buttons: no outline, no focus ring, no hover bg */
+.btn.vc-icon-btn,
+.btn.vc-icon-btn:hover,
+.btn.vc-icon-btn:focus,
+.btn.vc-icon-btn:focus-visible,
+.btn.vc-icon-btn:active,
+.btn.vc-icon-btn.active {
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    border: 0 !important;
+}
+
+/* optional: keep them tight and centered */
+.btn.vc-icon-btn {
+    padding: 0 !important;
+    line-height: 1 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    /* prevent icon itself from taking focus/hover */
+    .btn.vc-icon-btn i {
+        pointer-events: none;
+    }

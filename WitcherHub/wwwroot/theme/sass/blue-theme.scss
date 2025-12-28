@@ -880,3 +880,11 @@
   border-radius: 4px;
   width: max-content;
 }
+
+html[data-bs-theme="blue-theme"],
+:root[data-bs-theme="blue-theme"] {
+    --bs-secondary-color: rgba(255, 255, 255, 0.70);
+    --bs-secondary-color-rgb: 255, 255, 255;
+    --bs-tertiary-color: rgba(255, 255, 255, 0.55);
+    --bs-tertiary-color-rgb: 255, 255, 255;
+}

@@ -1,0 +1,410 @@
+﻿@* Pages/Shared/Modals/_ViewClientModal.cshtml *@
+
+<div class="modal fade" id="ViewClientModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content">
+
+            <!-- Header -->
+            <div class="modal-header border-bottom-0 py-2 bg-grd-primary">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="material-icons-outlined">visibility</span>
+                    <div>
+                        <h5 class="modal-title mb-0">Client Details</h5>
+                        <small class="opacity-75" id="vc-subtitle">—</small>
+                    </div>
+                </div>
+
+                <a href="javascript:;" class="primaery-menu-close" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="material-icons-outlined">close</i>
+                </a>
+            </div>
+
+            <!-- Body -->
+            <div class="modal-body">
+
+                <!-- Top Summary -->
+                <div class="card rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+                            <div>
+                                <h3 class="mb-1" id="vc-name">—</h3>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span id="vc-typeBadge"></span>
+                                    <span class="text-muted" id="vc-idText">—</span>
+                                </div>
+                            </div>
+
+                            <!-- Global Delete (icon only, no circle) -->
+                            <button type="button"
+                                    class="btn p-0 border-0 bg-transparent text-danger"
+                                    title="Delete Client"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#vc-deleteClientCollapse"
+                                    aria-expanded="false"
+                                    aria-controls="vc-deleteClientCollapse">
+                                <i class="material-icons-outlined">delete</i>
+                            </button>
+                        </div>
+
+                        <!-- Global Delete confirm -->
+                        <div class="collapse mt-4" id="vc-deleteClientCollapse">
+                            <div class="card rounded-4 border border-danger bg-transparent">
+                                <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="material-icons-outlined text-danger">warning</span>
+                                        <div>
+                                            <div class="fw-semibold">Delete this client?</div>
+                                            <small class="text-muted">This action cannot be undone.</small>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-light btn-sm"
+                                                data-bs-toggle="collapse" data-bs-target="#vc-deleteClientCollapse">
+                                            Cancel
+                                        </button>
+
+                                        <form method="post" asp-page-handler="DeleteClient" class="m-0">
+                                            <input type="hidden" name="ClientId" id="vc-clientId-deleteClient" value="" />
+                                            <button type="submit" class="btn btn-danger btn-sm" data-vc-confirm="delete-client">
+                                                Confirm
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Sections Grid -->
+                <div class="row g-4">
+
+                    <!-- 1) Basic Info (kept as-is) -->
+                    <div class="col-12 col-xl-6">
+                        <div class="card rounded-4 h-100">
+                            <div class="card-body">
+
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="material-icons-outlined opacity-75">person</span>
+                                        <h5 class="mb-0 fw-bold">Basic Information</h5>
+                                    </div>
+
+                                    <div class="d-flex gap-3">
+                                        <button type="button"
+                                                class="btn p-0 border-0 bg-transparent text-info"
+                                                title="Edit"
+                                                data-vc-action="edit-basic">
+                                            <i class="material-icons-outlined">edit</i>
+                                        </button>
+
+                                        
+
+                                    </div>
+                                </div>
+
+                               <!-- VIEW -->
+<div id="vc-basicView" class="row g-3">
+    <div class="col-12 col-md-6">
+        <div class="small text-muted">Email</div>
+        <div id="vc-email">—</div>
+    </div>
+
+    <div class="col-12 col-md-6">
+        <div class="small text-muted">Phone</div>
+        <div id="vc-phone">—</div>
+    </div>
+
+    <div class="col-12 col-md-6">
+        <div class="small text-muted">Tax ID</div>
+        <div id="vc-taxId">—</div>
+    </div>
+
+    <div class="col-12">
+        <div class="small text-muted">Notes</div>
+        <div id="vc-notes" class="text-muted">—</div>
+    </div>
+</div>
+
+<!-- EDIT (INLINE) -->
+<div id="vc-basicEdit" class="row g-2 d-none mt-2">
+
+    <!-- Row 1: Type + Email -->
+    <div class="col-12 col-md-12">
+        <label class="form-label">Type</label>
+        <select class="form-select form-select-sm" id="vc-basic-type">
+            <option value="Individual">Individual</option>
+            <option value="Company">Company</option>
+        </select>
+    </div>
+    <!-- Row 2: Name + Phone -->
+    <div class="col-12 col-md-6">
+        <label class="form-label">Name</label>
+        <input class="form-control form-control-sm" id="vc-basic-name" />
+    </div>
+    <div class="col-12 col-md-6">
+        <label class="form-label">Email</label>
+        <input class="form-control form-control-sm" id="vc-basic-email" type="email" />
+    </div>
+
+    
+
+    <div class="col-12 col-md-6">
+        <label class="form-label">Phone</label>
+        <input class="form-control form-control-sm" id="vc-basic-phone" />
+    </div>
+
+    <!-- Row 3: Tax ID (with Phone above it) -->
+    <div class="col-12 col-md-6">
+        <label class="form-label">Tax ID</label>
+        <input class="form-control form-control-sm" id="vc-basic-taxId" />
+    </div>
+
+    <!-- (اختياري) لو تبي تخلي العمود الثاني فاضي عشان الاتزان -->
+    <div class="col-12 col-md-6 d-none d-md-block"></div>
+
+    <!-- Row 4: Notes full width -->
+    <div class="col-12">
+        <label class="form-label">Notes</label>
+        <input class="form-control form-control-sm" id="vc-basic-notes" />
+    </div>
+
+    <div class="col-12 d-flex justify-content-end gap-2 mt-2">
+        <button type="button" class="btn btn-outline-secondary px-4" data-vc-action="cancel-basic">Cancel</button>
+        <button type="button" class="btn btn-grd btn-grd-primary px-4" data-vc-action="save-basic">Save</button>
+    </div>
+</div>
+
+
+
+                                
+                                
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2) Locations (inline edit per item) -->
+                    <div class="col-12 col-xl-6">
+                        <div class="card rounded-4 h-100">
+                            <div class="card-body">
+
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="material-icons-outlined opacity-75">location_on</span>
+                                        <h5 class="mb-0 fw-bold">Locations</h5>
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary" id="vc-addressCount">0</span>
+                                    </div>
+
+                                    <!-- Add (icon only, no circle) -->
+                                    <button type="button"
+                                            class="btn p-0 border-0 bg-transparent text-primary"
+                                            title="Add Location"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#vc-addLocationCollapse">
+                                        <i class="material-icons-outlined">add</i>
+                                    </button>
+                                </div>
+
+                                <div id="vc-addressList" class="d-flex flex-column gap-2">
+                                    <div class="text-muted">No locations.</div>
+                                </div>
+
+                                <!-- Add Location Form (unchanged, just trigger style) -->
+                                <div class="collapse mt-3" id="vc-addLocationCollapse">
+                                    <div class="card rounded-4 border-top border-4 border-primary border-gradient-1 mb-0">
+                                        <div class="card-body p-4">
+                                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                                <div class="fw-bold">Add Location</div>
+                                                <button type="button" class="btn btn-sm btn-light"
+                                                        data-bs-toggle="collapse" data-bs-target="#vc-addLocationCollapse">
+                                                    Close
+                                                </button>
+                                            </div>
+
+                                            <form class="row g-3" id="vcAddLocationForm">
+                                                <input type="hidden" id="vc-clientId-addLocation" value="" />
+
+                                                <div class="col-12 col-md-6">
+                                                    <label class="form-label">Label</label>
+                                                    <input class="form-control" id="vc-add-loc-label" placeholder="Billing / Shipping / Home" />
+                                                </div>
+                                                <div class="col-12 col-md-6">
+                                                    <label class="form-label">Country</label>
+                                                    <input class="form-control" id="vc-add-loc-country" />
+                                                </div>
+                                                <div class="col-12 col-md-6">
+                                                    <label class="form-label">City</label>
+                                                    <input class="form-control" id="vc-add-loc-city" />
+                                                </div>
+                                                <div class="col-12 col-md-6">
+                                                    <label class="form-label">Postal Code</label>
+                                                    <input class="form-control" id="vc-add-loc-postal" />
+                                                </div>
+                                                <div class="col-12 col-md-8">
+                                                    <label class="form-label">Street</label>
+                                                    <input class="form-control" id="vc-add-loc-street" />
+                                                </div>
+                                                <div class="col-12 col-md-4">
+                                                    <label class="form-label">Nr</label>
+                                                    <input class="form-control" id="vc-add-loc-nr" />
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label">Address Line 2</label>
+                                                    <input class="form-control" id="vc-add-loc-line2" />
+                                                </div>
+
+                                                <div class="col-12 d-flex align-items-center justify-content-between mt-2">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" id="vc-add-loc-default">
+                                                        <label class="form-check-label" for="vc-add-loc-default">
+                                                            Set as default
+                                                        </label>
+                                                    </div>
+
+                                                    <div class="d-flex gap-2">
+                                                        <button type="button" class="btn btn-light btn-sm"
+                                                                data-bs-toggle="collapse" data-bs-target="#vc-addLocationCollapse">
+                                                            Cancel
+                                                        </button>
+                                                        <button type="submit" class="btn btn-grd-primary btn-sm">
+                                                            Add
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </form>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3) Company Contacts (Company only, inline edit per item) -->
+                    <div class="col-12 d-none" id="vc-companyContactSection">
+                        <div class="card rounded-4">
+                            <div class="card-body">
+
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="material-icons-outlined opacity-75">contacts</span>
+                                        <h5 class="mb-0 fw-bold">Company Contacts</h5>
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary" id="vc-contactCount">0</span>
+                                    </div>
+
+                                    <!-- Add (icon only, no circle) -->
+                                    <button type="button"
+                                            class="btn p-0 border-0 bg-transparent text-primary"
+                                            title="Add Contact"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#vc-addContactCollapse">
+                                        <i class="material-icons-outlined">add</i>
+                                    </button>
+                                </div>
+
+                                <div id="vc-contactList" class="d-flex flex-column gap-2">
+                                    <div class="text-muted">No contacts.</div>
+                                </div>
+
+                                <!-- Add Contact Form -->
+                                <div class="collapse mt-3" id="vc-addContactCollapse">
+                                    <div class="card rounded-4 border-top border-4 border-primary border-gradient-1 mb-0">
+                                        <div class="card-body p-4">
+                                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                                <div class="fw-bold">Add Contact</div>
+                                                <button type="button" class="btn btn-sm btn-light"
+                                                        data-bs-toggle="collapse" data-bs-target="#vc-addContactCollapse">
+                                                    Close
+                                                </button>
+                                            </div>
+
+                                            <form class="row g-3" id="vcAddContactForm">
+                                                <input type="hidden" id="vc-clientId-addContact" value="" />
+
+                                                <div class="col-12 col-md-6">
+                                                    <label class="form-label">Name</label>
+                                                    <input class="form-control" id="vc-add-c-name" />
+                                                </div>
+                                                <div class="col-12 col-md-6">
+                                                    <label class="form-label">Position</label>
+                                                    <input class="form-control" id="vc-add-c-position" />
+                                                </div>
+                                                <div class="col-12 col-md-6">
+                                                    <label class="form-label">Email</label>
+                                                    <input class="form-control" id="vc-add-c-email" type="email" />
+                                                </div>
+                                                <div class="col-12 col-md-6">
+                                                    <label class="form-label">Phone</label>
+                                                    <input class="form-control" id="vc-add-c-phone" />
+                                                </div>
+
+                                                <div class="col-12 d-flex align-items-center justify-content-between mt-2">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" id="vc-add-c-primary">
+                                                        <label class="form-check-label" for="vc-add-c-primary">
+                                                            Set as primary
+                                                        </label>
+                                                    </div>
+
+                                                    <div class="d-flex gap-2">
+                                                        <button type="button" class="btn btn-light btn-sm"
+                                                                data-bs-toggle="collapse" data-bs-target="#vc-addContactCollapse">
+                                                            Cancel
+                                                        </button>
+                                                        <button type="submit" class="btn btn-grd-primary btn-sm">
+                                                            Add
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                            </form>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4) Projects -->
+                    <div class="col-12">
+                        <div class="card rounded-4">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="material-icons-outlined opacity-75">folder</span>
+                                        <h5 class="mb-0 fw-bold">Projects</h5>
+                                    </div>
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary" id="vc-projectCount">0</span>
+                                </div>
+
+                                <div class="table-responsive">
+                                    <table class="table align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Status</th>
+                                                <th class="text-end">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="vc-projects">
+                                            <tr><td colspan="3" class="text-muted">No projects.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+                </div><!-- end grid -->
+
+            </div><!-- end body -->
+        </div>
+    </div>
+</div>

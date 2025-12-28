@@ -63,6 +63,8 @@
     <link href="~/theme/sass/responsive.css" rel="stylesheet">
 
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link href="~/css/theme-overrides.css" rel="stylesheet" asp-append-version="true">
+    <link href="~/css/ui-kit.css" rel="stylesheet" asp-append-version="true">
 </head>
 
 <body>
@@ -389,9 +391,39 @@
         </div>
     </div>
     <!--end switcher-->
+
+
+    <!-- UI Kit: Loading Overlay -->
+    <div id="appLoading" class="app-loading d-none" aria-hidden="true">
+        <div class="app-loading__box">
+            <div class="spinner-border" role="status" aria-label="Loading"></div>
+            <div class="app-loading__text mt-3">Loading...</div>
+        </div>
+    </div>
+
+    <!-- UI Kit: Single Global Modal -->
+    <div class="modal fade" id="appModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="appModalTitle">Modal</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="appModalBody"></div>
+                <div class="modal-footer" id="appModalFooter"></div>
+            </div>
+        </div>
+    </div>
+
+
     <!--bootstrap js-->
     <script src="~/theme/assets/js/bootstrap.bundle.min.js"></script>
-
+    <script src="~/js/ui-kit.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+          window.UI?.init?.();
+        });
+    </script>
     <!--plugins-->
     <script src="~/theme/assets/js/jquery.min.js"></script>
     <script src="~/theme/assets/plugins/perfect-scrollbar/js/perfect-scrollbar.js"></script>

@@ -80,10 +80,11 @@ namespace WitcherHub.Pages
         {
             var data = new[]
             {
-            new { Name="Anas Sadek", Type="Individual", Phone="+49 174 234 5678", Email="anas@email.com", City="Berlin", TaxId="—" },
-            new { Name="ACME LLC", Type="Company", Phone="+1 212 555 0199", Email="finance@acme.com", City="New York", TaxId="CR-123456" },
-            new { Name="Mona Ali", Type="Individual", Phone="+966 50 123 4567", Email="mona.ali@example.com", City="Riyadh", TaxId="—" },
-        };
+                new { Id="demo-individual", Name="Anas Sadek", Type="Individual", Phone="+49 174 234 5678", Email="anas@email.com", City="Berlin", TaxId="—" },
+                new { Id="demo-company", Name="ACME LLC", Type="Company", Phone="+1 212 555 0199", Email="finance@acme.com", City="New York", TaxId="CR-123456" },
+                new { Id="demo-3", Name="Mona Ali", Type="Individual", Phone="+966 50 123 4567", Email="mona.ali@example.com", City="Riyadh", TaxId="—" },
+            };
+
 
             ClientsTable = new TableCardVm
             {
@@ -108,17 +109,19 @@ namespace WitcherHub.Pages
                 ClientsTable.Rows.Add(new TableRowVm
                 {
                     Cells =
-                {
-                    Html(c.Name),
-                    TypeBadge(c.Type),
-                    Html(c.Phone),
-                    Html(c.Email),
-                    Html(c.City),
-                    Html(c.TaxId),
-                    ActionsButtons()
-                }
+                    {
+                        Html(c.Name),
+                        TypeBadge(c.Type),
+                        Html(c.Phone),
+                        Html(c.Email),
+                        Html(c.City),
+                        Html(c.TaxId),
+                        ActionsButtons(c.Id)
+                    }
                 });
             }
+
+
         }
 
         private static IHtmlContent Html(string? text)
@@ -131,13 +134,30 @@ namespace WitcherHub.Pages
             return new HtmlString($"<span class='{cls}'>{HtmlEncoder.Default.Encode(type)}</span>");
         }
 
-        private static IHtmlContent ActionsButtons() => new HtmlString("""
-        <a class="btn btn-sm btn-outline-info rounded-circle">
-            <i class="material-icons-outlined">edit</i>
-        </a>
-        <a class="btn btn-sm btn-outline-danger rounded-circle">
-            <i class="material-icons-outlined">delete</i>
-        </a>
-    """);
+        private static string Enc(string? v) => HtmlEncoder.Default.Encode(v ?? "");
+
+        private static IHtmlContent ActionsButtons(string customerId) => new HtmlString($$"""
+<button type="button"
+        class="btn vc-icon-btn text-secondary"
+        title="View"
+        data-bs-toggle="modal"
+        data-bs-target="#ViewClientModal"
+        data-client-id="{{Enc(customerId)}}">
+    <i class="material-icons-outlined">visibility</i>
+</button>
+
+<button type="button"
+        class="btn vc-icon-btn text-danger"
+        title="Delete"
+        data-vc-action="table-delete"
+        data-client-id="{{Enc(customerId)}}">
+    <i class="material-icons-outlined">delete</i>
+</button>
+""");
+
+
+
+
+
     }
 }
