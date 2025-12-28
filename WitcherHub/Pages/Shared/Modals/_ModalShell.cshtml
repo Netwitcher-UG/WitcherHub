@@ -1,0 +1,46 @@
+﻿@model WitcherHub.Pages.Models.UI.ModalVm
+
+<div class="modal fade" id="@Model.Id" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered @Model.SizeClass">
+        <div class="modal-content">
+
+            <div class="modal-header bg-grd-info border-0">
+                <h5 class="modal-title text-light">@Model.Title</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                @if (!string.IsNullOrWhiteSpace(Model.Handler))
+                {
+                    <form method="post" asp-page-handler="@Model.Handler">
+                        <partial name="@Model.BodyPartialPath" model="Model.BodyModel" />
+
+                        <div class="d-flex justify-content-end gap-2 mt-5">
+                            <button type="button" class="btn btn-grd-info px-4" data-bs-dismiss="modal">@Model.CancelText</button>
+                            <button type="submit" class="btn btn-grd-primary px-4">@Model.SubmitText</button>
+                        </div>
+                    </form>
+                }
+                else
+                {
+                    <form method="post">
+                        <partial name="@Model.BodyPartialPath" model="Model.BodyModel" />
+
+                        <div class="d-flex justify-content-end gap-2 mt-5">
+                            <button type="button" class="btn btn-grd-info px-4" data-bs-dismiss="modal">@Model.CancelText</button>
+                            <button type="submit" class="btn btn-grd-primary px-4">@Model.SubmitText</button>
+                        </div>
+                    </form>
+                }
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@if (Model.AutoOpen)
+{
+    <script>
+        new bootstrap.Modal(document.getElementById('@Model.Id')).show();
+    </script>
+}

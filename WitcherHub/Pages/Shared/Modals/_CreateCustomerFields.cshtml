@@ -1,0 +1,165 @@
+﻿@model WitcherHub.Pages.IndexModel
+
+<div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+<!-- Customer Information -->
+<div class="form-section">
+    <div class="form-section-header">
+        <i class="material-icons-outlined">person</i>
+        <span>Customer Information</span>
+    </div>
+    <div class="form-section-divider"></div>
+
+    <div class="row g-3 mt-0">
+        <div class="col-md-4">
+            <label class="form-label text-light">
+                Customer Type <span class="text-danger">*</span>
+            </label>
+
+            <!-- نثبت id=type عشان JS -->
+            <select class="form-select" id="type" asp-for="Customer.Type">
+                <option value="Individual">Individual</option>
+                <option value="Company">Company</option>
+            </select>
+            <span class="text-danger" asp-validation-for="Customer.Type"></span>
+        </div>
+
+        <div class="col-md-8">
+            <label class="form-label text-light">
+                Name <span class="text-danger">*</span>
+            </label>
+            <input class="form-control"
+                   asp-for="Customer.Name"
+                   placeholder="e.g. Anas Sadek / ACME LLC"
+                   required autofocus />
+            <span class="text-danger" asp-validation-for="Customer.Name"></span>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label text-light opacity-75">
+                Email <small>(optional)</small>
+            </label>
+            <input class="form-control" asp-for="Customer.Email" type="email" />
+            <span class="text-danger" asp-validation-for="Customer.Email"></span>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label text-light opacity-75">
+                Phone <small>(optional)</small>
+            </label>
+            <input class="form-control" asp-for="Customer.Phone" />
+            <span class="text-danger" asp-validation-for="Customer.Phone"></span>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label text-light opacity-75">
+                Tax ID <small>(optional)</small>
+            </label>
+            <input class="form-control" asp-for="Customer.TaxId" />
+            <span class="text-danger" asp-validation-for="Customer.TaxId"></span>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label text-light opacity-75">
+                Notes <small>(optional)</small>
+            </label>
+            <input class="form-control" asp-for="Customer.Notes" />
+            <span class="text-danger" asp-validation-for="Customer.Notes"></span>
+        </div>
+    </div>
+</div>
+
+<!-- Address -->
+<div class="form-section">
+    <div class="form-section-header">
+        <i class="material-icons-outlined">location_on</i>
+        <span>Address</span>
+    </div>
+    <div class="form-section-divider"></div>
+
+    <div class="row g-3 mt-0">
+        <div class="col-md-4">
+            <label class="form-label text-light">Label</label>
+            <select class="form-select" asp-for="Address.Label">
+                <option>Billing</option>
+                <option>Shipping</option>
+                <option>Office</option>
+                <option>Home</option>
+            </select>
+            <span class="text-danger" asp-validation-for="Address.Label"></span>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label text-light">Country</label>
+            <input class="form-control" asp-for="Address.Country" />
+            <span class="text-danger" asp-validation-for="Address.Country"></span>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label text-light">City</label>
+            <input class="form-control" asp-for="Address.City" />
+            <span class="text-danger" asp-validation-for="Address.City"></span>
+        </div>
+
+        <div class="col-md-8">
+            <label class="form-label text-light">Address Line 1</label>
+            <input class="form-control" asp-for="Address.AddressLine1" />
+            <span class="text-danger" asp-validation-for="Address.AddressLine1"></span>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label text-light">Postal Code</label>
+            <input class="form-control" asp-for="Address.PostalCode" />
+            <span class="text-danger" asp-validation-for="Address.PostalCode"></span>
+        </div>
+
+        <div class="col-12">
+            <label class="form-label text-light">Address Line 2</label>
+            <input class="form-control" asp-for="Address.AddressLine2" />
+            <span class="text-danger" asp-validation-for="Address.AddressLine2"></span>
+        </div>
+    </div>
+</div>
+
+<!-- Primary Contact -->
+<div id="contactSection" class="form-section">
+    <div class="form-section-header">
+        <i class="material-icons-outlined">contacts</i>
+        <span>Primary Contact</span>
+    </div>
+    <div class="form-section-divider"></div>
+
+    <div class="row g-3 mt-0">
+        <div class="col-md-6">
+            <label class="form-label text-light opacity-75">
+                Contact Name <small>(optional)</small>
+            </label>
+            <input class="form-control" asp-for="Contact.Name" placeholder="e.g. Sara Ahmed" />
+            <span class="text-danger" asp-validation-for="Contact.Name"></span>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label text-light opacity-75">
+                Position <small>(optional)</small>
+            </label>
+            <input class="form-control" asp-for="Contact.Position" placeholder="e.g. Manager" />
+            <span class="text-danger" asp-validation-for="Contact.Position"></span>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label text-light opacity-75">
+                Contact Email <small>(optional)</small>
+            </label>
+            <input class="form-control" asp-for="Contact.Email" type="email" placeholder="e.g. sara@company.com" />
+            <span class="text-danger" asp-validation-for="Contact.Email"></span>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label text-light opacity-75">
+                Contact Phone <small>(optional)</small>
+            </label>
+            <input class="form-control" asp-for="Contact.Phone" placeholder="e.g. 49174..." />
+            <span class="text-danger" asp-validation-for="Contact.Phone"></span>
+        </div>
+    </div>
+</div>

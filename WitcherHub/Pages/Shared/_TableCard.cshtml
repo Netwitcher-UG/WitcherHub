@@ -1,0 +1,61 @@
+﻿@model WitcherHub.Pages.Models.UI.TableCardVm
+
+<div class="row">
+    <div class="col-12 col-xl-11 col-xxl-10 mx-auto">
+
+        <!-- Toolbar -->
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <h4 class="mb-0 fw-semibold text-light">@Model.Title</h4>
+
+            @if (!string.IsNullOrWhiteSpace(Model.PrimaryButtonText) &&
+                        !string.IsNullOrWhiteSpace(Model.PrimaryButtonTarget))
+            {
+                <button type="button"
+                        class="btn btn-grd-primary px-4"
+                        data-bs-toggle="modal"
+                        data-bs-target="@Model.PrimaryButtonTarget">
+                    @Model.PrimaryButtonText
+                </button>
+            }
+        </div>
+
+        <!-- Table Card -->
+        <div class="card w-100 rounded-4">
+            <div class="card-body">
+
+                <div class="order-search position-relative my-3 w-25 ms-4">
+                    <input class="form-control rounded-5 px-5" type="text" placeholder="@Model.SearchPlaceholder">
+                    <span class="material-icons-outlined position-absolute ms-3 translate-middle-y start-0 top-50">search</span>
+                </div>
+
+                <div class="table-responsive maxton-table-wrap mt-2">
+                    <table class="table align-middle w-100 maxton-table mb-0">
+                        <thead>
+                            <tr>
+                                @foreach (var col in Model.Columns)
+                                {
+                                    <th class="@col.HeaderClass">@col.Header</th>
+                                }
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach (var row in Model.Rows)
+                            {
+                                <tr>
+                                    @for (int i = 0; i < row.Cells.Count; i++)
+                                    {
+                                        var cellClass = (i < Model.Columns.Count) ? Model.Columns[i].CellClass : null;
+                                        <td class="@cellClass">@row.Cells[i]</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+

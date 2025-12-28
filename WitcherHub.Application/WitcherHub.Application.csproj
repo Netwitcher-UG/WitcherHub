@@ -12,10 +12,8 @@
 
   <ItemGroup>
     <Folder Include="Common\CacheKeys\" />
-    <Folder Include="Models\DTO\" />
     <Folder Include="Models\View\" />
     <Folder Include="Services\" />
-    <Folder Include="Validators\" />
   </ItemGroup>
 
   <ItemGroup>

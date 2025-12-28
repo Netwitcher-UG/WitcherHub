@@ -3,9 +3,10 @@
     background-color: rgb(255, 255, 255);
 
     .top-header { 
-        
+        .navbar {
              border-bottom: 1px solid #dee2e6;
              box-shadow: none;
+        }
     }
 
     .sidebar-wrapper {
@@ -16,10 +17,5 @@
     .card {
         box-shadow: none;
         border: 1px solid #dee2e6;
-    }
-
-    .primary-menu {
-            border-bottom: 1px solid #dee2e6;
-            box-shadow: none !important;
     }
 }
