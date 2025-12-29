@@ -45,7 +45,11 @@ namespace WitcherHub.Application.Models.DTO.Customers
     {
         public CustomerDTOs Customer { get; set; } = new();
     }
-
+    public class UpdateBasicRequest
+    {
+        public Guid CustomerId { get; set; }
+        public CustomerDto Customer { get; set; } = new();
+    }
     // ---------- Addresses ----------
     public class CreateCustomerAddressDto
     {

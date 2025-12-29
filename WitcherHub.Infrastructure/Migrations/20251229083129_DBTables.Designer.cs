@@ -13,7 +13,7 @@ using WitcherHub.Infrastructure.Data.Context;
 namespace WitcherHub.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251217043101_DBTables")]
+    [Migration("20251229083129_DBTables")]
     partial class DBTables
     {
         /// <inheritdoc />
@@ -389,9 +389,9 @@ namespace WitcherHub.Infrastructure.Migrations
                     b.Property<int>("Position")
                         .HasColumnType("integer");
 
-                    b.Property<string>("ServiceId")
+                    b.Property<Guid?>("ServiceId")
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -487,10 +487,6 @@ namespace WitcherHub.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("AddressLine1")
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
                     b.Property<string>("AddressLine2")
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)");
@@ -509,6 +505,10 @@ namespace WitcherHub.Infrastructure.Migrations
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("FullNameOrCompany")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<bool>("IsDefault")
                         .HasColumnType("boolean");
 
@@ -519,6 +519,14 @@ namespace WitcherHub.Infrastructure.Migrations
                     b.Property<string>("PostalCode")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Street")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("StreetNr")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -708,9 +716,9 @@ namespace WitcherHub.Infrastructure.Migrations
                     b.Property<decimal>("Quantity")
                         .HasColumnType("numeric(12,2)");
 
-                    b.Property<string>("ServiceId")
+                    b.Property<Guid?>("ServiceId")
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("TaxRateId")
                         .HasColumnType("uuid");
@@ -913,10 +921,9 @@ namespace WitcherHub.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
-                    b.Property<string>("ServiceId")
-                        .IsRequired()
+                    b.Property<Guid>("ServiceId")
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly?>("ValidFrom")
                         .HasColumnType("date");
@@ -1056,9 +1063,9 @@ namespace WitcherHub.Infrastructure.Migrations
                     b.Property<Guid>("QuoteId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ServiceId")
+                    b.Property<Guid?>("ServiceId")
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("TaxRateId")
                         .HasColumnType("uuid");
@@ -1084,9 +1091,9 @@ namespace WitcherHub.Infrastructure.Migrations
 
             modelBuilder.Entity("WitcherHub.Infrastructure.Data.Models.ServiceCatalogItem", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("BasePrice")
                         .HasColumnType("numeric(12,2)");

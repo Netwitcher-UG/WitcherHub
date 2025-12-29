@@ -90,8 +90,20 @@ namespace WitcherHub.Application.Validators.Customers
                 .MaximumLength(100)
                 .When(x => !string.IsNullOrWhiteSpace(x.TaxId));
         }
-    }
 
+    }
+    public sealed class UpdateBasicRequestValidator : AbstractValidator<UpdateBasicRequest>
+    {
+        public UpdateBasicRequestValidator()
+        {
+            RuleFor(x => x.CustomerId)
+                .NotEmpty().WithMessage("CustomerId is required.");
+
+            RuleFor(x => x.Customer)
+                .NotNull().WithMessage("Customer is required.")
+                .SetValidator(new CustomerDtoValidator());
+        }
+    }
     public sealed class AddressDtoValidator : AbstractValidator<AddressDto>
     {
         public AddressDtoValidator()

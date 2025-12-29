@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -7,10 +6,14 @@ using Microsoft.Extensions.Options;
 using OpenAI.Chat;
 using System;
 using System.Net.Http.Headers;
+using WitcherHub.Application.Common.Caching;
 using WitcherHub.Application.Interfaces;
+using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Infrastructure.Authentication;
+using WitcherHub.Infrastructure.Common.Caching;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
+using WitcherHub.Infrastructure.ManageData.Customers;
 using WitcherHub.Infrastructure.Repositories.Implementations;
 using WitcherHub.Infrastructure.Seeding;
 using WitcherHub.Infrastructure.Services.Caching;
@@ -38,9 +41,8 @@ namespace WitcherHub.Infrastructure
             });
             // Memory cache (in-process)
             services.AddMemoryCache();
-
-            // Cache service wrapper (tags + stampede protection)
-            services.AddScoped<ICacheService, CacheService>();
+            // AppCache (our hybrid cache wrapper)
+            services.AddScoped<IAppCache, AppCache>();
             // ===== Identity =====
             services.AddIdentityCore<AppUser>(options =>
             {
@@ -94,8 +96,8 @@ namespace WitcherHub.Infrastructure
             services.AddScoped<IAiTextGenerator, OpenAiTextGenerator>();
             services.AddScoped<IDataSeeder, IdentityDataSeeder>();
             services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<ICustomer, ManageCustomer>();
 
-         
 
             // UnitOfWork
             services.AddScoped<IUnitOfWork, UnitOfWork>();

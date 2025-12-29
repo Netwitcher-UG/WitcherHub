@@ -17,11 +17,11 @@ using CustomerEntity = WitcherHub.Infrastructure.Data.Models.Customer;
 
 namespace WitcherHub.Infrastructure.ManageData.Customers
 {
-    public sealed class Customer : ICustomer
+    public sealed class ManageCustomer : ICustomer
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IAppCache _cache;
-        private readonly ILogger<Customer> _log;
+        private readonly ILogger<ManageCustomer> _log;
 
         private static readonly AppCacheEntryOptions ListCacheOptions = new()
         {
@@ -35,7 +35,7 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
         };
 
-        public Customer(IUnitOfWork unitOfWork, IAppCache cache, ILogger<Customer> log)
+        public ManageCustomer(IUnitOfWork unitOfWork, IAppCache cache, ILogger<ManageCustomer> log)
         {
             _unitOfWork = unitOfWork;
             _cache = cache;

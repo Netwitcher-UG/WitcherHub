@@ -1,4 +1,5 @@
 ﻿using Serilog;
+using System.Text.Json.Serialization;
 using WitcherHub.Configuration.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,7 +13,13 @@ builder.Host.UseSerilog((context, services, configuration) =>
         .WriteTo.Console();
 });
 builder.Services.AddPresentation(builder.Configuration);
-
+builder.Services
+    .AddRazorPages()
+    .AddJsonOptions(o =>
+    {
+        o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        o.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    });
 var app = builder.Build();
 await app.SeedAsync();
 if (app.Environment.IsDevelopment())

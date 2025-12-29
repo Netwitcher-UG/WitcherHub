@@ -2,7 +2,11 @@
 @using WitcherHub.Domain.SeedData
 
 
-   
+@{
+    var tType = TempData["Toast.Type"]?.ToString();
+    var tTitle = TempData["Toast.Title"]?.ToString();
+    var tMsg = TempData["Toast.Message"]?.ToString();
+}
 @functions {
     bool HasPerm(string perm) =>
         User.Identity?.IsAuthenticated == true &&
@@ -434,5 +438,20 @@
     <script src="~/theme/assets/js/main.js"></script>
 
     @await RenderSectionAsync("Scripts", required: false)
+    @if (!string.IsNullOrWhiteSpace(tType) && !string.IsNullOrWhiteSpace(tMsg))
+    {
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                if (window.UI?.toast?.show) {
+                    UI.toast.show({
+                        type: "@tType",
+                        title: "@(tTitle ?? "")",
+                        msg: "@tMsg",
+                        timeout: 3500
+                    });
+                }
+            });
+        </script>
+    }
 </body>
 </html>

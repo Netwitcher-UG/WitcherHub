@@ -83,6 +83,7 @@
 
     // ---------- Modal Session State ----------
     let currentClientId = null;
+    let currentClient = null;
     let editingLocationIndex = null;
     let editingContactIndex = null;
     let editingBasic = false;
@@ -403,29 +404,55 @@
         const a2 = $('vc-clientId-addContact'); if (a2) a2.value = client?.id ?? '';
 
         currentClientId = client?.id ?? null;
+        currentClient = client ?? null;   
+
     }
 
-    // ---------- Modal Open ----------
+    // ---------- Modal Open (Server) ----------
     const viewModalEl = $('ViewClientModal');
     if (viewModalEl) {
-        viewModalEl.addEventListener('show.bs.modal', function (event) {
+        viewModalEl.addEventListener('show.bs.modal', async function (event) {
             closeAllCollapses();
             editingLocationIndex = null;
             editingContactIndex = null;
+            setBasicMode(false);
 
             const btn = event.relatedTarget;
             const id = btn?.getAttribute('data-client-id');
-            const client = mockClients[id];
 
-            if (!client) {
-                toastInfo('Client not found in mock data.', 'Info');
-                renderClient({ id, type: '—', name: 'Client not found', addresses: [], contacts: [], projects: [] });
+            if (!id) {
+                toastError('Missing client id.', 'Error');
+                renderClient({ id: '—', type: '—', name: 'Client not found', addresses: [], contacts: [], projects: [] });
                 return;
             }
 
-            renderClient(client);
+            // عرض placeholder سريع داخل المودال
+            renderClient({ id, type: '—', name: 'Loading...', addresses: [], contacts: [], projects: [] });
+
+            try {
+                // ✅ 1) اجلب من السيرفر
+                const client = await fetchClientById(id);
+
+                // ✅ 2) اعرض
+                renderClient(client);
+
+            } catch (err) {
+                console.error('Load client failed:', err);
+
+                // (اختياري) fallback للـ mock لو تبي
+                const fallback = mockClients[id];
+                if (fallback) {
+                    toastInfo('Loaded from mock (server failed).', 'Info');
+                    renderClient(fallback);
+                    return;
+                }
+
+                toastError('Client not found or failed to load.', 'Error');
+                renderClient({ id, type: '—', name: 'Client not found', addresses: [], contacts: [], projects: [] });
+            }
         });
     }
+
     // ---------- Create Modal (FormModal) : show/hide contact section ----------
     document.addEventListener('DOMContentLoaded', function () {
         const modalEl = document.getElementById('FormModal');
@@ -465,25 +492,46 @@
         const action = b.getAttribute('data-vc-action');
         const idx = Number(b.getAttribute('data-index') ?? -1);
 
-        if (!currentClientId || !mockClients[currentClientId]) return;
-        const client = mockClients[currentClientId];
+        if (!currentClient) return;       
+        const client = currentClient;
 
         // ✅ ---- Basic actions FIRST ----
         if (action === 'edit-basic') { setBasicMode(true); return; }
         if (action === 'cancel-basic') { setBasicMode(false); return; }
 
         if (action === 'save-basic') {
-            const c = mockClients[currentClientId];
-            c.type = $('vc-basic-type')?.value ?? c.type;
-            c.name = $('vc-basic-name')?.value?.trim() ?? c.name;
-            c.email = $('vc-basic-email')?.value?.trim() ?? '';
-            c.phone = $('vc-basic-phone')?.value?.trim() ?? '';
-            c.taxId = $('vc-basic-taxId')?.value?.trim() ?? '';
-            c.notes = $('vc-basic-notes')?.value?.trim() ?? '';
-            renderClient(c);
-            toastSuccess('Basic info updated.', 'Success');
+            if (!currentClient) return;
+
+            const url = document.getElementById('vcUpdateBasicUrl')?.value;
+            if (!url) { toastError('Update url not found.', 'Error'); return; }
+
+            const payload = {
+                customerId: currentClient.id,
+                customer: {
+                    type: $('vc-basic-type')?.value ?? currentClient.type,
+                    name: $('vc-basic-name')?.value?.trim() ?? currentClient.name,
+                    email: $('vc-basic-email')?.value?.trim() ?? '',
+                    phone: $('vc-basic-phone')?.value?.trim() ?? '',
+                    taxId: $('vc-basic-taxId')?.value?.trim() ?? '',
+                    notes: $('vc-basic-notes')?.value?.trim() ?? ''
+                }
+            };
+
+            try {
+                const updatedRaw = await postJson(url, payload);
+                const updated = normalizeClient(updatedRaw) || currentClient;
+                currentClient = updated;
+                renderClient(currentClient);
+                toastSuccess('Saved successfully.', 'Success');
+            } catch (err) {
+                console.error(err);
+                toastError('Failed to save.', 'Error');
+            }
             return;
         }
+
+
+
 
 
 
@@ -501,47 +549,83 @@
         }
 
         if (action === 'save-location') {
-            if (!client.addresses || idx < 0 || idx >= client.addresses.length) return;
+            const url = document.getElementById('vcUpdateAddressUrl')?.value;
+            if (!url) return toastError('vcUpdateAddressUrl not found', 'Error');
 
-            const a = client.addresses[idx];
-            a.label = $('vc-loc-' + idx + '-label')?.value?.trim() || a.label || 'Location';
-            a.country = $('vc-loc-' + idx + '-country')?.value?.trim() || '';
-            a.city = $('vc-loc-' + idx + '-city')?.value?.trim() || '';
-            a.street = $('vc-loc-' + idx + '-street')?.value?.trim() || '';
-            a.streetNr = $('vc-loc-' + idx + '-nr')?.value?.trim() || '';
-            a.postalCode = $('vc-loc-' + idx + '-postal')?.value?.trim() || '';
-            a.addressLine2 = $('vc-loc-' + idx + '-line2')?.value?.trim() || '';
+            const addressId = client.addresses?.[idx]?.id;
+            if (!addressId) return toastError('AddressId missing.', 'Error');
 
-            editingLocationIndex = null;
-            renderAddresses(client.addresses);
-            toastSuccess('Location updated.', 'Success');
+            const payload = {
+                customerId: client.id,
+                addressId: addressId,
+                address: {
+                    label: $('vc-loc-' + idx + '-label')?.value?.trim() || 'Location',
+                    country: $('vc-loc-' + idx + '-country')?.value?.trim() || '',
+                    city: $('vc-loc-' + idx + '-city')?.value?.trim() || '',
+                    postalCode: $('vc-loc-' + idx + '-postal')?.value?.trim() || '',
+                    street: $('vc-loc-' + idx + '-street')?.value?.trim() || '',
+                    streetNr: $('vc-loc-' + idx + '-nr')?.value?.trim() || '',
+                    fullNameOrCompany: currentClient?.name ?? '',
+                    isDefault: !!client.addresses?.[idx]?.isDefault
+                }
+            };
+
+            try {
+                const updatedRaw = await postJson(url, payload);
+                currentClient = normalizeClient(updatedRaw);
+                editingLocationIndex = null;
+                renderClient(currentClient);
+                toastSuccess('Location updated (DB).', 'Success');
+            } catch (err) {
+                console.error(err);
+                toastError('Failed to update location.', 'Error');
+            }
             return;
         }
+
 
         if (action === 'set-default-location') {
-            if (!client.addresses || idx < 0 || idx >= client.addresses.length) return;
-            client.addresses.forEach((x, i) => x.isDefault = (i === idx));
-            renderAddresses(client.addresses);
-            toastSuccess('Default location updated.', 'Success');
+            const url = document.getElementById('vcSetDefaultAddressUrl')?.value;
+            if (!url) return toastError('vcSetDefaultAddressUrl not found', 'Error');
+
+            const addressId = client.addresses?.[idx]?.id; 
+            if (!addressId) return toastError('AddressId missing.', 'Error');
+
+            try {
+                const updatedRaw = await postJson(url, { customerId: client.id, addressId });
+                currentClient = normalizeClient(updatedRaw);
+                renderClient(currentClient);
+                toastSuccess('Default updated (DB).', 'Success');
+            } catch (err) {
+                console.error(err);
+                toastError('Failed to set default.', 'Error');
+            }
             return;
         }
 
-        if (action === 'delete-location') {
-            if (!client.addresses || idx < 0 || idx >= client.addresses.length) return;
 
+        if (action === 'delete-location') {
             const ok = await confirmBox('Delete this location?', 'Confirm');
             if (!ok) return;
 
-            const wasDefault = !!client.addresses[idx]?.isDefault;
-            client.addresses.splice(idx, 1);
+            const url = document.getElementById('vcDeleteAddressUrl')?.value;
+            if (!url) return toastError('vcDeleteAddressUrl not found', 'Error');
 
-            if (wasDefault && client.addresses.length) client.addresses[0].isDefault = true;
+            const addressId = client.addresses?.[idx]?.id;
+            if (!addressId) return toastError('AddressId missing.', 'Error');
 
-            editingLocationIndex = null;
-            renderAddresses(client.addresses);
-            toastSuccess('Location deleted.', 'Success');
+            try {
+                const updatedRaw = await postJson(url, { customerId: client.id, addressId });
+                currentClient = normalizeClient(updatedRaw);
+                renderClient(currentClient);
+                toastSuccess('Location deleted (DB).', 'Success');
+            } catch (err) {
+                console.error(err);
+                toastError('Failed to delete location.', 'Error');
+            }
             return;
         }
+
 
         // ---- Contact actions (Company only) ----
         if (action === 'edit-contact' || action === 'save-contact' || action === 'cancel-contact'
@@ -566,117 +650,169 @@
         }
 
         if (action === 'save-contact') {
-            if (!client.contacts || idx < 0 || idx >= client.contacts.length) return;
+            const url = document.getElementById('vcUpdateContactUrl')?.value;
+            if (!url) return toastError('vcUpdateContactUrl not found', 'Error');
 
-            const c = client.contacts[idx];
-            c.name = $('vc-c-' + idx + '-name')?.value?.trim() || c.name || 'Contact';
-            c.position = $('vc-c-' + idx + '-position')?.value?.trim() || '';
-            c.email = $('vc-c-' + idx + '-email')?.value?.trim() || '';
-            c.phone = $('vc-c-' + idx + '-phone')?.value?.trim() || '';
+            const contactId = client.contacts?.[idx]?.id;
+            if (!contactId) return toastError('ContactId missing.', 'Error');
 
-            editingContactIndex = null;
-            renderContacts(client.contacts);
-            toastSuccess('Contact updated.', 'Success');
+            const payload = {
+                customerId: client.id,
+                contactId: contactId,
+                contact: {
+                    name: $('vc-c-' + idx + '-name')?.value?.trim() || '',
+                    position: $('vc-c-' + idx + '-position')?.value?.trim() || '',
+                    email: $('vc-c-' + idx + '-email')?.value?.trim() || '',
+                    phone: $('vc-c-' + idx + '-phone')?.value?.trim() || '',
+                    isPrimary: !!client.contacts?.[idx]?.isPrimary
+                }
+            };
+
+            try {
+                const updatedRaw = await postJson(url, payload);
+                currentClient = normalizeClient(updatedRaw);
+                editingContactIndex = null;
+                renderClient(currentClient);
+                toastSuccess('Contact updated (DB).', 'Success');
+            } catch (err) {
+                console.error(err);
+                toastError('Failed to update contact.', 'Error');
+            }
             return;
         }
+
 
         if (action === 'set-primary-contact') {
-            if (!client.contacts || idx < 0 || idx >= client.contacts.length) return;
-            client.contacts.forEach((x, i) => x.isPrimary = (i === idx));
-            renderContacts(client.contacts);
-            toastSuccess('Primary contact updated.', 'Success');
+            const url = document.getElementById('vcSetPrimaryContactUrl')?.value;
+            if (!url) return toastError('vcSetPrimaryContactUrl not found', 'Error');
+
+            const contactId = client.contacts?.[idx]?.id;
+            if (!contactId) return toastError('ContactId missing.', 'Error');
+
+            try {
+                const updatedRaw = await postJson(url, { customerId: client.id, contactId });
+                currentClient = normalizeClient(updatedRaw);
+                renderClient(currentClient);
+                toastSuccess('Primary contact updated (DB).', 'Success');
+            } catch (err) {
+                console.error(err);
+                toastError('Failed to set primary contact.', 'Error');
+            }
             return;
         }
 
-        if (action === 'delete-contact') {
-            if (!client.contacts || idx < 0 || idx >= client.contacts.length) return;
 
+        if (action === 'delete-contact') {
             const ok = await confirmBox('Delete this contact?', 'Confirm');
             if (!ok) return;
 
-            const wasPrimary = !!client.contacts[idx]?.isPrimary;
-            client.contacts.splice(idx, 1);
+            const url = document.getElementById('vcDeleteContactUrl')?.value;
+            if (!url) return toastError('vcDeleteContactUrl not found', 'Error');
 
-            if (wasPrimary && client.contacts.length) client.contacts[0].isPrimary = true;
+            const contactId = client.contacts?.[idx]?.id;
+            if (!contactId) return toastError('ContactId missing.', 'Error');
 
-            editingContactIndex = null;
-            renderContacts(client.contacts);
-            toastSuccess('Contact deleted.', 'Success');
+            try {
+                const updatedRaw = await postJson(url, { customerId: client.id, contactId });
+                currentClient = normalizeClient(updatedRaw);
+                renderClient(currentClient);
+                toastSuccess('Contact deleted (DB).', 'Success');
+            } catch (err) {
+                console.error(err);
+                toastError('Failed to delete contact.', 'Error');
+            }
             return;
         }
+
     });
 
     // ---------- Add Location (mock) ----------
     const addLocForm = $('vcAddLocationForm');
     if (addLocForm) {
-        addLocForm.addEventListener('submit', function (e) {
+        addLocForm.addEventListener('submit', async function (e) {
             e.preventDefault();
-            if (!currentClientId || !mockClients[currentClientId]) return;
+            if (!currentClient) return;
 
-            const client = mockClients[currentClientId];
-            client.addresses = client.addresses || [];
+            const url = document.getElementById('vcAddAddressUrl')?.value;
+            if (!url) return toastError('vcAddAddressUrl not found', 'Error');
 
-            const obj = {
-                label: $('vc-add-loc-label')?.value?.trim() || 'Location',
-                country: $('vc-add-loc-country')?.value?.trim() || '',
-                city: $('vc-add-loc-city')?.value?.trim() || '',
-                postalCode: $('vc-add-loc-postal')?.value?.trim() || '',
-                street: $('vc-add-loc-street')?.value?.trim() || '',
-                streetNr: $('vc-add-loc-nr')?.value?.trim() || '',
-                addressLine2: $('vc-add-loc-line2')?.value?.trim() || '',
-                isDefault: !!$('vc-add-loc-default')?.checked
+            const payload = {
+                customerId: currentClient.id,
+                address: {
+                    label: $('vc-add-loc-label')?.value?.trim() || 'Location',
+                    country: $('vc-add-loc-country')?.value?.trim() || '',
+                    city: $('vc-add-loc-city')?.value?.trim() || '',
+                    postalCode: $('vc-add-loc-postal')?.value?.trim() || '',
+                    fullNameOrCompany: currentClient.name,
+                    street: $('vc-add-loc-street')?.value?.trim() || '',
+                    streetNr: $('vc-add-loc-nr')?.value?.trim() || '',
+                    isDefault: !!$('vc-add-loc-default')?.checked
+                }
             };
 
-            if (obj.isDefault) client.addresses.forEach(a => a.isDefault = false);
-            if (client.addresses.length === 0) obj.isDefault = true;
+            try {
+                const updatedRaw = await postJson(url, payload);
+                currentClient = normalizeClient(updatedRaw);
+                renderClient(currentClient);
 
-            client.addresses.push(obj);
-            addLocForm.reset();
+                addLocForm.reset();
+                const c = $('vc-addLocationCollapse');
+                if (c) bootstrap.Collapse.getOrCreateInstance(c, { toggle: false }).hide();
 
-            const c = $('vc-addLocationCollapse');
-            if (c) bootstrap.Collapse.getOrCreateInstance(c, { toggle: false }).hide();
-
-            renderAddresses(client.addresses);
-            toastSuccess('Location added.', 'Success');
+                toastSuccess('Location saved to DB.', 'Success');
+            } catch (err) {
+                console.error(err);
+                toastError('Failed to add location.', 'Error');
+            }
         });
     }
+
+
+
 
     // ---------- Add Contact (mock) ----------
     const addContactForm = $('vcAddContactForm');
     if (addContactForm) {
-        addContactForm.addEventListener('submit', function (e) {
+        addContactForm.addEventListener('submit', async function (e) {
             e.preventDefault();
-            if (!currentClientId || !mockClients[currentClientId]) return;
+            if (!currentClient) return;
 
-            const client = mockClients[currentClientId];
-            if (client.type !== 'Company') {
+            if (currentClient.type !== 'Company') {
                 toastError('Contacts are available for Company clients only.', 'Error');
                 return;
             }
 
-            client.contacts = client.contacts || [];
+            const url = document.getElementById('vcAddContactUrl')?.value;
+            if (!url) return toastError('vcAddContactUrl not found', 'Error');
 
-            const obj = {
-                name: $('vc-add-c-name')?.value?.trim() || 'Contact',
-                position: $('vc-add-c-position')?.value?.trim() || '',
-                email: $('vc-add-c-email')?.value?.trim() || '',
-                phone: $('vc-add-c-phone')?.value?.trim() || '',
-                isPrimary: !!$('vc-add-c-primary')?.checked
+            const payload = {
+                customerId: currentClient.id,
+                contact: {
+                    name: $('vc-add-c-name')?.value?.trim() || '',
+                    position: $('vc-add-c-position')?.value?.trim() || '',
+                    email: $('vc-add-c-email')?.value?.trim() || '',
+                    phone: $('vc-add-c-phone')?.value?.trim() || '',
+                    isPrimary: !!$('vc-add-c-primary')?.checked
+                }
             };
 
-            if (obj.isPrimary) client.contacts.forEach(x => x.isPrimary = false);
-            if (client.contacts.length === 0) obj.isPrimary = true;
+            try {
+                const updatedRaw = await postJson(url, payload);
+                currentClient = normalizeClient(updatedRaw);
+                renderClient(currentClient);
 
-            client.contacts.push(obj);
-            addContactForm.reset();
+                addContactForm.reset();
+                const c = $('vc-addContactCollapse');
+                if (c) bootstrap.Collapse.getOrCreateInstance(c, { toggle: false }).hide();
 
-            const c = $('vc-addContactCollapse');
-            if (c) bootstrap.Collapse.getOrCreateInstance(c, { toggle: false }).hide();
-
-            renderContacts(client.contacts);
-            toastSuccess('Contact added.', 'Success');
+                toastSuccess('Contact saved to DB.', 'Success');
+            } catch (err) {
+                console.error(err);
+                toastError('Failed to add contact.', 'Error');
+            }
         });
     }
+
 
     // ---------- Confirm for server forms (data-vc-confirm) ----------
     document.addEventListener('click', async function (e) {
@@ -714,4 +850,97 @@
         hid.value = id;
         form.submit();
     });
+
+
+    // ---------- Server Fetch ----------
+    async function fetchClientById(id) {
+        const baseUrl = document.getElementById('vcClientUrl')?.value;
+        if (!baseUrl) throw new Error('vcClientUrl not found');
+
+        const joiner = baseUrl.includes('?') ? '&' : '?';
+        const url = `${baseUrl}${joiner}id=${encodeURIComponent(id)}`;
+
+        const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        return normalizeClient(data);
+
+    }
+    async function postJson(url, body) {
+        const token = document.getElementById('antiForgeryToken')?.value;
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                ...(token ? { 'RequestVerificationToken': token } : {})
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+            const text = await res.text().catch(() => '');
+            throw new Error(`HTTP ${res.status} - ${text}`);
+        }
+
+        return await res.json();
+    }
+    function normalizeClient(data) {
+        if (!data) return null;
+
+        const normalizeType = (v) => {
+            if (v === null || v === undefined) return 'Individual';
+            if (typeof v === 'number') return v === 1 ? 'Company' : 'Individual';
+            const s = String(v).trim().toLowerCase();
+            if (s === 'company' || s.includes('comp')) return 'Company';
+            return 'Individual';
+        };
+
+        // إذا السيرفر يرجع Wrapper مثل { customer: {...} } أو { Customer: {...} }
+        const root = data.customer ?? data.Customer ?? data;
+
+        const rawAddresses = root.addresses ?? root.Addresses ?? [];
+        const rawContacts =
+            root.contacts ?? root.Contacts ??
+            (root.contact ? [root.contact] : []) ??
+            (root.Contact ? [root.Contact] : []);
+
+        return {
+            id: root.id ?? root.Id,
+            type: normalizeType(root.type ?? root.Type),
+            name: root.name ?? root.Name,
+            email: root.email ?? root.Email,
+            phone: root.phone ?? root.Phone,
+            taxId: root.taxId ?? root.TaxId,
+            notes: root.notes ?? root.Notes,
+
+            addresses: (rawAddresses || []).map(a => ({
+                id: a.id ?? a.Id,   // ✅
+                label: a.label ?? a.Label ?? 'Location',
+                isDefault: a.isDefault ?? a.IsDefault ?? a.Default ?? false,
+                street: a.street ?? a.Street ?? '',
+                streetNr: a.streetNr ?? a.StreetNr ?? '',
+                city: a.city ?? a.City ?? '',
+                country: a.country ?? a.Country ?? '',
+                postalCode: a.postalCode ?? a.PostalCode ?? '',
+                addressLine2: a.addressLine2 ?? a.AddressLine2 ?? ''
+            })),
+            contacts: (rawContacts || []).map(c => ({
+                id: c.id ?? c.Id,   // ✅
+                isPrimary: c.isPrimary ?? c.IsPrimary ?? c.Primary ?? false,
+                name: c.name ?? c.Name ?? '',
+                position: c.position ?? c.Position ?? '',
+                email: c.email ?? c.Email ?? '',
+                phone: c.phone ?? c.Phone ?? ''
+            })),
+
+
+            projects: root.projects ?? root.Projects ?? []
+        };
+    }
+
 })();
+
+

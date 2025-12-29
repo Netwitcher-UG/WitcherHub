@@ -101,11 +101,7 @@
             <span class="text-danger" asp-validation-for="Address.City"></span>
         </div>
 
-        @* <div class="col-md-8">
-            <label class="form-label text-light">Address Line 1</label>
-            <input class="form-control" asp-for="Address.AddressLine1" />
-            <span class="text-danger" asp-validation-for="Address.AddressLine1"></span>
-        </div> *@
+        
 
         <div class="col-md-4">
             <label class="form-label text-light">Postal Code</label>
@@ -113,11 +109,24 @@
             <span class="text-danger" asp-validation-for="Address.PostalCode"></span>
         </div>
 
-        @* <div class="col-12">
-            <label class="form-label text-light">Address Line 2</label>
-            <input class="form-control" asp-for="Address.AddressLine2" />
-            <span class="text-danger" asp-validation-for="Address.AddressLine2"></span>
-        </div> *@
+        <div class="col-md-6">
+            <label class="form-label text-light">Full Name / Company <span class="text-danger">*</span></label>
+            <input class="form-control" asp-for="Address.FullNameOrCompany" />
+            <span class="text-danger" asp-validation-for="Address.FullNameOrCompany"></span>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label text-light">Street <span class="text-danger">*</span></label>
+            <input class="form-control" asp-for="Address.Street" />
+            <span class="text-danger" asp-validation-for="Address.Street"></span>
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label text-light">Nr <span class="text-danger">*</span></label>
+            <input class="form-control" asp-for="Address.StreetNr" />
+            <span class="text-danger" asp-validation-for="Address.StreetNr"></span>
+        </div>
+
     </div>
 </div>
 

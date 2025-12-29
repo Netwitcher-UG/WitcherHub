@@ -23,6 +23,9 @@ namespace WitcherHub.Application.Interfaces
         IQueryable<TEntity> Query(
             bool asNoTracking = true,
             params Expression<Func<TEntity, object>>[] includes);
+        IQueryable<TEntity> Query(
+            Func<IQueryable<TEntity>, IQueryable<TEntity>> include,
+            bool asNoTracking = true);
         Task<IReadOnlyList<TEntity>> ListAsync(
             Expression<Func<TEntity, bool>>? predicate = null,
             CancellationToken ct = default,

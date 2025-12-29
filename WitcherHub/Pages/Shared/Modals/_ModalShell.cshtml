@@ -13,6 +13,10 @@
                 @if (!string.IsNullOrWhiteSpace(Model.Handler))
                 {
                     <form method="post" asp-page-handler="@Model.Handler">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="p" value="@(ViewData["p"] ?? 1)" />
+                        <input type="hidden" name="pageSize" value="@(ViewData["pageSize"] ?? 10)" />
+                        <input type="hidden" name="q" value="@(ViewData["q"] ?? "")" />
                         <partial name="@Model.BodyPartialPath" model="Model.BodyModel" />
 
                         <div class="d-flex justify-content-end gap-2 mt-5">
@@ -24,6 +28,10 @@
                 else
                 {
                     <form method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="p" value="@(ViewData["p"] ?? 1)" />
+                        <input type="hidden" name="pageSize" value="@(ViewData["pageSize"] ?? 10)" />
+                        <input type="hidden" name="q" value="@(ViewData["q"] ?? "")" />
                         <partial name="@Model.BodyPartialPath" model="Model.BodyModel" />
 
                         <div class="d-flex justify-content-end gap-2 mt-5">

@@ -23,10 +23,21 @@
         <div class="card w-100 rounded-4">
             <div class="card-body">
 
-                <div class="order-search position-relative my-3 w-25 ms-4">
-                    <input class="form-control rounded-5 px-5" type="text" placeholder="@Model.SearchPlaceholder">
-                    <span class="material-icons-outlined position-absolute ms-3 translate-middle-y start-0 top-50">search</span>
-                </div>
+              
+                    <form method="get" class="order-search position-relative my-3 w-25 ms-4">
+                        <input class="form-control rounded-5 px-5"
+                               type="text"
+                               name="@Model.Pagination?.SearchParam"
+                               value="@Model.Pagination?.SearchQuery"
+                               placeholder="@Model.SearchPlaceholder" />
+
+                        <input type="hidden" name="@Model.Pagination?.PageParam" value="1" />
+                        <input type="hidden" name="@Model.Pagination?.PageSizeParam" value="@Model.Pagination?.PageSize" />
+
+                        <span class="material-icons-outlined position-absolute ms-3 translate-middle-y start-0 top-50">search</span>
+                    </form>
+
+                    
 
                 <div class="table-responsive maxton-table-wrap mt-2">
                     <table class="table align-middle w-100 maxton-table mb-0">
