@@ -21,6 +21,7 @@ namespace WitcherHub.Infrastructure.Data.Models
         public string? TaxId { get; set; }
 
         public string? Notes { get; set; }
+        public LexwareType LexwareType { get; set; }
 
         public ICollection<CustomerAddress> Addresses { get; set; } = new List<CustomerAddress>();
         public ICollection<CustomerContact> Contacts { get; set; } = new List<CustomerContact>();

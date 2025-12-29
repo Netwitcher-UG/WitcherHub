@@ -30,6 +30,7 @@ namespace WitcherHub.Infrastructure.Data.Models
         public enum MilestoneStatus { Planned, InProgress, Done, Cancelled }
 
         public enum AttachmentOwnerType { Quote, Contract, Invoice, Project, Customer }
+        public enum LexwareType { Imported, Exported ,  NotExported }
 
     }
 }
