@@ -138,28 +138,35 @@
             <option value="Individual">Individual</option>
             <option value="Company">Company</option>
         </select>
+        <div class="text-danger small mt-1" id="err-vc-basic-type"></div>
     </div>
     <!-- Row 2: Name + Phone -->
     <div class="col-12 col-md-6">
-        <label class="form-label">Name</label>
-        <input class="form-control form-control-sm" id="vc-basic-name" />
-    </div>
-    <div class="col-12 col-md-6">
-        <label class="form-label">Email</label>
-        <input class="form-control form-control-sm" id="vc-basic-email" type="email" />
-    </div>
+    <label class="form-label">Name</label>
+    <input class="form-control form-control-sm" id="vc-basic-name" />
+    <div class="text-danger small mt-1" id="err-vc-basic-name"></div>
+</div>
+
+<div class="col-12 col-md-6">
+    <label class="form-label">Email</label>
+    <input class="form-control form-control-sm" id="vc-basic-email" type="email" />
+    <div class="text-danger small mt-1" id="err-vc-basic-email"></div>
+</div>
+
 
     
 
     <div class="col-12 col-md-6">
         <label class="form-label">Phone</label>
         <input class="form-control form-control-sm" id="vc-basic-phone" />
+        <div class="text-danger small mt-1" id="err-vc-basic-phone"></div>
     </div>
 
     <!-- Row 3: Tax ID (with Phone above it) -->
     <div class="col-12 col-md-6">
         <label class="form-label">Tax ID</label>
         <input class="form-control form-control-sm" id="vc-basic-taxId" />
+        <div class="text-danger small mt-1" id="err-vc-basic-taxId"></div>
     </div>
 
     <!-- (اختياري) لو تبي تخلي العمود الثاني فاضي عشان الاتزان -->
@@ -169,6 +176,7 @@
     <div class="col-12">
         <label class="form-label">Notes</label>
         <input class="form-control form-control-sm" id="vc-basic-notes" />
+        <div class="text-danger small mt-1" id="err-vc-basic-notes"></div>
     </div>
 
     <div class="col-12 d-flex justify-content-end gap-2 mt-2">
@@ -229,30 +237,42 @@
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label">Label</label>
                                                     <input class="form-control" id="vc-add-loc-label" placeholder="Billing / Shipping / Home" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-loc-label"></div>
                                                 </div>
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label">Country</label>
                                                     <input class="form-control" id="vc-add-loc-country" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-loc-country"></div>
                                                 </div>
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label">City</label>
                                                     <input class="form-control" id="vc-add-loc-city" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-loc-city"></div>
                                                 </div>
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label">Postal Code</label>
                                                     <input class="form-control" id="vc-add-loc-postal" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-loc-postal"></div>
                                                 </div>
                                                 <div class="col-12 col-md-8">
                                                     <label class="form-label">Street</label>
                                                     <input class="form-control" id="vc-add-loc-street" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-loc-street"></div>
                                                 </div>
                                                 <div class="col-12 col-md-4">
                                                     <label class="form-label">Nr</label>
                                                     <input class="form-control" id="vc-add-loc-nr" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-loc-nr"></div>
                                                 </div>
-                                                <div class="col-12">
+                                                <div class="col-12 col-md-6">
                                                     <label class="form-label">Address Line 2</label>
                                                     <input class="form-control" id="vc-add-loc-line2" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-loc-line2"></div>
+                                                </div>
+                                                <div class="col-12 col-md-6">
+                                                    <label class="form-label">Full Name / Company</label>
+                                                    <input class="form-control" id="vc-add-loc-fullname" readonly />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-loc-fullname"></div>
                                                 </div>
 
                                                 <div class="col-12 d-flex align-items-center justify-content-between mt-2">
@@ -327,18 +347,25 @@
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label">Name</label>
                                                     <input class="form-control" id="vc-add-c-name" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-c-name"></div>
                                                 </div>
+
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label">Position</label>
                                                     <input class="form-control" id="vc-add-c-position" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-c-position"></div>
                                                 </div>
+
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label">Email</label>
                                                     <input class="form-control" id="vc-add-c-email" type="email" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-c-email"></div>
                                                 </div>
+
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label">Phone</label>
                                                     <input class="form-control" id="vc-add-c-phone" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-c-phone"></div>
                                                 </div>
 
                                                 <div class="col-12 d-flex align-items-center justify-content-between mt-2">

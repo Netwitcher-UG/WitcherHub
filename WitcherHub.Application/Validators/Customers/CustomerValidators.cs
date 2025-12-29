@@ -78,9 +78,9 @@ namespace WitcherHub.Application.Validators.Customers
                 .MaximumLength(250);
 
             RuleFor(x => x.Email)
+                .NotEmpty().WithMessage("Email is required.")
                 .MaximumLength(320)
-                .EmailAddress().WithMessage("Invalid email.")
-                .When(x => !string.IsNullOrWhiteSpace(x.Email));
+                .EmailAddress().WithMessage("Invalid email.");
 
             RuleFor(x => x.Phone)
                 .MaximumLength(50)
@@ -109,12 +109,12 @@ namespace WitcherHub.Application.Validators.Customers
         public AddressDtoValidator()
         {
             RuleFor(x => x.Label)
-                .MaximumLength(50)
-                .When(x => !string.IsNullOrWhiteSpace(x.Label));
+            .MaximumLength(50)
+            .When(x => !string.IsNullOrWhiteSpace(x.Label));
 
             RuleFor(x => x.Country)
-                .MaximumLength(100)
-                .When(x => !string.IsNullOrWhiteSpace(x.Country));
+                .NotEmpty().WithMessage("Country is required.")
+                .MaximumLength(100);
 
             RuleFor(x => x.City)
                 .MaximumLength(100)
@@ -124,17 +124,18 @@ namespace WitcherHub.Application.Validators.Customers
                 .MaximumLength(30)
                 .When(x => !string.IsNullOrWhiteSpace(x.PostalCode));
 
+            // صار Optional (بس نتحقق من الطول لو مكتوب)
             RuleFor(x => x.FullNameOrCompany)
-                .NotEmpty().WithMessage("Full name / company is required.")
-                .MaximumLength(250);
+                .MaximumLength(250)
+                .When(x => !string.IsNullOrWhiteSpace(x.FullNameOrCompany));
 
             RuleFor(x => x.Street)
-                .NotEmpty().WithMessage("Street is required.")
-                .MaximumLength(250);
+                .MaximumLength(250)
+                .When(x => !string.IsNullOrWhiteSpace(x.Street));
 
             RuleFor(x => x.StreetNr)
-                .NotEmpty().WithMessage("Street number is required.")
-                .MaximumLength(50);
+                .MaximumLength(50)
+                .When(x => !string.IsNullOrWhiteSpace(x.StreetNr));
         }
     }
 
@@ -144,8 +145,8 @@ namespace WitcherHub.Application.Validators.Customers
         public ContactDtoValidator()
         {
             RuleFor(x => x.Name)
-                .MaximumLength(200)
-                .When(x => !string.IsNullOrWhiteSpace(x.Name));
+             .MaximumLength(200)
+             .When(x => !string.IsNullOrWhiteSpace(x.Name));
 
             RuleFor(x => x.Position)
                 .MaximumLength(100)

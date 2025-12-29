@@ -14,7 +14,7 @@ namespace WitcherHub.Application.Models.DTO.Customers
     {
         public CustomerType Type { get; set; } = CustomerType.Individual;
         public string Name { get; set; } = "";
-        public string? Email { get; set; }
+        public string Email { get; set; } = "";
         public string? Phone { get; set; }
         public string? TaxId { get; set; }
         public string? Notes { get; set; }
@@ -22,7 +22,7 @@ namespace WitcherHub.Application.Models.DTO.Customers
 
     public class AddressDto
     {
-        public string? Label { get; set; }
+        public string Label { get; set; } = "";
         public string? Country { get; set; }
         public string? City { get; set; }
         public string? PostalCode { get; set; }
@@ -37,7 +37,7 @@ namespace WitcherHub.Application.Models.DTO.Customers
     {
         public string? Name { get; set; }
         public string? Position { get; set; }
-        public string? Email { get; set; }
+        public string Email { get; set; } = "";
         public string? Phone { get; set; }
         public bool IsPrimary { get; set; }
     }
@@ -103,41 +103,6 @@ namespace WitcherHub.Application.Models.DTO.Customers
     }
 
 
-    // view
-    public class CustomerListItemDto
-    {
-        public Guid Id { get; set; }
-        public CustomerType Type { get; set; }
-        public string Name { get; set; } = "";
-        public string? Email { get; set; }
-        public string? Phone { get; set; }
-        public string? TaxId { get; set; }
-        public string? City { get; set; } // غالباً default address city
-    }
-
-    public class CustomerDetailsDto
-    {
-        public Guid Id { get; set; }
-        public CustomerType Type { get; set; }
-        public string Name { get; set; } = "";
-        public string? Email { get; set; }
-        public string? Phone { get; set; }
-        public string? TaxId { get; set; }
-        public string? Notes { get; set; }
-
-        public List<CustomerAddressItemDto> Addresses { get; set; } = new();
-        public List<CustomerContactItemDto> Contacts { get; set; } = new();
-    }
-
-    public class CustomerAddressItemDto : AddressDto
-    {
-        public Guid Id { get; set; }
-    }
-
-    public class CustomerContactItemDto : ContactDto
-    {
-        public Guid Id { get; set; }
-    }
 
 
 }

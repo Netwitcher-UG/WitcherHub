@@ -34,5 +34,27 @@
 <input type="hidden" id="vcUpdateContactUrl" value="@Url.Page("./Index", "UpdateContact")" />
 
 @section Scripts {
+    <partial name="_ValidationScriptsPartial" />
     <script src="~/js/pages/clients/clients.js" asp-append-version="true"></script>
+
 }
+@if (Model.CreateCustomerModal?.AutoOpen == true)
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const el = document.getElementById('FormModal');
+            if (!el) return;
+
+            const m = bootstrap.Modal.getOrCreateInstance(el);
+            m.show();
+
+            // (اختياري) فوكس على أول حقل فيه خطأ
+            const firstErr = el.querySelector('.field-validation-error, .text-danger:not(:empty)');
+            if (firstErr) {
+                const input = firstErr.closest('.col-md-2,.col-md-4,.col-md-6,.col-md-8,.col-12')?.querySelector('input,select,textarea');
+                if (input) input.focus();
+            }
+        });
+    </script>
+}
+

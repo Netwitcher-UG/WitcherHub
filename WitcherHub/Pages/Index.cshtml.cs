@@ -15,13 +15,45 @@ namespace WitcherHub.Pages
         private readonly ICustomer _customers;
         private readonly IValidator<CustomerDTOs> _createValidator;
         private readonly IValidator<UpdateBasicRequest> _validator;
+        private readonly IValidator<CreateCustomerAddressDto> _createAddressValidator;
+        private readonly IValidator<UpdateCustomerAddressDto> _updateAddressValidator;
+        private readonly IValidator<DeleteCustomerAddressDto> _deleteAddressValidator;
+        private readonly IValidator<SetDefaultCustomerAddressDto> _setDefaultAddressValidator;
 
-        public IndexModel(ICustomer customers, IValidator<CustomerDTOs> createValidator, IValidator<UpdateBasicRequest> validator)
+        private readonly IValidator<CreateCustomerContactDto> _createContactValidator;
+        private readonly IValidator<UpdateCustomerContactDto> _updateContactValidator;
+        private readonly IValidator<DeleteCustomerContactDto> _deleteContactValidator;
+        private readonly IValidator<SetPrimaryCustomerContactDto> _setPrimaryContactValidator;
+
+        public IndexModel(
+            ICustomer customers,
+            IValidator<CustomerDTOs> createValidator,
+            IValidator<UpdateBasicRequest> validator,
+            IValidator<CreateCustomerAddressDto> createAddressValidator,
+            IValidator<UpdateCustomerAddressDto> updateAddressValidator,
+            IValidator<DeleteCustomerAddressDto> deleteAddressValidator,
+            IValidator<SetDefaultCustomerAddressDto> setDefaultAddressValidator,
+            IValidator<CreateCustomerContactDto> createContactValidator,
+            IValidator<UpdateCustomerContactDto> updateContactValidator,
+            IValidator<DeleteCustomerContactDto> deleteContactValidator,
+            IValidator<SetPrimaryCustomerContactDto> setPrimaryContactValidator
+        )
         {
             _customers = customers;
             _createValidator = createValidator;
             _validator = validator;
+
+            _createAddressValidator = createAddressValidator;
+            _updateAddressValidator = updateAddressValidator;
+            _deleteAddressValidator = deleteAddressValidator;
+            _setDefaultAddressValidator = setDefaultAddressValidator;
+
+            _createContactValidator = createContactValidator;
+            _updateContactValidator = updateContactValidator;
+            _deleteContactValidator = deleteContactValidator;
+            _setPrimaryContactValidator = setPrimaryContactValidator;
         }
+
 
         // query-string (pagination/search)
         [BindProperty(SupportsGet = true, Name = "p")] public new int Page { get; set; } = 1;
@@ -68,6 +100,11 @@ namespace WitcherHub.Pages
                     ModelState.AddModelError(err.PropertyName, err.ErrorMessage);
 
                 BuildCreateCustomerModal(autoOpen: true);
+
+                TempData["Toast.Type"] = "error";
+                TempData["Toast.Title"] = "Validation";
+                TempData["Toast.Message"] = "Please fix the highlighted fields.";
+
                 return Page();
             }
 
@@ -146,59 +183,112 @@ namespace WitcherHub.Pages
 
         public async Task<IActionResult> OnPostAddAddressAsync([FromBody] CreateCustomerAddressDto req, CancellationToken ct)
         {
-            if (req is null || req.CustomerId == Guid.Empty)
-                return BadRequest(new { message = "Invalid payload." });
+            if (req is null)
+                return BadRequest(new { message = "Body is null." });
 
-            await _customers.CreateAddressAsync(req, ct); // افترض أن عندك هذا بالـ ICustomer
+            var vr = await _createAddressValidator.ValidateAsync(req, ct);
+            if (!vr.IsValid)
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = vr.Errors.Select(e => new { field = e.PropertyName, error = e.ErrorMessage })
+                });
+
+            await _customers.CreateAddressAsync(req, ct);
             var updated = await _customers.GetCustomerAsync(req.CustomerId, ct);
             return new JsonResult(updated);
         }
 
+
         public async Task<IActionResult> OnPostDeleteAddressAsync([FromBody] DeleteCustomerAddressDto req, CancellationToken ct)
         {
-            if (req is null || req.CustomerId == Guid.Empty || req.AddressId == Guid.Empty)
-                return BadRequest(new { message = "Invalid payload." });
+            if (req is null)
+                return BadRequest(new { message = "Body is null." });
+
+            var vr = await _deleteAddressValidator.ValidateAsync(req, ct);
+            if (!vr.IsValid)
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = vr.Errors.Select(e => new { field = e.PropertyName, error = e.ErrorMessage })
+                });
 
             await _customers.DeleteAddressAsync(req, ct);
             var updated = await _customers.GetCustomerAsync(req.CustomerId, ct);
             return new JsonResult(updated);
         }
 
+
         public async Task<IActionResult> OnPostSetDefaultAddressAsync([FromBody] SetDefaultCustomerAddressDto req, CancellationToken ct)
         {
-            if (req is null || req.CustomerId == Guid.Empty || req.AddressId == Guid.Empty)
-                return BadRequest(new { message = "Invalid payload." });
+            if (req is null)
+                return BadRequest(new { message = "Body is null." });
+
+            var vr = await _setDefaultAddressValidator.ValidateAsync(req, ct);
+            if (!vr.IsValid)
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = vr.Errors.Select(e => new { field = e.PropertyName, error = e.ErrorMessage })
+                });
 
             await _customers.SetDefaultAddressAsync(req, ct);
             var updated = await _customers.GetCustomerAsync(req.CustomerId, ct);
             return new JsonResult(updated);
         }
+
         public async Task<IActionResult> OnPostUpdateAddressAsync([FromBody] UpdateCustomerAddressDto req, CancellationToken ct)
         {
-            if (req is null || req.CustomerId == Guid.Empty || req.AddressId == Guid.Empty)
-                return BadRequest(new { message = "Invalid payload." });
+            if (req is null)
+                return BadRequest(new { message = "Body is null." });
+
+            var vr = await _updateAddressValidator.ValidateAsync(req, ct);
+            if (!vr.IsValid)
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = vr.Errors.Select(e => new { field = e.PropertyName, error = e.ErrorMessage })
+                });
 
             await _customers.UpdateAddressAsync(req, ct);
             var updated = await _customers.GetCustomerAsync(req.CustomerId, ct);
             return new JsonResult(updated);
         }
 
+
         // -------- Contacts --------
 
         public async Task<IActionResult> OnPostAddContactAsync([FromBody] CreateCustomerContactDto req, CancellationToken ct)
         {
-            if (req is null || req.CustomerId == Guid.Empty)
-                return BadRequest(new { message = "Invalid payload." });
+            if (req is null)
+                return BadRequest(new { message = "Body is null." });
+
+            var vr = await _createContactValidator.ValidateAsync(req, ct);
+            if (!vr.IsValid)
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = vr.Errors.Select(e => new { field = e.PropertyName, error = e.ErrorMessage })
+                });
 
             await _customers.CreateContactAsync(req, ct);
             var updated = await _customers.GetCustomerAsync(req.CustomerId, ct);
             return new JsonResult(updated);
         }
 
+
         public async Task<IActionResult> OnPostDeleteContactAsync([FromBody] DeleteCustomerContactDto req, CancellationToken ct)
         {
-            if (req is null || req.CustomerId == Guid.Empty || req.ContactId == Guid.Empty)
-                return BadRequest(new { message = "Invalid payload." });
+            if (req is null)
+                return BadRequest(new { message = "Body is null." });
+
+            var vr = await _deleteContactValidator.ValidateAsync(req, ct);
+            if (!vr.IsValid)
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = vr.Errors.Select(e => new { field = e.PropertyName, error = e.ErrorMessage })
+                });
 
             await _customers.DeleteContactAsync(req, ct);
             var updated = await _customers.GetCustomerAsync(req.CustomerId, ct);
@@ -207,8 +297,16 @@ namespace WitcherHub.Pages
 
         public async Task<IActionResult> OnPostSetPrimaryContactAsync([FromBody] SetPrimaryCustomerContactDto req, CancellationToken ct)
         {
-            if (req is null || req.CustomerId == Guid.Empty || req.ContactId == Guid.Empty)
-                return BadRequest(new { message = "Invalid payload." });
+            if (req is null)
+                return BadRequest(new { message = "Body is null." });
+
+            var vr = await _setPrimaryContactValidator.ValidateAsync(req, ct);
+            if (!vr.IsValid)
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = vr.Errors.Select(e => new { field = e.PropertyName, error = e.ErrorMessage })
+                });
 
             await _customers.SetPrimaryContactAsync(req, ct);
             var updated = await _customers.GetCustomerAsync(req.CustomerId, ct);
@@ -216,10 +314,18 @@ namespace WitcherHub.Pages
         }
         public async Task<IActionResult> OnPostUpdateContactAsync([FromBody] UpdateCustomerContactDto req, CancellationToken ct)
         {
-            if (req is null || req.CustomerId == Guid.Empty || req.ContactId == Guid.Empty)
-                return BadRequest(new { message = "Invalid payload." });
+            if (req is null)
+                return BadRequest(new { message = "Body is null." });
 
-            await _customers.UpdateContactAsync(req, ct);   // لازم تكون موجودة في ICustomer
+            var vr = await _updateContactValidator.ValidateAsync(req, ct);
+            if (!vr.IsValid)
+                return BadRequest(new
+                {
+                    message = "Validation failed",
+                    errors = vr.Errors.Select(e => new { field = e.PropertyName, error = e.ErrorMessage })
+                });
+
+            await _customers.UpdateContactAsync(req, ct);
             var updated = await _customers.GetCustomerAsync(req.CustomerId, ct);
             return new JsonResult(updated);
         }

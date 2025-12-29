@@ -2,6 +2,64 @@
     'use strict';
     window.UI = window.UI || {};
     const UI = window.UI;
+    const mapUpdateBasic = {
+        "Customer.Name": "vc-basic-name",
+        "Name": "vc-basic-name",
+
+        "Customer.Email": "vc-basic-email",
+        "Email": "vc-basic-email",
+
+        "Customer.Phone": "vc-basic-phone",
+        "Phone": "vc-basic-phone",
+
+        "Customer.TaxId": "vc-basic-taxId",
+        "TaxId": "vc-basic-taxId",
+
+        "Customer.Notes": "vc-basic-notes",
+        "Notes": "vc-basic-notes",
+
+        "Customer.Type": "vc-basic-type",
+        "Type": "vc-basic-type",
+    };
+    const mapAddLocation = {
+        "Address.Label": "vc-add-loc-label",
+        "Address.Country": "vc-add-loc-country",
+        "Address.City": "vc-add-loc-city",
+        "Address.PostalCode": "vc-add-loc-postal",
+        "Address.Street": "vc-add-loc-street",
+        "Address.StreetNr": "vc-add-loc-nr",
+        "Address.AddressLine2": "vc-add-loc-line2",
+        "Address.FullNameOrCompany": "vc-add-loc-fullname"
+    };
+
+    const mapAddContact = {
+        "Contact.Name": "vc-add-c-name",
+        "Contact.Position": "vc-add-c-position",
+        "Contact.Email": "vc-add-c-email",
+        "Contact.Phone": "vc-add-c-phone"
+    };
+    function mapUpdateLocation(idx) {
+        return {
+            "Address.Label": `vc-loc-${idx}-label`,
+            "Address.Country": `vc-loc-${idx}-country`,
+            "Address.City": `vc-loc-${idx}-city`,
+            "Address.PostalCode": `vc-loc-${idx}-postal`,
+            "Address.Street": `vc-loc-${idx}-street`,
+            "Address.StreetNr": `vc-loc-${idx}-nr`,
+            "Address.AddressLine2": `vc-loc-${idx}-line2`,
+            "Address.FullNameOrCompany": `vc-loc-${idx}-fullname`
+        };
+    }
+
+    function mapUpdateContact(idx) {
+        return {
+            "Contact.Name": `vc-c-${idx}-name`,
+            "Contact.Position": `vc-c-${idx}-position`,
+            "Contact.Email": `vc-c-${idx}-email`,
+            "Contact.Phone": `vc-c-${idx}-phone`
+        };
+    }
+
     // ---------- Helpers ----------
     function esc(s) {
         return (s ?? '').toString()
@@ -154,32 +212,46 @@
 
                                     <!-- EDIT (inline, replaces text) -->
                                     <div class="${isEditing ? '' : 'd-none'}">
-                                        <div class="row g-2">
-                                            <div class="col-12 col-md-4">
-                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-label" value="${esc(a.label ?? '')}" placeholder="Label" />
-                                            </div>
-                                            <div class="col-12 col-md-4">
-                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-country" value="${esc(a.country ?? '')}" placeholder="Country" />
-                                            </div>
-                                            <div class="col-12 col-md-4">
-                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-city" value="${esc(a.city ?? '')}" placeholder="City" />
-                                            </div>
+                                      <div class="row g-2">
 
-                                            <div class="col-12 col-md-6">
-                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-street" value="${esc(a.street ?? '')}" placeholder="Street" />
-                                            </div>
-                                            <div class="col-12 col-md-2">
-                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-nr" value="${esc(a.streetNr ?? '')}" placeholder="Nr" />
-                                            </div>
-                                            <div class="col-12 col-md-4">
-                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-postal" value="${esc(a.postalCode ?? '')}" placeholder="Postal" />
-                                            </div>
-
-                                            <div class="col-12">
-                                                <input class="form-control form-control-sm" id="vc-loc-${idx}-line2" value="${esc(a.addressLine2 ?? '')}" placeholder="Address Line 2" />
-                                            </div>
+                                        <div class="col-12 col-md-4">
+                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-label" value="${esc(a.label ?? '')}" placeholder="Label" />
+                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-label"></div>
                                         </div>
+
+                                        <div class="col-12 col-md-4">
+                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-country" value="${esc(a.country ?? '')}" placeholder="Country" />
+                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-country"></div>
+                                        </div>
+
+                                        <div class="col-12 col-md-4">
+                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-city" value="${esc(a.city ?? '')}" placeholder="City" />
+                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-city"></div>
+                                        </div>
+
+                                        <div class="col-12 col-md-6">
+                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-street" value="${esc(a.street ?? '')}" placeholder="Street" />
+                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-street"></div>
+                                        </div>
+
+                                        <div class="col-12 col-md-2">
+                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-nr" value="${esc(a.streetNr ?? '')}" placeholder="Nr" />
+                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-nr"></div>
+                                        </div>
+
+                                        <div class="col-12 col-md-4">
+                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-postal" value="${esc(a.postalCode ?? '')}" placeholder="Postal" />
+                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-postal"></div>
+                                        </div>
+
+                                        <div class="col-12">
+                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-line2" value="${esc(a.addressLine2 ?? '')}" placeholder="Address Line 2" />
+                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-line2"></div>
+                                        </div>
+
+                                      </div>
                                     </div>
+
 
                                 </div>
 
@@ -274,21 +346,31 @@
 
                                     <!-- EDIT -->
                                     <div class="${isEditing ? '' : 'd-none'}">
-                                        <div class="row g-2">
-                                            <div class="col-12 col-md-6">
-                                                <input class="form-control form-control-sm" id="vc-c-${idx}-name" value="${esc(c.name ?? '')}" placeholder="Name" />
-                                            </div>
-                                            <div class="col-12 col-md-6">
-                                                <input class="form-control form-control-sm" id="vc-c-${idx}-position" value="${esc(c.position ?? '')}" placeholder="Position" />
-                                            </div>
-                                            <div class="col-12 col-md-6">
-                                                <input class="form-control form-control-sm" id="vc-c-${idx}-email" value="${esc(c.email ?? '')}" placeholder="Email" />
-                                            </div>
-                                            <div class="col-12 col-md-6">
-                                                <input class="form-control form-control-sm" id="vc-c-${idx}-phone" value="${esc(c.phone ?? '')}" placeholder="Phone" />
-                                            </div>
+                                      <div class="row g-2">
+
+                                        <div class="col-12 col-md-6">
+                                          <input class="form-control form-control-sm" id="vc-c-${idx}-name" value="${esc(c.name ?? '')}" placeholder="Name" />
+                                          <div class="text-danger small mt-1" id="err-vc-c-${idx}-name"></div>
                                         </div>
+
+                                        <div class="col-12 col-md-6">
+                                          <input class="form-control form-control-sm" id="vc-c-${idx}-position" value="${esc(c.position ?? '')}" placeholder="Position" />
+                                          <div class="text-danger small mt-1" id="err-vc-c-${idx}-position"></div>
+                                        </div>
+
+                                        <div class="col-12 col-md-6">
+                                          <input class="form-control form-control-sm" id="vc-c-${idx}-email" value="${esc(c.email ?? '')}" placeholder="Email" />
+                                          <div class="text-danger small mt-1" id="err-vc-c-${idx}-email"></div>
+                                        </div>
+
+                                        <div class="col-12 col-md-6">
+                                          <input class="form-control form-control-sm" id="vc-c-${idx}-phone" value="${esc(c.phone ?? '')}" placeholder="Phone" />
+                                          <div class="text-danger small mt-1" id="err-vc-c-${idx}-phone"></div>
+                                        </div>
+
+                                      </div>
                                     </div>
+
 
                                 </div>
 
@@ -346,11 +428,15 @@
     // ---------- Basic mode toggle ----------
     function setBasicMode(isEdit) {
         editingBasic = !!isEdit;
+
+        clearErrors('vc-basic');
+
         const view = $('vc-basicView');
         const edit = $('vc-basicEdit');
         if (view) view.classList.toggle('d-none', editingBasic);
         if (edit) edit.classList.toggle('d-none', !editingBasic);
     }
+
 
     // ---------- Render Client ----------
     function renderClient(client) {
@@ -525,7 +611,13 @@
                 toastSuccess('Saved successfully.', 'Success');
             } catch (err) {
                 console.error(err);
-                toastError('Failed to save.', 'Error');
+                if (err?.status === 400 && err?.payload?.errors) {
+                    showServerErrors(err.payload.errors, mapUpdateBasic, "vc-basic");
+                    toastError('Please fix the highlighted fields.', 'Validation');
+                    return;
+                }
+
+                toastError(err?.payload?.message || 'Failed to save.', 'Error');
             }
             return;
         }
@@ -578,7 +670,14 @@
                 toastSuccess('Location updated (DB).', 'Success');
             } catch (err) {
                 console.error(err);
-                toastError('Failed to update location.', 'Error');
+
+                if (err?.status === 400 && err?.payload?.errors) {
+                    showServerErrors(err.payload.errors, mapUpdateLocation(idx), `vc-loc-${idx}`);
+                    toastError('Fix errors.', 'Validation');
+                    return;
+                }
+
+                toastError(err?.payload?.message || 'Failed to update location.', 'Error');
             }
             return;
         }
@@ -676,7 +775,14 @@
                 toastSuccess('Contact updated (DB).', 'Success');
             } catch (err) {
                 console.error(err);
-                toastError('Failed to update contact.', 'Error');
+
+                if (err?.status === 400 && err?.payload?.errors) {
+                    showServerErrors(err.payload.errors, mapUpdateContact(idx), `vc-c-${idx}`);
+                    toastError('Fix errors.', 'Validation');
+                    return;
+                }
+
+                toastError(err?.payload?.message || 'Failed to update contact.', 'Error');
             }
             return;
         }
@@ -735,7 +841,7 @@
 
             const url = document.getElementById('vcAddAddressUrl')?.value;
             if (!url) return toastError('vcAddAddressUrl not found', 'Error');
-
+            clearErrors('vc-add-loc');
             const payload = {
                 customerId: currentClient.id,
                 address: {
@@ -758,12 +864,17 @@
                 addLocForm.reset();
                 const c = $('vc-addLocationCollapse');
                 if (c) bootstrap.Collapse.getOrCreateInstance(c, { toggle: false }).hide();
-
+                clearErrors('vc-add-loc');
                 toastSuccess('Location saved to DB.', 'Success');
             } catch (err) {
-                console.error(err);
+                if (err?.status === 400 && err?.payload?.errors) {
+                    showServerErrors(err.payload.errors, mapAddLocation, "vc-add-loc");
+                    toastError('Fix errors.', 'Validation');
+                    return;
+                }
                 toastError('Failed to add location.', 'Error');
             }
+
         });
     }
 
@@ -784,7 +895,7 @@
 
             const url = document.getElementById('vcAddContactUrl')?.value;
             if (!url) return toastError('vcAddContactUrl not found', 'Error');
-
+            clearErrors('vc-add-c');
             const payload = {
                 customerId: currentClient.id,
                 contact: {
@@ -804,11 +915,18 @@
                 addContactForm.reset();
                 const c = $('vc-addContactCollapse');
                 if (c) bootstrap.Collapse.getOrCreateInstance(c, { toggle: false }).hide();
-
+                clearErrors('vc-add-c');
                 toastSuccess('Contact saved to DB.', 'Success');
             } catch (err) {
                 console.error(err);
-                toastError('Failed to add contact.', 'Error');
+
+                if (err?.status === 400 && err?.payload?.errors) {
+                    showServerErrors(err.payload.errors, mapAddContact, "vc-add-c");
+                    toastError('Fix errors.', 'Validation');
+                    return;
+                }
+
+                toastError(err?.payload?.message || 'Failed to add contact.', 'Error');
             }
         });
     }
@@ -880,13 +998,44 @@
             body: JSON.stringify(body)
         });
 
+        const contentType = res.headers.get('content-type') || '';
+        const isJson = contentType.includes('application/json');
+
         if (!res.ok) {
-            const text = await res.text().catch(() => '');
-            throw new Error(`HTTP ${res.status} - ${text}`);
+            let payload = null;
+
+            try {
+                payload = isJson ? await res.json() : { message: await res.text() };
+            } catch {
+                payload = { message: 'Request failed.' };
+            }
+
+            // نرمي Error “منظم” بدل string
+            throw { status: res.status, payload };
         }
 
         return await res.json();
     }
+    function clearErrors(prefix) {
+        document.querySelectorAll(`[id^="err-${prefix}"]`).forEach(el => el.textContent = '');
+    }
+
+    function setFieldError(elId, message) {
+        const el = document.getElementById(`err-${elId}`);
+        if (el) el.textContent = message || '';
+    }
+
+    
+
+    function showServerErrors(errors, map, prefixToClear) {
+        if (prefixToClear) clearErrors(prefixToClear);
+        (errors || []).forEach(e => {
+            const id = map[e.field];
+            if (id) setFieldError(id, e.error);
+        });
+    }
+
+
     function normalizeClient(data) {
         if (!data) return null;
 
@@ -940,6 +1089,7 @@
             projects: root.projects ?? root.Projects ?? []
         };
     }
+    
 
 })();
 
