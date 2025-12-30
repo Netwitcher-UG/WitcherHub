@@ -1,0 +1,60 @@
+@* @page
+@using Microsoft.AspNetCore.Authorization
+@using WitcherHub.Domain.SeedData
+@attribute [Authorize(Policy = AppPolicyPrefixes.Permission + AppPermissions.ManageNetwitcher)]
+
+@model WitcherHub.Pages.ServicesModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+
+@{
+    ViewData["Title"] = "Services";
+}
+<partial name="_TableCard" model="Model.ClientsTable" />
+
+<partial name="~/Pages/Shared/Modals/_ModalShell.cshtml" model="Model.CreateCustomerModal" />
+<partial name="~/Pages/Shared/Modals/_ViewClientModal.cshtml" />
+
+<form id="tblDeleteForm" method="post" asp-page-handler="DeleteClient" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="ClientId" id="tblDeleteClientId" />
+</form>
+
+<input type="hidden" id="vcClientUrl" value="@Url.Page("./Index", "Client")" />
+<input type="hidden" id="vcUpdateBasicUrl" value="@Url.Page("./Index", "UpdateBasic")" />
+<input type="hidden" id="antiForgeryToken" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />
+
+<input type="hidden" id="vcAddAddressUrl" value="@Url.Page("./Index", "AddAddress")" />
+<input type="hidden" id="vcDeleteAddressUrl" value="@Url.Page("./Index", "DeleteAddress")" />
+<input type="hidden" id="vcSetDefaultAddressUrl" value="@Url.Page("./Index", "SetDefaultAddress")" />
+<input type="hidden" id="vcUpdateAddressUrl" value="@Url.Page("./Index", "UpdateAddress")" />
+
+<input type="hidden" id="vcAddContactUrl" value="@Url.Page("./Index", "AddContact")" />
+<input type="hidden" id="vcDeleteContactUrl" value="@Url.Page("./Index", "DeleteContact")" />
+<input type="hidden" id="vcSetPrimaryContactUrl" value="@Url.Page("./Index", "SetPrimaryContact")" />
+<input type="hidden" id="vcUpdateContactUrl" value="@Url.Page("./Index", "UpdateContact")" />
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/pages/clients/clients.js" asp-append-version="true"></script>
+
+}
+@if (Model.CreateCustomerModal?.AutoOpen == true)
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const el = document.getElementById('FormModal');
+            if (!el) return;
+
+            const m = bootstrap.Modal.getOrCreateInstance(el);
+            m.show();
+
+            // (اختياري) فوكس على أول حقل فيه خطأ
+            const firstErr = el.querySelector('.field-validation-error, .text-danger:not(:empty)');
+            if (firstErr) {
+                const input = firstErr.closest('.col-md-2,.col-md-4,.col-md-6,.col-md-8,.col-12')?.querySelector('input,select,textarea');
+                if (input) input.focus();
+            }
+        });
+    </script>
+}
+ *@
