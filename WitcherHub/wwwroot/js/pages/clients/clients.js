@@ -6,8 +6,8 @@
         "Customer.Name": "vc-basic-name",
         "Name": "vc-basic-name",
 
-        "Customer.Email": "vc-basic-email",
-        "Email": "vc-basic-email",
+        "Customer.EmailAddresses[0].Email": "vc-basic-email",
+        "EmailAddresses[0].Email": "vc-basic-email",
 
         "Customer.Phone": "vc-basic-phone",
         "Phone": "vc-basic-phone",
@@ -23,11 +23,11 @@
     };
     const mapAddLocation = {
         "Address.Label": "vc-add-loc-label",
-        "Address.Country": "vc-add-loc-country",
         "Address.City": "vc-add-loc-city",
         "Address.PostalCode": "vc-add-loc-postal",
-        "Address.Street": "vc-add-loc-street",
-        "Address.StreetNr": "vc-add-loc-nr",
+        "Address.CountryCode": "vc-add-loc-countryCode",   
+        "Address.Country": "vc-add-loc-country",          
+        "Address.StreetRaw": "vc-add-loc-streetRaw",
         "Address.AddressLine2": "vc-add-loc-line2",
         "Address.FullNameOrCompany": "vc-add-loc-fullname"
     };
@@ -41,15 +41,15 @@
     function mapUpdateLocation(idx) {
         return {
             "Address.Label": `vc-loc-${idx}-label`,
+            "Address.CountryCode": `vc-loc-${idx}-countryCode`,
             "Address.Country": `vc-loc-${idx}-country`,
             "Address.City": `vc-loc-${idx}-city`,
             "Address.PostalCode": `vc-loc-${idx}-postal`,
-            "Address.Street": `vc-loc-${idx}-street`,
-            "Address.StreetNr": `vc-loc-${idx}-nr`,
+            "Address.StreetRaw": `vc-loc-${idx}-streetRaw`,
             "Address.AddressLine2": `vc-loc-${idx}-line2`,
-            "Address.FullNameOrCompany": `vc-loc-${idx}-fullname`
         };
     }
+
 
     function mapUpdateContact(idx) {
         return {
@@ -186,9 +186,10 @@
         wrap.innerHTML = list.map((a, idx) => {
             const isEditing = (editingLocationIndex === idx);
 
-            const line1 = [a.street, a.streetNr].filter(Boolean).join(' ');
+            const line1 = a.streetRaw ?? '';
             const line2 = a.addressLine2 ? ` • ${esc(a.addressLine2)}` : '';
             const addressText = (line1 || a.addressLine2) ? `${esc(line1)}${line2}` : '—';
+
             const cityText = `${esc(a.postalCode ?? '')} ${esc(a.city ?? '')}${(a.city || a.country) ? ', ' : ''}${esc(a.country ?? '')}`.trim() || '—';
 
             const defaultBadge = a.isDefault ? `<span class="badge bg-primary bg-opacity-10 text-primary ms-2">Default</span>` : '';
@@ -229,15 +230,16 @@
                                           <div class="text-danger small mt-1" id="err-vc-loc-${idx}-city"></div>
                                         </div>
 
-                                        <div class="col-12 col-md-6">
-                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-street" value="${esc(a.street ?? '')}" placeholder="Street" />
-                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-street"></div>
+                                       <div class="col-12 col-md-4">
+                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-countryCode" value="${esc(a.countryCode ?? '')}" placeholder="Country Code (DE)" />
+                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-countryCode"></div>
                                         </div>
 
-                                        <div class="col-12 col-md-2">
-                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-nr" value="${esc(a.streetNr ?? '')}" placeholder="Nr" />
-                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-nr"></div>
+                                        <div class="col-12 col-md-8">
+                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-streetRaw" value="${esc(a.streetRaw ?? '')}" placeholder="Street / Nr" />
+                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-streetRaw"></div>
                                         </div>
+
 
                                         <div class="col-12 col-md-4">
                                           <input class="form-control form-control-sm" id="vc-loc-${idx}-postal" value="${esc(a.postalCode ?? '')}" placeholder="Postal" />
@@ -437,6 +439,27 @@
         if (edit) edit.classList.toggle('d-none', !editingBasic);
     }
 
+    function lexwareBadgeHtml(status) {
+        if (!status) return '';
+        const isNum = typeof status === 'number';
+        const s = isNum
+            ? (status === 0 ? 'Imported' : status === 1 ? 'Exported' : 'NotExported')
+            : status;
+
+        const cls =
+            s === 'Exported' ? "badge bg-primary bg-opacity-10 text-primary" :
+                s === 'Imported' ? "badge bg-secondary bg-opacity-10 text-secondary" :
+                    "badge bg-warning bg-opacity-10 text-warning";
+
+        return `<span class="${cls}">${esc(s)}</span>`;
+    }
+    document.addEventListener('click', async function (e) {
+        const btn = e.target.closest('[data-vc-action="table-export"]');
+        if (!btn) return;
+
+        e.preventDefault();
+        toastInfo('Export will be implemented in the next step (Lexware integration).', 'Lexware');
+    });
 
     // ---------- Render Client ----------
     function renderClient(client) {
@@ -449,6 +472,16 @@
         setText('vc-phone', client?.phone || '—');
         setText('vc-taxId', client?.taxId || '—');
         setText('vc-notes', client?.notes || '—');
+        // Lexware badge + Export button
+        setHtml('vc-lexwareBadge', lexwareBadgeHtml(client?.lexwareType));
+
+        const exportBtn = $('vc-exportBtn');
+        if (exportBtn) {
+            const lex = client?.lexwareType;
+            const isNotExported = (lex === 'NotExported') || (lex === 2);
+            exportBtn.classList.toggle('d-none', !isNotExported);
+            exportBtn.dataset.clientId = client?.id ?? '';
+        }
 
         // Fill basic edit inputs (for your existing markup)
         const typeSel = $('vc-basic-type'); if (typeSel) typeSel.value = client?.type ?? 'Individual';
@@ -552,21 +585,47 @@
 
         function updateCreateModalUI() {
             const isCompany = typeSelect.value === 'Company';
-
-            // ✅ show contact only for Company
             contactSection.classList.toggle('d-none', !isCompany);
-            // أو لو تفضّل ستايل display:
-            // contactSection.style.display = isCompany ? '' : 'none';
-
-            // optional: change title
             if (modalTitle) modalTitle.textContent = isCompany ? 'Add Company' : 'Add Individual';
         }
 
+        // ✅ NEW: clear validation when modal closes
+        function clearRazorValidationState(form) {
+            // jQuery validate (if موجود)
+            if (window.jQuery) {
+                const $form = window.jQuery(form);
+                const v = $form.data('validator');
+                if (v && typeof v.resetForm === 'function') v.resetForm();
+            }
+
+            // field messages
+            form.querySelectorAll('[data-valmsg-for]').forEach(el => {
+                el.textContent = '';
+                el.classList.remove('field-validation-error');
+                el.classList.add('field-validation-valid');
+            });
+
+            // summary
+            form.querySelectorAll('[data-valmsg-summary="true"]').forEach(el => {
+                el.innerHTML = '';
+                el.classList.remove('validation-summary-errors');
+                el.classList.add('validation-summary-valid');
+            });
+
+            // input error styles
+            form.querySelectorAll('.input-validation-error').forEach(el => {
+                el.classList.remove('input-validation-error');
+                el.removeAttribute('aria-invalid');
+            });
+        }
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            const form = modalEl.querySelector('form');
+            if (form) clearRazorValidationState(form);
+        });
+
         typeSelect.addEventListener('change', updateCreateModalUI);
-
-        // also run when modal opens (important)
         modalEl.addEventListener('shown.bs.modal', updateCreateModalUI);
-
         updateCreateModalUI();
     });
 
@@ -584,6 +643,11 @@
         // ✅ ---- Basic actions FIRST ----
         if (action === 'edit-basic') { setBasicMode(true); return; }
         if (action === 'cancel-basic') { setBasicMode(false); return; }
+        if (action === 'export-lexware') {
+            if (client?.lexwareType !== 'NotExported') return;
+            toastInfo('Export will be implemented in the next step (Lexware integration).', 'Lexware');
+            return;
+        }
 
         if (action === 'save-basic') {
             if (!currentClient) return;
@@ -596,11 +660,14 @@
                 customer: {
                     type: $('vc-basic-type')?.value ?? currentClient.type,
                     name: $('vc-basic-name')?.value?.trim() ?? currentClient.name,
-                    email: $('vc-basic-email')?.value?.trim() ?? '',
+                    emailAddresses: [
+                        { kind: "business", email: ($('vc-basic-email')?.value?.trim() ?? '') }
+                    ],
                     phone: $('vc-basic-phone')?.value?.trim() ?? '',
                     taxId: $('vc-basic-taxId')?.value?.trim() ?? '',
                     notes: $('vc-basic-notes')?.value?.trim() ?? ''
                 }
+
             };
 
             try {
@@ -652,14 +719,16 @@
                 addressId: addressId,
                 address: {
                     label: $('vc-loc-' + idx + '-label')?.value?.trim() || 'Location',
-                    country: $('vc-loc-' + idx + '-country')?.value?.trim() || '',
+                    countryCode: $('vc-loc-' + idx + '-countryCode')?.value?.trim() || null,
+                    country: $('vc-loc-' + idx + '-country')?.value?.trim() || null,
                     city: $('vc-loc-' + idx + '-city')?.value?.trim() || '',
                     postalCode: $('vc-loc-' + idx + '-postal')?.value?.trim() || '',
-                    street: $('vc-loc-' + idx + '-street')?.value?.trim() || '',
-                    streetNr: $('vc-loc-' + idx + '-nr')?.value?.trim() || '',
+                    streetRaw: $('vc-loc-' + idx + '-streetRaw')?.value?.trim() || 'N/A',
+                    addressLine2: $('vc-loc-' + idx + '-line2')?.value?.trim() || '',
                     fullNameOrCompany: currentClient?.name ?? '',
                     isDefault: !!client.addresses?.[idx]?.isDefault
                 }
+
             };
 
             try {
@@ -846,14 +915,16 @@
                 customerId: currentClient.id,
                 address: {
                     label: $('vc-add-loc-label')?.value?.trim() || 'Location',
-                    country: $('vc-add-loc-country')?.value?.trim() || '',
+                    countryCode: $('vc-add-loc-countryCode')?.value?.trim() || null,
+                    country: $('vc-add-loc-country')?.value?.trim() || null,
                     city: $('vc-add-loc-city')?.value?.trim() || '',
                     postalCode: $('vc-add-loc-postal')?.value?.trim() || '',
-                    fullNameOrCompany: currentClient.name,
-                    street: $('vc-add-loc-street')?.value?.trim() || '',
-                    streetNr: $('vc-add-loc-nr')?.value?.trim() || '',
+                    streetRaw: $('vc-add-loc-streetRaw')?.value?.trim() || 'N/A',
+                    addressLine2: $('vc-add-loc-line2')?.value?.trim() || '',
+                    fullNameOrCompany: $('vc-add-loc-fullname')?.value?.trim() || currentClient.name,
                     isDefault: !!$('vc-add-loc-default')?.checked
                 }
+
             };
 
             try {
@@ -1055,24 +1126,44 @@
             root.contacts ?? root.Contacts ??
             (root.contact ? [root.contact] : []) ??
             (root.Contact ? [root.Contact] : []);
+        const normalizeLexware = (v) => {
+            if (v === null || v === undefined) return null; // لا تفرض NotExported
+            if (typeof v === 'number') return v === 0 ? 'Imported' : v === 1 ? 'Exported' : 'NotExported';
 
+            const s = String(v).trim().toLowerCase();
+            if (s === 'imported') return 'Imported';
+            if (s === 'exported') return 'Exported';
+            if (s === 'notexported' || s === 'not_exported' || s === 'not exported') return 'NotExported';
+            return String(v);
+        };
+        const rawEmails = root.emailAddresses ?? root.EmailAddresses ?? [];
+        const primaryEmail =
+            (root.email ?? root.Email) ||
+            (rawEmails[0]?.email ?? rawEmails[0]?.Email) ||
+            '';
         return {
             id: root.id ?? root.Id,
             type: normalizeType(root.type ?? root.Type),
             name: root.name ?? root.Name,
-            email: root.email ?? root.Email,
+            email: primaryEmail,
+            emailAddresses: (rawEmails || []).map(e => ({
+                kind: e.kind ?? e.Kind ?? 'business',
+                email: e.email ?? e.Email ?? ''
+            })),
             phone: root.phone ?? root.Phone,
             taxId: root.taxId ?? root.TaxId,
             notes: root.notes ?? root.Notes,
-
+            lexwareType: normalizeLexware(root.lexwareType ?? root.LexwareType),
             addresses: (rawAddresses || []).map(a => ({
                 id: a.id ?? a.Id,   // ✅
                 label: a.label ?? a.Label ?? 'Location',
                 isDefault: a.isDefault ?? a.IsDefault ?? a.Default ?? false,
-                street: a.street ?? a.Street ?? '',
-                streetNr: a.streetNr ?? a.StreetNr ?? '',
+                
                 city: a.city ?? a.City ?? '',
                 country: a.country ?? a.Country ?? '',
+                countryCode: a.countryCode ?? a.CountryCode ?? '',
+                streetRaw: a.streetRaw ?? a.StreetRaw ?? '',
+
                 postalCode: a.postalCode ?? a.PostalCode ?? '',
                 addressLine2: a.addressLine2 ?? a.AddressLine2 ?? ''
             })),

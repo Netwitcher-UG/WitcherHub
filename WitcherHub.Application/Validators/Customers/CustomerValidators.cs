@@ -16,29 +16,30 @@ namespace WitcherHub.Application.Validators.Customers
                 .NotNull()
                 .SetValidator(new AddressDtoValidator());
 
-            // Contact is always present (not nullable), so validate it only when it has any input OR when Company.
+            // Company: contact required
             When(x => x.Customer.Type == CustomerType.Company, () =>
             {
                 RuleFor(x => x.Contact)
                     .NotNull()
                     .SetValidator(new ContactDtoValidator());
 
-                // Company contact rules (required)
-                RuleFor(x => x.Contact.Name)
-                    .NotEmpty().WithMessage("Contact name is required for company.")
-                    .MaximumLength(200);
+                RuleFor(x => x.Contact)
+                    .Must(c =>
+                        !string.IsNullOrWhiteSpace(c.Name) ||
+                        (!string.IsNullOrWhiteSpace(c.FirstName) && !string.IsNullOrWhiteSpace(c.LastName)))
+                    .WithMessage("Contact name (or first/last name) is required for company.");
 
                 RuleFor(x => x.Contact)
                     .Must(c => !string.IsNullOrWhiteSpace(c.Email) || !string.IsNullOrWhiteSpace(c.Phone))
                     .WithMessage("Company contact must include at least email or phone.");
             });
 
+            // Individual: validate contact only if has any input
             When(x => x.Customer.Type != CustomerType.Company, () =>
             {
                 When(x => !IsEmptyContact(x.Contact), () =>
                 {
-                    RuleFor(x => x.Contact)
-                        .SetValidator(new ContactDtoValidator());
+                    RuleFor(x => x.Contact).SetValidator(new ContactDtoValidator());
                 });
             });
         }
@@ -46,10 +47,14 @@ namespace WitcherHub.Application.Validators.Customers
         private static bool IsEmptyContact(ContactDto c)
         {
             if (c is null) return true;
+
             return string.IsNullOrWhiteSpace(c.Name)
                 && string.IsNullOrWhiteSpace(c.Email)
                 && string.IsNullOrWhiteSpace(c.Phone)
-                && string.IsNullOrWhiteSpace(c.Position);
+                && string.IsNullOrWhiteSpace(c.Position)
+                && string.IsNullOrWhiteSpace(c.Salutation)
+                && string.IsNullOrWhiteSpace(c.FirstName)
+                && string.IsNullOrWhiteSpace(c.LastName);
         }
     }
 
@@ -64,7 +69,7 @@ namespace WitcherHub.Application.Validators.Customers
     }
 
     // ============================
-    // Base validators (DI-friendly)
+    // Base validators
     // ============================
 
     public sealed class CustomerDtoValidator : AbstractValidator<CustomerDto>
@@ -77,11 +82,6 @@ namespace WitcherHub.Application.Validators.Customers
                 .NotEmpty().WithMessage("Name is required.")
                 .MaximumLength(250);
 
-            RuleFor(x => x.Email)
-                .NotEmpty().WithMessage("Email is required.")
-                .MaximumLength(320)
-                .EmailAddress().WithMessage("Invalid email.");
-
             RuleFor(x => x.Phone)
                 .MaximumLength(50)
                 .When(x => !string.IsNullOrWhiteSpace(x.Phone));
@@ -89,9 +89,33 @@ namespace WitcherHub.Application.Validators.Customers
             RuleFor(x => x.TaxId)
                 .MaximumLength(100)
                 .When(x => !string.IsNullOrWhiteSpace(x.TaxId));
-        }
 
+            // ✅ EmailAddresses بدل Email
+            RuleFor(x => x.EmailAddresses)
+                .NotNull()
+                .Must(list => list.Count > 0)
+                .WithMessage("At least one email address is required.");
+
+            RuleForEach(x => x.EmailAddresses)
+                .SetValidator(new EmailAddressDtoValidator());
+        }
     }
+
+    public sealed class EmailAddressDtoValidator : AbstractValidator<EmailAddressDto>
+    {
+        public EmailAddressDtoValidator()
+        {
+            RuleFor(x => x.Kind)
+                .NotEmpty().WithMessage("Email kind is required.")
+                .MaximumLength(30);
+
+            RuleFor(x => x.Email)
+                .NotEmpty().WithMessage("Email is required.")
+                .MaximumLength(320)
+                .EmailAddress().WithMessage("Invalid email.");
+        }
+    }
+
     public sealed class UpdateBasicRequestValidator : AbstractValidator<UpdateBasicRequest>
     {
         public UpdateBasicRequestValidator()
@@ -104,17 +128,32 @@ namespace WitcherHub.Application.Validators.Customers
                 .SetValidator(new CustomerDtoValidator());
         }
     }
+
     public sealed class AddressDtoValidator : AbstractValidator<AddressDto>
     {
         public AddressDtoValidator()
         {
             RuleFor(x => x.Label)
-            .MaximumLength(50)
-            .When(x => !string.IsNullOrWhiteSpace(x.Label));
+                .MaximumLength(50)
+                .When(x => !string.IsNullOrWhiteSpace(x.Label));
+
+            // ✅ FullNameOrCompany required (لأن الـ Entity non-null)
+            RuleFor(x => x.FullNameOrCompany)
+                .NotEmpty().WithMessage("Full name / company is required.")
+                .MaximumLength(250);
 
             RuleFor(x => x.Country)
-                .NotEmpty().WithMessage("Country is required.")
-                .MaximumLength(100);
+                .MaximumLength(100)
+                .When(x => !string.IsNullOrWhiteSpace(x.Country));
+
+            RuleFor(x => x.CountryCode)
+                .MaximumLength(2)
+                .When(x => !string.IsNullOrWhiteSpace(x.CountryCode));
+
+            // مطلوب واحد على الأقل من Country أو CountryCode
+            RuleFor(x => x)
+                .Must(a => !string.IsNullOrWhiteSpace(a.CountryCode) || !string.IsNullOrWhiteSpace(a.Country))
+                .WithMessage("Country or CountryCode is required.");
 
             RuleFor(x => x.City)
                 .MaximumLength(100)
@@ -124,29 +163,23 @@ namespace WitcherHub.Application.Validators.Customers
                 .MaximumLength(30)
                 .When(x => !string.IsNullOrWhiteSpace(x.PostalCode));
 
-            // صار Optional (بس نتحقق من الطول لو مكتوب)
-            RuleFor(x => x.FullNameOrCompany)
-                .MaximumLength(250)
-                .When(x => !string.IsNullOrWhiteSpace(x.FullNameOrCompany));
+            RuleFor(x => x.StreetRaw)
+                .MaximumLength(300)
+                .When(x => !string.IsNullOrWhiteSpace(x.StreetRaw));
 
-            RuleFor(x => x.Street)
+            RuleFor(x => x.AddressLine2)
                 .MaximumLength(250)
-                .When(x => !string.IsNullOrWhiteSpace(x.Street));
-
-            RuleFor(x => x.StreetNr)
-                .MaximumLength(50)
-                .When(x => !string.IsNullOrWhiteSpace(x.StreetNr));
+                .When(x => !string.IsNullOrWhiteSpace(x.AddressLine2));
         }
     }
 
-    // ✅ no bool constructor anymore => DI can build it
     public sealed class ContactDtoValidator : AbstractValidator<ContactDto>
     {
         public ContactDtoValidator()
         {
             RuleFor(x => x.Name)
-             .MaximumLength(200)
-             .When(x => !string.IsNullOrWhiteSpace(x.Name));
+                .MaximumLength(200)
+                .When(x => !string.IsNullOrWhiteSpace(x.Name));
 
             RuleFor(x => x.Position)
                 .MaximumLength(100)
@@ -160,6 +193,18 @@ namespace WitcherHub.Application.Validators.Customers
             RuleFor(x => x.Phone)
                 .MaximumLength(50)
                 .When(x => !string.IsNullOrWhiteSpace(x.Phone));
+
+            RuleFor(x => x.Salutation)
+                .MaximumLength(20)
+                .When(x => !string.IsNullOrWhiteSpace(x.Salutation));
+
+            RuleFor(x => x.FirstName)
+                .MaximumLength(120)
+                .When(x => !string.IsNullOrWhiteSpace(x.FirstName));
+
+            RuleFor(x => x.LastName)
+                .MaximumLength(120)
+                .When(x => !string.IsNullOrWhiteSpace(x.LastName));
         }
     }
 

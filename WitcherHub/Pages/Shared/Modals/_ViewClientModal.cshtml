@@ -5,7 +5,7 @@
         <div class="modal-content">
 
             <!-- Header -->
-            <div class="modal-header border-bottom-0 py-2 bg-grd-primary">
+            <div class="modal-header border-bottom-0 py-2 bg-grd-info text-white">
                 <div class="d-flex align-items-center gap-3">
                     <span class="material-icons-outlined">visibility</span>
                     <div>
@@ -14,10 +14,11 @@
                     </div>
                 </div>
 
-                <a href="javascript:;" class="primaery-menu-close" data-bs-dismiss="modal" aria-label="Close">
+                <a href="javascript:;" class="primaery-menu-close text-white" data-bs-dismiss="modal" aria-label="Close">
                     <i class="material-icons-outlined">close</i>
                 </a>
             </div>
+
 
             <!-- Body -->
             <div class="modal-body">
@@ -27,22 +28,36 @@
                     <div class="card-body p-4">
                         <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
                             <div>
-                                <h3 class="mb-1" id="vc-name">—</h3>
+                                <h3 class="mb-1 d-flex align-items-center gap-2 flex-wrap">
+                                    <span id="vc-name">—</span>
+                                    <span id="vc-lexwareBadge"></span>
+                                </h3>
+
                                 <div class="d-flex align-items-center gap-2">
                                     <span id="vc-typeBadge"></span>
                                     <span class="text-muted" id="vc-idText">—</span>
                                 </div>
                             </div>
 
-                            <button type="button"
-                                    class="btn p-0 border-0 bg-transparent text-danger"
-                                    title="Delete Client"
-                                    data-bs-toggle="collapse"
-                                    data-bs-target="#vc-deleteClientCollapse"
-                                    aria-expanded="false"
-                                    aria-controls="vc-deleteClientCollapse">
-                                <i class="material-icons-outlined">delete</i>
-                            </button>
+                            <div class="d-flex align-items-center gap-3">
+                                <button type="button"
+                                        id="vc-exportBtn"
+                                        class="btn p-0 border-0 bg-transparent text-warning d-none"
+                                        data-vc-action="export-lexware"
+                                        title="Export to Lexware">
+                                    <i class="material-icons-outlined">upload</i>
+                                </button>
+
+                                <button type="button"
+                                        class="btn p-0 border-0 bg-transparent text-danger"
+                                        title="Delete Client"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#vc-deleteClientCollapse">
+                                    <i class="material-icons-outlined">delete</i>
+                                </button>
+                            </div>
+
+
                         </div>
 
                         <!-- Global Delete confirm -->
@@ -233,6 +248,7 @@
 
                                             <form class="row g-3" id="vcAddLocationForm">
                                                 <input type="hidden" id="vc-clientId-addLocation" value="" />
+                                                <input type="hidden" id="vc-add-loc-countryCode" />
 
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label">Label</label>
@@ -255,14 +271,8 @@
                                                     <div class="text-danger small mt-1" id="err-vc-add-loc-postal"></div>
                                                 </div>
                                                 <div class="col-12 col-md-8">
-                                                    <label class="form-label">Street</label>
-                                                    <input class="form-control" id="vc-add-loc-street" />
-                                                    <div class="text-danger small mt-1" id="err-vc-add-loc-street"></div>
-                                                </div>
-                                                <div class="col-12 col-md-4">
-                                                    <label class="form-label">Nr</label>
-                                                    <input class="form-control" id="vc-add-loc-nr" />
-                                                    <div class="text-danger small mt-1" id="err-vc-add-loc-nr"></div>
+                                                    <label class="form-label">Street / Nr</label>
+                                                    <input class="form-control" id="vc-add-loc-streetRaw" />
                                                 </div>
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label">Address Line 2</label>

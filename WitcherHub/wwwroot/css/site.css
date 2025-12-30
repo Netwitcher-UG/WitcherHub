@@ -176,7 +176,24 @@ body {
     justify-content: center;
 }
 
-    /* prevent icon itself from taking focus/hover */
-    .btn.vc-icon-btn i {
-        pointer-events: none;
-    }
+.btn.vc-icon-btn i {
+    pointer-events: none;
+}        
+
+.maxton-table td, .maxton-table th {
+    white-space: nowrap;
+}
+
+.maxton-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vc-actions-wrap {
+    display: inline-block; 
+    text-align: right;
+    width: 100%; 
+    white-space: nowrap; 
+    min-width:80px;
+}
+

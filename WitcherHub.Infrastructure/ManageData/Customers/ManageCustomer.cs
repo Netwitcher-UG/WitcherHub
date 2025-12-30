@@ -9,11 +9,12 @@ using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Customers;
 using WitcherHub.Application.Models.View.Customers;
+using WitcherHub.Infrastructure.Data.Models;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
-
 using AddressEntity = WitcherHub.Infrastructure.Data.Models.CustomerAddress;
 using ContactEntity = WitcherHub.Infrastructure.Data.Models.CustomerContact;
 using CustomerEntity = WitcherHub.Infrastructure.Data.Models.Customer;
+using EmailEntity = WitcherHub.Infrastructure.Data.Models.CustomerEmailAddress;
 
 namespace WitcherHub.Infrastructure.ManageData.Customers
 {
@@ -74,10 +75,11 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
 
                         // SQL Server safe LIKE with escape char '!'
                         q = q.Where(c =>
-                            EF.Functions.Like(c.Name, pattern, "!") ||
-                            (c.Email != null && EF.Functions.Like(c.Email, pattern, "!")) ||
-                            (c.Phone != null && EF.Functions.Like(c.Phone, pattern, "!")) ||
-                            (c.TaxId != null && EF.Functions.Like(c.TaxId, pattern, "!")));
+                                EF.Functions.Like(c.Name, pattern, "!") ||
+                                (c.Phone != null && EF.Functions.Like(c.Phone, pattern, "!")) ||
+                                (c.TaxId != null && EF.Functions.Like(c.TaxId, pattern, "!")) ||
+                                c.EmailAddresses.Any(e => EF.Functions.Like(e.Email, pattern, "!"))
+                            );
                     }
 
                     var total = await q.LongCountAsync(token);
@@ -93,9 +95,14 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                             Id = c.Id,
                             Type = c.Type,
                             Name = c.Name,
-                            Email = c.Email,
+                            Email = c.EmailAddresses
+                                    .OrderByDescending(e => e.Kind == "business")
+                                    .ThenBy(e => e.Email)
+                                    .Select(e => e.Email)
+                                    .FirstOrDefault(),
                             Phone = c.Phone,
                             TaxId = c.TaxId,
+                            LexwareType = c.LexwareType,
 
                             // Default city (DB-side)
                             City = c.Addresses
@@ -139,24 +146,42 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                     var repo = _unitOfWork.Repo<CustomerEntity>();
 
                     var entity = await repo.GetByIdAsync(
-                        id,
-                        ct: token,
-                        asNoTracking: true,
-                        x => x.Addresses,
-                        x => x.Contacts);
+                                id,
+                                ct: token,
+                                asNoTracking: true,
+                                x => x.Addresses,
+                                x => x.Contacts,
+                                x => x.EmailAddresses);
 
-                    if (entity is null)
-                        return null;
+                    if (entity is null) return null;
+
+                    var primaryEmail = entity.EmailAddresses
+                        .OrderByDescending(e => e.Kind == "business")
+                        .ThenBy(e => e.Email)
+                        .Select(e => e.Email)
+                        .FirstOrDefault();
 
                     return new CustomerViews.CustomerDetailsView
                     {
                         Id = entity.Id,
                         Type = entity.Type,
                         Name = entity.Name,
-                        Email = entity.Email,
+                        Email = primaryEmail,
                         Phone = entity.Phone,
                         TaxId = entity.TaxId,
                         Notes = entity.Notes,
+                        LexwareType = entity.LexwareType,
+
+                        EmailAddresses = entity.EmailAddresses
+                            .OrderByDescending(e => e.Kind == "business")
+                            .ThenBy(e => e.Email)
+                            .Select(e => new CustomerViews.CustomerEmailAddressItemView
+                            {
+                                Id = e.Id,
+                                Kind = e.Kind,
+                                Email = e.Email
+                            })
+                            .ToList(),
 
                         Addresses = entity.Addresses
                             .OrderByDescending(a => a.IsDefault)
@@ -166,11 +191,12 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                                 Id = a.Id,
                                 Label = a.Label,
                                 Country = a.Country,
+                                CountryCode = a.CountryCode,
                                 City = a.City,
                                 PostalCode = a.PostalCode,
                                 FullNameOrCompany = a.FullNameOrCompany,
-                                Street = a.Street,
-                                StreetNr = a.StreetNr,
+                                StreetRaw = a.StreetRaw,
+                                AddressLine2 = a.AddressLine2,
                                 IsDefault = a.IsDefault
                             })
                             .ToList(),
@@ -185,10 +211,14 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                                 Position = x.Position,
                                 Email = x.Email,
                                 Phone = x.Phone,
+                                Salutation = x.Salutation,
+                                FirstName = x.FirstName,
+                                LastName = x.LastName,
                                 IsPrimary = x.IsPrimary
                             })
                             .ToList()
                     };
+
                 },
                 DetailsCacheOptions,
                 ct);
@@ -203,18 +233,49 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
 
             var customerRepo = _unitOfWork.Repo<CustomerEntity>();
 
-            var customer = dto.Customer.Adapt<CustomerEntity>();
 
-            // Address required
+            var customer = new CustomerEntity
+            {
+                Type = dto.Customer.Type,
+                Name = (dto.Customer.Name ?? "").Trim(),
+                Phone = string.IsNullOrWhiteSpace(dto.Customer.Phone) ? null : dto.Customer.Phone.Trim(),
+                TaxId = string.IsNullOrWhiteSpace(dto.Customer.TaxId) ? null : dto.Customer.TaxId.Trim(),
+                Notes = string.IsNullOrWhiteSpace(dto.Customer.Notes) ? null : dto.Customer.Notes.Trim(),
+                LexwareType = LexwareType.NotExported
+            };
+
+            // ✅ EmailAddresses required
+            if (dto.Customer.EmailAddresses is null || dto.Customer.EmailAddresses.Count == 0)
+                throw new BadRequestAppException("At least one email address is required.");
+
+            foreach (var e in dto.Customer.EmailAddresses)
+            {
+                customer.EmailAddresses.Add(new EmailEntity
+                {
+                    Kind = (e.Kind ?? "business").Trim(),
+                    Email = (e.Email ?? "").Trim()
+                });
+            }
+
+            // ✅ Address required
             var address = dto.Address.Adapt<AddressEntity>();
+            if (string.IsNullOrWhiteSpace(address.FullNameOrCompany))
+                address.FullNameOrCompany = customer.Name;
+
             address.IsDefault = true;
+            address.IsLexware = false;
+            address.Label = string.IsNullOrWhiteSpace(address.Label) ? "Billing" : address.Label.Trim();
+            address.CountryCode = string.IsNullOrWhiteSpace(address.CountryCode) ? null : address.CountryCode.Trim();
+            address.StreetRaw = string.IsNullOrWhiteSpace(address.StreetRaw) ? "N/A" : address.StreetRaw.Trim();
+
             customer.Addresses.Add(address);
 
-            // Contact only for Company
+            // ✅ Contact only for Company
             if (dto.Customer.Type == CustomerType.Company)
             {
                 var contact = dto.Contact.Adapt<ContactEntity>();
                 contact.IsPrimary = true;
+                contact.IsLexware = false;
                 customer.Contacts.Add(contact);
             }
 
@@ -222,37 +283,50 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             await _unitOfWork.SaveChangesAsync(ct);
 
             await InvalidateAfterCustomerChangeAsync(customer.Id, ct);
-
-            _log.LogInformation("Customer created. {CustomerId}", customer.Id);
             return customer.Id;
+
+
         }
 
         public async Task UpdateAsync(Guid id, UpdateCustomerDto dto, CancellationToken ct = default)
         {
-            if (id == Guid.Empty) throw new BadRequestAppException("Invalid customer id.");
-            if (dto is null) throw new BadRequestAppException("Invalid payload.");
+            var customerRepo = _unitOfWork.Repo<Customer>();
+            var emailRepo = _unitOfWork.Repo<CustomerEmailAddress>();
 
-            var repo = _unitOfWork.Repo<CustomerEntity>();
-
-            var entity = await repo.GetByIdAsync(id, ct: ct, asNoTracking: false);
-            if (entity is null) throw new NotFoundAppException("Customer not found.");
+            var customer = await customerRepo.GetByIdAsync(id, ct: ct, asNoTracking: false, x => x.EmailAddresses);
+            if (customer is null) throw new NotFoundAppException("Customer not found.");
 
             var basic = dto.Customer?.Customer ?? throw new BadRequestAppException("Missing customer data.");
 
-            entity.Type = basic.Type;
-            entity.Name = (basic.Name ?? "").Trim();
-            entity.Email = string.IsNullOrWhiteSpace(basic.Email) ? null : basic.Email.Trim();
-            entity.Phone = string.IsNullOrWhiteSpace(basic.Phone) ? null : basic.Phone.Trim();
-            entity.TaxId = string.IsNullOrWhiteSpace(basic.TaxId) ? null : basic.TaxId.Trim();
-            entity.Notes = string.IsNullOrWhiteSpace(basic.Notes) ? null : basic.Notes.Trim();
+            // تحديث الحقول العادية
+            customer.Type = basic.Type;
+            customer.Name = (basic.Name ?? "").Trim();
+            customer.Phone = string.IsNullOrWhiteSpace(basic.Phone) ? null : basic.Phone.Trim();
+            customer.TaxId = string.IsNullOrWhiteSpace(basic.TaxId) ? null : basic.TaxId.Trim();
+            customer.Notes = string.IsNullOrWhiteSpace(basic.Notes) ? null : basic.Notes.Trim();
 
-            repo.Update(entity);
+            //if (basic.EmailAddresses is null || basic.EmailAddresses.Count == 0)
+            //    throw new BadRequestAppException("At least one email address is required.");
+
+            //// احذف القديم من DB ثم أضف الجديد
+            //var old = customer.EmailAddresses.ToList();
+            //if (old.Count > 0) emailRepo.RemoveRange(old);
+            //customer.EmailAddresses.Clear();
+
+            //foreach (var e in basic.EmailAddresses)
+            //{
+            //    customer.EmailAddresses.Add(new CustomerEmailAddress
+            //    {
+            //        CustomerId = customer.Id,
+            //        Kind = (e.Kind ?? "business").Trim(),
+            //        Email = (e.Email ?? "").Trim()
+            //    });
+            //}
+
+            // لا Update(customer)
             await _unitOfWork.SaveChangesAsync(ct);
-
-            await InvalidateAfterCustomerChangeAsync(id, ct);
-
-            _log.LogInformation("Customer updated. {CustomerId}", id);
         }
+
 
         public async Task DeleteAsync(Guid id, CancellationToken ct = default)
         {
@@ -302,6 +376,17 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                 var address = dto.Address.Adapt<AddressEntity>();
                 address.CustomerId = dto.CustomerId;
                 address.IsDefault = hasAny ? dto.Address.IsDefault : true;
+                if (string.IsNullOrWhiteSpace(address.FullNameOrCompany))
+                {
+                    var customer = await customersRepo.FirstOrDefaultAsync(x => x.Id == dto.CustomerId, ct, asNoTracking: true);
+                    if (customer is null) throw new NotFoundAppException("Customer not found.");
+                    address.FullNameOrCompany = customer.Name;
+                }
+
+                address.IsLexware = false;
+                address.CountryCode = string.IsNullOrWhiteSpace(address.CountryCode) ? null : address.CountryCode.Trim();
+                address.StreetRaw = string.IsNullOrWhiteSpace(address.StreetRaw) ? "N/A" : address.StreetRaw.Trim();
+                address.Label = string.IsNullOrWhiteSpace(address.Label) ? "Location" : address.Label.Trim();
 
                 await addressesRepo.AddAsync(address, ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
@@ -335,15 +420,19 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
 
                 if (address is null) throw new NotFoundAppException("Address not found.");
 
-                address.Label = dto.Address.Label;
-                address.Country = dto.Address.Country;
-                address.City = dto.Address.City;
-                address.PostalCode = dto.Address.PostalCode;
 
-                // required fields on entity
-                address.FullNameOrCompany = dto.Address.FullNameOrCompany ?? address.FullNameOrCompany;
-                address.Street = dto.Address.Street ?? address.Street;
-                address.StreetNr = dto.Address.StreetNr ?? address.StreetNr;
+                address.FullNameOrCompany = string.IsNullOrWhiteSpace(dto.Address.FullNameOrCompany)
+                                        ? address.FullNameOrCompany
+                                        : dto.Address.FullNameOrCompany!.Trim();
+
+                address.Country = string.IsNullOrWhiteSpace(dto.Address.Country) ? null : dto.Address.Country.Trim();
+                address.City = string.IsNullOrWhiteSpace(dto.Address.City) ? null : dto.Address.City.Trim();
+                address.PostalCode = string.IsNullOrWhiteSpace(dto.Address.PostalCode) ? null : dto.Address.PostalCode.Trim();
+                address.AddressLine2 = string.IsNullOrWhiteSpace(dto.Address.AddressLine2) ? null : dto.Address.AddressLine2.Trim();
+                address.Label = string.IsNullOrWhiteSpace(dto.Address.Label) ? address.Label : dto.Address.Label.Trim();
+                address.CountryCode = string.IsNullOrWhiteSpace(dto.Address.CountryCode) ? null : dto.Address.CountryCode.Trim();
+                address.StreetRaw = string.IsNullOrWhiteSpace(dto.Address.StreetRaw) ? "N/A" : dto.Address.StreetRaw.Trim();
+
 
                 if (dto.Address.IsDefault && !address.IsDefault)
                 {
@@ -485,7 +574,9 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                 }
 
                 var contact = dto.Contact.Adapt<ContactEntity>();
+                contact.Name = string.IsNullOrWhiteSpace(contact.Name) ? "N/A" : contact.Name.Trim();
                 contact.CustomerId = dto.CustomerId;
+                contact.IsLexware = false;
                 contact.IsPrimary = hasAny ? dto.Contact.IsPrimary : true;
 
                 await contactsRepo.AddAsync(contact, ct);
@@ -520,10 +611,14 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
 
                 if (contact is null) throw new NotFoundAppException("Contact not found.");
 
-                contact.Name = dto.Contact.Name ?? contact.Name;
-                contact.Position = dto.Contact.Position;
-                contact.Email = dto.Contact.Email;
-                contact.Phone = dto.Contact.Phone;
+                if (!string.IsNullOrWhiteSpace(dto.Contact.Name))
+                    contact.Name = dto.Contact.Name.Trim();
+                contact.Position = string.IsNullOrWhiteSpace(dto.Contact.Position) ? null : dto.Contact.Position.Trim();
+                contact.Email = string.IsNullOrWhiteSpace(dto.Contact.Email) ? null : dto.Contact.Email.Trim();
+                contact.Phone = string.IsNullOrWhiteSpace(dto.Contact.Phone) ? null : dto.Contact.Phone.Trim();
+                contact.Salutation = string.IsNullOrWhiteSpace(dto.Contact.Salutation) ? null : dto.Contact.Salutation.Trim();
+                contact.FirstName = string.IsNullOrWhiteSpace(dto.Contact.FirstName) ? null : dto.Contact.FirstName.Trim();
+                contact.LastName = string.IsNullOrWhiteSpace(dto.Contact.LastName) ? null : dto.Contact.LastName.Trim();
 
                 if (dto.Contact.IsPrimary && !contact.IsPrimary)
                 {

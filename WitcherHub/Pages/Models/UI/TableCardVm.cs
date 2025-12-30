@@ -20,6 +20,7 @@ namespace WitcherHub.Pages.Models.UI
         public string Header { get; set; } = "";
         public string? HeaderClass { get; set; }
         public string? CellClass { get; set; }
+        public string? Width { get; set; }
     }
 
     public class TableRowVm

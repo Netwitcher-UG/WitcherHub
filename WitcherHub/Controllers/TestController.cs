@@ -31,7 +31,12 @@ namespace WitcherHub.Controllers
             var json = await _lexwareClient.GetContactsPageAsync(page, cancellationToken);
             return Content(json, "application/json");
         }
-
+        [HttpGet("contacts/all")]
+        public async Task<IActionResult> GetAllContacts(CancellationToken ct)
+        {
+            var items = await _lexwareClient.GetAllContactsAsync(ct);
+            return Ok(items);
+        }
 
         // لاختبار OpenAI
         [HttpGet("ai-demo")]

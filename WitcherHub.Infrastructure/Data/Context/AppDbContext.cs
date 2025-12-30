@@ -11,9 +11,10 @@ namespace WitcherHub.Infrastructure.Data.Context
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
         // -------- Customers --------
-        public DbSet<Customer> Customers => Set<Customer>();
+        public DbSet<Customer> Customers => Set<Customer>(); 
         public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
         public DbSet<CustomerContact> CustomerContacts => Set<CustomerContact>();
+        public DbSet<CustomerEmailAddress> CustomerEmailAddresses => Set<CustomerEmailAddress>();
 
         // -------- Projects --------
         public DbSet<Project> Projects => Set<Project>();
@@ -233,6 +234,11 @@ namespace WitcherHub.Infrastructure.Data.Context
                 .WithMany()
                 .HasForeignKey(x => x.CreatedById)
                 .OnDelete(DeleteBehavior.SetNull);
+            b.Entity<CustomerEmailAddress>()
+             .HasOne(x => x.Customer)
+             .WithMany(x => x.EmailAddresses)
+             .HasForeignKey(x => x.CustomerId)
+             .OnDelete(DeleteBehavior.Cascade);
 
 
             // =========================

@@ -39,8 +39,16 @@
             <label class="form-label text-light">
                 Email <span class="text-danger">*</span>
             </label>
-            <input class="form-control" asp-for="Customer.Email" type="email" required />
-            <span class="text-danger" asp-validation-for="Customer.Email"></span>
+
+            <input class="form-control"
+                   asp-for="Customer.EmailAddresses[0].Email"
+                   type="email"
+                   required />
+
+            <input type="hidden" asp-for="Customer.EmailAddresses[0].Kind" value="business" />
+
+            <span class="text-danger" asp-validation-for="Customer.EmailAddresses[0].Email"></span>
+
         </div>
 
         <div class="col-md-6">
@@ -94,8 +102,16 @@
             <label class="form-label text-light">
                 Country <span class="text-danger">*</span>
             </label>
-            <input class="form-control" asp-for="Address.Country" required />
-            <span class="text-danger" asp-validation-for="Address.Country"></span>
+
+            <select class="form-select"
+                    asp-for="Address.CountryCode"
+                    asp-items="Model.CountryOptions"
+                    required>
+            </select>
+
+            <input type="hidden" asp-for="Address.Country" /> 
+
+            <span class="text-danger" asp-validation-for="Address.CountryCode"></span>
         </div>
 
         <div class="col-md-4">
@@ -118,17 +134,18 @@
             <span class="text-danger" asp-validation-for="Address.FullNameOrCompany"></span>
         </div>
 
-        <div class="col-md-4">
-            <label class="form-label text-light opacity-75">Street <small>(optional)</small></label>
-            <input class="form-control" asp-for="Address.Street" />
-            <span class="text-danger" asp-validation-for="Address.Street"></span>
+        <div class="col-md-8">
+            <label class="form-label text-light opacity-75">Street / Nr <small>(optional)</small></label>
+            <input class="form-control" asp-for="Address.StreetRaw" placeholder="Hofjagdweg 21" />
+            <span class="text-danger" asp-validation-for="Address.StreetRaw"></span>
         </div>
 
-        <div class="col-md-2">
-            <label class="form-label text-light opacity-75">Nr <small>(optional)</small></label>
-            <input class="form-control" asp-for="Address.StreetNr" />
-            <span class="text-danger" asp-validation-for="Address.StreetNr"></span>
+        <div class="col-md-4">
+            <label class="form-label text-light opacity-75">Address Line 2 <small>(optional)</small></label>
+            <input class="form-control" asp-for="Address.AddressLine2" />
+            <span class="text-danger" asp-validation-for="Address.AddressLine2"></span>
         </div>
+
 
     </div>
 </div>
@@ -163,7 +180,7 @@
             <label class="form-label text-light">
                 Contact Email <span class="text-danger">*</span>
             </label>
-            <input class="form-control" asp-for="Contact.Email" type="email" placeholder="e.g. sara@company.com" required />
+            <input class="form-control" asp-for="Contact.Email" type="email" placeholder="e.g. sara@company.com" />
             <span class="text-danger" asp-validation-for="Contact.Email"></span>
         </div>
 

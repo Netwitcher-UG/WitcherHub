@@ -10,10 +10,13 @@ namespace WitcherHub.Application.Models.View.Customers
             public Guid Id { get; set; }
             public CustomerType Type { get; set; }
             public string Name { get; set; } = "";
+
             public string? Email { get; set; }
+
             public string? Phone { get; set; }
             public string? TaxId { get; set; }
-            public string? City { get; set; } 
+            public string? City { get; set; }
+            public LexwareType LexwareType { get; set; }
         }
 
         public class CustomerDetailsView
@@ -21,13 +24,23 @@ namespace WitcherHub.Application.Models.View.Customers
             public Guid Id { get; set; }
             public CustomerType Type { get; set; }
             public string Name { get; set; } = "";
+
             public string? Email { get; set; }
+
             public string? Phone { get; set; }
             public string? TaxId { get; set; }
             public string? Notes { get; set; }
+            public LexwareType LexwareType { get; set; }
+
+            public List<CustomerEmailAddressItemView> EmailAddresses { get; set; } = new();
 
             public List<CustomerAddressItemView> Addresses { get; set; } = new();
             public List<CustomerContactItemView> Contacts { get; set; } = new();
+        }
+
+        public class CustomerEmailAddressItemView : EmailAddressDto
+        {
+            public Guid Id { get; set; }
         }
 
         public class CustomerAddressItemView : AddressDto

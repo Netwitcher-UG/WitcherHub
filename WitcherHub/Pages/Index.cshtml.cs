@@ -1,12 +1,15 @@
 ﻿using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Globalization;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Common.Pagination;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Customers;
 using WitcherHub.Application.Models.View.Customers;
 using WitcherHub.Pages.Models.UI;
+using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Pages
 {
@@ -66,24 +69,81 @@ namespace WitcherHub.Pages
         [BindProperty] public CustomerDto Customer { get; set; } = new();
         [BindProperty] public AddressDto Address { get; set; } = new();
         [BindProperty] public ContactDto Contact { get; set; } = new();
+        public List<SelectListItem> CountryOptions { get; private set; } = new();
+
+        private static readonly Lazy<IReadOnlyList<(string Code, string Name)>> _allCountries =
+    new(() =>
+    {
+        var list = CultureInfo.GetCultures(CultureTypes.SpecificCultures)
+            .Where(ci => !ci.CultureTypes.HasFlag(CultureTypes.UserCustomCulture))
+            .Select(ci =>
+            {
+                try
+                {
+                    var r = new RegionInfo(ci.Name);
+                    return (Code: r.TwoLetterISORegionName, Name: r.EnglishName);
+                }
+                catch { return (Code: "", Name: ""); }
+            })
+            .Where(x => !string.IsNullOrWhiteSpace(x.Code) && !string.IsNullOrWhiteSpace(x.Name))
+            .Distinct()
+            .OrderBy(x => x.Name)
+            .ToList();
+
+        return list;
+    });
+
+        private void EnsureCountryOptions()
+        {
+            if (string.IsNullOrWhiteSpace(Address.CountryCode))
+                Address.CountryCode = "DE";
+
+            CountryOptions = _allCountries.Value
+                .Select(c => new SelectListItem
+                {
+                    Value = c.Code,
+                    Text = c.Name,
+                    Selected = string.Equals(c.Code, Address.CountryCode, StringComparison.OrdinalIgnoreCase)
+                })
+                .ToList();
+
+            // ✅ عبّي الاسم كمان (Country) من الكود
+            Address.Country = CountryOptions.FirstOrDefault(x => x.Value == Address.CountryCode)?.Text ?? "Germany";
+        }
+
+
+
+
+        
 
         public ModalVm CreateCustomerModal { get; private set; } = new();
 
         public async Task OnGetAsync(CancellationToken ct)
         {
+            EnsureEmailSlot();
+            EnsureCountryOptions();
             ViewData["p"] = Page;
             ViewData["pageSize"] = PageSize;
             ViewData["q"] = Search;
             await LoadTableAsync(ct);
             BuildCreateCustomerModal(autoOpen: false);
         }
+        private void EnsureEmailSlot()
+        {
+            Customer.EmailAddresses ??= new List<EmailAddressDto>();
 
+            if (Customer.EmailAddresses.Count == 0)
+                Customer.EmailAddresses.Add(new EmailAddressDto { Kind = "business" });
+        }
         // =========================
         // POST: Create (normal form)
         // =========================
         public async Task<IActionResult> OnPostAsync(CancellationToken ct)
         {
+            EnsureEmailSlot();
             await LoadTableAsync(ct);
+
+            EnsureCountryOptions(); 
 
             var dto = new CustomerDTOs
             {
@@ -98,7 +158,7 @@ namespace WitcherHub.Pages
             {
                 foreach (var err in result.Errors)
                     ModelState.AddModelError(err.PropertyName, err.ErrorMessage);
-
+                EnsureCountryOptions();
                 BuildCreateCustomerModal(autoOpen: true);
 
                 TempData["Toast.Type"] = "error";
@@ -356,14 +416,16 @@ namespace WitcherHub.Pages
                 },
                 Columns =
                 {
-                    new() { Header="Name", HeaderClass="ps-4", CellClass="ps-4 fw-semibold" },
-                    new() { Header="Type" },
-                    new() { Header="Phone" },
-                    new() { Header="Email" },
-                    new() { Header="City" },
-                    new() { Header="Tax ID" },
-                    new() { Header="Actions", HeaderClass="text-end pe-4", CellClass="text-end pe-4" },
+                    new() { Header="Name",    Width="17%", HeaderClass="ps-4", CellClass="ps-4 fw-semibold" },
+                    new() { Header="Type",    Width="12%" },
+                    new() { Header="Phone",   Width="12%" },
+                    new() { Header="Email",   Width="20%" },
+                    new() { Header="City",    Width="8%" },
+                    new() { Header="Tax ID",  Width="8%" },
+                    new() { Header="Lexware", Width="13%"  },
+                    new() { Header="Actions", Width="10%", HeaderClass="text-end pe-4", CellClass="text-end pe-4" },
                 }
+
             };
 
             foreach (var c in res.Items)
@@ -378,11 +440,26 @@ namespace WitcherHub.Pages
                         Html(c.Email),
                         Html(c.City),
                         Html(c.TaxId),
-                        ActionsButtons(c.Id.ToString())
+                        LexwareBadge(c.LexwareType.ToString()),
+                        ActionsButtons(c.Id.ToString(), c.LexwareType == LexwareType.NotExported)
                     }
                 });
             }
         }
+        private static Microsoft.AspNetCore.Html.IHtmlContent LexwareBadge(string status)
+        {
+            var cls = status switch
+            {
+                "Exported" => "badge bg-primary bg-opacity-10 text-primary",
+                "Imported" => "badge bg-secondary bg-opacity-10 text-secondary",
+                _ => "badge bg-warning bg-opacity-10 text-warning" // NotExported
+            };
+
+            var safe = System.Text.Encodings.Web.HtmlEncoder.Default.Encode(status ?? "");
+            return new Microsoft.AspNetCore.Html.HtmlString($"<span class=\"{cls}\">{safe}</span>");
+        }
+        
+
 
         private void BuildCreateCustomerModal(bool autoOpen)
         {
@@ -413,25 +490,47 @@ namespace WitcherHub.Pages
 
         private static string Enc(string? v) => System.Text.Encodings.Web.HtmlEncoder.Default.Encode(v ?? "");
 
-        private static Microsoft.AspNetCore.Html.IHtmlContent ActionsButtons(string customerId) => new Microsoft.AspNetCore.Html.HtmlString($$"""
+        private static Microsoft.AspNetCore.Html.IHtmlContent ActionsButtons(string customerId, bool canExport)
+        {
+            var exportBtn = canExport
+                ? $$"""
 <button type="button"
-        class="btn vc-icon-btn text-secondary"
-        title="View"
-        data-bs-toggle="modal"
-        data-bs-target="#ViewClientModal"
+        class="btn vc-icon-btn text-warning"
+        title="Export to Lexware"
+        data-vc-action="table-export"
         data-client-id="{{Enc(customerId)}}">
-    <i class="material-icons-outlined">visibility</i>
+    <i class="material-icons-outlined">upload</i>
 </button>
+"""
+                : "";
 
-<button type="button"
-        class="btn vc-icon-btn text-danger"
-        title="Delete"
-        data-vc-action="table-delete"
-        data-client-id="{{Enc(customerId)}}">
-    <i class="material-icons-outlined">delete</i>
-</button>
+            return new Microsoft.AspNetCore.Html.HtmlString($$"""
+<div class="vc-actions-wrap">
+    {{exportBtn}}
+
+    <button type="button"
+            class="btn vc-icon-btn text-secondary"
+            title="View"
+            data-bs-toggle="modal"
+            data-bs-target="#ViewClientModal"
+            data-client-id="{{Enc(customerId)}}">
+        <i class="material-icons-outlined">visibility</i>
+    </button>
+
+    <button type="button"
+            class="btn vc-icon-btn text-danger"
+            title="Delete"
+            data-vc-action="table-delete"
+            data-client-id="{{Enc(customerId)}}">
+        <i class="material-icons-outlined">delete</i>
+    </button>
+</div>
 """);
+   
+
     }
 
-    
+}
+
+
 }

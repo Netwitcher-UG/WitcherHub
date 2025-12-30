@@ -24,18 +24,24 @@
             <div class="card-body">
 
               
-                    <form method="get" class="order-search position-relative my-3 w-25 ms-4">
-                        <input class="form-control rounded-5 px-5"
-                               type="text"
-                               name="@Model.Pagination?.SearchParam"
-                               value="@Model.Pagination?.SearchQuery"
-                               placeholder="@Model.SearchPlaceholder" />
+                    @if (Model.Pagination is not null)
+{
+    var p = Model.Pagination;
 
-                        <input type="hidden" name="@Model.Pagination?.PageParam" value="1" />
-                        <input type="hidden" name="@Model.Pagination?.PageSizeParam" value="@Model.Pagination?.PageSize" />
+    <form method="get" class="order-search position-relative my-3 w-25 ms-4">
+        <input class="form-control rounded-5 px-5"
+               type="text"
+               name="@p.SearchParam"
+               value="@p.SearchQuery"
+               placeholder="@Model.SearchPlaceholder" />
 
-                        <span class="material-icons-outlined position-absolute ms-3 translate-middle-y start-0 top-50">search</span>
-                    </form>
+        <input type="hidden" name="@p.PageParam" value="1" />
+        <input type="hidden" name="@p.PageSizeParam" value="@p.PageSize" />
+
+        <span class="material-icons-outlined position-absolute ms-3 translate-middle-y start-0 top-50">search</span>
+    </form>
+}
+
 
                     
 
@@ -45,7 +51,7 @@
                             <tr>
                                 @foreach (var col in Model.Columns)
                                 {
-                                    <th class="@col.HeaderClass">@col.Header</th>
+                                    <th class="@col.HeaderClass" style="width:@col.Width">@col.Header</th>
                                 }
                             </tr>
                         </thead>
@@ -57,7 +63,7 @@
                                     @for (int i = 0; i < row.Cells.Count; i++)
                                     {
                                         var cellClass = (i < Model.Columns.Count) ? Model.Columns[i].CellClass : null;
-                                        <td class="@cellClass">@row.Cells[i]</td>
+                                        <td class="@cellClass" style="width:@Model.Columns[i].Width">@row.Cells[i]</td>
                                     }
                                 </tr>
                             }

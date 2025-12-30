@@ -11,9 +11,6 @@ namespace WitcherHub.Infrastructure.Data.Models
         [MaxLength(250)]
         public string Name { get; set; } = default!;
 
-        [MaxLength(320)]
-        public string? Email { get; set; }
-
         [MaxLength(50)]
         public string? Phone { get; set; }
 
@@ -21,7 +18,19 @@ namespace WitcherHub.Infrastructure.Data.Models
         public string? TaxId { get; set; }
 
         public string? Notes { get; set; }
+
         public LexwareType LexwareType { get; set; }
+        [MaxLength(64)] 
+        public string? LexwareContactId { get; set; }
+        [MaxLength(64)] 
+        public string? LexwareOrganizationId { get; set; }
+        
+        public int? LexwareCustomerNumber { get; set; }
+        public int? LexwareVersion { get; set; }
+        public bool? LexwareArchived { get; set; }        
+        public bool? LexwareAllowTaxFreeInvoices { get; set; }
+        public DateTime? LexwareSyncedAtUtc { get; set; }
+        public ICollection<CustomerEmailAddress> EmailAddresses { get; set; } = new List<CustomerEmailAddress>();
 
         public ICollection<CustomerAddress> Addresses { get; set; } = new List<CustomerAddress>();
         public ICollection<CustomerContact> Contacts { get; set; } = new List<CustomerContact>();
@@ -33,11 +42,10 @@ namespace WitcherHub.Infrastructure.Data.Models
     {
         public Guid CustomerId { get; set; }
         public Customer Customer { get; set; } = default!;
-
+        [MaxLength(250)]
         public string FullNameOrCompany { get; set; } = default!; // اسم صاحب العنوان
-
-        public string Street { get; set; } = default!;
-        public string StreetNr { get; set; } = default!; // رقم البيت
+        [MaxLength(300)]
+        public string? StreetRaw { get; set; }
 
 
         [MaxLength(50)]
@@ -45,6 +53,8 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         [MaxLength(100)]
         public string? Country { get; set; }
+        [MaxLength(2)]
+        public string? CountryCode { get; set; }
 
         [MaxLength(100)]
         public string? City { get; set; }
@@ -57,6 +67,7 @@ namespace WitcherHub.Infrastructure.Data.Models
         public string? PostalCode { get; set; }
 
         public bool IsDefault { get; set; }
+        public bool IsLexware { get; set; }
     }
 
     public class CustomerContact : BaseEntity
@@ -75,8 +86,28 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         [MaxLength(100)]
         public string? Position { get; set; }
+        [MaxLength(20)]
+        public string? Salutation { get; set; }
+
+        [MaxLength(120)]
+        public string? FirstName { get; set; }
+
+        [MaxLength(120)]
+        public string? LastName { get; set; }
 
         public bool IsPrimary { get; set; }
+        public bool IsLexware { get; set; }
+    }
+    public class CustomerEmailAddress : BaseEntity
+    {
+        public Guid CustomerId { get; set; }
+        public Customer Customer { get; set; } = default!;
+
+        [MaxLength(30)]
+        public string Kind { get; set; } = "business"; // business / private / other
+
+        [MaxLength(320)]
+        public string Email { get; set; } = default!;
     }
 
 }
