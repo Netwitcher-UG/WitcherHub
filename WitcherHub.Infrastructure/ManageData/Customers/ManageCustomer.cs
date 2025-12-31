@@ -172,6 +172,15 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                         Notes = entity.Notes,
                         LexwareType = entity.LexwareType,
 
+                        // ✅ Lexware read-only fields
+                        LexwareCustomerNumber = entity.LexwareCustomerNumber,
+                        LexwareContactId = entity.LexwareContactId,
+                        LexwareOrganizationId = entity.LexwareOrganizationId,
+                        LexwareVersion = entity.LexwareVersion,
+                        LexwareArchived = entity.LexwareArchived,
+                        LexwareAllowTaxFreeInvoices = entity.LexwareAllowTaxFreeInvoices,
+                        LexwareSyncedAtUtc = entity.LexwareSyncedAtUtc,
+
                         EmailAddresses = entity.EmailAddresses
                             .OrderByDescending(e => e.Kind == "business")
                             .ThenBy(e => e.Email)
@@ -290,41 +299,89 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
 
         public async Task UpdateAsync(Guid id, UpdateCustomerDto dto, CancellationToken ct = default)
         {
-            var customerRepo = _unitOfWork.Repo<Customer>();
-            var emailRepo = _unitOfWork.Repo<CustomerEmailAddress>();
+            if (id == Guid.Empty) throw new BadRequestAppException("Invalid customer id.");
+            if (dto is null) throw new BadRequestAppException("Invalid payload.");
 
-            var customer = await customerRepo.GetByIdAsync(id, ct: ct, asNoTracking: false, x => x.EmailAddresses);
+            var customerRepo = _unitOfWork.Repo<Customer>();
+
+            var customer = await customerRepo.GetByIdAsync(
+                id, ct: ct, asNoTracking: false, x => x.EmailAddresses);
+
             if (customer is null) throw new NotFoundAppException("Customer not found.");
 
-            var basic = dto.Customer?.Customer ?? throw new BadRequestAppException("Missing customer data.");
+            var basic = dto.Customer ?? throw new BadRequestAppException("Missing customer data.");
 
-            // تحديث الحقول العادية
             customer.Type = basic.Type;
             customer.Name = (basic.Name ?? "").Trim();
             customer.Phone = string.IsNullOrWhiteSpace(basic.Phone) ? null : basic.Phone.Trim();
             customer.TaxId = string.IsNullOrWhiteSpace(basic.TaxId) ? null : basic.TaxId.Trim();
             customer.Notes = string.IsNullOrWhiteSpace(basic.Notes) ? null : basic.Notes.Trim();
 
-            //if (basic.EmailAddresses is null || basic.EmailAddresses.Count == 0)
-            //    throw new BadRequestAppException("At least one email address is required.");
+            static string NormEmail(string? e) => (e ?? "").Trim().ToLowerInvariant();
+            static string NormKind(string? k) =>
+                string.IsNullOrWhiteSpace(k) ? "business" : k.Trim().ToLowerInvariant();
 
-            //// احذف القديم من DB ثم أضف الجديد
-            //var old = customer.EmailAddresses.ToList();
-            //if (old.Count > 0) emailRepo.RemoveRange(old);
-            //customer.EmailAddresses.Clear();
+            var incoming = (basic.EmailAddresses ?? new List<EmailAddressDto>())
+                .Select(x => new { Email = NormEmail(x.Email), Kind = NormKind(x.Kind) })
+                .Where(x => !string.IsNullOrWhiteSpace(x.Email))
+                .GroupBy(x => x.Email)
+                .Select(g => g.First())
+                .ToList();
 
-            //foreach (var e in basic.EmailAddresses)
-            //{
-            //    customer.EmailAddresses.Add(new CustomerEmailAddress
-            //    {
-            //        CustomerId = customer.Id,
-            //        Kind = (e.Kind ?? "business").Trim(),
-            //        Email = (e.Email ?? "").Trim()
-            //    });
-            //}
+            if (incoming.Count == 0) throw new BadRequestAppException("At least one email address is required.");
 
-            // لا Update(customer)
+            // -------------------------
+            // 3) مقارنة DB vs Incoming
+            // -------------------------
+            var dbList = customer.EmailAddresses.ToList(); // tracked
+            var dbByEmail = dbList.ToDictionary(x => NormEmail(x.Email), x => x);
+
+            var inByEmail = incoming.ToDictionary(x => x.Email, x => x);
+
+            bool sameCount = dbByEmail.Count == inByEmail.Count;
+
+            bool sameContent = sameCount && dbByEmail.All(kvp =>
+                inByEmail.TryGetValue(kvp.Key, out var inc) &&
+                NormKind(kvp.Value.Kind) == inc.Kind);
+
+            if (!sameContent)
+            {
+                foreach (var db in dbList)
+                {
+                    var key = NormEmail(db.Email);
+                    if (!inByEmail.ContainsKey(key))
+                    {
+                        customer.EmailAddresses.Remove(db);
+                    }
+                }
+
+                foreach (var kv in dbByEmail)
+                {
+                    if (inByEmail.TryGetValue(kv.Key, out var inc))
+                    {
+                        if (NormKind(kv.Value.Kind) != inc.Kind)
+                            kv.Value.Kind = inc.Kind; // tracked update
+                    }
+                }
+
+                foreach (var inc in incoming)
+                {
+                    if (!dbByEmail.ContainsKey(inc.Email))
+                    {
+                        customer.EmailAddresses.Add(new CustomerEmailAddress
+                        {
+                            CustomerId = customer.Id,
+                            Email = inc.Email,
+                            Kind = inc.Kind
+                        });
+
+                    }
+                }
+            }
+
             await _unitOfWork.SaveChangesAsync(ct);
+            await InvalidateAfterCustomerChangeAsync(id, ct);
+            _log.LogInformation("Customer updated. {CustomerId}", id);
         }
 
 
@@ -346,7 +403,7 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
         }
 
         // =========================
-        // Addresses
+        // Addresses 
         // =========================
         public async Task<Guid> CreateAddressAsync(CreateCustomerAddressDto dto, CancellationToken ct = default)
         {
@@ -574,7 +631,19 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                 }
 
                 var contact = dto.Contact.Adapt<ContactEntity>();
-                contact.Name = string.IsNullOrWhiteSpace(contact.Name) ? "N/A" : contact.Name.Trim();
+
+                var fn = (contact.FirstName ?? "").Trim();
+                var ln = (contact.LastName ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(contact.Name))
+                {
+                    var full = $"{fn} {ln}".Trim();
+                    contact.Name = string.IsNullOrWhiteSpace(full) ? "N/A" : full;
+                }
+                else
+                {
+                    contact.Name = contact.Name.Trim();
+                }
+
                 contact.CustomerId = dto.CustomerId;
                 contact.IsLexware = false;
                 contact.IsPrimary = hasAny ? dto.Contact.IsPrimary : true;
@@ -612,7 +681,18 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                 if (contact is null) throw new NotFoundAppException("Contact not found.");
 
                 if (!string.IsNullOrWhiteSpace(dto.Contact.Name))
+                {
                     contact.Name = dto.Contact.Name.Trim();
+                }
+                else
+                {
+                    var fn = (dto.Contact.FirstName ?? "").Trim();
+                    var ln = (dto.Contact.LastName ?? "").Trim();
+                    var full = $"{fn} {ln}".Trim();
+                    if (!string.IsNullOrWhiteSpace(full))
+                        contact.Name = full; // keep entity happy
+                }
+
                 contact.Position = string.IsNullOrWhiteSpace(dto.Contact.Position) ? null : dto.Contact.Position.Trim();
                 contact.Email = string.IsNullOrWhiteSpace(dto.Contact.Email) ? null : dto.Contact.Email.Trim();
                 contact.Phone = string.IsNullOrWhiteSpace(dto.Contact.Phone) ? null : dto.Contact.Phone.Trim();

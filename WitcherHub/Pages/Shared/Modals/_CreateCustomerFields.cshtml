@@ -35,21 +35,79 @@
             <span class="text-danger" asp-validation-for="Customer.Name"></span>
         </div>
 
-        <div class="col-md-6">
-            <label class="form-label text-light">
-                Email <span class="text-danger">*</span>
-            </label>
+        @* Emails (multi) - nicer UI *@
+        <div class="col-12">
+            <div class="card rounded-4 border bg-transparent">
+                <div class="card-body p-3">
 
-            <input class="form-control"
-                   asp-for="Customer.EmailAddresses[0].Email"
-                   type="email"
-                   required />
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <div>
+                            <div class="fw-semibold text-light">
+                                Emails <span class="text-danger">*</span>
+                            </div>
+                            <div class="small text-muted">Add one or more email addresses for this customer.</div>
+                        </div>
 
-            <input type="hidden" asp-for="Customer.EmailAddresses[0].Kind" value="business" />
+                        <button type="button"
+                                class="btn btn-sm btn-outline-primary"
+                                id="create-email-add"
+                                title="Add email">
+                            <i class="material-icons-outlined align-middle" style="font-size:18px">add</i>
+                            <span class="ms-1">Add</span>
+                        </button>
+                    </div>
 
-            <span class="text-danger" asp-validation-for="Customer.EmailAddresses[0].Email"></span>
+                    @* Header (desktop only) *@
+                    <div class="row mt-3 small text-muted d-none d-md-flex">
+                        <div class="col-md-4">Kind</div>
+                        <div class="col-md-8">Email</div>
+                    </div>
 
+                    <div class="mt-2 d-flex flex-column gap-2" id="create-email-list">
+                        @for (var i = 0; i < (Model.Customer.EmailAddresses?.Count ?? 0); i++)
+                        {
+                            <div class="email-row" data-email-row="create">
+
+                                <div class="input-group">
+                                    <select class="form-select"
+                                            asp-for="Customer.EmailAddresses[i].Kind"
+                                            style="max-width:170px">
+                                        <option value="business">business</option>
+                                        <option value="private">private</option>
+                                        <option value="other">other</option>
+                                    </select>
+
+                                    <input class="form-control"
+                                           asp-for="Customer.EmailAddresses[i].Email"
+                                           type="email"
+                                           placeholder="name@domain.com"
+                                           required />
+
+                                    <button type="button"
+                                            class="btn btn-outline-danger create-email-remove"
+                                            title="Remove email">
+                                        <i class="material-icons-outlined align-middle" style="font-size:18px">delete</i>
+                                    </button>
+                                </div>
+
+                                @* validation lines *@
+                                <div class="row g-2 mt-1">
+                                    <div class="col-12 col-md-4">
+                                        <span class="text-danger small" asp-validation-for="Customer.EmailAddresses[i].Kind"></span>
+                                    </div>
+                                    <div class="col-12 col-md-8">
+                                        <span class="text-danger small" asp-validation-for="Customer.EmailAddresses[i].Email"></span>
+                                    </div>
+                                </div>
+
+                            </div>
+                        }
+                    </div>
+
+                </div>
+            </div>
         </div>
+
 
         <div class="col-md-6">
             <label class="form-label text-light opacity-75">
@@ -67,7 +125,7 @@
             <span class="text-danger" asp-validation-for="Customer.TaxId"></span>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-12">
             <label class="form-label text-light opacity-75">
                 Notes <small>(optional)</small>
             </label>
@@ -96,7 +154,11 @@
             </select>
             <span class="text-danger" asp-validation-for="Address.Label"></span>
         </div>
-
+        <div class="col-md-8">
+            <label class="form-label text-light opacity-75">Full Name / Company <small>(optional)</small></label>
+            <input class="form-control" asp-for="Address.FullNameOrCompany" />
+            <span class="text-danger" asp-validation-for="Address.FullNameOrCompany"></span>
+        </div>
         <div class="col-md-4">
             
             <label class="form-label text-light">
@@ -128,19 +190,15 @@
             <span class="text-danger" asp-validation-for="Address.PostalCode"></span>
         </div>
 
-        <div class="col-md-6">
-            <label class="form-label text-light opacity-75">Full Name / Company <small>(optional)</small></label>
-            <input class="form-control" asp-for="Address.FullNameOrCompany" />
-            <span class="text-danger" asp-validation-for="Address.FullNameOrCompany"></span>
-        </div>
+        
 
-        <div class="col-md-8">
+        <div class="col-md-6">
             <label class="form-label text-light opacity-75">Street / Nr <small>(optional)</small></label>
             <input class="form-control" asp-for="Address.StreetRaw" placeholder="Hofjagdweg 21" />
             <span class="text-danger" asp-validation-for="Address.StreetRaw"></span>
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-6">
             <label class="form-label text-light opacity-75">Address Line 2 <small>(optional)</small></label>
             <input class="form-control" asp-for="Address.AddressLine2" />
             <span class="text-danger" asp-validation-for="Address.AddressLine2"></span>

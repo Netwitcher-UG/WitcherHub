@@ -122,10 +122,12 @@
 
                                <!-- VIEW -->
 <div id="vc-basicView" class="row g-3">
-    <div class="col-12 col-md-6">
-        <div class="small text-muted">Email</div>
-        <div id="vc-email">—</div>
+    <div class="col-12">
+    <div class="small text-muted">Emails</div>
+    <div class="mt-2 d-flex flex-wrap gap-2" id="vc-emailList">
     </div>
+</div>
+
 
     <div class="col-12 col-md-6">
         <div class="small text-muted">Phone</div>
@@ -162,11 +164,40 @@
     <div class="text-danger small mt-1" id="err-vc-basic-name"></div>
 </div>
 
-<div class="col-12 col-md-6">
-    <label class="form-label">Email</label>
-    <input class="form-control form-control-sm" id="vc-basic-email" type="email" />
-    <div class="text-danger small mt-1" id="err-vc-basic-email"></div>
+<div class="col-12">
+    <div class="card rounded-4 border bg-transparent">
+        <div class="card-body p-3">
+
+            <div class="d-flex align-items-center justify-content-between gap-2">
+                <div>
+                    <div class="fw-semibold">Emails <span class="text-danger">*</span></div>
+                    <div class="small text-muted">You must keep at least one email.</div>
+                </div>
+
+                <button type="button"
+                        class="btn btn-sm btn-outline-primary"
+                        id="vc-basic-email-add"
+                        title="Add email">
+                    <i class="material-icons-outlined align-middle" style="font-size:18px">add</i>
+                    <span class="ms-1">Add</span>
+                </button>
+            </div>
+
+            <div class="row mt-3 small text-muted d-none d-md-flex">
+                <div class="col-md-4">Kind</div>
+                <div class="col-md-8">Email</div>
+            </div>
+
+            <div class="mt-2 d-flex flex-column gap-2" id="vc-basic-email-list">
+                <!-- rows injected by JS -->
+            </div>
+
+            <div class="text-danger small mt-2 d-none" id="err-vc-basic-email-global"></div>
+
+        </div>
+    </div>
 </div>
+
 
 
     
@@ -207,9 +238,56 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- 2) Locations (inline edit per item) -->
+                    <!-- 1.5) Lexware (Read-only) -->
                     <div class="col-12 col-xl-6">
+                        <div class="card rounded-4 h-100">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center gap-2 mb-3">
+                                    <span class="material-icons-outlined opacity-75">sync</span>
+                                    <h5 class="mb-0 fw-bold">Lexware</h5>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <div class="small text-muted">Customer Number</div>
+                                        <div id="vc-lx-customerNumber">—</div>
+                                    </div>
+
+                                    <div class="col-12 col-md-6">
+                                        <div class="small text-muted">Version</div>
+                                        <div id="vc-lx-version">—</div>
+                                    </div>
+
+                                    <div class="col-12 col-md-6">
+                                        <div class="small text-muted">ContactId</div>
+                                        <div id="vc-lx-contactId" class="text-muted">—</div>
+                                    </div>
+
+                                    <div class="col-12 col-md-6">
+                                        <div class="small text-muted">OrganizationId</div>
+                                        <div id="vc-lx-organizationId" class="text-muted">—</div>
+                                    </div>
+
+                                    <div class="col-12 col-md-6">
+                                        <div class="small text-muted">Archived</div>
+                                        <div id="vc-lx-archived">—</div>
+                                    </div>
+
+                                    <div class="col-12 col-md-6">
+                                        <div class="small text-muted">Allow Tax Free Invoices</div>
+                                        <div id="vc-lx-taxFree">—</div>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <div class="small text-muted">Synced At (UTC)</div>
+                                        <div id="vc-lx-syncedAt" class="text-muted">—</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 2) Locations (inline edit per item) -->
+                    <div class="col-12">
                         <div class="card rounded-4 h-100">
                             <div class="card-body">
 
@@ -271,7 +349,7 @@
                                                     <div class="text-danger small mt-1" id="err-vc-add-loc-postal"></div>
                                                 </div>
                                                 <div class="col-12 col-md-8">
-                                                    <label class="form-label">Street / Nr</label>
+                                                    <label class="form-label">Street (raw)</label>
                                                     <input class="form-control" id="vc-add-loc-streetRaw" />
                                                 </div>
                                                 <div class="col-12 col-md-6">
@@ -354,10 +432,22 @@
                                             <form class="row g-3" id="vcAddContactForm">
                                                 <input type="hidden" id="vc-clientId-addContact" value="" />
 
-                                                <div class="col-12 col-md-6">
-                                                    <label class="form-label">Name</label>
-                                                    <input class="form-control" id="vc-add-c-name" />
-                                                    <div class="text-danger small mt-1" id="err-vc-add-c-name"></div>
+                                                <div class="col-12 col-md-4">
+                                                    <label class="form-label">Salutation</label>
+                                                    <input class="form-control" id="vc-add-c-salutation" placeholder="Herr / Frau" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-c-salutation"></div>
+                                                </div>
+
+                                                <div class="col-12 col-md-4">
+                                                    <label class="form-label">First Name</label>
+                                                    <input class="form-control" id="vc-add-c-firstName" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-c-firstName"></div>
+                                                </div>
+
+                                                <div class="col-12 col-md-4">
+                                                    <label class="form-label">Last Name</label>
+                                                    <input class="form-control" id="vc-add-c-lastName" />
+                                                    <div class="text-danger small mt-1" id="err-vc-add-c-lastName"></div>
                                                 </div>
 
                                                 <div class="col-12 col-md-6">
@@ -396,8 +486,8 @@
                                                         </button>
                                                     </div>
                                                 </div>
-
                                             </form>
+
 
                                         </div>
                                     </div>

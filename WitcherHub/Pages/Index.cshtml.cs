@@ -227,12 +227,7 @@ namespace WitcherHub.Pages
 
             var updateDto = new UpdateCustomerDto
             {
-                Customer = new CustomerDTOs
-                {
-                    Customer = req.Customer,
-                    Address = new AddressDto(),
-                    Contact = new ContactDto()
-                }
+                Customer = req.Customer
             };
 
             await _customers.UpdateAsync(req.CustomerId, updateDto, ct);
@@ -240,6 +235,7 @@ namespace WitcherHub.Pages
             var updated = await _customers.GetCustomerAsync(req.CustomerId, ct);
             return new JsonResult(updated);
         }
+
 
         public async Task<IActionResult> OnPostAddAddressAsync([FromBody] CreateCustomerAddressDto req, CancellationToken ct)
         {

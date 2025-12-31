@@ -32,11 +32,20 @@ namespace WitcherHub.Application.Models.View.Customers
             public string? Notes { get; set; }
             public LexwareType LexwareType { get; set; }
 
-            public List<CustomerEmailAddressItemView> EmailAddresses { get; set; } = new();
+            // ✅ Lexware read-only fields
+            public int? LexwareCustomerNumber { get; set; }
+            public string? LexwareContactId { get; set; }
+            public string? LexwareOrganizationId { get; set; }
+            public int? LexwareVersion { get; set; }
+            public bool? LexwareArchived { get; set; }
+            public bool? LexwareAllowTaxFreeInvoices { get; set; }
+            public DateTime? LexwareSyncedAtUtc { get; set; }
 
+            public List<CustomerEmailAddressItemView> EmailAddresses { get; set; } = new();
             public List<CustomerAddressItemView> Addresses { get; set; } = new();
             public List<CustomerContactItemView> Contacts { get; set; } = new();
         }
+
 
         public class CustomerEmailAddressItemView : EmailAddressDto
         {

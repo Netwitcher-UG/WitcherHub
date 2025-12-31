@@ -4,9 +4,9 @@ using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Application.Validators.Customers
 {
-    public sealed class CustomerDTOsValidator : AbstractValidator<CustomerDTOs>
+    public sealed class CustomerDTOValidator : AbstractValidator<CustomerDTOs>
     {
-        public CustomerDTOsValidator()
+        public CustomerDTOValidator()
         {
             RuleFor(x => x.Customer)
                 .NotNull()
@@ -62,9 +62,9 @@ namespace WitcherHub.Application.Validators.Customers
     {
         public UpdateCustomerDtoValidator()
         {
-            RuleFor(x => x.Customer)
-                .NotNull()
-                .SetValidator(new CustomerDTOsValidator());
+            //RuleFor(x => x.Customer)
+            //    .NotNull()
+            //    .SetValidator(new CustomerDTOValidator());
         }
     }
 

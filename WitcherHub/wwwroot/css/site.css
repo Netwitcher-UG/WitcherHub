@@ -196,4 +196,11 @@ body {
     white-space: nowrap; 
     min-width:80px;
 }
+#create-email-list .input-group .form-select {
+    flex: 0 0 170px;
+}
+
+#create-email-list .email-row {
+    padding: 6px 0;
+}
 

@@ -63,7 +63,7 @@ namespace WitcherHub.Application.Models.DTO.Customers
 
     public class UpdateCustomerDto
     {
-        public CustomerDTOs Customer { get; set; } = new();
+        public CustomerDto Customer { get; set; } = new();
     }
 
     public class UpdateBasicRequest

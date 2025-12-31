@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using WitcherHub.Application.Interfaces;
+using WitcherHub.Infrastructure.Services.Lexware;
 
 namespace WitcherHub.Controllers
 {
@@ -11,15 +12,24 @@ namespace WitcherHub.Controllers
         private readonly ILexwareClient _lexwareClient;
         private readonly IAiTextGenerator _aiTextGenerator;
         private readonly IAuthService _auth;
+        private readonly ILexwareSyncService _sync;
 
         public TestController(
             ILexwareClient lexwareClient,
             IAiTextGenerator aiTextGenerator,
-            IAuthService auth)
+            IAuthService auth,
+            ILexwareSyncService sync)
         {
             _lexwareClient = lexwareClient;
             _aiTextGenerator = aiTextGenerator;
             _auth = auth;
+            _sync = sync;
+        }
+        [HttpPost("lexware/import/contacts")]
+        public async Task<IActionResult> ImportLexwareContacts(CancellationToken ct)
+        {
+            var res = await _sync.ImportAllContactsAsync(ct);
+            return Ok(res);
         }
 
         /// <summary>
