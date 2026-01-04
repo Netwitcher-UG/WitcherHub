@@ -14,6 +14,7 @@ using WitcherHub.Infrastructure.Common.Caching;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
 using WitcherHub.Infrastructure.ManageData.Customers;
+using WitcherHub.Infrastructure.ManageData.Services;
 using WitcherHub.Infrastructure.Repositories.Implementations;
 using WitcherHub.Infrastructure.Seeding;
 using WitcherHub.Infrastructure.Services.Caching;
@@ -97,6 +98,8 @@ namespace WitcherHub.Infrastructure
             services.AddScoped<IDataSeeder, IdentityDataSeeder>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<ICustomer, ManageCustomer>();
+            services.AddScoped<IServiceCatalog, ManageServiceCatalog>();
+
 
 
             // UnitOfWork

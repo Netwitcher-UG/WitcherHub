@@ -1,0 +1,301 @@
+@using static WitcherHub.Infrastructure.Data.Models.Enums
+
+<!-- Template: RuleAction options (for dynamic inline edit selects) -->
+<template id="vsRuleActionOptions">
+    @foreach (var opt in Html.GetEnumSelectList<RuleAction>())
+    {
+        <option value="@opt.Value">@opt.Text</option>
+    }
+</template>
+
+<div class="modal fade" id="ViewServiceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title">Service</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+
+                <!-- Loading -->
+                <div id="vsLoading" class="text-muted">Loading...</div>
+
+                <!-- Body -->
+                <div id="vsBody" class="d-none">
+
+                    <!-- Header -->
+                    <div class="d-flex align-items-start justify-content-between gap-3">
+                        <div>
+                            <div class="fw-semibold fs-5" id="vs-name">—</div>
+                            <div class="text-muted" id="vs-meta">—</div>
+                        </div>
+
+                        <div class="text-end">
+                            <span id="vs-activeBadge"></span>
+                            <div class="small text-muted mt-1" id="vs-idText">—</div>
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    <!-- BASIC -->
+                    <div class="form-section">
+                        <div class="form-section-header">
+                            <i class="material-icons-outlined">tune</i>
+                            <span>Basic</span>
+                        </div>
+                        <div class="form-section-divider"></div>
+
+                        <!-- VIEW -->
+                        <div id="vs-basicView" class="mt-3">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="text-muted small">Name</div>
+                                    <div class="fw-semibold" id="vs-v-name">—</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-muted small">Type</div>
+                                    <div class="fw-semibold" id="vs-v-type">—</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-muted small">Pricing</div>
+                                    <div class="fw-semibold" id="vs-v-pricing">—</div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <div class="text-muted small">Base Price</div>
+                                    <div class="fw-semibold" id="vs-v-basePrice">—</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-muted small">Currency</div>
+                                    <div class="fw-semibold" id="vs-v-currency">—</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-muted small">Active</div>
+                                    <div class="fw-semibold" id="vs-v-active">—</div>
+                                </div>
+
+                                <div class="col-12">
+                                    <button type="button"
+                                            class="btn btn-outline-info"
+                                            data-vc-action="edit-basic">
+                                        <i class="material-icons-outlined align-middle">edit</i>
+                                        <span class="align-middle">Edit</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- EDIT -->
+                        <div id="vs-basicEdit" class="mt-3 d-none">
+                            <div class="row g-3">
+
+                                <div class="col-md-8">
+                                    <label class="form-label text-light">Name</label>
+                                    <input class="form-control" id="vs-basic-name" />
+                                    <div class="text-danger small mt-1" id="err-vs-basic-name"></div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label text-light">Currency</label>
+                                    <input class="form-control" id="vs-basic-currency" placeholder="EUR" />
+                                    <div class="text-danger small mt-1" id="err-vs-basic-currency"></div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label text-light">Service Type</label>
+                                    <select class="form-select" id="vs-basic-serviceType">
+                                        @foreach (var opt in Html.GetEnumSelectList<ServiceType>())
+                                        {
+                                            <option value="@opt.Value">@opt.Text</option>
+                                        }
+                                    </select>
+                                    <div class="text-danger small mt-1" id="err-vs-basic-serviceType"></div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label text-light">Pricing Model</label>
+                                    <select class="form-select" id="vs-basic-pricingModel">
+                                        @foreach (var opt in Html.GetEnumSelectList<PricingModel>())
+                                        {
+                                            <option value="@opt.Value">@opt.Text</option>
+                                        }
+                                    </select>
+                                    <div class="text-danger small mt-1" id="err-vs-basic-pricingModel"></div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label text-light">Base Price</label>
+                                    <input class="form-control" id="vs-basic-basePrice" />
+                                    <div class="text-danger small mt-1" id="err-vs-basic-basePrice"></div>
+                                </div>
+
+                                <div class="col-md-6 d-flex align-items-end">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="vs-basic-active" />
+                                        <label class="form-check-label text-light" for="vs-basic-active">Active</label>
+                                    </div>
+                                    <div class="text-danger small mt-1 ms-3" id="err-vs-basic-active"></div>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label text-light opacity-75">Config Schema JSON</label>
+                                    <textarea class="form-control" rows="6" id="vs-basic-config"
+                                              placeholder='{"example": true}'></textarea>
+                                    <div class="text-danger small mt-1" id="err-vs-basic-config"></div>
+
+                                    <div class="form-text">
+                                        Leave empty = no change. Write JSON to update. Use empty string only if you want to clear (depends on backend behavior).
+                                    </div>
+                                </div>
+
+                                <div class="col-12 d-flex gap-2">
+                                    <button type="button" class="btn btn-success" data-vc-action="save-basic">
+                                        <i class="material-icons-outlined align-middle">check</i>
+                                        <span class="align-middle">Save</span>
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" data-vc-action="cancel-basic">
+                                        Cancel
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PRICING RULES -->
+                    <div class="form-section mt-3">
+                        <div class="form-section-header">
+                            <i class="material-icons-outlined">rule</i>
+                            <span>Pricing Rules</span>
+                            <span class="ms-2 badge bg-secondary bg-opacity-10 text-secondary" id="vs-ruleCount">0</span>
+                        </div>
+                        <div class="form-section-divider"></div>
+
+                        <div class="mt-3">
+                            <button class="btn btn-outline-primary"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#vs-addRuleCollapse">
+                                <i class="material-icons-outlined align-middle">add</i>
+                                <span class="align-middle">Add Rule</span>
+                            </button>
+                        </div>
+
+                        <div class="collapse mt-3" id="vs-addRuleCollapse">
+                            <form id="vsAddRuleForm" class="card bg-transparent border rounded-4">
+                                <div class="card-body">
+                                    <div class="row g-2">
+
+                                        <div class="col-md-6">
+                                            <label class="form-label text-light">Name</label>
+                                            <input class="form-control form-control-sm" id="vs-add-rule-name" />
+                                            <div class="text-danger small mt-1" id="err-vs-add-rule-name"></div>
+                                        </div>
+
+                                        <div class="col-md-3">
+                                            <label class="form-label text-light">Priority</label>
+                                            <input class="form-control form-control-sm" id="vs-add-rule-priority" value="100" />
+                                            <div class="text-danger small mt-1" id="err-vs-add-rule-priority"></div>
+                                        </div>
+
+                                        <div class="col-md-3">
+                                            <label class="form-label text-light">Scope</label>
+                                            <select class="form-select form-select-sm" id="vs-add-rule-scope">
+                                                <option value="LINE_ITEM">LINE_ITEM</option>
+                                                <option value="INVOICE">INVOICE</option>
+                                            </select>
+                                            <div class="text-danger small mt-1" id="err-vs-add-rule-scope"></div>
+                                        </div>
+
+                                        <div class="col-md-4">
+                                            <label class="form-label text-light">Action</label>
+                                            <select class="form-select form-select-sm" id="vs-add-rule-action">
+                                                @foreach (var opt in Html.GetEnumSelectList<RuleAction>())
+                                                {
+                                                    <option value="@opt.Value">@opt.Text</option>
+                                                }
+                                            </select>
+                                            <div class="text-danger small mt-1" id="err-vs-add-rule-action"></div>
+                                        </div>
+
+                                        <div class="col-md-8">
+                                            <label class="form-label text-light">Value Expr</label>
+                                            <input class="form-control form-control-sm" id="vs-add-rule-valueExpr" value="0" />
+                                            <div class="text-danger small mt-1" id="err-vs-add-rule-valueExpr"></div>
+                                        </div>
+
+                                        <div class="col-12">
+                                            <label class="form-label text-light">Condition Expr</label>
+                                            <input class="form-control form-control-sm" id="vs-add-rule-conditionExpr" value="true" />
+                                            <div class="text-danger small mt-1" id="err-vs-add-rule-conditionExpr"></div>
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label class="form-label text-light opacity-75">Label (optional)</label>
+                                            <input class="form-control form-control-sm" id="vs-add-rule-label" />
+                                            <div class="text-danger small mt-1" id="err-vs-add-rule-label"></div>
+                                        </div>
+
+                                        <div class="col-md-3">
+                                            <label class="form-label text-light opacity-75">Valid From</label>
+                                            <input type="date" class="form-control form-control-sm" id="vs-add-rule-validFrom" />
+                                            <div class="text-danger small mt-1" id="err-vs-add-rule-validFrom"></div>
+                                        </div>
+
+                                        <div class="col-md-3">
+                                            <label class="form-label text-light opacity-75">Valid To</label>
+                                            <input type="date" class="form-control form-control-sm" id="vs-add-rule-validTo" />
+                                            <div class="text-danger small mt-1" id="err-vs-add-rule-validTo"></div>
+                                        </div>
+
+                                        <div class="col-md-6 d-flex align-items-end">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="vs-add-rule-active" checked />
+                                                <label class="form-check-label text-light" for="vs-add-rule-active">Active</label>
+                                            </div>
+                                            <div class="text-danger small mt-1 ms-3" id="err-vs-add-rule-active"></div>
+                                        </div>
+
+                                        <div class="col-12 d-flex gap-2 mt-2">
+                                            <button type="submit" class="btn btn-success btn-sm">Save Rule</button>
+                                            <button type="button" class="btn btn-secondary btn-sm"
+                                                    data-bs-toggle="collapse"
+                                                    data-bs-target="#vs-addRuleCollapse">
+                                                Cancel
+                                            </button>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="mt-3" id="vs-ruleList">
+                            <div class="text-muted">No rules.</div>
+                        </div>
+                    </div>
+
+                    <!-- Schema preview -->
+                    <div class="form-section mt-3">
+                        <div class="form-section-header">
+                            <i class="material-icons-outlined">data_object</i>
+                            <span>Config Schema</span>
+                        </div>
+                        <div class="form-section-divider"></div>
+
+                        <pre class="bg-light p-2 rounded mt-3" style="max-height:260px; overflow:auto" id="vs-schema"></pre>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Close</button>
+            </div>
+
+        </div>
+    </div>
+</div>

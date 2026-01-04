@@ -1,0 +1,94 @@
+@using static WitcherHub.Infrastructure.Data.Models.Enums
+@model WitcherHub.Pages.ServicesModel
+
+<div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+<!-- Service Information -->
+<div class="form-section">
+    <div class="form-section-header">
+        <i class="material-icons-outlined">design_services</i>
+        <span>Service Information</span>
+    </div>
+    <div class="form-section-divider"></div>
+
+    <div class="row g-3 mt-0">
+        <div class="col-md-8">
+            <label class="form-label text-light">
+                Name <span class="text-danger">*</span>
+            </label>
+            <input class="form-control"
+                   asp-for="Service.Name"
+                   placeholder="e.g. Consulting / Maintenance"
+                   required autofocus />
+            <span class="text-danger" asp-validation-for="Service.Name"></span>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label text-light">
+                Currency <span class="text-danger">*</span>
+            </label>
+            <input class="form-control" asp-for="Service.DefaultCurrency" placeholder="EUR" required />
+            <span class="text-danger" asp-validation-for="Service.DefaultCurrency"></span>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label text-light">
+                Service Type <span class="text-danger">*</span>
+            </label>
+            <select class="form-select"
+                    asp-for="Service.ServiceType"
+                    asp-items="Html.GetEnumSelectList<ServiceType>()">
+            </select>
+            <span class="text-danger" asp-validation-for="Service.ServiceType"></span>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label text-light">
+                Pricing Model <span class="text-danger">*</span>
+            </label>
+            <select class="form-select"
+                    asp-for="Service.PricingModel"
+                    asp-items="Html.GetEnumSelectList<PricingModel>()">
+            </select>
+            <span class="text-danger" asp-validation-for="Service.PricingModel"></span>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label text-light">
+                Base Price <span class="text-danger">*</span>
+            </label>
+            <input class="form-control" asp-for="Service.BasePrice" />
+            <span class="text-danger" asp-validation-for="Service.BasePrice"></span>
+        </div>
+
+        <div class="col-md-6 d-flex align-items-end">
+            <div class="form-check form-switch">
+                <input class="form-check-input" asp-for="Service.IsActive" />
+                <label class="form-check-label text-light" asp-for="Service.IsActive">Active</label>
+            </div>
+            <span class="text-danger ms-3" asp-validation-for="Service.IsActive"></span>
+        </div>
+    </div>
+</div>
+
+<!-- Advanced -->
+<div class="form-section">
+    <div class="form-section-header">
+        <i class="material-icons-outlined">tune</i>
+        <span>Advanced</span>
+    </div>
+    <div class="form-section-divider"></div>
+
+    <div class="row g-3 mt-0">
+        <div class="col-12">
+            <label class="form-label text-light opacity-75">
+                Config Schema JSON <small>(optional)</small>
+            </label>
+            <textarea class="form-control"
+                      asp-for="Service.ConfigSchemaJson"
+                      rows="6"
+                      placeholder='{"example": true}'></textarea>
+            <span class="text-danger" asp-validation-for="Service.ConfigSchemaJson"></span>
+        </div>
+    </div>
+</div>
