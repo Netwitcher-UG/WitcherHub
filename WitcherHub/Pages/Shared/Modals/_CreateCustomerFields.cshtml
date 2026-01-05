@@ -24,16 +24,47 @@
             <span class="text-danger" asp-validation-for="Customer.Type"></span>
         </div>
 
-        <div class="col-md-8">
+        <!-- ✅ Individual First/Last -->
+        <div class="col-md-4 individual-only">
             <label class="form-label text-light">
-                Name <span class="text-danger">*</span>
+                First Name <span class="text-danger">*</span>
+            </label>
+            <input class="form-control"
+                   asp-for="Customer.FirstName"
+                   id="firstName"
+                   placeholder="e.g. Anas"
+                   required />
+            <span class="text-danger" asp-validation-for="Customer.FirstName"></span>
+        </div>
+
+        <div class="col-md-4 individual-only">
+            <label class="form-label text-light">
+                Last Name <span class="text-danger">*</span>
+            </label>
+            <input class="form-control"
+                   asp-for="Customer.LastName"
+                   id="lastName"
+                   placeholder="e.g. Sadek"
+                   required />
+            <span class="text-danger" asp-validation-for="Customer.LastName"></span>
+        </div>
+
+        <!-- ✅ Company Name -->
+        <div class="col-md-8 company-only">
+            <label class="form-label text-light">
+                Company Name <span class="text-danger">*</span>
             </label>
             <input class="form-control"
                    asp-for="Customer.Name"
-                   placeholder="e.g. Anas Sadek / ACME LLC"
-                   required autofocus />
+                   id="companyName"
+                   placeholder="e.g. ACME LLC"
+                   required />
             <span class="text-danger" asp-validation-for="Customer.Name"></span>
         </div>
+
+        <!-- ✅ Hidden Name always exists (for Individual only) -->
+        <input type="hidden" asp-for="Customer.Name" id="hiddenName" />
+
 
         @* Emails (multi) - nicer UI *@
         <div class="col-12">

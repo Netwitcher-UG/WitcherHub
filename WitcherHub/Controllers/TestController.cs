@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using WitcherHub.Application.Interfaces;
+using WitcherHub.Application.Models.DTO.Customers;
 using WitcherHub.Infrastructure.Services.Lexware;
 
 namespace WitcherHub.Controllers
@@ -31,6 +32,32 @@ namespace WitcherHub.Controllers
             var res = await _sync.ImportAllContactsAsync(ct);
             return Ok(res);
         }
+        [HttpPost("lexware/export/customer")]
+        public async Task<IActionResult> ExportCustomerToLexware(
+            [FromBody] CustomerIdRequest req,
+            CancellationToken ct)
+        {
+            if (req == null || req.CustomerId == Guid.Empty)
+                return BadRequest(new { message = "CustomerId is missing." });
+
+            var updated = await _sync.ExportCustomerAsync(req.CustomerId, ct);
+
+            return Ok(updated);
+        }
+        [HttpPost("lexware/delete/customer")]
+        public async Task<IActionResult> DeleteCustomerFromLexware(
+    [FromBody] LexwareDeleteRequest req,
+    CancellationToken ct)
+        {
+            if (req == null || string.IsNullOrWhiteSpace(req.ContactId))
+                return BadRequest(new { message = "ContactId is missing." });
+
+            var updated = await _sync.DeleteCustomerFromLexwareAsync(req.ContactId, ct);
+
+            return Ok(updated);
+        }
+
+
 
         /// <summary>
         /// يجلب صفحة Contacts من Lexware كـ JSON خام

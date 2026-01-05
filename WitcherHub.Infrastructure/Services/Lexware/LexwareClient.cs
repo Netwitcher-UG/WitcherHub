@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Net.Http.Json;
+using System.Text.Json;
 using WitcherHub.Application.Interfaces;
 
 namespace WitcherHub.Infrastructure.Services.Lexware
@@ -76,5 +77,26 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             return all;
         }
+        public async Task<JsonElement> CreateContactAsync(object payload, CancellationToken ct = default)
+        {
+            using var res = await _http.PostAsJsonAsync("/v1/contacts", payload, ct);
+            if (!res.IsSuccessStatusCode)
+            {
+                var error = await res.Content.ReadAsStringAsync(ct);
+                throw new Exception($"Lexware API error: {res.StatusCode} => {error}");
+            }
+
+
+            await using var stream = await res.Content.ReadAsStreamAsync(ct);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            return doc.RootElement.Clone();
+        }
+
+        public async Task DeleteContactAsync(string lexwareContactId, CancellationToken ct = default)
+        {
+            using var res = await _http.DeleteAsync($"/v1/contacts/{lexwareContactId}", ct);
+            res.EnsureSuccessStatusCode();
+        }
+
     }
 }

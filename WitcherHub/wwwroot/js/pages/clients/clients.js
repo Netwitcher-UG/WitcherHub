@@ -6,6 +6,12 @@
         "Customer.Name": "vc-basic-name",
         "Name": "vc-basic-name",
 
+        "Customer.FirstName": "vc-basic-firstName",
+        "FirstName": "vc-basic-firstName",
+
+        "Customer.LastName": "vc-basic-lastName",
+        "LastName": "vc-basic-lastName",
+
         "Customer.EmailAddresses[0].Email": "vc-basic-email",
         "EmailAddresses[0].Email": "vc-basic-email",
 
@@ -102,6 +108,21 @@
             bootstrap.Collapse.getOrCreateInstance(el, { toggle: false }).hide();
         });
     }
+    // ---------- Show Lexware toast after reload (sessionStorage) ----------
+    (function showLexwareToastFromStorage() {
+        try {
+            const raw = sessionStorage.getItem('lx_toast');
+            if (!raw) return;
+
+            sessionStorage.removeItem('lx_toast');
+            const t = JSON.parse(raw);
+
+            if (t?.type === 'success') toastSuccess(t.message, t.title);
+            else if (t?.type === 'info') toastInfo(t.message, t.title);
+            else if (t?.type === 'error') toastError(t.message, t.title);
+        } catch { /* ignore */ }
+    })();
+
 
     // ---------- Mock Data (demo) ----------
     const mockClients = {
@@ -448,13 +469,16 @@ ${esc((c.firstName || c.lastName) ? `${c.salutation ? c.salutation + ' ' : ''}${
     function setBasicMode(isEdit) {
         editingBasic = !!isEdit;
 
+
         clearErrors('vc-basic');
 
         const view = $('vc-basicView');
         const edit = $('vc-basicEdit');
         if (view) view.classList.toggle('d-none', editingBasic);
         if (edit) edit.classList.toggle('d-none', !editingBasic);
-
+        if (currentClient) {
+            toggleBasicNameFields(currentClient.type);
+        }
         if (editingBasic && currentClient) {
             renderEmailEditRows(currentClient.emailAddresses ?? []);
         }
@@ -476,13 +500,45 @@ ${esc((c.firstName || c.lastName) ? `${c.salutation ? c.salutation + ' ' : ''}${
 
         return `<span class="${cls}">${esc(s)}</span>`;
     }
-    document.addEventListener('click', async function (e) {
-        const btn = e.target.closest('[data-vc-action="table-export"]');
-        if (!btn) return;
+    document.addEventListener('DOMContentLoaded', () => {
+        const typeSelect = document.getElementById("type");
+        const firstName = document.getElementById("firstName");
+        const lastName = document.getElementById("lastName");
+        const hiddenName = document.getElementById("hiddenName");
+        const companyName = document.getElementById("companyName");
 
-        e.preventDefault();
-        toastInfo('Export will be implemented in the next step (Lexware integration).', 'Lexware');
+        function updateUI() {
+            const isCompany = typeSelect.value === "Company";
+
+            document.querySelectorAll(".individual-only").forEach(x => x.classList.toggle("d-none", isCompany));
+            document.querySelectorAll(".company-only").forEach(x => x.classList.toggle("d-none", !isCompany));
+
+            if (!isCompany) {
+                companyName?.removeAttribute("required");
+                firstName?.setAttribute("required", "required");
+                lastName?.setAttribute("required", "required");
+            } else {
+                companyName?.setAttribute("required", "required");
+                firstName?.removeAttribute("required");
+                lastName?.removeAttribute("required");
+            }
+
+            buildName();
+        }
+
+        function buildName() {
+            if (typeSelect.value === "Individual") {
+                hiddenName.value = `${firstName.value} ${lastName.value}`.trim();
+            }
+        }
+
+        firstName?.addEventListener("input", buildName);
+        lastName?.addEventListener("input", buildName);
+        typeSelect?.addEventListener("change", updateUI);
+
+        updateUI();
     });
+
 
     // ---------- Render Client ----------
     function renderClient(client) {
@@ -502,6 +558,12 @@ ${esc((c.firstName || c.lastName) ? `${c.salutation ? c.salutation + ' ' : ''}${
         setText('vc-lx-archived', fmtBool(client?.lexwareArchived));
         setText('vc-lx-taxFree', fmtBool(client?.lexwareAllowTaxFreeInvoices));
         setText('vc-lx-syncedAt', fmtDate(client?.lexwareSyncedAtUtc));
+        const fn = document.getElementById("vc-basic-firstName");
+        if (fn) fn.value = client?.firstName ?? "";
+
+        const ln = document.getElementById("vc-basic-lastName");
+        if (ln) ln.value = client?.lastName ?? "";
+
 
         // Lexware badge + Export button
         setHtml('vc-lexwareBadge', lexwareBadgeHtml(client?.lexwareType));
@@ -516,7 +578,11 @@ ${esc((c.firstName || c.lastName) ? `${c.salutation ? c.salutation + ' ' : ''}${
 
         // Fill basic edit inputs (for your existing markup)
         const typeSel = $('vc-basic-type'); if (typeSel) typeSel.value = client?.type ?? 'Individual';
-        const nameInp = $('vc-basic-name'); if (nameInp) nameInp.value = client?.name ?? '';
+        const nameInp = $('vc-basic-name');
+        if (nameInp) {
+            nameInp.value = (client?.type === "Company") ? (client?.name ?? '') : '';
+        }
+
         const phoneInp = $('vc-basic-phone'); if (phoneInp) phoneInp.value = client?.phone ?? '';
         const taxInp = $('vc-basic-taxId'); if (taxInp) taxInp.value = client?.taxId ?? '';
         const notesInp = $('vc-basic-notes'); if (notesInp) notesInp.value = client?.notes ?? '';
@@ -554,7 +620,7 @@ ${esc((c.firstName || c.lastName) ? `${c.salutation ? c.salutation + ' ' : ''}${
 
         currentClientId = client?.id ?? null;
         currentClient = client ?? null;   
-
+        toggleBasicNameFields(client?.type ?? "Individual");
     }
     function renderEmailEditRows(list) {
         const wrap = $('vc-basic-email-list');
@@ -769,17 +835,27 @@ ${esc((c.firstName || c.lastName) ? `${c.salutation ? c.salutation + ' ' : ''}${
                 globalErr.textContent = '';
             }
 
+            const selectedType = $('vc-basic-type')?.value ?? currentClient.type;
+
+            const finalName = selectedType === "Company"
+                ? ($('vc-basic-name')?.value?.trim() ?? currentClient.name)
+                : `${$('vc-basic-firstName')?.value?.trim() ?? ''} ${$('vc-basic-lastName')?.value?.trim() ?? ''}`.trim();
+
             const payload = {
                 customerId: currentClient.id,
                 customer: {
-                    type: $('vc-basic-type')?.value ?? currentClient.type,
-                    name: $('vc-basic-name')?.value?.trim() ?? currentClient.name,
+                    type: selectedType,
+                    firstName: $('vc-basic-firstName')?.value?.trim() ?? '',
+                    lastName: $('vc-basic-lastName')?.value?.trim() ?? '',
+                    name: finalName,
+
                     emailAddresses: emailItems,
                     phone: $('vc-basic-phone')?.value?.trim() ?? '',
                     taxId: $('vc-basic-taxId')?.value?.trim() ?? '',
                     notes: $('vc-basic-notes')?.value?.trim() ?? ''
                 }
             };
+
 
 
 
@@ -1289,6 +1365,8 @@ ${esc((c.firstName || c.lastName) ? `${c.salutation ? c.salutation + ' ' : ''}${
             id: root.id ?? root.Id,
             type: normalizeType(root.type ?? root.Type),
             name: root.name ?? root.Name,
+            firstName: root.firstName ?? root.FirstName ?? '',
+            lastName: root.lastName ?? root.LastName ?? '',
             email: primaryEmail,
             emailAddresses: (rawEmails || []).map(e => ({
                 kind: e.kind ?? e.Kind ?? 'business',
@@ -1630,6 +1708,86 @@ ${esc((c.firstName || c.lastName) ? `${c.salutation ? c.salutation + ' ' : ''}${
             return;
         }
     });
+    // ---------- Lexware: Refresh/Import Contacts ----------
+    document.addEventListener('click', async function (e) {
+        const btn = e.target.closest('[data-vc-action="lexware-refresh"]');
+        if (!btn) return;
+
+        e.preventDefault();
+
+        const url = document.getElementById('vcLexwareImportUrl')?.value;
+        if (!url) {
+            toastError('vcLexwareImportUrl not found.', 'Lexware');
+            return;
+        }
+
+        try {
+            btn.disabled = true;
+            toastInfo('Importing contacts from Lexware...', 'Lexware');
+
+            const res = await postJson(url, {}); // Razor Page handler returns JSON
+
+            const created = res?.created ?? 0;
+            const skipped = res?.skipped ?? 0;
+            const failed = res?.failed ?? 0;
+
+            const msg = `Done. Created: ${created}, Skipped: ${skipped}, Failed: ${failed}`;
+
+            sessionStorage.setItem('lx_toast', JSON.stringify({
+                type: 'success',
+                title: 'Lexware',
+                message: msg
+            }));
+
+            window.location.reload();
+        } catch (err) {
+            console.error(err);
+            toastError(err?.payload?.message || 'Lexware import failed.', 'Lexware');
+        } finally {
+            btn.disabled = false;
+        }
+    });
+    document.addEventListener('click', async function (e) {
+        const btn = e.target.closest('[data-vc-action="table-export"]');
+        if (!btn) return;
+
+        e.preventDefault();
+
+        const id = btn.dataset.clientId;
+        const url = document.getElementById('vcLexwareExportUrl')?.value;
+        if (!url) return toastError("Export url not found", "Lexware");
+
+        try {
+            btn.disabled = true;
+            toastInfo("Exporting to Lexware...", "Lexware");
+
+            await postJson(url, { customerId: id });
+
+            sessionStorage.setItem('lx_toast', JSON.stringify({
+                type: "success",
+                title: "Lexware",
+                message: "Exported successfully."
+            }));
+
+            window.location.reload();
+        } catch (err) {
+            console.error(err);
+            toastError(err?.payload?.message || "Export failed.", "Lexware");
+        } finally {
+            btn.disabled = false;
+        }
+    });
+    function toggleBasicNameFields(clientType) {
+        const isCompany = clientType === "Company";
+
+        document.querySelectorAll(".vc-individual-only").forEach(el => {
+            el.classList.toggle("d-none", isCompany);
+        });
+
+        document.querySelectorAll(".vc-company-only").forEach(el => {
+            el.classList.toggle("d-none", !isCompany);
+        });
+    }
 
 
 })();

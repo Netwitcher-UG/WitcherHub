@@ -87,7 +87,7 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                         return PagedResult<CustomerViews.CustomerListItemView>.Empty(page, pageSize);
 
                     var items = await q
-                        .OrderBy(c => c.Name)
+                        .OrderByDescending(c => c.CreatedAt)
                         .Skip((page - 1) * pageSize)
                         .Take(pageSize)
                         .Select(c => new CustomerViews.CustomerListItemView
@@ -246,7 +246,11 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             var customer = new CustomerEntity
             {
                 Type = dto.Customer.Type,
-                Name = (dto.Customer.Name ?? "").Trim(),
+                FirstName = dto.Customer.FirstName?.Trim(),
+                LastName = dto.Customer.LastName?.Trim(),
+                Name = dto.Customer.Type == CustomerType.Individual
+        ? $"{dto.Customer.FirstName} {dto.Customer.LastName}".Trim()
+        : (dto.Customer.Name ?? "").Trim(),
                 Phone = string.IsNullOrWhiteSpace(dto.Customer.Phone) ? null : dto.Customer.Phone.Trim(),
                 TaxId = string.IsNullOrWhiteSpace(dto.Customer.TaxId) ? null : dto.Customer.TaxId.Trim(),
                 Notes = string.IsNullOrWhiteSpace(dto.Customer.Notes) ? null : dto.Customer.Notes.Trim(),
@@ -257,14 +261,22 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             if (dto.Customer.EmailAddresses is null || dto.Customer.EmailAddresses.Count == 0)
                 throw new BadRequestAppException("At least one email address is required.");
 
-            foreach (var e in dto.Customer.EmailAddresses)
+            var emails = DistinctEmails(
+                dto.Customer.EmailAddresses.Select(e => (e.Email ?? "", e.Kind ?? "business"))
+            );
+
+            if (emails.Count == 0)
+                throw new BadRequestAppException("At least one valid email address is required.");
+
+            foreach (var e in emails)
             {
                 customer.EmailAddresses.Add(new EmailEntity
                 {
-                    Kind = (e.Kind ?? "business").Trim(),
-                    Email = (e.Email ?? "").Trim()
+                    Kind = e.Kind,
+                    Email = e.Email
                 });
             }
+
 
             // ✅ Address required
             var address = dto.Address.Adapt<AddressEntity>();
@@ -302,17 +314,40 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             if (id == Guid.Empty) throw new BadRequestAppException("Invalid customer id.");
             if (dto is null) throw new BadRequestAppException("Invalid payload.");
 
-            var customerRepo = _unitOfWork.Repo<Customer>();
+            var customerRepo = _unitOfWork.Repo<CustomerEntity>();
 
             var customer = await customerRepo.GetByIdAsync(
-                id, ct: ct, asNoTracking: false, x => x.EmailAddresses);
+    id, ct: ct, asNoTracking: false, x => x.EmailAddresses);
 
             if (customer is null) throw new NotFoundAppException("Customer not found.");
 
+            var dbGroups = customer.EmailAddresses
+                .GroupBy(e => NormEmail(e.Email))
+                .Where(g => !string.IsNullOrWhiteSpace(g.Key))
+                .ToList();
+
+            foreach (var g in dbGroups)
+            {
+                if (g.Count() <= 1) continue;
+
+                var keep = g.OrderByDescending(x => KindRank(NormKind(x.Kind)))
+                            .ThenBy(x => x.Id)
+                            .First();
+
+                foreach (var dup in g.Where(x => x.Id != keep.Id).ToList())
+                    customer.EmailAddresses.Remove(dup);
+            }
+
             var basic = dto.Customer ?? throw new BadRequestAppException("Missing customer data.");
 
+
             customer.Type = basic.Type;
-            customer.Name = (basic.Name ?? "").Trim();
+            customer.FirstName = basic.FirstName?.Trim();
+            customer.LastName = basic.LastName?.Trim();
+
+            customer.Name = customer.Type == CustomerType.Individual
+                ? $"{customer.FirstName} {customer.LastName}".Trim()
+                : (basic.Name ?? "").Trim();
             customer.Phone = string.IsNullOrWhiteSpace(basic.Phone) ? null : basic.Phone.Trim();
             customer.TaxId = string.IsNullOrWhiteSpace(basic.TaxId) ? null : basic.TaxId.Trim();
             customer.Notes = string.IsNullOrWhiteSpace(basic.Notes) ? null : basic.Notes.Trim();
@@ -321,22 +356,20 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             static string NormKind(string? k) =>
                 string.IsNullOrWhiteSpace(k) ? "business" : k.Trim().ToLowerInvariant();
 
-            var incoming = (basic.EmailAddresses ?? new List<EmailAddressDto>())
-                .Select(x => new { Email = NormEmail(x.Email), Kind = NormKind(x.Kind) })
-                .Where(x => !string.IsNullOrWhiteSpace(x.Email))
-                .GroupBy(x => x.Email)
-                .Select(g => g.First())
-                .ToList();
+            var incoming = DistinctEmails(
+                (basic.EmailAddresses ?? new List<EmailAddressDto>())
+                    .Select(x => (x.Email ?? "", x.Kind ?? "business"))
+            );
 
-            if (incoming.Count == 0) throw new BadRequestAppException("At least one email address is required.");
+            if (incoming.Count == 0)
+                throw new BadRequestAppException("At least one email address is required.");
+            var dbByEmail = customer.EmailAddresses
+                .Where(x => !string.IsNullOrWhiteSpace(NormEmail(x.Email)))
+                .ToDictionary(x => NormEmail(x.Email), x => x, StringComparer.OrdinalIgnoreCase);
 
-            // -------------------------
-            // 3) مقارنة DB vs Incoming
-            // -------------------------
-            var dbList = customer.EmailAddresses.ToList(); // tracked
-            var dbByEmail = dbList.ToDictionary(x => NormEmail(x.Email), x => x);
+            var inByEmail = incoming
+                .ToDictionary(x => x.Email, x => x, StringComparer.OrdinalIgnoreCase);
 
-            var inByEmail = incoming.ToDictionary(x => x.Email, x => x);
 
             bool sameCount = dbByEmail.Count == inByEmail.Count;
 
@@ -346,7 +379,7 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
 
             if (!sameContent)
             {
-                foreach (var db in dbList)
+                foreach (var db in customer.EmailAddresses.ToList())
                 {
                     var key = NormEmail(db.Email);
                     if (!inByEmail.ContainsKey(key))
@@ -819,5 +852,26 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             await _cache.RemoveAsync(CustomerCacheKeys.Details(customerId), ct);
             await _cache.BumpVersionAsync(CustomerCacheKeys.ListVersionKey, ct);
         }
+        static string NormEmail(string? e) => (e ?? "").Trim().ToLowerInvariant();
+        static string NormKind(string? k) => string.IsNullOrWhiteSpace(k) ? "business" : k.Trim().ToLowerInvariant();
+
+        static int KindRank(string kind) => kind switch
+        {
+            "business" => 3,
+            "other" => 2,
+            "private" => 1,
+            _ => 0
+        };
+
+        static List<(string Email, string Kind)> DistinctEmails(IEnumerable<(string Email, string Kind)> src)
+        {
+            return src
+                .Select(x => (Email: NormEmail(x.Email), Kind: NormKind(x.Kind)))
+                .Where(x => !string.IsNullOrWhiteSpace(x.Email))
+                .GroupBy(x => x.Email) // dedupe على الإيميل
+                .Select(g => g.OrderByDescending(x => KindRank(x.Kind)).First()) // اختار الأفضل
+                .ToList();
+        }
+
     }
 }

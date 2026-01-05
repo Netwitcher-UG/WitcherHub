@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using System.Globalization;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Common.Pagination;
+using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Customers;
 using WitcherHub.Application.Models.View.Customers;
@@ -16,6 +17,7 @@ namespace WitcherHub.Pages
     public class IndexModel : PageModel
     {
         private readonly ICustomer _customers;
+        private readonly ILexwareSyncService _lexwareSync;
         private readonly IValidator<CustomerDTOs> _createValidator;
         private readonly IValidator<UpdateBasicRequest> _validator;
         private readonly IValidator<CreateCustomerAddressDto> _createAddressValidator;
@@ -30,6 +32,7 @@ namespace WitcherHub.Pages
 
         public IndexModel(
             ICustomer customers,
+            ILexwareSyncService lexwareSync,
             IValidator<CustomerDTOs> createValidator,
             IValidator<UpdateBasicRequest> validator,
             IValidator<CreateCustomerAddressDto> createAddressValidator,
@@ -43,6 +46,7 @@ namespace WitcherHub.Pages
         )
         {
             _customers = customers;
+            _lexwareSync = lexwareSync;
             _createValidator = createValidator;
             _validator = validator;
 
@@ -205,6 +209,16 @@ namespace WitcherHub.Pages
 
             return new JsonResult(client);
         }
+
+        // =========================
+        // POST: Lexware Import Contacts (Ajax JSON)
+        // =========================
+        public async Task<IActionResult> OnPostLexwareImportContactsAsync(CancellationToken ct)
+        {
+            var res = await _lexwareSync.ImportAllContactsAsync(ct);
+            return new JsonResult(res);
+        }
+
 
         // =========================
         // POST: Update Basic (Ajax JSON)
@@ -472,6 +486,28 @@ namespace WitcherHub.Pages
                 AutoOpen = autoOpen
             };
         }
+        public async Task<IActionResult> OnPostLexwareExportAsync([FromBody] CustomerIdRequest? req, CancellationToken ct)
+        {
+            if (req is null)
+                return BadRequest(new { message = "Body is null. Send { customerId: '...' }" });
+
+            if (req.CustomerId == Guid.Empty)
+                return BadRequest(new { message = "CustomerId is empty." });
+
+            var res = await _lexwareSync.ExportCustomerAsync(req.CustomerId, ct);
+            return new JsonResult(res);
+        }
+
+        public async Task<IActionResult> OnPostLexwareDeleteAsync([FromBody] LexwareDeleteRequest req, CancellationToken ct)
+        {
+            if (req == null || string.IsNullOrWhiteSpace(req.ContactId))
+                return new JsonResult(new { message = "ContactId is missing." }) { StatusCode = 400 };
+
+            var updated = await _lexwareSync.DeleteCustomerFromLexwareAsync(req.ContactId, ct);
+            return new JsonResult(updated);
+        }
+
+
 
         // ========= helpers (same you had) =========
         private static Microsoft.AspNetCore.Html.IHtmlContent Html(string? text)

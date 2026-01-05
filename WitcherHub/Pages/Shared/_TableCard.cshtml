@@ -24,22 +24,38 @@
             <div class="card-body">
 
               
-                    @if (Model.Pagination is not null)
-{
-    var p = Model.Pagination;
+                @if (Model.Pagination is not null)
+                {
+                    var p = Model.Pagination;
+                    var lexUrl = ViewData["LexwareImportUrl"] as string;
 
-    <form method="get" class="order-search position-relative my-3 w-25 ms-4">
-        <input class="form-control rounded-5 px-5"
-               type="text"
-               name="@p.SearchParam"
-               value="@p.SearchQuery"
-               placeholder="@Model.SearchPlaceholder" />
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 my-3 px-4">
+                        <form method="get" class="order-search position-relative w-25 m-0">
+                            <input class="form-control rounded-5 px-5"
+                                   type="text"
+                                   name="@p.SearchParam"
+                                   value="@p.SearchQuery"
+                                   placeholder="@Model.SearchPlaceholder" />
 
-        <input type="hidden" name="@p.PageParam" value="1" />
-        <input type="hidden" name="@p.PageSizeParam" value="@p.PageSize" />
+                            <input type="hidden" name="@p.PageParam" value="1" />
+                            <input type="hidden" name="@p.PageSizeParam" value="@p.PageSize" />
 
-        <span class="material-icons-outlined position-absolute ms-3 translate-middle-y start-0 top-50">search</span>
-    </form>
+                            <span class="material-icons-outlined position-absolute ms-3 translate-middle-y start-0 top-50">search</span>
+                        </form>
+
+                        @if (!string.IsNullOrWhiteSpace(lexUrl))
+                        {
+                            <button type="button"
+                                    class="btn btn-outline-secondary rounded-5 px-3 d-inline-flex align-items-center gap-2"
+                                    title="Refresh from Lexware"
+                                    data-vc-action="lexware-refresh">
+                                <i class="material-icons-outlined">sync</i>
+                                <span class="d-none d-md-inline">Lexware</span>
+                            </button>
+                        }
+                    </div>
+                }
+
 }
 
 

@@ -14,6 +14,8 @@ namespace WitcherHub.Application.Models.DTO.Customers
         public CustomerType Type { get; set; } = CustomerType.Individual;
 
         public string Name { get; set; } = "";
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
 
         public string? Phone { get; set; }
         public string? TaxId { get; set; }
@@ -59,6 +61,15 @@ namespace WitcherHub.Application.Models.DTO.Customers
         public string? LastName { get; set; }
 
         public bool IsPrimary { get; set; }
+    }
+    public sealed class CustomerIdRequest
+    {
+        public Guid CustomerId { get; set; }
+    }
+
+    public sealed class LexwareDeleteRequest
+    {
+        public string ContactId { get; set; } = "";
     }
 
     public class UpdateCustomerDto

@@ -157,12 +157,26 @@
         </select>
         <div class="text-danger small mt-1" id="err-vc-basic-type"></div>
     </div>
-    <!-- Row 2: Name + Phone -->
-    <div class="col-12 col-md-6">
-    <label class="form-label">Name</label>
+    <!-- ✅ Individual: First/Last -->
+<div class="col-12 col-md-6 vc-individual-only">
+    <label class="form-label">First Name</label>
+    <input class="form-control form-control-sm" id="vc-basic-firstName" />
+    <div class="text-danger small mt-1" id="err-vc-basic-firstName"></div>
+</div>
+
+<div class="col-12 col-md-6 vc-individual-only">
+    <label class="form-label">Last Name</label>
+    <input class="form-control form-control-sm" id="vc-basic-lastName" />
+    <div class="text-danger small mt-1" id="err-vc-basic-lastName"></div>
+</div>
+
+<!-- ✅ Company: Name -->
+<div class="col-12 col-md-6 vc-company-only">
+    <label class="form-label">Company Name</label>
     <input class="form-control form-control-sm" id="vc-basic-name" />
     <div class="text-danger small mt-1" id="err-vc-basic-name"></div>
 </div>
+
 
 <div class="col-12">
     <div class="card rounded-4 border bg-transparent">

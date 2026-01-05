@@ -10,6 +10,11 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         [MaxLength(250)]
         public string Name { get; set; } = default!;
+        [MaxLength(120)]
+        public string? FirstName { get; set; }
+
+        [MaxLength(120)]
+        public string? LastName { get; set; }
 
         [MaxLength(50)]
         public string? Phone { get; set; }
