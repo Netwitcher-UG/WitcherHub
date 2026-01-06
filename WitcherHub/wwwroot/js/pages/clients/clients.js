@@ -81,6 +81,15 @@
             .replaceAll('"', '&quot;')
             .replaceAll("'", '&#039;');
     }
+    function initTooltips(root = document) {
+        if (!window.bootstrap || !bootstrap.Tooltip) return;
+
+        // فعّل tooltips للعناصر الجديدة
+        root.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+            bootstrap.Tooltip.getOrCreateInstance(el, { container: 'body' });
+        });
+    }
+
     function $(id) { return document.getElementById(id); }
     function setText(id, value) { const el = $(id); if (el) el.textContent = value ?? '—'; }
     function setHtml(id, html) { const el = $(id); if (el) el.innerHTML = html ?? ''; }
@@ -213,127 +222,199 @@
         wrap.innerHTML = list.map((a, idx) => {
             const isEditing = (editingLocationIndex === idx);
 
-            const line1 = a.streetRaw ?? '';
-            const line2 = a.addressLine2 ? ` • ${esc(a.addressLine2)}` : '';
-            const addressText = (line1 || a.addressLine2) ? `${esc(line1)}${line2}` : '—';
+            // support old/mock keys too
+            const streetRaw = a.streetRaw ?? a.street ?? '';
+            const addressLine2 = a.addressLine2 ?? a.AddressLine2 ?? '';
+            const postalCode = a.postalCode ?? a.PostalCode ?? '';
+            const city = a.city ?? a.City ?? '';
+            const country = a.country ?? a.Country ?? '';
+            const countryCode = a.countryCode ?? a.CountryCode ?? '';
+            const label = a.label ?? a.Label ?? 'Location';
 
-            const cityText = `${esc(a.postalCode ?? '')} ${esc(a.city ?? '')}${(a.city || a.country) ? ', ' : ''}${esc(a.country ?? '')}`.trim() || '—';
+            const line1 = streetRaw ?? '';
+            const line2 = addressLine2 ? ` • ${esc(addressLine2)}` : '';
+            const addressText = (line1 || addressLine2) ? `${esc(line1)}${line2}` : '—';
 
-            const defaultBadge = a.isDefault ? `<span class="badge bg-primary bg-opacity-10 text-primary ms-2">Default</span>` : '';
-            const starIcon = a.isDefault ? 'star' : 'star_border';
+            const cityText = `${esc(postalCode ?? '')} ${esc(city ?? '')}${(city || country) ? ', ' : ''}${esc(country ?? '')}`.trim() || '—';
+
+            const isDefault = !!(a.isDefault ?? a.IsDefault ?? a.Default);
+            const defaultBadge = isDefault ? `<span class="badge bg-primary bg-opacity-10 text-primary ms-2">Default</span>` : '';
+            const starIcon = isDefault ? 'star' : 'star_border';
 
             return `
-                    <div class="card rounded-4 border bg-transparent shadow-none mb-0">
-                        <div class="card-body py-3">
-                            <div class="d-flex align-items-start justify-content-between gap-3">
-                                <div class="flex-grow-1">
+            <div class="card rounded-4 border bg-transparent shadow-none mb-0">
+                <div class="card-body py-3">
+                    <div class="d-flex align-items-start justify-content-between gap-3">
 
-                                    <!-- VIEW -->
-                                    <div class="${isEditing ? 'd-none' : ''}">
-                                        <div class="fw-semibold">
-                                            ${esc(a.label ?? 'Location')}
-                                            ${defaultBadge}
-                                        </div>
-                                        <div class="text-muted small">${addressText}</div>
-                                        <div class="text-muted small">${cityText}</div>
-                                    </div>
+                        <div class="flex-grow-1">
 
-                                    <!-- EDIT (inline, replaces text) -->
-                                    <div class="${isEditing ? '' : 'd-none'}">
-                                      <div class="row g-2">
-
-                                        <div class="col-12 col-md-4">
-                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-label" value="${esc(a.label ?? '')}" placeholder="Label" />
-                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-label"></div>
-                                        </div>
-
-                                        <div class="col-12 col-md-4">
-                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-country" value="${esc(a.country ?? '')}" placeholder="Country" />
-                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-country"></div>
-                                        </div>
-
-                                        <div class="col-12 col-md-4">
-                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-city" value="${esc(a.city ?? '')}" placeholder="City" />
-                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-city"></div>
-                                        </div>
-
-                                       <div class="col-12 col-md-4">
-                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-countryCode" value="${esc(a.countryCode ?? '')}" placeholder="Country Code (DE)" />
-                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-countryCode"></div>
-                                        </div>
-
-                                        <div class="col-12 col-md-8">
-                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-streetRaw" value="${esc(a.streetRaw ?? '')}" placeholder="Street / Nr" />
-                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-streetRaw"></div>
-                                        </div>
-
-
-                                        <div class="col-12 col-md-4">
-                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-postal" value="${esc(a.postalCode ?? '')}" placeholder="Postal" />
-                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-postal"></div>
-                                        </div>
-
-                                        <div class="col-12">
-                                          <input class="form-control form-control-sm" id="vc-loc-${idx}-line2" value="${esc(a.addressLine2 ?? '')}" placeholder="Address Line 2" />
-                                          <div class="text-danger small mt-1" id="err-vc-loc-${idx}-line2"></div>
-                                        </div>
-
-                                      </div>
-                                    </div>
-
-
+                            <!-- VIEW -->
+                            <div class="${isEditing ? 'd-none' : ''}">
+                                <div class="fw-semibold">
+                                    ${esc(label)}
+                                    ${defaultBadge}
                                 </div>
-
-                                <!-- Actions (icons only, no circle) -->
-                                <div class="d-flex align-items-start gap-3">
-
-                                    <button type="button"
-                                            class="btn p-0 border-0 bg-transparent text-primary"
-                                            title="Set default"
-                                            data-vc-action="set-default-location"
-                                            data-index="${idx}">
-                                        <i class="material-icons-outlined">${starIcon}</i>
-                                    </button>
-
-                                    <button type="button"
-                                            class="btn p-0 border-0 bg-transparent text-info ${isEditing ? 'd-none' : ''}"
-                                            title="Edit"
-                                            data-vc-action="edit-location"
-                                            data-index="${idx}">
-                                        <i class="material-icons-outlined">edit</i>
-                                    </button>
-
-                                    <button type="button"
-                                            class="btn p-0 border-0 bg-transparent text-success ${isEditing ? '' : 'd-none'}"
-                                            title="Save"
-                                            data-vc-action="save-location"
-                                            data-index="${idx}">
-                                        <i class="material-icons-outlined">check</i>
-                                    </button>
-
-                                    <button type="button"
-                                            class="btn p-0 border-0 bg-transparent text-muted ${isEditing ? '' : 'd-none'}"
-                                            title="Cancel"
-                                            data-vc-action="cancel-location"
-                                            data-index="${idx}">
-                                        <i class="material-icons-outlined">close</i>
-                                    </button>
-
-                                    <button type="button"
-                                            class="btn p-0 border-0 bg-transparent text-danger"
-                                            title="Delete"
-                                            data-vc-action="delete-location"
-                                            data-index="${idx}">
-                                        <i class="material-icons-outlined">delete</i>
-                                    </button>
-                                </div>
-
+                                <div class="text-muted small">${addressText}</div>
+                                <div class="text-muted small">${cityText}</div>
                             </div>
+
+                            <!-- EDIT (inline) -->
+                            <div class="${isEditing ? '' : 'd-none'}">
+                                <div class="row g-2">
+
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small mb-1" for="vc-loc-${idx}-label">
+                                            Label
+                                            <span class="material-icons-outlined text-muted ms-1"
+                                                  style="font-size:16px"
+                                                  data-bs-toggle="tooltip"
+                                                  title="Example: Billing / Shipping / Home">info</span>
+                                        </label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-loc-${idx}-label"
+                                               value="${esc(label ?? '')}"
+                                               placeholder="Billing" />
+                                        <div class="text-danger small mt-1" id="err-vc-loc-${idx}-label"></div>
+                                    </div>
+
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small mb-1" for="vc-loc-${idx}-country">
+                                            Country
+                                            <span class="material-icons-outlined text-muted ms-1"
+                                                  style="font-size:16px"
+                                                  data-bs-toggle="tooltip"
+                                                  title="Country name (optional). Example: Germany">info</span>
+                                        </label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-loc-${idx}-country"
+                                               value="${esc(country ?? '')}"
+                                               placeholder="Germany" />
+                                        <div class="text-danger small mt-1" id="err-vc-loc-${idx}-country"></div>
+                                    </div>
+
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small mb-1" for="vc-loc-${idx}-city">City</label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-loc-${idx}-city"
+                                               value="${esc(city ?? '')}"
+                                               placeholder="Berlin" />
+                                        <div class="text-danger small mt-1" id="err-vc-loc-${idx}-city"></div>
+                                    </div>
+
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small mb-1" for="vc-loc-${idx}-countryCode">
+                                            Country Code
+                                            <span class="material-icons-outlined text-muted ms-1"
+                                                  style="font-size:16px"
+                                                  data-bs-toggle="tooltip"
+                                                  title="ISO 2-letter code. Example: DE, US, NL">info</span>
+                                        </label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-loc-${idx}-countryCode"
+                                               value="${esc(countryCode ?? '')}"
+                                               placeholder="DE" />
+                                        <div class="text-danger small mt-1" id="err-vc-loc-${idx}-countryCode"></div>
+                                    </div>
+
+                                    <div class="col-12 col-md-8">
+                                        <label class="form-label small mb-1" for="vc-loc-${idx}-streetRaw">
+                                            Street (raw)
+                                            <span class="material-icons-outlined text-muted ms-1"
+                                                  style="font-size:16px"
+                                                  data-bs-toggle="tooltip"
+                                                  title="Street and number. Example: Hauptstr. 12">info</span>
+                                        </label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-loc-${idx}-streetRaw"
+                                               value="${esc(streetRaw ?? '')}"
+                                               placeholder="Hauptstr. 12" />
+                                        <div class="text-danger small mt-1" id="err-vc-loc-${idx}-streetRaw"></div>
+                                    </div>
+
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small mb-1" for="vc-loc-${idx}-postal">Postal Code</label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-loc-${idx}-postal"
+                                               value="${esc(postalCode ?? '')}"
+                                               placeholder="10115" />
+                                        <div class="text-danger small mt-1" id="err-vc-loc-${idx}-postal"></div>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label small mb-1" for="vc-loc-${idx}-line2">
+                                            Address Line 2
+                                            <span class="material-icons-outlined text-muted ms-1"
+                                                  style="font-size:16px"
+                                                  data-bs-toggle="tooltip"
+                                                  title="Supplement, floor, apartment, etc.">info</span>
+                                        </label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-loc-${idx}-line2"
+                                               value="${esc(addressLine2 ?? '')}"
+                                               placeholder="Floor 2, Apt 5" />
+                                        <div class="text-danger small mt-1" id="err-vc-loc-${idx}-line2"></div>
+                                    </div>
+
+                                </div>
+                            </div>
+
                         </div>
+
+                        <!-- Actions -->
+                        <div class="d-flex align-items-start gap-3">
+
+                            <button type="button"
+                                    class="btn p-0 border-0 bg-transparent text-primary"
+                                    title="Set default"
+                                    data-vc-action="set-default-location"
+                                    data-index="${idx}">
+                                <i class="material-icons-outlined">${starIcon}</i>
+                            </button>
+
+                            <button type="button"
+                                    class="btn p-0 border-0 bg-transparent text-info ${isEditing ? 'd-none' : ''}"
+                                    title="Edit"
+                                    data-vc-action="edit-location"
+                                    data-index="${idx}">
+                                <i class="material-icons-outlined">edit</i>
+                            </button>
+
+                            <button type="button"
+                                    class="btn p-0 border-0 bg-transparent text-success ${isEditing ? '' : 'd-none'}"
+                                    title="Save"
+                                    data-vc-action="save-location"
+                                    data-index="${idx}">
+                                <i class="material-icons-outlined">check</i>
+                            </button>
+
+                            <button type="button"
+                                    class="btn p-0 border-0 bg-transparent text-muted ${isEditing ? '' : 'd-none'}"
+                                    title="Cancel"
+                                    data-vc-action="cancel-location"
+                                    data-index="${idx}">
+                                <i class="material-icons-outlined">close</i>
+                            </button>
+
+                            <button type="button"
+                                    class="btn p-0 border-0 bg-transparent text-danger"
+                                    title="Delete"
+                                    data-vc-action="delete-location"
+                                    data-index="${idx}">
+                                <i class="material-icons-outlined">delete</i>
+                            </button>
+
+                        </div>
+
                     </div>
-                `;
+                </div>
+            </div>
+        `;
         }).join('');
+
+        // safe tooltips init (if you have initTooltips in your file)
+        if (typeof initTooltips === 'function') initTooltips(wrap);
     }
+
 
     // ---------- Render Contacts (inline edit) ----------
     function renderContacts(list) {
@@ -349,120 +430,174 @@
 
         wrap.innerHTML = list.map((c, idx) => {
             const isEditing = (editingContactIndex === idx);
-            const primaryBadge = c.isPrimary ? `<span class="badge bg-warning bg-opacity-10 text-warning ms-2">Primary</span>` : '';
-            const starIcon = c.isPrimary ? 'star' : 'star_border';
+
+            const isPrimary = !!(c.isPrimary ?? c.IsPrimary ?? c.Primary);
+            const primaryBadge = isPrimary ? `<span class="badge bg-warning bg-opacity-10 text-warning ms-2">Primary</span>` : '';
+            const starIcon = isPrimary ? 'star' : 'star_border';
+
+            const salutation = c.salutation ?? c.Salutation ?? '';
+            const firstName = c.firstName ?? c.FirstName ?? '';
+            const lastName = c.lastName ?? c.LastName ?? '';
+            const name = c.name ?? c.Name ?? '';
+            const position = c.position ?? c.Position ?? '';
+            const email = c.email ?? c.Email ?? '';
+            const phone = c.phone ?? c.Phone ?? '';
+
+            const displayName =
+                (firstName || lastName)
+                    ? `${salutation ? salutation + ' ' : ''}${(firstName || '')} ${(lastName || '')}`.trim()
+                    : (name || '—');
 
             return `
-                    <div class="card rounded-4 border bg-transparent shadow-none mb-0">
-                        <div class="card-body py-3">
-                            <div class="d-flex align-items-start justify-content-between gap-3">
-                                <div class="flex-grow-1">
+            <div class="card rounded-4 border bg-transparent shadow-none mb-0">
+                <div class="card-body py-3">
+                    <div class="d-flex align-items-start justify-content-between gap-3">
 
-                                    <!-- VIEW -->
-                                    <div class="${isEditing ? 'd-none' : ''}">
-                                        <div class="fw-semibold">
-${esc((c.firstName || c.lastName) ? `${c.salutation ? c.salutation + ' ' : ''}${(c.firstName || '')} ${(c.lastName || '')}`.trim() : (c.name ?? '—'))}
-                                            ${primaryBadge}
-                                        </div>
-                                        <div class="text-muted small">${esc(c.position ?? '')}</div>
-                                        <div class="text-muted small">
-                                            <span class="material-icons-outlined align-middle me-1" style="font-size:18px">send</span>${esc(c.email ?? '—')}
-                                        </div>
-                                        <div class="text-muted small">
-                                            <span class="material-icons-outlined align-middle me-1" style="font-size:18px">call</span>${esc(c.phone ?? '—')}
-                                        </div>
-                                    </div>
+                        <div class="flex-grow-1">
 
-                                    <!-- EDIT -->
-                                    <div class="${isEditing ? '' : 'd-none'}">
-                                      <div class="row g-2">
-
-                                        <div class="col-12 col-md-3">
-  <input class="form-control form-control-sm" id="vc-c-${idx}-salutation" value="${esc(c.salutation ?? '')}" placeholder="Salutation" />
-  <div class="text-danger small mt-1" id="err-vc-c-${idx}-salutation"></div>
-</div>
-
-<div class="col-12 col-md-4">
-  <input class="form-control form-control-sm" id="vc-c-${idx}-firstName" value="${esc(c.firstName ?? '')}" placeholder="First name" />
-  <div class="text-danger small mt-1" id="err-vc-c-${idx}-firstName"></div>
-</div>
-
-<div class="col-12 col-md-5">
-  <input class="form-control form-control-sm" id="vc-c-${idx}-lastName" value="${esc(c.lastName ?? '')}" placeholder="Last name" />
-  <div class="text-danger small mt-1" id="err-vc-c-${idx}-lastName"></div>
-</div>
-
-<div class="col-12 col-md-6">
-  <input class="form-control form-control-sm" id="vc-c-${idx}-position" value="${esc(c.position ?? '')}" placeholder="Position" />
-  <div class="text-danger small mt-1" id="err-vc-c-${idx}-position"></div>
-</div>
-
-<div class="col-12 col-md-6">
-  <input class="form-control form-control-sm" id="vc-c-${idx}-email" value="${esc(c.email ?? '')}" placeholder="Email" />
-  <div class="text-danger small mt-1" id="err-vc-c-${idx}-email"></div>
-</div>
-
-<div class="col-12 col-md-6">
-  <input class="form-control form-control-sm" id="vc-c-${idx}-phone" value="${esc(c.phone ?? '')}" placeholder="Phone" />
-  <div class="text-danger small mt-1" id="err-vc-c-${idx}-phone"></div>
-</div>
-
-
-                                      </div>
-                                    </div>
-
-
+                            <!-- VIEW -->
+                            <div class="${isEditing ? 'd-none' : ''}">
+                                <div class="fw-semibold">
+                                    ${esc(displayName)}
+                                    ${primaryBadge}
                                 </div>
-
-                                <!-- Actions -->
-                                <div class="d-flex align-items-start gap-3">
-
-                                    <button type="button"
-                                            class="btn p-0 border-0 bg-transparent text-primary"
-                                            title="Set primary"
-                                            data-vc-action="set-primary-contact"
-                                            data-index="${idx}">
-                                        <i class="material-icons-outlined">${starIcon}</i>
-                                    </button>
-
-                                    <button type="button"
-                                            class="btn p-0 border-0 bg-transparent text-info ${isEditing ? 'd-none' : ''}"
-                                            title="Edit"
-                                            data-vc-action="edit-contact"
-                                            data-index="${idx}">
-                                        <i class="material-icons-outlined">edit</i>
-                                    </button>
-
-                                    <button type="button"
-                                            class="btn p-0 border-0 bg-transparent text-success ${isEditing ? '' : 'd-none'}"
-                                            title="Save"
-                                            data-vc-action="save-contact"
-                                            data-index="${idx}">
-                                        <i class="material-icons-outlined">check</i>
-                                    </button>
-
-                                    <button type="button"
-                                            class="btn p-0 border-0 bg-transparent text-muted ${isEditing ? '' : 'd-none'}"
-                                            title="Cancel"
-                                            data-vc-action="cancel-contact"
-                                            data-index="${idx}">
-                                        <i class="material-icons-outlined">close</i>
-                                    </button>
-
-                                    <button type="button"
-                                            class="btn p-0 border-0 bg-transparent text-danger"
-                                            title="Delete"
-                                            data-vc-action="delete-contact"
-                                            data-index="${idx}">
-                                        <i class="material-icons-outlined">delete</i>
-                                    </button>
+                                <div class="text-muted small">${esc(position ?? '')}</div>
+                                <div class="text-muted small">
+                                    <span class="material-icons-outlined align-middle me-1" style="font-size:18px">send</span>${esc(email || '—')}
                                 </div>
-
+                                <div class="text-muted small">
+                                    <span class="material-icons-outlined align-middle me-1" style="font-size:18px">call</span>${esc(phone || '—')}
+                                </div>
                             </div>
+
+                            <!-- EDIT -->
+                            <div class="${isEditing ? '' : 'd-none'}">
+                                <div class="row g-2">
+
+                                    <div class="col-12 col-md-3">
+                                        <label class="form-label small mb-1" for="vc-c-${idx}-salutation">
+                                            Salutation
+                                            <span class="material-icons-outlined text-muted ms-1"
+                                                  style="font-size:16px"
+                                                  data-bs-toggle="tooltip"
+                                                  title="Example: Herr / Frau / Mr / Ms">info</span>
+                                        </label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-c-${idx}-salutation"
+                                               value="${esc(salutation ?? '')}"
+                                               placeholder="Herr" />
+                                        <div class="text-danger small mt-1" id="err-vc-c-${idx}-salutation"></div>
+                                    </div>
+
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small mb-1" for="vc-c-${idx}-firstName">First Name</label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-c-${idx}-firstName"
+                                               value="${esc(firstName ?? '')}"
+                                               placeholder="John" />
+                                        <div class="text-danger small mt-1" id="err-vc-c-${idx}-firstName"></div>
+                                    </div>
+
+                                    <div class="col-12 col-md-5">
+                                        <label class="form-label small mb-1" for="vc-c-${idx}-lastName">Last Name</label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-c-${idx}-lastName"
+                                               value="${esc(lastName ?? '')}"
+                                               placeholder="Doe" />
+                                        <div class="text-danger small mt-1" id="err-vc-c-${idx}-lastName"></div>
+                                    </div>
+
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small mb-1" for="vc-c-${idx}-position">
+                                            Position
+                                            <span class="material-icons-outlined text-muted ms-1"
+                                                  style="font-size:16px"
+                                                  data-bs-toggle="tooltip"
+                                                  title="Job title inside the company">info</span>
+                                        </label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-c-${idx}-position"
+                                               value="${esc(position ?? '')}"
+                                               placeholder="Manager" />
+                                        <div class="text-danger small mt-1" id="err-vc-c-${idx}-position"></div>
+                                    </div>
+
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small mb-1" for="vc-c-${idx}-email">Email</label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-c-${idx}-email"
+                                               value="${esc(email ?? '')}"
+                                               placeholder="name@domain.com" />
+                                        <div class="text-danger small mt-1" id="err-vc-c-${idx}-email"></div>
+                                    </div>
+
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small mb-1" for="vc-c-${idx}-phone">Phone</label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-c-${idx}-phone"
+                                               value="${esc(phone ?? '')}"
+                                               placeholder="+49 ..." />
+                                        <div class="text-danger small mt-1" id="err-vc-c-${idx}-phone"></div>
+                                    </div>
+
+                                </div>
+                            </div>
+
                         </div>
+
+                        <!-- Actions -->
+                        <div class="d-flex align-items-start gap-3">
+
+                            <button type="button"
+                                    class="btn p-0 border-0 bg-transparent text-primary"
+                                    title="Set primary"
+                                    data-vc-action="set-primary-contact"
+                                    data-index="${idx}">
+                                <i class="material-icons-outlined">${starIcon}</i>
+                            </button>
+
+                            <button type="button"
+                                    class="btn p-0 border-0 bg-transparent text-info ${isEditing ? 'd-none' : ''}"
+                                    title="Edit"
+                                    data-vc-action="edit-contact"
+                                    data-index="${idx}">
+                                <i class="material-icons-outlined">edit</i>
+                            </button>
+
+                            <button type="button"
+                                    class="btn p-0 border-0 bg-transparent text-success ${isEditing ? '' : 'd-none'}"
+                                    title="Save"
+                                    data-vc-action="save-contact"
+                                    data-index="${idx}">
+                                <i class="material-icons-outlined">check</i>
+                            </button>
+
+                            <button type="button"
+                                    class="btn p-0 border-0 bg-transparent text-muted ${isEditing ? '' : 'd-none'}"
+                                    title="Cancel"
+                                    data-vc-action="cancel-contact"
+                                    data-index="${idx}">
+                                <i class="material-icons-outlined">close</i>
+                            </button>
+
+                            <button type="button"
+                                    class="btn p-0 border-0 bg-transparent text-danger"
+                                    title="Delete"
+                                    data-vc-action="delete-contact"
+                                    data-index="${idx}">
+                                <i class="material-icons-outlined">delete</i>
+                            </button>
+
+                        </div>
+
                     </div>
-                `;
+                </div>
+            </div>
+        `;
         }).join('');
+
+        // safe tooltips init (if you have initTooltips in your file)
+        if (typeof initTooltips === 'function') initTooltips(wrap);
     }
 
     // ---------- Basic mode toggle ----------
@@ -1594,96 +1729,7 @@ ${esc((c.firstName || c.lastName) ? `${c.salutation ? c.salutation + ' ' : ''}${
     `).join('');
     }
 
-    //function buildBasicEmailRow(idx, kind = 'business', email = '') {
-    //    const row = document.createElement('div');
-    //    row.className = 'vc-basic-email-row';
-
-    //    row.innerHTML = `
-    //    <div class="input-group">
-    //        <select class="form-select form-select-sm" style="max-width:170px" id="vc-basic-kind-${idx}">
-    //            <option value="business">business</option>
-    //            <option value="private">private</option>
-    //            <option value="other">other</option>
-    //        </select>
-
-    //        <input class="form-control form-control-sm" type="email" placeholder="name@domain.com"
-    //               id="vc-basic-email-${idx}" value="" required />
-
-    //        <button type="button" class="btn btn-outline-danger vc-basic-email-remove" title="Remove">
-    //            <i class="material-icons-outlined align-middle" style="font-size:18px">delete</i>
-    //        </button>
-    //    </div>
-
-    //    <div class="row g-2 mt-1">
-    //        <div class="col-12 col-md-4">
-    //            <div class="text-danger small" id="err-vc-basic-kind-${idx}"></div>
-    //        </div>
-    //        <div class="col-12 col-md-8">
-    //            <div class="text-danger small" id="err-vc-basic-email-${idx}"></div>
-    //        </div>
-    //    </div>
-    //`;
-
-    //    const sel = row.querySelector(`#vc-basic-kind-${idx}`);
-    //    const inp = row.querySelector(`#vc-basic-email-${idx}`);
-    //    if (sel) sel.value = (kind || 'business');
-    //    if (inp) inp.value = (email || '');
-
-    //    return row;
-    //}
-
-    //function renumberBasicEmailRows() {
-    //    const wrap = $('vc-basic-email-list');
-    //    if (!wrap) return;
-
-    //    const rows = [...wrap.querySelectorAll('.vc-basic-email-row')];
-
-    //    rows.forEach((row, i) => {
-    //        // update ids
-    //        row.querySelectorAll('[id]').forEach(el => {
-    //            el.id = el.id
-    //                .replace(/vc-basic-kind-\d+/g, `vc-basic-kind-${i}`)
-    //                .replace(/vc-basic-email-\d+/g, `vc-basic-email-${i}`)
-    //                .replace(/err-vc-basic-kind-\d+/g, `err-vc-basic-kind-${i}`)
-    //                .replace(/err-vc-basic-email-\d+/g, `err-vc-basic-email-${i}`);
-    //        });
-    //    });
-
-    //    // hide remove on last remaining row
-    //    const removeButtons = [...wrap.querySelectorAll('.vc-basic-email-remove')];
-    //    if (rows.length <= 1) {
-    //        removeButtons.forEach(b => b.classList.add('disabled'));
-    //    } else {
-    //        removeButtons.forEach(b => b.classList.remove('disabled'));
-    //    }
-    //}
-
-    //function renderEmailsEdit(emails) {
-    //    const wrap = $('vc-basic-email-list');
-    //    if (!wrap) return;
-
-    //    wrap.innerHTML = '';
-    //    const list = (emails && emails.length) ? emails : [{ kind: 'business', email: '' }];
-
-    //    list.forEach((e, i) => wrap.appendChild(buildBasicEmailRow(i, e.kind, e.email)));
-
-    //    renumberBasicEmailRows();
-    //}
-
-    //function collectEmailsFromEdit() {
-    //    const wrap = $('vc-basic-email-list');
-    //    if (!wrap) return [];
-
-    //    const rows = [...wrap.querySelectorAll('.vc-basic-email-row')];
-    //    const emails = rows.map((row, i) => {
-    //        const kind = row.querySelector(`#vc-basic-kind-${i}`)?.value ?? 'business';
-    //        const email = row.querySelector(`#vc-basic-email-${i}`)?.value?.trim() ?? '';
-    //        return { kind, email };
-    //    }).filter(x => (x.email || '').trim().length > 0);
-
-    //    return emails;
-    //}
-    // Add/remove in basic emails editor
+    
     document.addEventListener('click', function (e) {
         if (e.target.closest('#vc-basic-email-add')) {
             e.preventDefault();

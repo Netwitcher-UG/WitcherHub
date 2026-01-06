@@ -16,25 +16,38 @@ namespace WitcherHub.Application.Validators.Customers
                 .NotNull()
                 .SetValidator(new AddressDtoValidator());
 
-            // Company: contact required
+            // Company: contact required + stronger rules
             When(x => x.Customer.Type == CustomerType.Company, () =>
             {
                 RuleFor(x => x.Contact)
                     .NotNull()
                     .SetValidator(new ContactDtoValidator());
 
-                RuleFor(x => x.Contact)
-                    .Must(c =>
-                        !string.IsNullOrWhiteSpace(c.Name) ||
-                        (!string.IsNullOrWhiteSpace(c.FirstName) && !string.IsNullOrWhiteSpace(c.LastName)))
-                    .WithMessage("Contact name (or first/last name) is required for company.");
+                RuleFor(x => x.Contact).Custom((c, ctx) =>
+                {
+                    if (c is null) return;
 
-                RuleFor(x => x.Contact)
-                    .Must(c => !string.IsNullOrWhiteSpace(c.Email) || !string.IsNullOrWhiteSpace(c.Phone))
-                    .WithMessage("Company contact must include at least email or phone.");
+                    var hasName =
+                        !string.IsNullOrWhiteSpace(c.Name) ||
+                        (!string.IsNullOrWhiteSpace(c.FirstName) && !string.IsNullOrWhiteSpace(c.LastName));
+
+                    if (!hasName)
+                    {
+                        ctx.AddFailure("Contact.Name", "Contact name is required (or first/last name).");
+                        ctx.AddFailure("Contact.FirstName", "First name is required when contact name is empty.");
+                        ctx.AddFailure("Contact.LastName", "Last name is required when contact name is empty.");
+                    }
+
+                    var hasComms = !string.IsNullOrWhiteSpace(c.Email) || !string.IsNullOrWhiteSpace(c.Phone);
+                    if (!hasComms)
+                    {
+                        ctx.AddFailure("Contact.Email", "Company contact must include at least email or phone.");
+                        ctx.AddFailure("Contact.Phone", "Company contact must include at least email or phone.");
+                    }
+                });
             });
 
-            // Individual: validate contact only if has any input
+            // Individual: validate contact only if has any input (اختياري)
             When(x => x.Customer.Type != CustomerType.Company, () =>
             {
                 When(x => !IsEmptyContact(x.Contact), () =>
@@ -58,29 +71,40 @@ namespace WitcherHub.Application.Validators.Customers
         }
     }
 
-    public sealed class UpdateCustomerDtoValidator : AbstractValidator<UpdateCustomerDto>
-    {
-        public UpdateCustomerDtoValidator()
-        {
-            //RuleFor(x => x.Customer)
-            //    .NotNull()
-            //    .SetValidator(new CustomerDTOValidator());
-        }
-    }
-
     // ============================
-    // Base validators
+    // Customer
     // ============================
 
     public sealed class CustomerDtoValidator : AbstractValidator<CustomerDto>
     {
+        private static readonly HashSet<string> AllowedKinds =
+            new(StringComparer.OrdinalIgnoreCase) { "business", "private", "other" };
+
         public CustomerDtoValidator()
         {
             RuleFor(x => x.Type).IsInEnum();
 
-            RuleFor(x => x.Name)
-                .NotEmpty().WithMessage("Name is required.")
-                .MaximumLength(250);
+            // Company vs Individual rules
+            When(x => x.Type == CustomerType.Company, () =>
+            {
+                RuleFor(x => x.Name)
+                    .NotEmpty().WithMessage("Company name is required.")
+                    .MaximumLength(250);
+            });
+
+            When(x => x.Type == CustomerType.Individual, () =>
+            {
+                RuleFor(x => x.FirstName)
+                    .NotEmpty().WithMessage("First name is required.")
+                    .MaximumLength(120);
+
+                RuleFor(x => x.LastName)
+                    .NotEmpty().WithMessage("Last name is required.")
+                    .MaximumLength(120);
+
+                RuleFor(x => x.Name)
+                    .MaximumLength(250);
+            });
 
             RuleFor(x => x.Phone)
                 .MaximumLength(50)
@@ -90,24 +114,30 @@ namespace WitcherHub.Application.Validators.Customers
                 .MaximumLength(100)
                 .When(x => !string.IsNullOrWhiteSpace(x.TaxId));
 
-            // ✅ EmailAddresses بدل Email
+            // EmailAddresses required
             RuleFor(x => x.EmailAddresses)
                 .NotNull()
                 .Must(list => list.Count > 0)
                 .WithMessage("At least one email address is required.");
 
             RuleForEach(x => x.EmailAddresses)
-                .SetValidator(new EmailAddressDtoValidator());
+                .SetValidator(new EmailAddressDtoValidator(AllowedKinds));
         }
     }
 
     public sealed class EmailAddressDtoValidator : AbstractValidator<EmailAddressDto>
     {
-        public EmailAddressDtoValidator()
+        private readonly ISet<string> _allowedKinds;
+
+        public EmailAddressDtoValidator(ISet<string> allowedKinds)
         {
+            _allowedKinds = allowedKinds;
+
             RuleFor(x => x.Kind)
                 .NotEmpty().WithMessage("Email kind is required.")
-                .MaximumLength(30);
+                .MaximumLength(30)
+                .Must(k => _allowedKinds.Contains((k ?? "").Trim()))
+                .WithMessage("Email kind must be business, private, or other.");
 
             RuleFor(x => x.Email)
                 .NotEmpty().WithMessage("Email is required.")
@@ -129,6 +159,10 @@ namespace WitcherHub.Application.Validators.Customers
         }
     }
 
+    // ============================
+    // Address
+    // ============================
+
     public sealed class AddressDtoValidator : AbstractValidator<AddressDto>
     {
         public AddressDtoValidator()
@@ -137,10 +171,9 @@ namespace WitcherHub.Application.Validators.Customers
                 .MaximumLength(50)
                 .When(x => !string.IsNullOrWhiteSpace(x.Label));
 
-            // ✅ FullNameOrCompany required (لأن الـ Entity non-null)
             RuleFor(x => x.FullNameOrCompany)
-                .NotEmpty().WithMessage("Full name / company is required.")
-                .MaximumLength(250);
+                .MaximumLength(250)
+                .When(x => !string.IsNullOrWhiteSpace(x.FullNameOrCompany));
 
             RuleFor(x => x.Country)
                 .MaximumLength(100)
@@ -149,11 +182,6 @@ namespace WitcherHub.Application.Validators.Customers
             RuleFor(x => x.CountryCode)
                 .MaximumLength(2)
                 .When(x => !string.IsNullOrWhiteSpace(x.CountryCode));
-
-            // مطلوب واحد على الأقل من Country أو CountryCode
-            RuleFor(x => x)
-                .Must(a => !string.IsNullOrWhiteSpace(a.CountryCode) || !string.IsNullOrWhiteSpace(a.Country))
-                .WithMessage("Country or CountryCode is required.");
 
             RuleFor(x => x.City)
                 .MaximumLength(100)
@@ -170,8 +198,24 @@ namespace WitcherHub.Application.Validators.Customers
             RuleFor(x => x.AddressLine2)
                 .MaximumLength(250)
                 .When(x => !string.IsNullOrWhiteSpace(x.AddressLine2));
+
+            RuleFor(x => x).Custom((a, ctx) =>
+            {
+                var hasCountry = !string.IsNullOrWhiteSpace(a.Country);
+                var hasCode = !string.IsNullOrWhiteSpace(a.CountryCode);
+
+                if (!hasCountry && !hasCode)
+                {
+                    ctx.AddFailure(nameof(AddressDto.Country), "Country or CountryCode is required.");
+                    ctx.AddFailure(nameof(AddressDto.CountryCode), "Country or CountryCode is required.");
+                }
+            });
         }
     }
+
+    // ============================
+    // Contact
+    // ============================
 
     public sealed class ContactDtoValidator : AbstractValidator<ContactDto>
     {
@@ -209,7 +253,7 @@ namespace WitcherHub.Application.Validators.Customers
     }
 
     // ============================
-    // Address operations validators
+    // Address ops
     // ============================
 
     public sealed class CreateCustomerAddressDtoValidator : AbstractValidator<CreateCustomerAddressDto>
@@ -250,7 +294,7 @@ namespace WitcherHub.Application.Validators.Customers
     }
 
     // ============================
-    // Contact operations validators
+    // Contact ops
     // ============================
 
     public sealed class CreateCustomerContactDtoValidator : AbstractValidator<CreateCustomerContactDto>
@@ -259,6 +303,29 @@ namespace WitcherHub.Application.Validators.Customers
         {
             RuleFor(x => x.CustomerId).NotEmpty();
             RuleFor(x => x.Contact).NotNull().SetValidator(new ContactDtoValidator());
+
+            RuleFor(x => x.Contact).Custom((c, ctx) =>
+            {
+                if (c is null) return;
+
+                var hasName =
+                    !string.IsNullOrWhiteSpace(c.Name) ||
+                    (!string.IsNullOrWhiteSpace(c.FirstName) && !string.IsNullOrWhiteSpace(c.LastName));
+
+                if (!hasName)
+                {
+                    ctx.AddFailure("Contact.Name", "Contact name is required (or first/last name).");
+                    ctx.AddFailure("Contact.FirstName", "First name is required when contact name is empty.");
+                    ctx.AddFailure("Contact.LastName", "Last name is required when contact name is empty.");
+                }
+
+                var hasComms = !string.IsNullOrWhiteSpace(c.Email) || !string.IsNullOrWhiteSpace(c.Phone);
+                if (!hasComms)
+                {
+                    ctx.AddFailure("Contact.Email", "Email or phone is required.");
+                    ctx.AddFailure("Contact.Phone", "Email or phone is required.");
+                }
+            });
         }
     }
 
@@ -269,6 +336,29 @@ namespace WitcherHub.Application.Validators.Customers
             RuleFor(x => x.CustomerId).NotEmpty();
             RuleFor(x => x.ContactId).NotEmpty();
             RuleFor(x => x.Contact).NotNull().SetValidator(new ContactDtoValidator());
+
+            RuleFor(x => x.Contact).Custom((c, ctx) =>
+            {
+                if (c is null) return;
+
+                var hasName =
+                    !string.IsNullOrWhiteSpace(c.Name) ||
+                    (!string.IsNullOrWhiteSpace(c.FirstName) && !string.IsNullOrWhiteSpace(c.LastName));
+
+                if (!hasName)
+                {
+                    ctx.AddFailure("Contact.Name", "Contact name is required (or first/last name).");
+                    ctx.AddFailure("Contact.FirstName", "First name is required when contact name is empty.");
+                    ctx.AddFailure("Contact.LastName", "Last name is required when contact name is empty.");
+                }
+
+                var hasComms = !string.IsNullOrWhiteSpace(c.Email) || !string.IsNullOrWhiteSpace(c.Phone);
+                if (!hasComms)
+                {
+                    ctx.AddFailure("Contact.Email", "Email or phone is required.");
+                    ctx.AddFailure("Contact.Phone", "Email or phone is required.");
+                }
+            });
         }
     }
 
