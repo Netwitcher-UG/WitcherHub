@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 using WitcherHub.Application.Models.DTO.Customers;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
@@ -121,22 +121,21 @@ namespace WitcherHub.Application.Validators.Customers
                 .WithMessage("At least one email address is required.");
 
             RuleForEach(x => x.EmailAddresses)
-                .SetValidator(new EmailAddressDtoValidator(AllowedKinds));
+            .SetValidator(new EmailAddressDtoValidator());
         }
     }
 
     public sealed class EmailAddressDtoValidator : AbstractValidator<EmailAddressDto>
     {
-        private readonly ISet<string> _allowedKinds;
+        private static readonly HashSet<string> AllowedKinds =
+            new(StringComparer.OrdinalIgnoreCase) { "business", "private", "other" };
 
-        public EmailAddressDtoValidator(ISet<string> allowedKinds)
+        public EmailAddressDtoValidator()
         {
-            _allowedKinds = allowedKinds;
-
             RuleFor(x => x.Kind)
                 .NotEmpty().WithMessage("Email kind is required.")
                 .MaximumLength(30)
-                .Must(k => _allowedKinds.Contains((k ?? "").Trim()))
+                .Must(k => AllowedKinds.Contains((k ?? "").Trim()))
                 .WithMessage("Email kind must be business, private, or other.");
 
             RuleFor(x => x.Email)

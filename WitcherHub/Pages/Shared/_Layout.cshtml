@@ -290,14 +290,15 @@
                 @if (HasPerm(AppPermissions.ManageNetwitcher))
                 {
                     <li>
-                        <a asp-page="/Clients/Index">
+                        <a asp-area="" asp-page="/Index">
+
                             <div class="parent-icon"><i class="material-icons-outlined">groups</i></div>
                             <div class="menu-title">Clients</div>
                         </a>
                     </li>
                     <li>
-                        <a asp-page="/Services">
-                            <div class="parent-icon"><i class="material-icons-outlined">groups</i></div>
+                        <a asp-area="" asp-page="/Services">
+                            <div class="parent-icon"><i class="material-icons-outlined">local_mall</i></div>
                             <div class="menu-title">Services</div>
                         </a>
                     </li>
