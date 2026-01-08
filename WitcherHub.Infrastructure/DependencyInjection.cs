@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,7 +8,10 @@ using System;
 using System.Net.Http.Headers;
 using WitcherHub.Application.Common.Caching;
 using WitcherHub.Application.Interfaces;
+using WitcherHub.Application.Interfaces.BackgroundTasks;
+using WitcherHub.Application.Interfaces.Email;
 using WitcherHub.Application.Interfaces.ManageData;
+using WitcherHub.Application.Services.Email;
 using WitcherHub.Infrastructure.Authentication;
 using WitcherHub.Infrastructure.Common.Caching;
 using WitcherHub.Infrastructure.Data.Context;
@@ -17,7 +20,12 @@ using WitcherHub.Infrastructure.ManageData.Customers;
 using WitcherHub.Infrastructure.ManageData.Services;
 using WitcherHub.Infrastructure.Repositories.Implementations;
 using WitcherHub.Infrastructure.Seeding;
+using WitcherHub.Infrastructure.Services.BackgroundTasks;
 using WitcherHub.Infrastructure.Services.Caching;
+using WitcherHub.Infrastructure.Services.Email_Sender.EmailTemplates;
+using WitcherHub.Infrastructure.Services.Email_Sender.Options;
+using WitcherHub.Infrastructure.Services.Email_Sender.Sender;
+using WitcherHub.Infrastructure.Services.HostedServices;
 using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Infrastructure.Services.OpenAI;
 
@@ -29,7 +37,6 @@ namespace WitcherHub.Infrastructure
             this IServiceCollection services,
             IConfiguration configuration)
         {
-
             var connectionString = configuration.GetConnectionString("DefaultConnection");
             if (string.IsNullOrWhiteSpace(connectionString))
             {
@@ -40,10 +47,12 @@ namespace WitcherHub.Infrastructure
             {
                 options.UseNpgsql(connectionString);
             });
+
             // Memory cache (in-process)
             services.AddMemoryCache();
             // AppCache (our hybrid cache wrapper)
             services.AddScoped<IAppCache, AppCache>();
+
             // ===== Identity =====
             services.AddIdentityCore<AppUser>(options =>
             {
@@ -52,8 +61,8 @@ namespace WitcherHub.Infrastructure
                 options.Password.RequireUppercase = false;
                 options.Password.RequiredLength = 6;
             })
-                .AddRoles<IdentityRole<Guid>>()
-                .AddEntityFrameworkStores<AppDbContext>();
+            .AddRoles<IdentityRole<Guid>>()
+            .AddEntityFrameworkStores<AppDbContext>();
 
             //======= Lexware =======
             services.Configure<LexwareOptions>(
@@ -70,8 +79,9 @@ namespace WitcherHub.Infrastructure
                     new MediaTypeWithQualityHeaderValue("application/json"));
             });
 
+            //======= OpenAI =======
             services.Configure<OpenAIOptions>(
-            configuration.GetSection(OpenAIOptions.SectionName));
+                configuration.GetSection(OpenAIOptions.SectionName));
 
             services.AddSingleton<ChatClient>(sp =>
             {
@@ -83,8 +93,7 @@ namespace WitcherHub.Infrastructure
 
                 if (string.IsNullOrWhiteSpace(apiKey))
                 {
-                    throw new InvalidOperationException(
-                        "OpenAI API key is not configured. ");
+                    throw new InvalidOperationException("OpenAI API key is not configured.");
                 }
 
                 var model = string.IsNullOrWhiteSpace(options.Model)
@@ -94,6 +103,7 @@ namespace WitcherHub.Infrastructure
                 return new ChatClient(model, apiKey);
             });
 
+            // ===== Services =====
             services.AddScoped<IAiTextGenerator, OpenAiTextGenerator>();
             services.AddScoped<IDataSeeder, IdentityDataSeeder>();
             services.AddScoped<IAuthService, AuthService>();
@@ -101,10 +111,31 @@ namespace WitcherHub.Infrastructure
             services.AddScoped<ILexwareSyncService, LexwareSyncService>();
             services.AddScoped<IServiceCatalog, ManageServiceCatalog>();
 
-
-
             // UnitOfWork
             services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+            // =========================================================
+            // ✅ Email Sender + Templates + Background Queue (NEW)
+            // =========================================================
+            services.Configure<SmtpOptions>(configuration.GetSection("Smtp"));
+            services.Configure<BackgroundTaskOptions>(configuration.GetSection("BackgroundTasks"));
+            services.Configure<EmailTemplateOptions>(configuration.GetSection("EmailTemplates"));
+
+            // Queue (Channel) - Singleton
+            services.AddSingleton<IBackgroundTaskQueue>(sp =>
+            {
+                var opt = sp.GetRequiredService<IOptions<BackgroundTaskOptions>>().Value;
+                return new ChannelBackgroundTaskQueue(opt.Capacity);
+            });
+
+            // Hosted background worker
+            services.AddHostedService<QueuedHostedService>();
+
+            // Email sender + template renderer
+            services.AddTransient<IEmailSender, MailKitEmailSender>();
+            services.AddSingleton<IEmailTemplateRenderer, FileEmailTemplateRenderer>();
+
+            services.AddScoped<IEmailService, EmailService>();
 
             return services;
         }

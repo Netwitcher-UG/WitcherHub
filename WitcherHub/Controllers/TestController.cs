@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Mvc;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Models.DTO.Customers;
+using WitcherHub.Application.Models.Email;
+using WitcherHub.Application.Services.Email;
 using WitcherHub.Infrastructure.Services.Lexware;
 
 namespace WitcherHub.Controllers
@@ -14,17 +16,20 @@ namespace WitcherHub.Controllers
         private readonly IAiTextGenerator _aiTextGenerator;
         private readonly IAuthService _auth;
         private readonly ILexwareSyncService _sync;
+        private readonly IEmailService _email;
 
         public TestController(
             ILexwareClient lexwareClient,
             IAiTextGenerator aiTextGenerator,
             IAuthService auth,
-            ILexwareSyncService sync)
+            ILexwareSyncService sync,
+            IEmailService email)
         {
             _lexwareClient = lexwareClient;
             _aiTextGenerator = aiTextGenerator;
             _auth = auth;
             _sync = sync;
+            _email = email;
         }
         [HttpPost("lexware/import/contacts")]
         public async Task<IActionResult> ImportLexwareContacts(CancellationToken ct)
@@ -114,5 +119,45 @@ namespace WitcherHub.Controllers
             Response.Cookies.Delete("access_token");
             return Ok();
         }
+
+        public sealed class SendWelcomeEmailRequest
+        {
+            public string ToEmail { get; set; } = "";
+            public string? ToName { get; set; }
+            public string UserName { get; set; } = "";
+            public string ActionUrl { get; set; } = "";
+        }
+
+
+        [HttpPost("email/welcome")]
+        public async Task<IActionResult> SendWelcomeEmail([FromBody] SendWelcomeEmailRequest req, CancellationToken ct)
+        {
+            if (req is null || string.IsNullOrWhiteSpace(req.ToEmail))
+                return BadRequest(new { message = "ToEmail is required." });
+
+            if (string.IsNullOrWhiteSpace(req.ActionUrl))
+                return BadRequest(new { message = "ActionUrl is required." });
+
+            var to = new EmailAddress(req.ToEmail, req.ToName);
+
+            // مهم: نمرر Subject داخل model لكي يظهر في _Layout.html إذا استخدمت {{Subject}}
+            var subject = "Welcome to WitcherHub";
+
+            await _email.QueueTemplateAsync(
+                templateName: "Welcome",
+                model: new
+                {
+                    Subject = subject,
+                    AppName = "WitcherHub",
+                    UserName = req.UserName,
+                    ActionUrl = req.ActionUrl
+                },
+                to: to,
+                subject: subject,
+                ct: ct);
+
+            return Ok(new { message = "Queued. Check logs for sending result." });
+        }
+
     }
 }

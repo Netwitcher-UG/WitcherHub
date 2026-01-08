@@ -17,6 +17,20 @@
 		<None Remove="Configuration\Middleware\**" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <None Remove="EmailTemplates\Messages\Welcome.html" />
+	  <None Remove="EmailTemplates\_Layout.html" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Content Include="EmailTemplates\Messages\Welcome.html">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Content>
+	  <Content Include="EmailTemplates\_Layout.html">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Content>
+	</ItemGroup>
+
 
 	<ItemGroup>
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
