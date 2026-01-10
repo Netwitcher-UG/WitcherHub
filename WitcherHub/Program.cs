@@ -1,4 +1,6 @@
-﻿using Serilog;
+﻿using Microsoft.AspNetCore.Localization;
+using Serilog;
+using System.Globalization;
 using System.Text.Json.Serialization;
 using WitcherHub.Configuration.Extensions;
 
@@ -13,14 +15,17 @@ builder.Host.UseSerilog((context, services, configuration) =>
         .WriteTo.Console();
 });
 builder.Services.AddPresentation(builder.Configuration);
-builder.Services
-    .AddRazorPages()
-    .AddJsonOptions(o =>
-    {
-        o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-        o.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-    });
+
+    
 var app = builder.Build();
+var supportedCultures = new[] { new CultureInfo("en"), new CultureInfo("de") };
+
+app.UseRequestLocalization(new RequestLocalizationOptions
+{
+    DefaultRequestCulture = new RequestCulture("en"),
+    SupportedCultures = supportedCultures,
+    SupportedUICultures = supportedCultures
+});
 await app.SeedAsync();
 if (app.Environment.IsDevelopment())
 {

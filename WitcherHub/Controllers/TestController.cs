@@ -1,10 +1,15 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
+using System.Globalization;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Models.DTO.Customers;
 using WitcherHub.Application.Models.Email;
 using WitcherHub.Application.Services.Email;
 using WitcherHub.Infrastructure.Services.Lexware;
+using WitcherHub.Resources;
+
+
 
 namespace WitcherHub.Controllers
 {
@@ -17,20 +22,45 @@ namespace WitcherHub.Controllers
         private readonly IAuthService _auth;
         private readonly ILexwareSyncService _sync;
         private readonly IEmailService _email;
+        private readonly IStringLocalizer<SharedResource> T;
 
         public TestController(
             ILexwareClient lexwareClient,
             IAiTextGenerator aiTextGenerator,
             IAuthService auth,
             ILexwareSyncService sync,
-            IEmailService email)
+            IEmailService email,
+            IStringLocalizer<SharedResource> t)
         {
             _lexwareClient = lexwareClient;
             _aiTextGenerator = aiTextGenerator;
             _auth = auth;
             _sync = sync;
             _email = email;
+            T = t;
         }
+        [HttpGet("i18n-ping")]
+        public IActionResult I18nPing([FromQuery] string? lang = null)
+        {
+            if (!string.IsNullOrWhiteSpace(lang))
+            {
+                var culture = new CultureInfo(lang);
+                CultureInfo.CurrentCulture = culture;
+                CultureInfo.CurrentUICulture = culture;
+            }
+
+            var s = T["Hello"];
+
+            return Ok(new
+            {
+                lang = CultureInfo.CurrentUICulture.Name,
+                value = s.Value,
+                notFound = s.ResourceNotFound
+            });
+        }
+
+
+
         [HttpPost("lexware/import/contacts")]
         public async Task<IActionResult> ImportLexwareContacts(CancellationToken ct)
         {

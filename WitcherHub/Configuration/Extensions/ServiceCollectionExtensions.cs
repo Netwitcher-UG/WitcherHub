@@ -1,12 +1,17 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Serialization;
 using WitcherHub.Application;
 using WitcherHub.Configuration.Authorization;
 using WitcherHub.Infrastructure;
 using WitcherHub.Infrastructure.Authentication;
+using WitcherHub.Resources;
+
+
 
 namespace WitcherHub.Configuration.Extensions
 {
@@ -16,8 +21,28 @@ namespace WitcherHub.Configuration.Extensions
             this IServiceCollection services,
             IConfiguration configuration)
         {
-            services.AddRazorPages();
-            services.AddControllers();
+            services.AddLocalization();
+
+            services.AddRazorPages()
+                .AddViewLocalization(LanguageViewLocationExpanderFormat.Suffix)
+                .AddDataAnnotationsLocalization(options =>
+                {
+                    options.DataAnnotationLocalizerProvider = (type, factory) =>
+                        factory.Create(typeof(SharedResource));
+                });
+
+            services.AddControllers()
+                .AddJsonOptions(o =>
+                {
+                    o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                    o.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+                })
+                .AddDataAnnotationsLocalization(options =>
+                {
+                    options.DataAnnotationLocalizerProvider = (type, factory) =>
+                        factory.Create(typeof(SharedResource));
+                });
+
             services.AddAuthorization();
             services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
 
