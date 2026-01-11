@@ -54,6 +54,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Resources\Pages\" />
     <Folder Include="wwwroot\theme\assets\" />
   </ItemGroup>
 

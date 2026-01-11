@@ -1,0 +1,118 @@
+﻿@* Pages/Contracts/SignDemo.cshtml *@
+@page "/contracts/sign-demo"
+@using Microsoft.Extensions.Localization
+@using WitcherHub.Resources
+@model WitcherHub.Pages.Contracts.SignDemoModel
+@inject IStringLocalizer<SharedResource> T
+
+@{
+    ViewData["Title"] = T["contractPage_Title"];
+    Layout = "_ContractsLayout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/contracts/contract-sign.css" asp-append-version="true" />
+}
+
+<div class="contractPage">
+    <div class="contractPage__langFab" aria-label="Language switch">
+        <button class="contractPage__langBtn" type="button" data-culture="en">EN</button>
+        <button class="contractPage__langBtn" type="button" data-culture="de">DE</button>
+    </div>
+
+    <div class="contractPage__container">
+
+        <div class="contractPage__controls">
+            <div class="contractPage__left">
+                <div class="contractPage__badgeRow">
+                    <div class="contractPage__badge" id="signedBadge">@T["contractPage_Unsigned"]</div>
+                </div>
+                <div class="contractPage__info">@T["contractPage_InfoText"]</div>
+            </div>
+
+            <div class="contractPage__right">
+                <button class="contractPage__btn contractPage__btn--primary" type="button" id="btnOpen" disabled>
+                    @T["contractPage_SignAccept"]
+                </button>
+                <button class="contractPage__btn" type="button" id="btnPrint">@T["contractPage_Print"]</button>
+                <button class="contractPage__btn" type="button" id="btnReset">@T["contractPage_Reset"]</button>
+            </div>
+        </div>
+
+        <div class="contractPage__agree">
+            <input type="checkbox" id="chkAgree" />
+            <div>
+                <div class="contractPage__agreeTitle">@T["contractPage_AgreeTitle"]</div>
+                <div class="contractPage__agreeText">@T["contractPage_AgreeText"]</div>
+            </div>
+        </div>
+
+        <div class="contractPage__paper" id="paper">
+            <div class="contractPage__contractHtml">
+                @Html.Raw(Model.ContractHtml)
+            </div>
+
+            <div class="contractPage__sigRow">
+                <div class="contractPage__sigBox" id="sigBoxClick" style="cursor:pointer;">
+                    <div class="contractPage__sigTitle">@T["contractPage_CustomerSignature"]</div>
+                    <img id="sigImage" class="contractPage__sigImg" alt="signature" />
+                    <div id="sigPlaceholder" class="contractPage__sigPlaceholder">@T["contractPage_SignatureWillAppear"]</div>
+                    <div class="contractPage__sigMeta">
+                        @T["contractPage_SignedAt"]: <span id="signedAt">—</span>
+                    </div>
+                </div>
+
+                <div class="contractPage__sigBox">
+                    <div class="contractPage__sigTitle">@T["contractPage_Provider"]</div>
+                    <div class="contractPage__sigPlaceholder">
+                        Fekrahub Solutions GmbH<br />
+                        @T["contractPage_AuthorizedRepresentative"]
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="contractPage__toast" id="toast"></div>
+
+    <div class="contractPage__modal" id="sigModal" aria-hidden="true">
+        <div class="contractPage__modalCard" role="dialog" aria-modal="true">
+            <div class="contractPage__modalHead">
+                <div>@T["contractPage_ModalTitle"]</div>
+                <button class="contractPage__btn" type="button" id="btnClose">✕</button>
+            </div>
+
+            <div class="contractPage__modalBody">
+                <div class="contractPage__modalHint">@T["contractPage_ModalHint"]</div>
+
+                <div class="contractPage__sigPad">
+                    <canvas id="sigCanvas" tabindex="0"></canvas>
+                </div>
+
+                <div class="contractPage__modalActions">
+                    <button class="contractPage__btn" type="button" id="btnClear">@T["contractPage_Clear"]</button>
+                    <button class="contractPage__btn contractPage__btn--primary" type="button" id="btnAccept">
+                        @T["contractPage_AcceptSignature"]
+                    </button>
+                    <button class="contractPage__btn" type="button" id="btnCancel">@T["contractPage_Cancel"]</button>
+                </div>
+
+                <div class="contractPage__modalStatus" id="modalStatus"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        window.contractPageI18n = {
+            emptyCanvas: "@T["contractPage_ErrEmptyCanvas"]",
+            mustAgree: "@T["contractPage_ErrMustAgree"]",
+            cleared: "@T["contractPage_Cleared"]",
+            signedOk: "@T["contractPage_SignedOk"]",
+            signed: "@T["contractPage_Signed"]",
+            unsigned: "@T["contractPage_Unsigned"]"
+        };
+    </script>
+    <script src="~/js/pages/contracts/contract-sign.js" asp-append-version="true"></script>
+}

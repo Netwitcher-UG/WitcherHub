@@ -1,0 +1,412 @@
+﻿/* wwwroot/css/contracts/contract-sign.css */
+
+.contractPage {
+    background: #f6f7fb;
+    min-height: 100vh;
+    padding: 20px 0 28px;
+    overflow-x: hidden;
+}
+
+.contractPage__container {
+    max-width: 1150px;
+    margin: 0 auto;
+    padding: 64px 14px 0;
+}
+
+.contractPage__langFab {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
+    z-index: 10000;
+    display: inline-flex;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,.10);
+    box-shadow: 0 10px 25px rgba(0,0,0,.12);
+}
+
+.contractPage__langBtn {
+    border: 1px solid rgba(0,0,0,.12);
+    background: #fff;
+    color: #111;
+    padding: 8px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: .2px;
+    line-height: 1;
+}
+
+    .contractPage__langBtn.active {
+        background: #111;
+        color: #fff;
+        border-color: #111;
+    }
+
+.contractPage__controls {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 14px;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,.10);
+    box-shadow: 0 10px 25px rgba(0,0,0,.08);
+}
+
+.contractPage__left {
+    min-width: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.contractPage__badgeRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.contractPage__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 999px;
+    background: #f3f5ff;
+    border: 1px solid rgba(0,0,0,.08);
+    font-weight: 900;
+    font-size: 13px;
+    color: #111;
+}
+
+    .contractPage__badge.signed {
+        background: #ecfff1;
+        border-color: rgba(46,204,113,.25);
+    }
+
+.contractPage__info {
+    font-size: 13px;
+    font-weight: 700;
+    color: #444;
+    overflow-wrap: anywhere;
+}
+
+.contractPage__right {
+    min-width: 0;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.contractPage__btn {
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,.12);
+    background: #fff;
+    color: #111;
+    cursor: pointer;
+    font-weight: 800;
+    font-size: 13px;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.contractPage__btn--primary {
+    background: #111;
+    color: #fff;
+    border-color: #111;
+}
+
+.contractPage__btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.contractPage__agree {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    gap: 10px;
+    align-items: start;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,.10);
+    box-shadow: 0 10px 25px rgba(0,0,0,.06);
+}
+
+    .contractPage__agree input {
+        margin-top: 4px;
+    }
+
+.contractPage__agreeTitle {
+    font-weight: 900;
+    color: #111;
+    overflow-wrap: anywhere;
+}
+
+.contractPage__agreeText {
+    color: #555;
+    font-size: 13px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+
+.contractPage__paper {
+    margin: 14px auto 0;
+    background: #fff;
+    color: #111;
+    width: 100%;
+    max-width: 210mm;
+    min-height: 297mm;
+    padding: 28px 26px;
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,.10);
+    box-shadow: 0 18px 45px rgba(0,0,0,.12);
+}
+
+.contractPage__contractHtml {
+    font-size: 14px;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
+}
+
+    .contractPage__contractHtml img,
+    .contractPage__contractHtml table {
+        max-width: 100%;
+    }
+
+.contractPage__sigRow {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+    margin-top: 26px;
+    align-items: end;
+}
+
+.contractPage__sigBox {
+    border: 1px dashed rgba(0,0,0,.35);
+    border-radius: 12px;
+    padding: 12px;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.contractPage__sigTitle {
+    font-weight: 900;
+    font-size: 13px;
+    margin-bottom: 10px;
+    overflow-wrap: anywhere;
+}
+
+.contractPage__sigImg {
+    width: 100%;
+    height: 140px;
+    object-fit: contain;
+    display: none;
+    background: #fafafa;
+    border-radius: 10px;
+    border: 1px solid rgba(0,0,0,.06);
+}
+
+.contractPage__sigPlaceholder {
+    font-size: 12px;
+    color: #666;
+    overflow-wrap: anywhere;
+}
+
+.contractPage__sigMeta {
+    font-size: 12px;
+    color: #666;
+    margin-top: 10px;
+    overflow-wrap: anywhere;
+}
+
+.contractPage__toast {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 78px);
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
+    z-index: 11000;
+    display: none;
+    max-width: min(360px, calc(100vw - 24px));
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #111;
+    color: #fff;
+    font-weight: 800;
+    font-size: 13px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.18);
+    overflow-wrap: anywhere;
+}
+
+    .contractPage__toast.error {
+        background: #d9534f;
+    }
+
+.contractPage__modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    background: rgba(0,0,0,.55);
+    padding: 14px;
+}
+
+.contractPage__modalCard {
+    width: min(920px, 100%);
+    margin: 6vh auto;
+    background: #fff;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,.15);
+    color: #111;
+    box-shadow: 0 24px 60px rgba(0,0,0,.25);
+}
+
+.contractPage__modalHead {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(0,0,0,.08);
+    font-weight: 900;
+}
+
+.contractPage__modalBody {
+    padding: 16px;
+}
+
+.contractPage__modalHint {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 10px;
+    overflow-wrap: anywhere;
+}
+
+.contractPage__sigPad {
+    border: 1px solid rgba(0,0,0,.15);
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+}
+
+    .contractPage__sigPad canvas {
+        width: 100%;
+        height: 360px;
+        display: block;
+        touch-action: none;
+        cursor: crosshair;
+    }
+
+.contractPage__modalActions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.contractPage__modalStatus {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,.10);
+    background: #fafafa;
+    display: none;
+    font-size: 13px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+    .contractPage__container {
+        padding-top: 64px;
+    }
+
+    .contractPage__controls {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .contractPage__right {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 600px) {
+    .contractPage__container {
+        padding: 64px 12px 0;
+    }
+
+    .contractPage__right {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .contractPage__btn {
+        width: 100%;
+    }
+
+    .contractPage__paper {
+        padding: 18px 16px;
+        min-height: auto;
+    }
+
+    .contractPage__sigPad canvas {
+        height: 46vh;
+        max-height: 520px;
+    }
+
+    .contractPage__langFab {
+        top: calc(env(safe-area-inset-top, 0px) + 10px);
+        right: calc(env(safe-area-inset-right, 0px) + 10px);
+        padding: 6px;
+        gap: 6px;
+        border-radius: 12px;
+    }
+
+    .contractPage__langBtn {
+        padding: 8px 10px;
+        border-radius: 10px;
+    }
+}
+
+@media print {
+    .contractPage__langFab,
+    .contractPage__controls,
+    .contractPage__agree,
+    .contractPage__toast {
+        display: none !important;
+    }
+
+    .contractPage {
+        background: #fff !important;
+        padding: 0 !important;
+    }
+
+    .contractPage__container {
+        padding: 0 !important;
+        max-width: none !important;
+    }
+
+    .contractPage__paper {
+        box-shadow: none;
+        border: none;
+        max-width: none;
+        width: auto;
+        min-height: auto;
+        padding: 0;
+        border-radius: 0;
+    }
+}
