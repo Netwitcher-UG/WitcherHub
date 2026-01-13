@@ -1,111 +1,75 @@
 ﻿using Ganss.Xss;
 using Markdig;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Models.DTO.Contracts;
+using WitcherHub.Infrastructure.Services.Contracts;
 
 namespace WitcherHub.Pages.Contracts
 {
     public class SignDemoModel : PageModel
     {
         private readonly IContractDocumentGenerator _generator;
+        private readonly ContractTemplateOptions _opt;
 
         public string ContractHtml { get; private set; } = "";
         public string ContractMarkdown { get; private set; } = "";
 
-        public SignDemoModel(IContractDocumentGenerator generator)
+        public string ProviderName { get; private set; } = "";
+        public string ProviderAddress { get; private set; } = "";
+
+        public SignDemoModel(IContractDocumentGenerator generator, IOptions<ContractTemplateOptions> opt)
         {
             _generator = generator;
+            _opt = opt.Value;
         }
 
-        public async Task OnGetAsync()
+        public async Task OnGetAsync(CancellationToken ct)
         {
-            // ✅ بيانات افتراضية للتجريب مثل Swagger تمامًا
             var req = new GenerateContractDocumentRequest
             {
-                ContractNo = "C-DEMO-001",
-                ProjectTitle = "Demo Website Project",
+                ContractNo = "DEMO-001",
+                ProjectTitle = "Videos Animation",
+                SignerName = "", // ✅ name is filled on the page (input)
                 Currency = "EUR",
-                SignerName = "Ahmed Ali",
-                SignerEmail = "ahmed@example.com",
                 LeaveCustomerFieldsBlank = true,
-                IncludePricesInServicesSection = false,
-                AdditionalInstructions = "Use concise bullet points. Mention timeline if present in config. Do NOT add '---'.",
+                IncludePricesInServicesSection = true,
                 Services = new List<ContractServiceLineDto>
                 {
-                    new()
+                    new ContractServiceLineDto
                     {
                         Position = 1,
-                        Title = "Website Development",
-                        ServiceName = "Website",
-                        ServiceType = "Web",
+                        Title = "Video Animation",
+                        ServiceName = "Erklärvideo / Animation",
+                        ServiceType = "Video",
                         PricingModel = "Fixed",
-                        AgreedPrice = 1500,
-                        Config = new Dictionary<string, object>
-                        {
-                            ["pages"] = 5,
-                            ["languages"] = new [] { "de", "en" },
-                            ["revisionsIncluded"] = 2,
-                            ["timelineWeeks"] = 3,
-                            ["includesCMS"] = true,
-                            ["includesContactForm"] = true,
-                            ["seoBasicsIncluded"] = true
-                        }
-                    },
-                    new()
-                    {
-                        Position = 2,
-                        Title = "SEO Setup",
-                        ServiceName = "SEO",
-                        ServiceType = "Marketing",
-                        PricingModel = "Fixed",
-                        AgreedPrice = 400,
-                        Config = new Dictionary<string, object>
-                        {
-                            ["keywordCount"] = 10,
-                            ["technicalAudit"] = true,
-                            ["onpageSetup"] = new [] { "metaTitles", "metaDescriptions", "sitemap", "robots" },
-                            ["reporting"] = "monthly"
-                        }
-                    },
-                    new()
-                    {
-                        Position = 3,
-                        Title = "Hosting (12 months)",
-                        ServiceName = "Web Hosting",
-                        ServiceType = "Hosting",
-                        PricingModel = "Subscription",
-                        AgreedPrice = 240,
-                        Config = new Dictionary<string, object>
-                        {
-                            ["durationMonths"] = 12,
-                            ["storageGB"] = 10,
-                            ["emailAccounts"] = 5,
-                            ["sslIncluded"] = true,
-                            ["backups"] = "daily",
-                            ["support"] = "business-hours"
-                        }
+                        AgreedPrice = 0m,
+                        Config = new Dictionary<string, object>()
                     }
                 }
             };
 
-            var res = await _generator.GenerateAsync(req);
+            // Provider block split: first line = name, rest = address
+            var pb = NormalizeNewLines(_opt.ProviderBlock ?? "");
+            var lines = pb.Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
-            // Markdown
-            ContractMarkdown = NormalizeNewLines(res.FullDocument);
+            ProviderName = lines.Length > 0 ? lines[0] : "";
+            ProviderAddress = lines.Length > 1 ? string.Join("\n", lines.Skip(1)) : "";
 
-            // Markdown -> HTML
+            var doc = await _generator.GenerateAsync(req, ct);
+
+            ContractMarkdown = NormalizeNewLines(doc.FullDocument);
+
             var pipeline = new MarkdownPipelineBuilder()
                 .UseAdvancedExtensions()
                 .Build();
 
-            var rawHtml = Markdown.ToHtml(ContractMarkdown, pipeline);
+            var html = Markdown.ToHtml(ContractMarkdown, pipeline);
 
-            // ✅ Sanitize (مهم لأنك تستخدم Html.Raw)
             var sanitizer = new HtmlSanitizer();
-            sanitizer.AllowedSchemes.Add("data"); // احتياط لو عندك data-url لاحقًا
-            ContractHtml = sanitizer.Sanitize(rawHtml);
+            sanitizer.AllowedSchemes.Add("mailto");
+            ContractHtml = sanitizer.Sanitize(html);
         }
 
         private static string NormalizeNewLines(string s)

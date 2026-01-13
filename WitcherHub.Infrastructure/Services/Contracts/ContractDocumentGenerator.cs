@@ -22,42 +22,44 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             GenerateContractDocumentRequest request,
             CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(request.SignerName))
-                throw new InvalidOperationException("SignerName is required (entered by the user).");
+            request.SignerName ??= "";
 
             if (request.Services == null || request.Services.Count == 0)
                 throw new InvalidOperationException("At least one service is required.");
 
-            // 1) اقرأ القالب الثابت
+            // 1) Template
             var templatePath = Path.Combine(AppContext.BaseDirectory, _opt.BaseDePath);
             if (!File.Exists(templatePath))
                 throw new InvalidOperationException($"Contract template not found: {templatePath}");
 
             var baseTemplate = await ReadTextSmartAsync(templatePath, ct);
-            var fixedPath = Path.Combine(AppContext.BaseDirectory, _opt.FixedTermsDePath);
-            if (!File.Exists(fixedPath))
-                throw new InvalidOperationException($"Fixed terms file not found: {fixedPath}");
 
-            var fixedTermsBody = await ReadTextSmartAsync(fixedPath, ct);
-
+            // 2) AGB
             var agbPath = Path.Combine(AppContext.BaseDirectory, _opt.AgbDePath);
             if (!File.Exists(agbPath))
                 throw new InvalidOperationException($"AGB file not found: {agbPath}");
 
             var agbBody = await ReadTextSmartAsync(agbPath, ct);
-            // 2) Customer block (placeholder أو override)
+
+            // 3) Customer block
             var customerBlock = request.CustomerBlockOverride;
             if (string.IsNullOrWhiteSpace(customerBlock))
             {
                 customerBlock = request.LeaveCustomerFieldsBlank
-                    ? "Name/Firma: ____________________\nAdresse: ____________________\nPLZ/Ort: ____________________\n"
+                    ? "Name/Firma:\nAdresse:\nPLZ/Ort:\n"
                     : "Name/Firma: (filled)\nAdresse: (filled)\nPLZ/Ort: (filled)\n";
             }
 
-            // 3) Provider block من Options
-            var providerBlock = _opt.ProviderBlock;
+            customerBlock = StripHtml(customerBlock);
 
-            // 4) جهّز payload للخدمات لـ GPT
+            // 4) Provider block
+            var providerBlock = _opt.ProviderBlock ?? "";
+
+            // ✅ IMPORTANT: Preserve line breaks in markdown
+            providerBlock = ToMarkdownHardBreaks(providerBlock);
+            customerBlock = ToMarkdownHardBreaks(customerBlock);
+
+            // 5) Services payload for GPT
             var servicesPayload = request.Services
                 .OrderBy(s => s.Position)
                 .Select(s => new
@@ -80,58 +82,62 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 servicesPayload: servicesPayload,
                 additionalInstructions: request.AdditionalInstructions);
 
-            // 5) GPT يولّد فقط قسم الخدمات
             var servicesSection = await _ai.GenerateTextAsync(prompt);
             servicesSection = CleanModelOutput(servicesSection);
 
             if (string.IsNullOrWhiteSpace(servicesSection))
                 servicesSection = "*(No services section generated.)*";
 
-            // 6) ادمج داخل القالب
+            // 6) Merge
             var tokens = new Dictionary<string, string?>
             {
-                ["CONTRACT_NO"] = string.IsNullOrWhiteSpace(request.ContractNo) ? "____________________" : request.ContractNo,
+                ["CONTRACT_NO"] = string.IsNullOrWhiteSpace(request.ContractNo) ? "" : request.ContractNo,
                 ["PROJECT_TITLE"] = request.ProjectTitle,
                 ["PROVIDER_BLOCK"] = providerBlock,
                 ["CUSTOMER_BLOCK"] = customerBlock,
                 ["SIGNER_NAME"] = request.SignerName,
-                ["FIXED_TERMS_BODY"] = fixedTermsBody,
-                ["AGB_BODY"] = agbBody,               
+                ["AGB_BODY"] = agbBody,
                 ["SERVICES_SECTION"] = servicesSection,
             };
 
-
-
             var full = ReplaceTokens(baseTemplate, tokens);
-
-            // FixedTerms: نفس القالب لكن بدون الخدمات
-            tokens["SERVICES_SECTION"] = "";
-            var fixedTerms = ReplaceTokens(baseTemplate, tokens);
 
             return new GenerateContractDocumentResponse
             {
-                FixedTerms = fixedTerms,
+                FixedTerms = "",
                 ServicesSection = servicesSection,
                 FullDocument = full
             };
         }
+
+        private static string StripHtml(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return input;
+            return Regex.Replace(input, "<.*?>", string.Empty);
+        }
+
+        // ✅ This fixes "Address line City, ZIP" collapsing into one line
+        private static string ToMarkdownHardBreaks(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return "";
+            input = input.Replace("\r\n", "\n");
+            var lines = input.Split('\n')
+                .Select(l => l.TrimEnd())
+                .Where(l => l.Length > 0);
+            return string.Join("  \n", lines); // markdown hard line break
+        }
+
         private static async Task<string> ReadTextSmartAsync(string path, CancellationToken ct)
         {
-            // 1) Try UTF-8 first
             var text = await File.ReadAllTextAsync(path, Encoding.UTF8, ct);
 
-            // If it looks broken (replacement chars), try Windows-1252
             if (LooksLikeBrokenEncoding(text))
             {
-                // Windows-1252 is common for German text saved as ANSI on Windows
                 var win1252 = Encoding.GetEncoding(1252);
                 text = await File.ReadAllTextAsync(path, win1252, ct);
 
-                // If still broken, last fallback: Latin1
                 if (LooksLikeBrokenEncoding(text))
-                {
                     text = await File.ReadAllTextAsync(path, Encoding.Latin1, ct);
-                }
             }
 
             return text;
@@ -140,14 +146,8 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         private static bool LooksLikeBrokenEncoding(string text)
         {
             if (string.IsNullOrEmpty(text)) return false;
-
-            // Common symptom: replacement character �
             if (text.Contains('�')) return true;
-
-            // Another symptom: sequences like "Ã¼" instead of "ü"
-            // (UTF-8 bytes read as Latin1)
             if (Regex.IsMatch(text, "Ã.|Â.")) return true;
-
             return false;
         }
 
@@ -155,9 +155,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         {
             var result = template;
             foreach (var kv in tokens)
-            {
                 result = result.Replace("{{" + kv.Key + "}}", kv.Value ?? "");
-            }
             return result;
         }
 
@@ -175,36 +173,23 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 if (lastFence >= 0) text = text[..lastFence];
             }
 
-            // لو رجع عنوان Anlage A بالغلط نحذفه
             var trimmed = text.TrimStart();
-            if (trimmed.StartsWith("#") && trimmed.Contains("Anlage A") || trimmed.StartsWith("##") && trimmed.Contains("Anlage A"))
+            if ((trimmed.StartsWith("#") || trimmed.StartsWith("##")) && trimmed.Contains("Anlage A"))
             {
                 var idx = trimmed.IndexOf("\n\n", StringComparison.Ordinal);
-                if (idx > 0)
-                    trimmed = trimmed[(idx + 2)..];
+                if (idx > 0) trimmed = trimmed[(idx + 2)..];
                 text = trimmed.Trim();
             }
-            // Remove horizontal rules if model returns them anyway
-            text = string.Join("\n",
-                text.Split('\n')
-                    .Where(l =>
-                    {
-                        var t = l.Trim();
-                        return t != "---" && t != "***" && t != "___";
-                    })
-            );
+
             var lines = text.Split('\n')
-                    .Where(l =>
-                    {
-                        var t = l.Trim();
-                        return t != "---" && t != "***" && t != "___";
-                    });
+                .Where(l =>
+                {
+                    var t = l.Trim();
+                    return t != "---" && t != "***" && t != "___";
+                });
 
-            text = string.Join("\n", lines).Trim();
-
-            return text.Trim();
+            return string.Join("\n", lines).Trim();
         }
-
 
         private static string BuildServicesPrompt(
             string projectTitle,
@@ -234,6 +219,7 @@ Rules:
 - Do NOT add any section separators; keep a clean list of positions.
 - For each service item: include Scope, Deliverables, Out-of-scope, Customer responsibilities, Acceptance criteria.
 - Keep it professional and client-friendly.
+- Output language: German (DE).
 - {(includePrices ? "Include the agreed price per item if present." : "Do NOT include any prices.")}
 
 Project: {projectTitle}
@@ -245,8 +231,6 @@ Services (JSON):
 Additional instructions:
 {additionalInstructions ?? "(none)"}
 ";
-
-
         }
     }
 }

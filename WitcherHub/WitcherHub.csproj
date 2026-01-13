@@ -8,9 +8,8 @@
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
   </PropertyGroup>
 	<ItemGroup>
-		<Content Include="OpenAI/Contracts/**/*.md">
+		<Content Include="OpenAI\Contracts\**\*.md">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Content>
 	</ItemGroup>
 
@@ -62,7 +61,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="OpenAI\Contracts\" />
     <Folder Include="Resources\Pages\" />
     <Folder Include="wwwroot\theme\assets\" />
   </ItemGroup>

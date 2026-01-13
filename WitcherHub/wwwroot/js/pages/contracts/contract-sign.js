@@ -1,8 +1,6 @@
 ﻿// wwwroot/js/pages/contracts/contract-sign.js
-
 (function () {
     const i18n = window.contractPageI18n || {};
-
     const $ = (id) => document.getElementById(id);
 
     const chkAgree = $("chkAgree");
@@ -24,32 +22,34 @@
     const sigImage = $("sigImage");
     const sigPlaceholder = $("sigPlaceholder");
     const signedAt = $("signedAt");
+    const customerDate = $("customerDate");
+    const customerName = $("customerName");
 
     const canvas = $("sigCanvas");
-    if (!chkAgree || !btnOpen || !sigModal || !canvas) return;
+    if (!chkAgree || !btnOpen || !sigModal || !canvas || !customerName) return;
 
     const ctx = canvas.getContext("2d");
 
     const STORAGE_SIG = "fekrahub.contract.signature";
     const STORAGE_AT = "fekrahub.contract.signedAt";
-
-    function lang2() {
-        return (document.documentElement.lang || "en").slice(0, 2).toLowerCase();
-    }
+    const STORAGE_NAME = "fekrahub.contract.customerName";
 
     function formatSignedAt(iso) {
         try {
             const d = new Date(iso);
             return d.toLocaleString(document.documentElement.lang || undefined, {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit"
+                year: "numeric", month: "2-digit", day: "2-digit",
+                hour: "2-digit", minute: "2-digit"
             });
-        } catch {
-            return iso;
-        }
+        } catch { return iso; }
+    }
+    function formatDateOnly(iso) {
+        try {
+            const d = new Date(iso);
+            return d.toLocaleDateString(document.documentElement.lang || undefined, {
+                year: "numeric", month: "2-digit", day: "2-digit"
+            });
+        } catch { return ""; }
     }
 
     function hideToast() {
@@ -58,9 +58,18 @@
         toast.textContent = "";
         toast.classList.remove("error");
     }
+    function decodeHtmlEntities(s) {
+        if (!s) return s;
+        const t = document.createElement("textarea");
+        t.innerHTML = s;
+        return t.value;
+    }
 
     function showToast(msg, isError) {
         if (!toast) return;
+
+        msg = decodeHtmlEntities(msg);
+
         if (!msg) {
             hideToast();
             return;
@@ -71,6 +80,7 @@
         clearTimeout(showToast._t);
         showToast._t = setTimeout(hideToast, 2600);
     }
+
 
     function showModalStatus(msg, isError) {
         if (!modalStatus) return;
@@ -85,18 +95,34 @@
         modalStatus.style.background = isError ? "#fff5f5" : "#fafafa";
     }
 
+    function canSignNow() {
+        const nameOk = (customerName.value || "").trim().length > 0;
+        return chkAgree.checked && nameOk;
+    }
+
+    function refreshSignButton() {
+        btnOpen.disabled = !canSignNow();
+    }
+
     function setSignedUI(whenIso, dataUrl) {
         if (sigImage) {
             sigImage.src = dataUrl;
             sigImage.style.display = "block";
         }
         if (sigPlaceholder) sigPlaceholder.style.display = "none";
+
         if (signedAt) signedAt.textContent = formatSignedAt(whenIso);
+        if (customerDate) customerDate.textContent = formatDateOnly(whenIso);
 
         if (signedBadge) {
             signedBadge.textContent = i18n.signed || "Signed";
             signedBadge.classList.add("signed");
         }
+
+        // lock fields after sign (production)
+        customerName.readOnly = true;
+        chkAgree.disabled = true;
+        btnOpen.disabled = true;
     }
 
     function setUnsignedUI() {
@@ -105,12 +131,18 @@
             sigImage.style.display = "none";
         }
         if (sigPlaceholder) sigPlaceholder.style.display = "block";
-        if (signedAt) signedAt.textContent = "—";
+
+        if (signedAt) signedAt.textContent = "";
+        if (customerDate) customerDate.textContent = "";
 
         if (signedBadge) {
             signedBadge.textContent = i18n.unsigned || "Unsigned";
             signedBadge.classList.remove("signed");
         }
+
+        customerName.readOnly = false;
+        chkAgree.disabled = false;
+        refreshSignButton();
     }
 
     function resizeCanvas() {
@@ -118,12 +150,18 @@
         const rect = canvas.getBoundingClientRect();
         const w = Math.max(1, Math.floor(rect.width));
         const h = Math.max(1, Math.floor(rect.height));
+
         canvas.width = Math.floor(w * ratio);
         canvas.height = Math.floor(h * ratio);
+
         ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-        ctx.lineWidth = 2;
+
+        // ✅ darker + thicker signature
+        ctx.lineWidth = 3.6;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
+        ctx.strokeStyle = "#111";
+        ctx.globalAlpha = 1;
     }
 
     function clearCanvas() {
@@ -144,9 +182,17 @@
 
     function openModal() {
         if (!chkAgree.checked) {
-            showToast(i18n.mustAgree || "Please confirm agreement.", true);
+            showToast(i18n.mustAgree || "Please confirm agreement before signing", true);
             return;
         }
+
+        const name = (customerName?.value || "").trim();
+        if (!name) {
+            showToast(i18n.fillName || "Please enter your name before signing", true);
+            customerName?.focus();
+            return;
+        }
+
         sigModal.style.display = "block";
         sigModal.setAttribute("aria-hidden", "false");
         document.body.style.overflow = "hidden";
@@ -156,6 +202,7 @@
         canvas.focus?.();
     }
 
+
     function closeModal() {
         sigModal.style.display = "none";
         sigModal.setAttribute("aria-hidden", "true");
@@ -163,26 +210,25 @@
         showModalStatus("", false);
     }
 
-    function wireLangButtons() {
-        const current = lang2();
-        document.querySelectorAll(".contractPage__langBtn").forEach((b) => {
-            if (b.dataset.culture === current) b.classList.add("active");
-            b.addEventListener("click", () => {
-                const url = new URL(window.location.href);
-                url.searchParams.set("culture", b.dataset.culture);
-                url.searchParams.set("ui-culture", b.dataset.culture);
-                window.location.href = url.toString();
-            });
-        });
-    }
-
+    // Events
     chkAgree.addEventListener("change", () => {
-        btnOpen.disabled = !chkAgree.checked;
+        refreshSignButton();
         if (chkAgree.checked) hideToast();
+    });
+
+    customerName.addEventListener("input", () => {
+        localStorage.setItem(STORAGE_NAME, customerName.value || "");
+        refreshSignButton();
     });
 
     btnOpen.addEventListener("click", openModal);
     sigBoxClick?.addEventListener("click", openModal);
+    sigBoxClick?.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openModal();
+        }
+    });
 
     btnClose?.addEventListener("click", closeModal);
     btnCancel?.addEventListener("click", closeModal);
@@ -195,6 +241,7 @@
         if (e.key === "Escape" && sigModal.style.display === "block") closeModal();
     });
 
+    // Drawing
     let drawing = false;
     let last = null;
 
@@ -257,13 +304,14 @@
     btnReset?.addEventListener("click", () => {
         localStorage.removeItem(STORAGE_SIG);
         localStorage.removeItem(STORAGE_AT);
+        localStorage.removeItem(STORAGE_NAME);
+
+        customerName.value = "";
+        chkAgree.checked = false;
 
         setUnsignedUI();
-        chkAgree.checked = false;
-        btnOpen.disabled = true;
-        clearCanvas();
         hideToast();
-        showModalStatus("", false);
+        clearCanvas();
     });
 
     window.addEventListener("resize", () => {
@@ -271,19 +319,23 @@
     });
 
     function initFromStorage() {
+        const savedName = localStorage.getItem(STORAGE_NAME);
+        if (savedName) customerName.value = savedName;
+
         const savedSig = localStorage.getItem(STORAGE_SIG);
         const savedAt = localStorage.getItem(STORAGE_AT);
+
         if (savedSig && savedAt) {
+            // already signed
             chkAgree.checked = true;
-            btnOpen.disabled = false;
             setSignedUI(savedAt, savedSig);
         } else {
             setUnsignedUI();
-            btnOpen.disabled = !chkAgree.checked;
         }
+
+        refreshSignButton();
     }
 
-    wireLangButtons();
     resizeCanvas();
     clearCanvas();
     initFromStorage();
