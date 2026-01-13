@@ -8,8 +8,10 @@
 
         public string BaseDePath { get; set; } = "OpenAI/Contracts/Agenturvertrag.de.md";
         public string AgbDePath { get; set; } = "OpenAI/Contracts/AGB.de.md";
-
         public string ProviderBlock { get; set; } =
-            "WitcherHub / Your Company Name\nAddress line\nCity, ZIP\n";
+           "WitcherHub / netwitcher\n" +
+           "Berlin, Deutschland\n" +
+           "Address line\n";
+        
     }
 }
