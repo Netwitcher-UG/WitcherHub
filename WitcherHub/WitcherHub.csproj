@@ -7,6 +7,12 @@
     <UserSecretsId>cd0935cf-1dce-4462-a1f2-151a5ee3f80e</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
   </PropertyGroup>
+	<ItemGroup>
+		<Content Include="OpenAI/Contracts/**/*.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</Content>
+	</ItemGroup>
 
 	<ItemGroup>
 		<Compile Remove="Configuration\Middleware\**" />

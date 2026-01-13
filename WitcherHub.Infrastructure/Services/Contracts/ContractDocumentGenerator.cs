@@ -29,18 +29,18 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 throw new InvalidOperationException("At least one service is required.");
 
             // 1) اقرأ القالب الثابت
-            var templatePath = Path.GetFullPath(_opt.BaseDePath);
+            var templatePath = Path.Combine(AppContext.BaseDirectory, _opt.BaseDePath);
             if (!File.Exists(templatePath))
                 throw new InvalidOperationException($"Contract template not found: {templatePath}");
 
             var baseTemplate = await ReadTextSmartAsync(templatePath, ct);
-            var fixedPath = Path.GetFullPath(_opt.FixedTermsDePath);
+            var fixedPath = Path.Combine(AppContext.BaseDirectory, _opt.FixedTermsDePath);
             if (!File.Exists(fixedPath))
                 throw new InvalidOperationException($"Fixed terms file not found: {fixedPath}");
 
             var fixedTermsBody = await ReadTextSmartAsync(fixedPath, ct);
 
-            var agbPath = Path.GetFullPath(_opt.AgbDePath);
+            var agbPath = Path.Combine(AppContext.BaseDirectory, _opt.AgbDePath);
             if (!File.Exists(agbPath))
                 throw new InvalidOperationException($"AGB file not found: {agbPath}");
 
