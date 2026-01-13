@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Localization;
 using System.Globalization;
 using WitcherHub.Application.Interfaces;
+using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Models.DTO.Customers;
 using WitcherHub.Application.Models.Email;
 using WitcherHub.Application.Services.Email;
@@ -23,14 +24,15 @@ namespace WitcherHub.Controllers
         private readonly ILexwareSyncService _sync;
         private readonly IEmailService _email;
         private readonly IStringLocalizer<SharedResource> T;
-
+        private readonly IContractDocumentGenerator _contractDoc;
         public TestController(
             ILexwareClient lexwareClient,
             IAiTextGenerator aiTextGenerator,
             IAuthService auth,
             ILexwareSyncService sync,
             IEmailService email,
-            IStringLocalizer<SharedResource> t)
+            IStringLocalizer<SharedResource> t,
+            IContractDocumentGenerator contractDoc)
         {
             _lexwareClient = lexwareClient;
             _aiTextGenerator = aiTextGenerator;
@@ -38,6 +40,7 @@ namespace WitcherHub.Controllers
             _sync = sync;
             _email = email;
             T = t;
+            _contractDoc = contractDoc;
         }
         [HttpGet("i18n-ping")]
         public IActionResult I18nPing([FromQuery] string? lang = null)
@@ -110,21 +113,38 @@ namespace WitcherHub.Controllers
             return Ok(items);
         }
 
-        // لاختبار OpenAI
         [HttpGet("ai-demo")]
-        public async Task<IActionResult> AiDemo(
-            [FromQuery] string prompt = "دردش مع شات جي بي تي")
+        public async Task<IActionResult> AiDemo([FromQuery] string? prompt)
         {
-            var response = await _aiTextGenerator.GenerateTextAsync(prompt);
+            prompt ??= "دردش مع شات جي بي تي";
 
-            return Ok(new
+            try
             {
-                Prompt = prompt,
-                Response = response
-            });
+                var response = await _aiTextGenerator.GenerateTextAsync(prompt);
+
+                return Ok(new
+                {
+                    Prompt = prompt,
+                    Response = response
+                });
+            }
+            catch (Exception ex)
+            {
+                // يرجّع خطأ واضح وقت التجربة
+                return Problem(
+                    title: "OpenAI call failed",
+                    detail: ex.Message,
+                    statusCode: StatusCodes.Status500InternalServerError
+                );
+            }
         }
 
-        
+        [HttpPost("contract/preview")]
+        public async Task<IActionResult> ContractPreview([FromBody] GenerateContractDocumentRequest request, CancellationToken ct)
+        {
+            var result = await _contractDoc.GenerateAsync(request, ct);
+            return Ok(result);
+        }
 
 
         [HttpPost("login")]

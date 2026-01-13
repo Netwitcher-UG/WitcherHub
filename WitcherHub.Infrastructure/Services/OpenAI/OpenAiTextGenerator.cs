@@ -14,6 +14,9 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
 
         public async Task<string> GenerateTextAsync(string prompt)
         {
+            if (string.IsNullOrWhiteSpace(prompt))
+                return string.Empty;
+
             ChatCompletion completion = await _chatClient.CompleteChatAsync(prompt);
 
             return completion.Content.Count > 0

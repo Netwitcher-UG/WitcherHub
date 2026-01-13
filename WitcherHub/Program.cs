@@ -1,10 +1,12 @@
 ﻿using Microsoft.AspNetCore.Localization;
 using Serilog;
 using System.Globalization;
+using System.Text;
 using System.Text.Json.Serialization;
 using WitcherHub.Configuration.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 builder.Services.AddAppExceptionHandling();
 builder.Host.UseSerilog((context, services, configuration) =>
 {

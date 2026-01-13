@@ -22,6 +22,7 @@ using WitcherHub.Infrastructure.Repositories.Implementations;
 using WitcherHub.Infrastructure.Seeding;
 using WitcherHub.Infrastructure.Services.BackgroundTasks;
 using WitcherHub.Infrastructure.Services.Caching;
+using WitcherHub.Infrastructure.Services.Contracts;
 using WitcherHub.Infrastructure.Services.Email_Sender.EmailTemplates;
 using WitcherHub.Infrastructure.Services.Email_Sender.Options;
 using WitcherHub.Infrastructure.Services.Email_Sender.Sender;
@@ -136,6 +137,10 @@ namespace WitcherHub.Infrastructure
             services.AddSingleton<IEmailTemplateRenderer, FileEmailTemplateRenderer>();
 
             services.AddScoped<IEmailService, EmailService>();
+            services.Configure<ContractTemplateOptions>(
+    configuration.GetSection(ContractTemplateOptions.SectionName));
+
+            services.AddScoped<IContractDocumentGenerator, ContractDocumentGenerator>();
 
             return services;
         }
