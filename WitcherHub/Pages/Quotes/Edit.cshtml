@@ -1,0 +1,611 @@
+@page
+@using System.Text.Json
+@using static WitcherHub.Infrastructure.Data.Models.Enums
+@model WitcherHub.Pages.Quotes.EditModel
+
+@{
+    ViewData["Title"] = "Edit Quote";
+}
+
+@if (Model.Quote is null)
+{
+    <div class="alert alert-danger">Quote not found.</div>
+    return;
+}
+
+@functions {
+    string FmtDate(DateTimeOffset? d) => d?.ToString("yyyy-MM-dd") ?? "";
+
+    decimal ReadDec(JsonDocument? doc, string prop, decimal fallback = 0m)
+    {
+        try
+        {
+            if (doc is null) return fallback;
+            var root = doc.RootElement;
+            if (!root.TryGetProperty(prop, out var v)) return fallback;
+            if (v.ValueKind == JsonValueKind.Number && v.TryGetDecimal(out var d)) return d;
+            if (v.ValueKind == JsonValueKind.String && decimal.TryParse(v.GetString(), out var ds)) return ds;
+            return fallback;
+        }
+        catch { return fallback; }
+    }
+
+    decimal ReadNestedDec(JsonDocument? doc, string parent, string prop, decimal fallback = 0m)
+    {
+        try
+        {
+            if (doc is null) return fallback;
+            var root = doc.RootElement;
+            if (!root.TryGetProperty(parent, out var p)) return fallback;
+            if (p.ValueKind != JsonValueKind.Object) return fallback;
+            if (!p.TryGetProperty(prop, out var v)) return fallback;
+            if (v.ValueKind == JsonValueKind.Number && v.TryGetDecimal(out var d)) return d;
+            if (v.ValueKind == JsonValueKind.String && decimal.TryParse(v.GetString(), out var ds)) return ds;
+            return fallback;
+        }
+        catch { return fallback; }
+    }
+
+    string ReadNestedStr(JsonDocument? doc, string parent, string prop, string fallback = "")
+    {
+        try
+        {
+            if (doc is null) return fallback;
+            var root = doc.RootElement;
+            if (!root.TryGetProperty(parent, out var p)) return fallback;
+            if (p.ValueKind != JsonValueKind.Object) return fallback;
+            if (!p.TryGetProperty(prop, out var v)) return fallback;
+            if (v.ValueKind == JsonValueKind.String) return v.GetString() ?? fallback;
+            return fallback;
+        }
+        catch { return fallback; }
+    }
+
+    // To safely embed JSON in data attribute
+    string EscapeForAttr(string? s)
+        => string.IsNullOrEmpty(s) ? "" : s.Replace("&", "&amp;").Replace("\"", "&quot;").Replace("<", "&lt;").Replace(">", "&gt;");
+}
+
+@{
+    var isDraft = Model.Quote.Status == DocumentStatus.Draft;
+    var items = Model.Quote.Items.OrderBy(x => x.Position).ToList();
+
+    // Totals for the sidebar
+    decimal sumSub = 0m;
+    decimal sumDisc = 0m;
+    decimal sumTax = 0m;
+    decimal sumTotal = 0m;
+
+    foreach (var it in items)
+    {
+        var subTotal = ReadDec(it.PriceBreakdown, "subTotal", it.LineTotal);
+        var discountAmt = ReadNestedDec(it.PriceBreakdown, "discount", "amount", 0m);
+        var taxAmt = ReadNestedDec(it.PriceBreakdown, "tax", "amount", 0m);
+        var total = ReadDec(it.PriceBreakdown, "total", it.LineTotal);
+
+        sumSub += subTotal;
+        sumDisc += discountAmt;
+        sumTax += taxAmt;
+        sumTotal += total;
+    }
+
+    // Re-open canvas if validation fails
+    var openAddCanvas = ViewContext.ViewData.ModelState.Keys.Any(k => k.StartsWith("NewItem") || k == "NewItemConfigJson");
+    var openEditCanvas = ViewContext.ViewData.ModelState.Keys.Any(k => k.StartsWith("EditItem") || k == "EditItemConfigJson");
+}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+    <div>
+        <div class="text-muted small">Quote</div>
+        <h3 class="mb-1">@Model.Quote.QuoteNo</h3>
+
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            <span class="badge @(isDraft ? "bg-success" : "bg-warning text-dark")">@Model.Quote.Status</span>
+            <span class="text-muted">Currency: <strong>@Model.Quote.Currency</strong></span>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-secondary"
+           asp-page="/Projects"
+           asp-route-openProjectId="@Model.Quote.ProjectId"
+           asp-route-openTab="quotes">
+            Back
+        </a>
+        <a class="btn btn-outline-primary" asp-page="/Quotes/Details" asp-route-id="@Model.Quote.Id">Preview</a>
+
+        <form method="post" asp-page-handler="DeleteQuote" asp-route-id="@Model.Id" class="d-inline"
+              onsubmit="return confirm('Delete this quote?');">
+            <button class="btn btn-outline-danger" type="submit">Delete</button>
+        </form>
+    </div>
+</div>
+
+@if (!isDraft)
+{
+    <div class="alert alert-warning d-flex justify-content-between align-items-center">
+        <div>
+            <strong>Locked:</strong> line items cannot be changed because status is <strong>@Model.Quote.Status</strong>.
+        </div>
+        <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="collapse" data-bs-target="#headerCollapse">
+            Edit header anyway
+        </button>
+    </div>
+}
+
+<div class="row g-3">
+    <!-- MAIN -->
+    <div class="col-12 col-lg-8">
+        <!-- Header -->
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="fw-semibold">Header</div>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#headerCollapse">
+                    Toggle
+                </button>
+            </div>
+
+            <div id="headerCollapse" class="collapse show">
+                <div class="card-body">
+                    <form method="post" asp-page-handler="UpdateHeader" asp-route-id="@Model.Id">
+                        <input type="hidden" asp-for="Id" />
+                        <input type="hidden" asp-for="Header.Quote.ProjectId" />
+
+                        <div class="row g-3">
+                            <div class="col-12 col-md-3">
+                                <label class="form-label">Currency</label>
+                                <input class="form-control" asp-for="Header.Quote.Currency" />
+                                <span class="text-danger small" asp-validation-for="Header.Quote.Currency"></span>
+                            </div>
+
+                            <div class="col-12 col-md-3">
+                                <label class="form-label">Status</label>
+                                <select class="form-select" asp-for="Header.Quote.Status">
+                                    <option value="Draft">Draft</option>
+                                    <option value="Sent">Sent</option>
+                                    <option value="Accepted">Accepted</option>
+                                    <option value="Rejected">Rejected</option>
+                                    <option value="Signed">Signed</option>
+                                    <option value="Terminated">Terminated</option>
+                                </select>
+                                <span class="text-danger small" asp-validation-for="Header.Quote.Status"></span>
+                            </div>
+
+                            <div class="col-12 col-md-3">
+                                <label class="form-label">Issued At</label>
+                                <input type="date" class="form-control" name="Header.Quote.IssuedAt"
+                                       value="@FmtDate(Model.Header.Quote.IssuedAt)" />
+                            </div>
+
+                            <div class="col-12 col-md-3">
+                                <label class="form-label">Expires At</label>
+                                <input type="date" class="form-control" name="Header.Quote.ExpiresAt"
+                                       value="@FmtDate(Model.Header.Quote.ExpiresAt)" />
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">Notes</label>
+                                <textarea class="form-control" rows="3" asp-for="Header.Quote.Notes"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-3">
+                            <button class="btn btn-primary" type="submit">Save header</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <div class="fw-semibold">Line items</div>
+                    <div class="text-muted small">Quick edit totals, and open advanced edit only when needed.</div>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-primary @(isDraft ? "" : "disabled")"
+                       asp-page="/Quotes/Items/Create"
+                       asp-route-quoteId="@Model.Quote.Id"
+                       aria-disabled="@(!isDraft)"
+                       tabindex="@(isDraft ? "0" : "-1")">
+                        From catalog
+                    </a>
+
+                    <button class="btn btn-primary" type="button"
+                            data-bs-toggle="offcanvas" data-bs-target="#AddItemCanvas"
+                            @(isDraft ? "" : "disabled")>
+                        Quick add
+                    </button>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <div class="row g-2 align-items-end mb-3">
+                    <div class="col-12 col-md-8">
+                        <label class="form-label mb-1">Search items</label>
+                        <input class="form-control" id="itemSearch" placeholder="Type to filter by title..." />
+                    </div>
+                    <div class="col-12 col-md-4 text-md-end">
+                        <div class="text-muted small">Items: <strong>@items.Count</strong></div>
+                    </div>
+                </div>
+
+                @if (items.Count == 0)
+                {
+                    <div class="alert alert-info mb-0">
+                        No items yet. Use <strong>From catalog</strong> or <strong>Quick add</strong>.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle" id="itemsTable">
+                            <thead>
+                                <tr>
+                                    <th style="width:70px;">#</th>
+                                    <th>Item</th>
+                                    <th class="text-end" style="width:90px;">Qty</th>
+                                    <th class="text-end" style="width:120px;">Unit</th>
+                                    <th class="text-end" style="width:180px;">Total</th>
+                                    <th class="text-end" style="width:160px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var it in items)
+                                {
+                                    var subTotal = ReadDec(it.PriceBreakdown, "subTotal", it.LineTotal);
+                                    var discountAmt = ReadNestedDec(it.PriceBreakdown, "discount", "amount", 0m);
+                                    var taxAmt = ReadNestedDec(it.PriceBreakdown, "tax", "amount", 0m);
+                                    var total = ReadDec(it.PriceBreakdown, "total", it.LineTotal);
+
+                                    var dt = ReadNestedStr(it.PriceBreakdown, "discount", "type", "");
+                                    var discVal = it.DiscountValue?.ToString() ?? "";
+                                    var cfg = it.Config?.RootElement.GetRawText() ?? "{}";
+
+                                    <tr data-title="@(it.Title?.ToString()?.ToLowerInvariant() ?? "")">
+                                        <td class="text-muted">@it.Position</td>
+
+                                        <td>
+                                            <div class="fw-semibold">@it.Title</div>
+                                            <div class="text-muted small">
+                                                Sub: <strong>@subTotal.ToString("0.00")</strong>
+                                                &nbsp;•&nbsp; Disc: <strong>@discountAmt.ToString("0.00")</strong>
+                                                &nbsp;•&nbsp; Tax: <strong>@taxAmt.ToString("0.00")</strong>
+                                            </div>
+                                        </td>
+
+                                        <td class="text-end">@it.Quantity.ToString("0.##")</td>
+                                        <td class="text-end">@it.UnitPrice.ToString("0.00")</td>
+                                        <td class="text-end fw-semibold">@total.ToString("0.00")</td>
+
+                                        <td class="text-end">
+                                            @if (isDraft)
+                                            {
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-primary"
+                                                        data-bs-toggle="offcanvas"
+                                                        data-bs-target="#EditItemCanvas"
+                                                        data-item-id="@it.Id"
+                                                        data-item-title="@it.Title"
+                                                        data-item-qty="@it.Quantity"
+                                                        data-item-unit="@it.UnitPrice"
+                                                        data-item-pos="@it.Position"
+                                                        data-item-tax="@it.TaxRateId"
+                                                        data-item-disctype="@dt"
+                                                        data-item-discval="@discVal"
+                                                        data-item-config="@EscapeForAttr(cfg)">
+                                                    Edit
+                                                </button>
+
+                                                <form method="post" asp-page-handler="DeleteItem" asp-route-id="@Model.Id" class="d-inline"
+                                                      onsubmit="return confirm('Delete this item?');">
+                                                    <input type="hidden" name="id" value="@Model.Quote.Id" />
+                                                    <input type="hidden" name="itemId" value="@it.Id" />
+                                                    <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                                                </form>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">Locked</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="col-12 col-lg-4">
+        <div class="card sticky-top" style="top: 1rem;">
+            <div class="card-header fw-semibold">Summary</div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <div class="text-muted">Subtotal</div>
+                    <div class="fw-semibold">@sumSub.ToString("0.00")</div>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <div class="text-muted">Discounts</div>
+                    <div class="fw-semibold">-@sumDisc.ToString("0.00")</div>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <div class="text-muted">Tax</div>
+                    <div class="fw-semibold">@sumTax.ToString("0.00")</div>
+                </div>
+
+                <hr />
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="text-muted">Total</div>
+                    <div class="fs-4 fw-bold">@sumTotal.ToString("0.00")</div>
+                </div>
+
+                <div class="text-muted small mt-2">
+                    Currency: <strong>@Model.Quote.Currency</strong>
+                </div>
+            </div>
+
+            <div class="card-footer d-grid gap-2">
+                <a class="btn btn-outline-primary" asp-page="/Quotes/Details" asp-route-id="@Model.Quote.Id">Preview</a>
+                <a class="btn btn-outline-secondary" asp-page="/Projects">Back to projects</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- OFFCANVAS: QUICK ADD -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="AddItemCanvas" aria-labelledby="AddItemCanvasLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="AddItemCanvasLabel">Quick add item</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+
+    <div class="offcanvas-body">
+        <form method="post" asp-page-handler="AddItem" asp-route-id="@Model.Id" id="addItemForm">
+            <input type="hidden" asp-for="Id" />
+
+            <div class="mb-3">
+                <label class="form-label">Title</label>
+                <input class="form-control" asp-for="NewItem.Item.Title" />
+                <span class="text-danger small" asp-validation-for="NewItem.Item.Title"></span>
+            </div>
+
+            <div class="row g-2">
+                <div class="col-4">
+                    <label class="form-label">Qty</label>
+                    <input class="form-control" asp-for="NewItem.Item.Quantity" />
+                </div>
+                <div class="col-4">
+                    <label class="form-label">Unit</label>
+                    <input class="form-control" asp-for="NewItem.Item.UnitPrice" />
+                </div>
+                <div class="col-4">
+                    <label class="form-label">Pos</label>
+                    <input class="form-control" asp-for="NewItem.Item.Position" />
+                </div>
+            </div>
+
+            <div class="accordion mt-3" id="addItemAdvanced">
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="addItemAdvancedHeading">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#addItemAdvancedBody">
+                            Advanced (tax / discounts / config)
+                        </button>
+                    </h2>
+
+                    <div id="addItemAdvancedBody" class="accordion-collapse collapse" data-bs-parent="#addItemAdvanced">
+                        <div class="accordion-body">
+                            <div class="mb-3">
+                                <label class="form-label">Tax Rate</label>
+                                <select class="form-select" asp-for="NewItem.Item.TaxRateId" asp-items="Model.TaxRateOptions">
+                                    <option value="">-- none --</option>
+                                </select>
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="form-label">Discount Type</label>
+                                    <select class="form-select" asp-for="NewItem.Item.DiscountType">
+                                        <option value="">-- none --</option>
+                                        <option value="Percent">Percent</option>
+                                        <option value="Amount">Amount</option>
+                                        <option value="Fixed">Fixed</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">Discount Value</label>
+                                    <input class="form-control" asp-for="NewItem.Item.DiscountValue" />
+                                </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <label class="form-label mb-0">Config (JSON)</label>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" onclick="formatJson('ni-config')">Format</button>
+                                </div>
+                                <textarea class="form-control mt-2" rows="6" asp-for="NewItemConfigJson" id="ni-config"></textarea>
+                                <span class="text-danger small" asp-validation-for="NewItemConfigJson"></span>
+                                <div class="form-text">Example: {"hours": 12, "rush": true}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 mt-3">
+                <button class="btn btn-success" type="submit">Add item</button>
+                <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="offcanvas">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- OFFCANVAS: EDIT ITEM -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="EditItemCanvas" aria-labelledby="EditItemCanvasLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="EditItemCanvasLabel">Edit item</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+
+    <div class="offcanvas-body">
+        <form method="post" asp-page-handler="UpdateItem" asp-route-id="@Model.Id" id="editItemForm">
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="EditItem.ItemId" id="ei-id" />
+
+            <div class="mb-3">
+                <label class="form-label">Title</label>
+                <input class="form-control" asp-for="EditItem.Item.Title" id="ei-title" />
+            </div>
+
+            <div class="row g-2">
+                <div class="col-4">
+                    <label class="form-label">Qty</label>
+                    <input class="form-control" asp-for="EditItem.Item.Quantity" id="ei-qty" />
+                </div>
+                <div class="col-4">
+                    <label class="form-label">Unit</label>
+                    <input class="form-control" asp-for="EditItem.Item.UnitPrice" id="ei-unit" />
+                </div>
+                <div class="col-4">
+                    <label class="form-label">Pos</label>
+                    <input class="form-control" asp-for="EditItem.Item.Position" id="ei-pos" />
+                </div>
+            </div>
+
+            <div class="accordion mt-3" id="editItemAdvanced">
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="editItemAdvancedHeading">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#editItemAdvancedBody">
+                            Advanced (tax / discounts / config)
+                        </button>
+                    </h2>
+
+                    <div id="editItemAdvancedBody" class="accordion-collapse collapse" data-bs-parent="#editItemAdvanced">
+                        <div class="accordion-body">
+                            <div class="mb-3">
+                                <label class="form-label">Tax Rate</label>
+                                <select class="form-select" asp-for="EditItem.Item.TaxRateId" asp-items="Model.TaxRateOptions" id="ei-tax">
+                                    <option value="">-- none --</option>
+                                </select>
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="form-label">Discount Type</label>
+                                    <select class="form-select" asp-for="EditItem.Item.DiscountType" id="ei-disctype">
+                                        <option value="">-- none --</option>
+                                        <option value="Percent">Percent</option>
+                                        <option value="Amount">Amount</option>
+                                        <option value="Fixed">Fixed</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-6">
+                                    <label class="form-label">Discount Value</label>
+                                    <input class="form-control" asp-for="EditItem.Item.DiscountValue" id="ei-discval" />
+                                </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <label class="form-label mb-0">Config (JSON)</label>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" onclick="formatJson('ei-config')">Format</button>
+                                </div>
+                                <textarea class="form-control mt-2" rows="6" asp-for="EditItemConfigJson" id="ei-config"></textarea>
+                                <span class="text-danger small" asp-validation-for="EditItemConfigJson"></span>
+                            </div>
+
+                            <div class="alert alert-info mt-3 mb-0">
+                                PriceBreakdown will be recalculated automatically when you save.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 mt-3">
+                <button class="btn btn-primary" type="submit">Save changes</button>
+                <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="offcanvas">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <script>
+        // Filter items table
+        (function () {
+            const search = document.getElementById('itemSearch');
+            if (!search) return;
+
+            function applyFilter() {
+                const q = (search.value || '').trim().toLowerCase();
+                document.querySelectorAll('#itemsTable tbody tr').forEach(tr => {
+                    const title = (tr.getAttribute('data-title') || '');
+                    tr.style.display = (!q || title.includes(q)) ? '' : 'none';
+                });
+            }
+
+            search.addEventListener('input', applyFilter);
+        })();
+
+        // Populate edit offcanvas
+        document.addEventListener('show.bs.offcanvas', function (e) {
+            const el = e.target;
+            if (!el || el.id !== 'EditItemCanvas') return;
+
+            const btn = e.relatedTarget;
+            if (!btn) return;
+
+            document.getElementById('ei-id').value = btn.getAttribute('data-item-id') || '';
+            document.getElementById('ei-title').value = btn.getAttribute('data-item-title') || '';
+            document.getElementById('ei-qty').value = btn.getAttribute('data-item-qty') || '1';
+            document.getElementById('ei-unit').value = btn.getAttribute('data-item-unit') || '0';
+            document.getElementById('ei-pos').value = btn.getAttribute('data-item-pos') || '1';
+
+            document.getElementById('ei-tax').value = btn.getAttribute('data-item-tax') || '';
+            document.getElementById('ei-disctype').value = btn.getAttribute('data-item-disctype') || '';
+            document.getElementById('ei-discval').value = btn.getAttribute('data-item-discval') || '';
+            document.getElementById('ei-config').value = btn.getAttribute('data-item-config') || '{}';
+        });
+
+        // JSON formatter
+        function formatJson(textareaId) {
+            const el = document.getElementById(textareaId);
+            if (!el) return;
+
+            try {
+                const obj = JSON.parse(el.value || "{}");
+                el.value = JSON.stringify(obj, null, 2);
+            } catch {
+                alert("Invalid JSON. Please fix it first.");
+            }
+        }
+        window.formatJson = formatJson;
+
+        // Re-open canvases on validation errors
+        (function () {
+            const openAdd = @openAddCanvas.ToString().ToLowerInvariant();
+            const openEdit = @openEditCanvas.ToString().ToLowerInvariant();
+
+            if (openAdd) {
+                const el = document.getElementById('AddItemCanvas');
+                if (el) bootstrap.Offcanvas.getOrCreateInstance(el).show();
+            }
+
+            if (openEdit) {
+                const el = document.getElementById('EditItemCanvas');
+                if (el) bootstrap.Offcanvas.getOrCreateInstance(el).show();
+            }
+        })();
+    </script>
+}

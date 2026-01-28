@@ -1,0 +1,106 @@
+@page
+@using Microsoft.AspNetCore.Authorization
+@using WitcherHub.Domain.SeedData
+@attribute [Authorize(Policy = AppPolicyPrefixes.Permission + AppPermissions.ManageNetwitcher)]
+@model WitcherHub.Pages.ProjectsModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+
+@{
+    ViewData["Title"] = "Projects";
+}
+
+<partial name="_TableCard" model="Model.ProjectsTable" />
+
+<partial name="~/Pages/Shared/Modals/_ModalShell.cshtml" model="Model.CreateProjectModal" />
+<partial name="~/Pages/Shared/Modals/_ViewProjectModal.cshtml" />
+
+<form id="tblDeleteForm" method="post" asp-page-handler="DeleteProject" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="projectId" id="tblDeleteProjectId" />
+</form>
+
+<input type="hidden" id="vcProjectUrl" value="@Url.Page("./Projects", "Project")" />
+<input type="hidden" id="vcUpdateProjectUrl" value="@Url.Page("./Projects", "UpdateBasic")" />
+<input type="hidden" id="vcChangeStatusUrl" value="@Url.Page("./Projects", "ChangeStatus")" />
+<button type="button"
+        id="vcAutoOpenBtn"
+        class="d-none"
+        data-bs-toggle="modal"
+        data-bs-target="#ViewProjectModal">
+</button>
+
+<!-- ✅ New: quotes list endpoint -->
+<input type="hidden" id="vcProjectQuotesUrl" value="@Url.Page("./Projects", "ProjectQuotes")" />
+
+<input type="hidden" id="antiForgeryToken" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />
+
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/pages/projects/projects.js" asp-append-version="true"></script>
+
+    <script>
+        // Deep-link:
+        // /Projects?openProjectId=<GUID>&tab=quotes -> open project modal directly
+        document.addEventListener('DOMContentLoaded', function () {
+            const params = new URLSearchParams(window.location.search);
+            const openProjectId = params.get('openProjectId');
+            if (!openProjectId) return;
+
+            const tab = params.get('tab') || 'overview';
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'd-none';
+            btn.setAttribute('data-bs-toggle', 'modal');
+            btn.setAttribute('data-bs-target', '#ViewProjectModal');
+            btn.setAttribute('data-project-id', openProjectId);
+            btn.setAttribute('data-open-tab', tab);
+
+            document.body.appendChild(btn);
+            btn.click();
+
+            // optional: clean url
+            params.delete('openProjectId');
+            params.delete('tab');
+            const qs = params.toString();
+            const newUrl = window.location.pathname + (qs ? ('?' + qs) : '');
+            window.history.replaceState({}, document.title, newUrl);
+        });
+    </script>
+}
+
+
+@if (Model.CreateProjectModal?.AutoOpen == true)
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const el = document.getElementById('FormModal');
+            if (!el) return;
+
+            const m = bootstrap.Modal.getOrCreateInstance(el);
+            m.show();
+
+            const firstErr = el.querySelector('.field-validation-error, .text-danger:not(:empty)');
+            if (firstErr) {
+                const input = firstErr.closest('.col-md-2,.col-md-4,.col-md-6,.col-md-8,.col-12')
+                    ?.querySelector('input,select,textarea');
+                if (input) input.focus();
+            }
+        });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+          const pid = '@Model.OpenProjectId';
+          if (!pid || pid === '00000000-0000-0000-0000-000000000000') return;
+
+          const tab = '@(Model.OpenTab ?? "overview")';
+          const btn = document.getElementById('vcAutoOpenBtn');
+          if (!btn) return;
+
+          btn.dataset.projectId = pid;
+          btn.dataset.openTab = tab;
+          btn.click();
+        });
+    </script>
+}

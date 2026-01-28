@@ -1,0 +1,41 @@
+@model WitcherHub.Pages.ProjectsModel
+
+<div class="row g-3">
+
+    <div class="col-12 col-md-6">
+        <label class="form-label">Customer</label>
+
+        <select class="form-select"
+                asp-for="Project.CustomerId"
+                asp-items="Model.CustomerOptions" required>
+        </select>
+
+        <span class="text-danger small" asp-validation-for="Project.CustomerId"></span>
+    </div>
+
+
+    <div class="col-12 col-md-6">
+        <label class="form-label">Title</label>
+        <input class="form-control" asp-for="Project.Title" placeholder="Project title" />
+        <span class="text-danger small" asp-validation-for="Project.Title"></span>
+    </div>
+
+    <div class="col-12">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" asp-for="Project.Description" rows="3" placeholder="Optional..."></textarea>
+        <span class="text-danger small" asp-validation-for="Project.Description"></span>
+    </div>
+
+    <div class="col-12 col-md-6">
+        <label class="form-label">Start Date</label>
+        <input type="date" class="form-control" asp-for="Project.StartDate" />
+        <span class="text-danger small" asp-validation-for="Project.StartDate"></span>
+    </div>
+
+    <div class="col-12 col-md-6">
+        <label class="form-label">End Date</label>
+        <input type="date" class="form-control" asp-for="Project.EndDate" />
+        <span class="text-danger small" asp-validation-for="Project.EndDate"></span>
+    </div>
+
+</div>

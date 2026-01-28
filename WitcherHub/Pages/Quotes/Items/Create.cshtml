@@ -1,0 +1,161 @@
+@page
+@model WitcherHub.Pages.Quotes.Items.CreateModel
+@using static WitcherHub.Infrastructure.Data.Models.Enums
+
+@{
+    ViewData["Title"] = "Add Line Item";
+}
+
+@if (Model.Quote is null)
+{
+    <div class="alert alert-danger">Quote not found.</div>
+    return;
+}
+
+@{
+    var isDraft = Model.Quote.Status == DocumentStatus.Draft;
+}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+    <div>
+        <div class="text-muted small">Add line item to</div>
+        <h3 class="mb-1">@Model.Quote.QuoteNo</h3>
+        <div class="text-muted small">
+            Status: <strong>@Model.Quote.Status</strong> &nbsp;|&nbsp;
+            Currency: <strong>@Model.Quote.Currency</strong>
+        </div>
+    </div>
+
+    <a class="btn btn-outline-secondary"
+       asp-page="/Quotes/Edit"
+       asp-route-id="@Model.Quote.Id">Back</a>
+</div>
+
+@if (!isDraft)
+{
+    <div class="alert alert-warning">
+        This quote is not in Draft status. Items are locked.
+    </div>
+    return;
+}
+
+<form method="post" class="card">
+    <div class="card-body">
+        <input type="hidden" asp-for="QuoteId" />
+        <input type="hidden" asp-for="Form.QuoteId" />
+
+        <div class="row g-3">
+            <div class="col-12">
+                <label class="form-label">Find service</label>
+                <input class="form-control" id="serviceFilter" placeholder="Type to filter services..." />
+                <div class="form-text">Tip: start typing a keyword (website, design, video...).</div>
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">Service</label>
+                <select class="form-select" asp-for="SelectedServiceId" asp-items="Model.ServiceOptions" id="serviceSelect"></select>
+                <span class="text-danger small" asp-validation-for="SelectedServiceId"></span>
+            </div>
+
+            <div class="col-6 col-md-3">
+                <label class="form-label">Quantity</label>
+                <input class="form-control" asp-for="Form.Item.Quantity" />
+                <span class="text-danger small" asp-validation-for="Form.Item.Quantity"></span>
+            </div>
+
+            <div class="col-6 col-md-3">
+                <label class="form-label">Tax Rate</label>
+                <select class="form-select" asp-for="Form.Item.TaxRateId" asp-items="Model.TaxRateOptions">
+                    <option value="">-- none --</option>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-3">
+                <label class="form-label">Discount Type</label>
+                <select class="form-select" asp-for="Form.Item.DiscountType">
+                    <option value="">-- none --</option>
+                    <option value="Percent">Percent</option>
+                    <option value="Amount">Amount</option>
+                    <option value="Fixed">Fixed</option>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-3">
+                <label class="form-label">Discount Value</label>
+                <input class="form-control" asp-for="Form.Item.DiscountValue" />
+            </div>
+
+            <div class="col-12">
+                <div class="accordion" id="cfgAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="cfgHeading">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cfgBody">
+                                Config (JSON) – only if you need it
+                            </button>
+                        </h2>
+                        <div id="cfgBody" class="accordion-collapse collapse" data-bs-parent="#cfgAccordion">
+                            <div class="accordion-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <label class="form-label mb-0">Config (JSON)</label>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" onclick="formatJson('cfg-json')">Format</button>
+                                </div>
+                                <textarea class="form-control mt-2" rows="7" asp-for="ConfigJson" id="cfg-json"></textarea>
+                                <div class="form-text">Example: {"hours": 12, "rush": true}</div>
+                                <span class="text-danger small" asp-validation-for="ConfigJson"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-primary" type="submit">Add Item</button>
+            <a class="btn btn-outline-secondary"
+               asp-page="/Quotes/Edit"
+               asp-route-id="@Model.Quote.Id">Cancel</a>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <script>
+        // Filter select options by text
+        (function () {
+            const filter = document.getElementById('serviceFilter');
+            const select = document.getElementById('serviceSelect');
+            if (!filter || !select) return;
+
+            const options = Array.from(select.options);
+
+            function apply() {
+                const q = (filter.value || '').trim().toLowerCase();
+                options.forEach(o => {
+                    const t = (o.text || '').toLowerCase();
+                    o.hidden = (!!q && !t.includes(q));
+                });
+
+                // keep current selection visible
+                const sel = select.options[select.selectedIndex];
+                if (sel) sel.hidden = false;
+            }
+
+            filter.addEventListener('input', apply);
+        })();
+
+        function formatJson(textareaId) {
+            const el = document.getElementById(textareaId);
+            if (!el) return;
+
+            try {
+                const obj = JSON.parse(el.value || "{}");
+                el.value = JSON.stringify(obj, null, 2);
+            } catch {
+                alert("Invalid JSON. Please fix it first.");
+            }
+        }
+        window.formatJson = formatJson;
+    </script>
+}

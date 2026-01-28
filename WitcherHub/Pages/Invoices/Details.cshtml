@@ -1,0 +1,98 @@
+@page
+@using System.Text.Json
+@model WitcherHub.Pages.Invoices.DetailsModel
+
+@{
+    ViewData["Title"] = "Invoice Details";
+}
+
+@if (Model.Invoice is null)
+{
+    <div class="alert alert-danger">Invoice not found.</div>
+    return;
+}
+
+@functions {
+    decimal ReadDec(JsonDocument? doc, string prop, decimal fallback = 0m)
+    {
+        try
+        {
+            if (doc is null) return fallback;
+            var root = doc.RootElement;
+            if (!root.TryGetProperty(prop, out var v)) return fallback;
+            if (v.ValueKind == JsonValueKind.Number && v.TryGetDecimal(out var d)) return d;
+            if (v.ValueKind == JsonValueKind.String && decimal.TryParse(v.GetString(), out var ds)) return ds;
+            return fallback;
+        }
+        catch { return fallback; }
+    }
+}
+
+@{
+    var items = Model.Invoice.Items.OrderBy(x => x.Position).ToList();
+    decimal total = 0m;
+    foreach (var it in items)
+        total += ReadDec(it.PriceBreakdown, "total", it.LineTotal);
+}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+    <div>
+        <div class="text-muted small">Invoice</div>
+        <h3 class="mb-1">@Model.Invoice.InvoiceNo</h3>
+        <div class="text-muted small">
+            Status: <strong>@Model.Invoice.Status</strong> | Currency: <strong>@Model.Invoice.Currency</strong>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-secondary" asp-page="/Invoices/Edit" asp-route-id="@Model.Invoice.Id">Back to edit</a>
+        <a class="btn btn-outline-secondary"
+           asp-page="/Projects"
+           asp-route-openProjectId="@Model.Invoice.ProjectId"
+           asp-route-tab="overview">Project</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-12 col-md-6">
+                <div class="text-muted small">Notes</div>
+                <div>@(string.IsNullOrWhiteSpace(Model.Invoice.Notes) ? "—" : Model.Invoice.Notes)</div>
+            </div>
+            <div class="col-12 col-md-6 text-md-end">
+                <div class="text-muted small">Total</div>
+                <div class="fs-3 fw-bold">@total.ToString("0.00")</div>
+            </div>
+        </div>
+
+        <hr />
+
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th style="width:70px;">#</th>
+                        <th>Item</th>
+                        <th class="text-end" style="width:90px;">Qty</th>
+                        <th class="text-end" style="width:120px;">Unit</th>
+                        <th class="text-end" style="width:160px;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var it in items)
+                    {
+                        var t = ReadDec(it.PriceBreakdown, "total", it.LineTotal);
+                        <tr>
+                            <td class="text-muted">@it.Position</td>
+                            <td>@it.Title</td>
+                            <td class="text-end">@it.Quantity.ToString("0.##")</td>
+                            <td class="text-end">@it.UnitPrice.ToString("0.00")</td>
+                            <td class="text-end fw-semibold">@t.ToString("0.00")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

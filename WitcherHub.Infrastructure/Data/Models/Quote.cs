@@ -35,7 +35,7 @@ namespace WitcherHub.Infrastructure.Data.Models
         public Guid QuoteId { get; set; }
         public Quote Quote { get; set; } = default!;
 
-        [MaxLength(80)]
+        
         public Guid? ServiceId { get; set; }
         public ServiceCatalogItem? Service { get; set; }
 

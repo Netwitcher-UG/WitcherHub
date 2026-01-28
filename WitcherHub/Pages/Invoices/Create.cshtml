@@ -1,0 +1,78 @@
+@page
+@using static WitcherHub.Infrastructure.Data.Models.Enums
+@model WitcherHub.Pages.Invoices.CreateModel
+
+@{
+    ViewData["Title"] = "Create Invoice";
+}
+
+@functions {
+    string FmtDate(DateTimeOffset? d) => d?.ToString("yyyy-MM-dd") ?? "";
+}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+    <div>
+        <div class="text-muted small">Invoice</div>
+        <h3 class="mb-1">Create</h3>
+        <div class="text-muted small">Project: <strong>@Model.ProjectId</strong></div>
+    </div>
+
+    <a class="btn btn-outline-secondary"
+       asp-page="/Projects"
+       asp-route-openProjectId="@Model.ProjectId"
+       asp-route-tab="overview">
+        Back
+    </a>
+</div>
+
+<form method="post" class="card">
+    <div class="card-body">
+        <input type="hidden" asp-for="ProjectId" />
+        <input type="hidden" asp-for="Form.Invoice.ProjectId" />
+
+        <div class="row g-3">
+            <div class="col-12 col-md-3">
+                <label class="form-label">Currency</label>
+                <input class="form-control" asp-for="Form.Invoice.Currency" />
+                <span class="text-danger small" asp-validation-for="Form.Invoice.Currency"></span>
+            </div>
+
+            <div class="col-12 col-md-3">
+                <label class="form-label">Status</label>
+                <select class="form-select" asp-for="Form.Invoice.Status">
+                    @foreach (var st in Enum.GetValues(typeof(DocumentStatus)).Cast<DocumentStatus>())
+{
+    <option value="@st">@st</option>
+}
+                </select>
+                <span class="text-danger small" asp-validation-for="Form.Invoice.Status"></span>
+            </div>
+
+            <div class="col-12 col-md-3">
+                <label class="form-label">Issued At</label>
+                <input type="date" class="form-control" name="Form.Invoice.IssuedAt" value="@FmtDate(Model.Form.Invoice.IssuedAt)" />
+            </div>
+
+           
+
+            <div class="col-12">
+                <label class="form-label">Notes</label>
+                <textarea class="form-control" rows="4" asp-for="Form.Invoice.Notes"></textarea>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-primary" type="submit">Create</button>
+            <a class="btn btn-outline-secondary"
+               asp-page="/Projects"
+               asp-route-openProjectId="@Model.ProjectId"
+               asp-route-tab="overview">
+                Cancel
+            </a>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

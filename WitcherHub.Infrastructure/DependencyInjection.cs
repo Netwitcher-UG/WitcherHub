@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +16,11 @@ using WitcherHub.Infrastructure.Authentication;
 using WitcherHub.Infrastructure.Common.Caching;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
+using WitcherHub.Infrastructure.ManageData.Contracts;
 using WitcherHub.Infrastructure.ManageData.Customers;
+using WitcherHub.Infrastructure.ManageData.Invoices;
+using WitcherHub.Infrastructure.ManageData.Projects;
+using WitcherHub.Infrastructure.ManageData.Quotes;
 using WitcherHub.Infrastructure.ManageData.Services;
 using WitcherHub.Infrastructure.Repositories.Implementations;
 using WitcherHub.Infrastructure.Seeding;
@@ -111,6 +115,10 @@ namespace WitcherHub.Infrastructure
             services.AddScoped<ICustomer, ManageCustomer>();
             services.AddScoped<ILexwareSyncService, LexwareSyncService>();
             services.AddScoped<IServiceCatalog, ManageServiceCatalog>();
+            services.AddScoped<IProject, ManageProject>();
+            services.AddScoped<IQuote, ManageQuote>();
+            services.AddScoped<IInvoice, ManageInvoice>();
+            services.AddScoped<IContract, ManageContract>();
 
             // UnitOfWork
             services.AddScoped<IUnitOfWork, UnitOfWork>();

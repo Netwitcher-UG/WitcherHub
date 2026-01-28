@@ -1,0 +1,52 @@
+@page
+@model WitcherHub.Pages.Quotes.CreateModel
+
+@{
+    ViewData["Title"] = "Create Quote";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Create Quote</h3>
+    <a class="btn btn-outline-secondary" asp-page="/Projects">Back</a>
+</div>
+
+<form method="post" class="card">
+    <div class="card-body">
+        <input type="hidden" asp-for="Form.Quote.ProjectId" />
+
+        <div class="row g-3">
+            <div class="col-12 col-md-4">
+                <label class="form-label">Currency</label>
+                <input class="form-control" asp-for="Form.Quote.Currency" />
+                <span class="text-danger small" asp-validation-for="Form.Quote.Currency"></span>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <label class="form-label">Issued At</label>
+                <input type="date" class="form-control" asp-for="Form.Quote.IssuedAt" />
+                <span class="text-danger small" asp-validation-for="Form.Quote.IssuedAt"></span>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <label class="form-label">Expires At</label>
+                <input type="date" class="form-control" asp-for="Form.Quote.ExpiresAt" />
+                <span class="text-danger small" asp-validation-for="Form.Quote.ExpiresAt"></span>
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">Notes</label>
+                <textarea class="form-control" rows="3" asp-for="Form.Quote.Notes"></textarea>
+                <span class="text-danger small" asp-validation-for="Form.Quote.Notes"></span>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-primary" type="submit">Create</button>
+            <a class="btn btn-outline-secondary" asp-page="/Projects">Cancel</a>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

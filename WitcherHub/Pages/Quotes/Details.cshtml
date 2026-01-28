@@ -1,0 +1,126 @@
+@page
+@model WitcherHub.Pages.Quotes.DetailsModel
+
+@{
+    ViewData["Title"] = "Quote Details";
+}
+
+@if (Model.Quote is null)
+{
+    <div class="alert alert-danger">Quote not found.</div>
+    return;
+}
+
+@functions {
+    string StatusClass(string st)
+    {
+        var s = (st ?? "").ToLowerInvariant();
+        if (s == "accepted") return "badge bg-success bg-opacity-10 text-success";
+        if (s == "rejected") return "badge bg-danger bg-opacity-10 text-danger";
+        if (s == "sent") return "badge bg-info bg-opacity-10 text-info";
+        return "badge bg-warning bg-opacity-10 text-warning";
+    }
+
+    string FmtDate(DateTimeOffset? d) => d?.ToString("yyyy-MM-dd") ?? "—";
+}
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h3 class="mb-1">@Model.Quote.QuoteNo</h3>
+
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            <span class="@StatusClass(Model.Quote.Status.ToString())">@Model.Quote.Status</span>
+            <span class="text-muted">Currency: <strong>@Model.Quote.Currency</strong></span>
+        </div>
+
+        <div class="text-muted small mt-2">
+            Created: <strong>@Model.Quote.CreatedAt.ToString("yyyy-MM-dd")</strong>
+            &nbsp;|&nbsp;
+            Issued: <strong>@FmtDate(Model.Quote.IssuedAt)</strong>
+            &nbsp;|&nbsp;
+            Expires: <strong>@FmtDate(Model.Quote.ExpiresAt)</strong>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary"
+           asp-page="/Projects"
+           title="Back to Projects">
+            Back
+        </a>
+
+        <!-- رجوع للمشروع (يفتح المودال وتبويب quotes) -->
+     
+        <a class="btn btn-outline-secondary"
+           asp-page="/Projects"
+           asp-route-openProjectId="@Model.Quote.ProjectId"
+           asp-route-openTab="quotes"
+           title="Back to Project (open quotes tab)">
+            Back to Project Quotes
+        </a>
+
+        <a class="btn btn-primary"
+           asp-page="/Quotes/Edit"
+           asp-route-id="@Model.Quote.Id">
+            Edit
+        </a>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.Quote.Notes))
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="text-muted small mb-1">Notes</div>
+            <div>@Model.Quote.Notes</div>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0">Items</h5>
+            <span class="text-muted small">Count: @Model.Quote.Items.Count</span>
+        </div>
+
+        @if (Model.Quote.Items.Count == 0)
+        {
+            <div class="alert alert-info mb-0">No items.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width:70px;">#</th>
+                            <th>Title</th>
+                            <th style="width:110px;" class="text-end">Qty</th>
+                            <th style="width:130px;" class="text-end">Unit</th>
+                            <th style="width:140px;" class="text-end">Line Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var it in Model.Quote.Items.OrderBy(x => x.Position))
+                        {
+                            <tr>
+                                <td>@it.Position</td>
+                                <td>
+                                    <div class="fw-semibold">@it.Title</div>
+                                    @if (!string.IsNullOrWhiteSpace(it.ServiceName))
+                                    {
+                                        <div class="text-muted small">@it.ServiceName</div>
+                                    }
+                                </td>
+                                <td class="text-end">@it.Quantity.ToString("0.##")</td>
+                                <td class="text-end">@it.UnitPrice.ToString("0.00")</td>
+                                <td class="text-end fw-semibold">@it.LineTotal.ToString("0.00")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

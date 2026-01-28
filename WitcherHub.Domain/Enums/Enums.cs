@@ -22,7 +22,9 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         public enum RuleAction { Add, Multiply, SetUnit, SetTotal, Discount }
 
-        public enum DiscountType { Percent, Amount }
+        public enum DiscountType { Percent, Amount,
+            Fixed
+        }
 
         public enum PaymentMethod { Cash, Bank, Card, Online, Other }
         public enum PaymentStatus { Pending, Success, Failed, Refunded }

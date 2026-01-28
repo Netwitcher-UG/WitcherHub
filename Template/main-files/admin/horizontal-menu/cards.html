@@ -1,6 +1,134 @@
 <!doctype html>
 <html lang="en" data-bs-theme="blue-theme">
 
+        <div class="card rounded-4 border bg-transparent shadow-none mb-2">
+          <div class="card-body py-3">
+            <div class="d-flex align-items-start justify-content-between gap-3">
+              <div class="flex-grow-1">
+
+                <div class="${isEditing ? 'd-none' : ''}">
+                  <div class="fw-semibold">${esc(r.name ?? '—')}</div>
+                  <div class="text-muted small">
+                    Priority: ${esc(r.priority)} • Scope: ${esc(r.scope)} • Active: ${activeTxt}
+                  </div>
+                </div>
+
+                <div class="${isEditing ? '' : 'd-none'}">
+              <div class="row g-2">
+
+  <div class="col-12 col-md-6">
+    <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-name">Name</label>
+    <input class="form-control form-control-sm" id="vs-rule-${idx}-name" value="${esc(r.name ?? '')}" placeholder="Name" />
+    <div class="text-danger small mt-1" id="err-vs-rule-${idx}-name"></div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-priority">Priority</label>
+    <input class="form-control form-control-sm" id="vs-rule-${idx}-priority" value="${esc(r.priority ?? 100)}" placeholder="Priority" />
+    <div class="text-danger small mt-1" id="err-vs-rule-${idx}-priority"></div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-scope">Scope</label>
+    <select class="form-select form-select-sm" id="vs-rule-${idx}-scope">
+      <option value="LINE_ITEM">LINE_ITEM</option>
+      <option value="INVOICE">INVOICE</option>
+    </select>
+    <div class="text-danger small mt-1" id="err-vs-rule-${idx}-scope"></div>
+  </div>
+
+  <div class="col-12 col-md-4">
+    <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-action">Action</label>
+    <select class="form-select form-select-sm" id="vs-rule-${idx}-action">
+      ${actionOptions}
+    </select>
+    <div class="text-danger small mt-1" id="err-vs-rule-${idx}-action"></div>
+  </div>
+
+  <div class="col-12 col-md-8">
+    <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-valueExpr">Value Expr</label>
+    <input class="form-control form-control-sm" id="vs-rule-${idx}-valueExpr" value="${esc(r.valueExpr ?? '0')}" placeholder="ValueExpr" />
+    <div class="text-danger small mt-1" id="err-vs-rule-${idx}-valueExpr"></div>
+  </div>
+
+  <div class="col-12">
+    <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-conditionExpr">Condition Expr</label>
+    <input class="form-control form-control-sm" id="vs-rule-${idx}-conditionExpr" value="${esc(r.conditionExpr ?? 'true')}" placeholder="ConditionExpr" />
+    <div class="text-danger small mt-1" id="err-vs-rule-${idx}-conditionExpr"></div>
+  </div>
+
+  <div class="col-12 col-md-6">
+    <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-label">Label</label>
+    <input class="form-control form-control-sm" id="vs-rule-${idx}-label" value="${esc(r.label ?? '')}" placeholder="Label (optional)" />
+    <div class="text-danger small mt-1" id="err-vs-rule-${idx}-label"></div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-validFrom">Valid From</label>
+    <input type="date" class="form-control form-control-sm" id="vs-rule-${idx}-validFrom" value="${esc(r.validFrom ?? '')}" />
+    <div class="text-danger small mt-1" id="err-vs-rule-${idx}-validFrom"></div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-validTo">Valid To</label>
+    <input type="date" class="form-control form-control-sm" id="vs-rule-${idx}-validTo" value="${esc(r.validTo ?? '')}" />
+    <div class="text-danger small mt-1" id="err-vs-rule-${idx}-validTo"></div>
+  </div>
+
+  <div class="col-12 col-md-6 d-flex align-items-end">
+    <div>
+      <label class="form-label mb-1 small text-muted d-block" for="vs-rule-${idx}-active">Active</label>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="vs-rule-${idx}-active" ${r.isActive ? 'checked' : ''} />
+        <label class="form-check-label" for="vs-rule-${idx}-active">Active</label>
+      </div>
+      <div class="text-danger small mt-1" id="err-vs-rule-${idx}-active"></div>
+    </div>
+  </div>
+
+</div>
+
+
+              </div>
+
+              <div class="d-flex align-items-start gap-3">
+                <button type="button"
+                        class="btn p-0 border-0 bg-transparent text-info ${isEditing ? 'd-none' : ''}"
+                        title="Edit"
+                        data-vc-action="edit-rule"
+                        data-index="${idx}">
+                  <i class="material-icons-outlined">edit</i>
+                </button>
+
+                <button type="button"
+                        class="btn p-0 border-0 bg-transparent text-success ${isEditing ? '' : 'd-none'}"
+                        title="Save"
+                        data-vc-action="save-rule"
+                        data-index="${idx}">
+                  <i class="material-icons-outlined">check</i>
+                </button>
+
+                <button type="button"
+                        class="btn p-0 border-0 bg-transparent text-muted ${isEditing ? '' : 'd-none'}"
+                        title="Cancel"
+                        data-vc-action="cancel-rule"
+                        data-index="${idx}">
+                  <i class="material-icons-outlined">close</i>
+                </button>
+
+                <button type="button"
+                        class="btn p-0 border-0 bg-transparent text-danger"
+                        title="Delete"
+                        data-vc-action="delete-rule"
+                        data-index="${idx}">
+                  <i class="material-icons-outlined">delete</i>
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+        </div>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">

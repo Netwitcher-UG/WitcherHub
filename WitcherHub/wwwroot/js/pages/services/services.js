@@ -211,6 +211,184 @@
         };
     }
 
+    // ---------- Expr Builder (UI helper) ----------
+    // (واجهة فقط - ما بتغيّر الباك اند)
+    const VC_RULE_VARS = [
+        { key: 'qty', label: 'Quantity (qty)' },
+        { key: 'pages', label: 'Pages (pages)' },
+        { key: 'subtotal', label: 'Subtotal (subtotal)' },
+        { key: 'total', label: 'Total (total)' }
+    ];
+
+    const VC_RULE_OPS = [
+        { v: '>=', t: '>=' },
+        { v: '>', t: '>' },
+        { v: '<=', t: '<=' },
+        { v: '<', t: '<' },
+        { v: '==', t: '=' },
+        { v: '!=', t: '!=' }
+    ];
+
+    function vcVarExpr(k) { return k ? `params["${k}"]` : ''; }
+
+    function vcBuildCondition(field, op, value) {
+        if (!field || !op) return '';
+        const left = vcVarExpr(field);
+
+        const trimmed = (value ?? '').toString().trim();
+        const num = Number(trimmed);
+        const isNum = trimmed !== '' && !Number.isNaN(num);
+
+        const right = isNum ? String(num) : `"${trimmed.replaceAll('"', '\\"')}"`;
+        return `${left} ${op} ${right}`;
+    }
+
+    function vcBuildValueExpr(action, amount, mode, field, threshold) {
+        const act = (action ?? '').toString().toLowerCase();
+        const a = Number(amount ?? 0);
+        const f = vcVarExpr(field);
+
+        // Discount: غالباً value expr نسبة مثل 0.10
+        if (act === 'discount') return String(a);
+
+        if (mode === 'extra_over') {
+            const thr = Number(threshold ?? 0);
+            return `(${f} - ${thr}) * ${a}`;
+        }
+        if (mode === 'per_unit') {
+            return `${f} * ${a}`;
+        }
+        return String(a); // once
+    }
+
+    function vcBuilderHtml(prefix) {
+        const varsOptions = VC_RULE_VARS.map(x => `<option value="${x.key}">${x.label}</option>`).join('');
+        const opsOptions = VC_RULE_OPS.map(x => `<option value="${x.v}">${x.t}</option>`).join('');
+
+        return `
+<div class="mt-2">
+  <div class="d-flex align-items-center justify-content-between">
+    <div class="fw-semibold">Easy Builder</div>
+    <button type="button"
+            class="btn btn-sm btn-outline-secondary rounded-5"
+            data-vc-action="toggle-advanced"
+            data-prefix="${prefix}">
+      Advanced
+    </button>
+  </div>
+
+  <div class="row g-2 mt-1" id="${prefix}-builder">
+    <div class="col-12">
+      <div class="text-muted small">Build Condition/Value without writing expressions.</div>
+    </div>
+
+    <div class="col-12 col-md-4">
+      <label class="form-label mb-1 small text-muted" for="${prefix}-b-field">Field</label>
+      <select class="form-select form-select-sm" id="${prefix}-b-field">
+        ${varsOptions}
+      </select>
+    </div>
+
+    <div class="col-6 col-md-2">
+      <label class="form-label mb-1 small text-muted" for="${prefix}-b-op">Operator</label>
+      <select class="form-select form-select-sm" id="${prefix}-b-op">
+        ${opsOptions}
+      </select>
+    </div>
+
+    <div class="col-6 col-md-2">
+      <label class="form-label mb-1 small text-muted" for="${prefix}-b-val">Value</label>
+      <input class="form-control form-control-sm" id="${prefix}-b-val" placeholder="e.g. 3" />
+    </div>
+
+    <div class="col-12 col-md-4">
+      <label class="form-label mb-1 small text-muted" for="${prefix}-b-amt">Amount / Discount</label>
+      <input class="form-control form-control-sm" id="${prefix}-b-amt" placeholder="e.g. 80 or 0.10" />
+    </div>
+
+    <div class="col-12 col-md-6">
+      <label class="form-label mb-1 small text-muted">Apply</label>
+      <div class="d-flex gap-3 flex-wrap">
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="${prefix}-b-mode" id="${prefix}-b-once" value="once" checked>
+          <label class="form-check-label small" for="${prefix}-b-once">Once</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="${prefix}-b-mode" id="${prefix}-b-per" value="per_unit">
+          <label class="form-check-label small" for="${prefix}-b-per">Per unit</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="${prefix}-b-mode" id="${prefix}-b-extra" value="extra_over">
+          <label class="form-check-label small" for="${prefix}-b-extra">Extra over threshold</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6">
+      <label class="form-label mb-1 small text-muted" for="${prefix}-b-threshold">Threshold (for Extra over)</label>
+      <input class="form-control form-control-sm" id="${prefix}-b-threshold" placeholder="e.g. 5" />
+    </div>
+
+    <div class="col-12">
+      <div class="small text-muted">Preview:</div>
+      <div class="small" id="${prefix}-b-preview" style="word-break:break-word;"></div>
+    </div>
+  </div>
+</div>
+`;
+    }
+
+    function vcWireBuilder(prefix, ids) {
+        // ids = { conditionId, valueId, actionId }
+        const fieldEl = document.getElementById(`${prefix}-b-field`);
+        const opEl = document.getElementById(`${prefix}-b-op`);
+        const valEl = document.getElementById(`${prefix}-b-val`);
+        const amtEl = document.getElementById(`${prefix}-b-amt`);
+        const thrEl = document.getElementById(`${prefix}-b-threshold`);
+        const previewEl = document.getElementById(`${prefix}-b-preview`);
+
+        const condInput = document.getElementById(ids.conditionId);
+        const valInput = document.getElementById(ids.valueId);
+
+        function getMode() {
+            return document.querySelector(`input[name="${prefix}-b-mode"]:checked`)?.value || 'once';
+        }
+
+        function run() {
+            const field = fieldEl?.value;
+            const op = opEl?.value;
+            const v = valEl?.value;
+
+            const mode = getMode();
+            const thr = thrEl?.value;
+            const amt = amtEl?.value;
+
+            const action = document.getElementById(ids.actionId)?.value || '';
+
+            const cond = vcBuildCondition(field, op, v);
+            const valExpr = vcBuildValueExpr(action, amt, mode, field, thr);
+
+            if (condInput && cond) condInput.value = cond;
+            if (valInput && valExpr) valInput.value = valExpr;
+
+            if (previewEl) previewEl.textContent = `IF ${cond || '(...)'} THEN ${valExpr || '(...)'}`;
+        }
+
+        [fieldEl, opEl, valEl, amtEl, thrEl].forEach(x => x && x.addEventListener('input', run));
+        [fieldEl, opEl].forEach(x => x && x.addEventListener('change', run));
+        document.querySelectorAll(`input[name="${prefix}-b-mode"]`).forEach(r => r.addEventListener('change', run));
+
+        document.getElementById(ids.actionId)?.addEventListener('change', run);
+
+        run();
+    }
+
+    function vcToggleAdvanced(prefix) {
+        const adv = document.getElementById(`${prefix}-advWrap`);
+        if (!adv) return;
+        adv.classList.toggle('d-none');
+    }
+
     // ---------- State ----------
     let currentService = null;
     let editingRuleIndex = null;
@@ -228,6 +406,52 @@
         return active
             ? `<span class="badge bg-success bg-opacity-10 text-success">Active</span>`
             : `<span class="badge bg-secondary bg-opacity-10 text-secondary">Inactive</span>`;
+    }
+
+    // ---- Add Rule builder injection ----
+    function ensureAddRuleBuilder() {
+        const addWrap = document.getElementById('vsAddRuleForm');
+        if (!addWrap) return;
+
+        // إذا انحقن قبل لا تعيد
+        if (document.getElementById('vs-add-rule-builderWrap')) return;
+
+        // لازم تكون موجودة inputs الأصلية
+        const cond = document.getElementById('vs-add-rule-conditionExpr');
+        const val = document.getElementById('vs-add-rule-valueExpr');
+        const action = document.getElementById('vs-add-rule-action');
+        if (!cond || !val || !action) return;
+
+        // لفّ الحقول الأصلية (Advanced)
+        // إذا عندك wrapper جاهز بالـ cshtml ما رح يأثر، بس هون حل عام
+        const advWrap = document.createElement('div');
+        advWrap.id = 'vs-add-rule-advWrap';
+        advWrap.className = 'd-none';
+
+        // نقل الحقول (Condition/Value) جوّا Advanced
+        // ملاحظة: ما منغيّر IDs ولا Name
+        const condCol = cond.closest('.col-12') || cond.parentElement;
+        const valCol = val.closest('.col-12') || val.parentElement;
+
+        // في حال structure مختلفة، بنحافظ قد ما فينا
+        if (valCol) advWrap.appendChild(valCol);
+        if (condCol && condCol !== valCol) advWrap.appendChild(condCol);
+
+        // Inject builder قبل الـ advanced
+        const builderWrap = document.createElement('div');
+        builderWrap.id = 'vs-add-rule-builderWrap';
+        builderWrap.innerHTML = vcBuilderHtml('vs-add-rule');
+
+        // حطهم بأول الفورم (أو قبل زر الحفظ حسب هيكل صفحتك)
+        addWrap.prepend(advWrap);
+        addWrap.prepend(builderWrap);
+
+        // Wire builder to existing fields
+        vcWireBuilder('vs-add-rule', {
+            conditionId: 'vs-add-rule-conditionExpr',
+            valueId: 'vs-add-rule-valueExpr',
+            actionId: 'vs-add-rule-action'
+        });
     }
 
     function renderRules(list) {
@@ -262,19 +486,24 @@
                 </div>
 
                 <div class="${isEditing ? '' : 'd-none'}">
-                  <div class="row g-2">
+                  ${vcBuilderHtml(`vs-rule-${idx}`)}
+
+                  <div class="row g-2 mt-2">
 
                     <div class="col-12 col-md-6">
+                      <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-name">Name</label>
                       <input class="form-control form-control-sm" id="vs-rule-${idx}-name" value="${esc(r.name ?? '')}" placeholder="Name" />
                       <div class="text-danger small mt-1" id="err-vs-rule-${idx}-name"></div>
                     </div>
 
                     <div class="col-6 col-md-3">
+                      <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-priority">Priority</label>
                       <input class="form-control form-control-sm" id="vs-rule-${idx}-priority" value="${esc(r.priority ?? 100)}" placeholder="Priority" />
                       <div class="text-danger small mt-1" id="err-vs-rule-${idx}-priority"></div>
                     </div>
 
                     <div class="col-6 col-md-3">
+                      <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-scope">Scope</label>
                       <select class="form-select form-select-sm" id="vs-rule-${idx}-scope">
                         <option value="LINE_ITEM">LINE_ITEM</option>
                         <option value="INVOICE">INVOICE</option>
@@ -283,43 +512,55 @@
                     </div>
 
                     <div class="col-12 col-md-4">
+                      <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-action">Action</label>
                       <select class="form-select form-select-sm" id="vs-rule-${idx}-action">
                         ${actionOptions}
                       </select>
                       <div class="text-danger small mt-1" id="err-vs-rule-${idx}-action"></div>
                     </div>
 
-                    <div class="col-12 col-md-8">
-                      <input class="form-control form-control-sm" id="vs-rule-${idx}-valueExpr" value="${esc(r.valueExpr ?? '0')}" placeholder="ValueExpr" />
-                      <div class="text-danger small mt-1" id="err-vs-rule-${idx}-valueExpr"></div>
-                    </div>
-
-                    <div class="col-12">
-                      <input class="form-control form-control-sm" id="vs-rule-${idx}-conditionExpr" value="${esc(r.conditionExpr ?? 'true')}" placeholder="ConditionExpr" />
-                      <div class="text-danger small mt-1" id="err-vs-rule-${idx}-conditionExpr"></div>
-                    </div>
-
                     <div class="col-12 col-md-6">
+                      <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-label">Label</label>
                       <input class="form-control form-control-sm" id="vs-rule-${idx}-label" value="${esc(r.label ?? '')}" placeholder="Label (optional)" />
                       <div class="text-danger small mt-1" id="err-vs-rule-${idx}-label"></div>
                     </div>
 
                     <div class="col-6 col-md-3">
+                      <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-validFrom">Valid From</label>
                       <input type="date" class="form-control form-control-sm" id="vs-rule-${idx}-validFrom" value="${esc(r.validFrom ?? '')}" />
                       <div class="text-danger small mt-1" id="err-vs-rule-${idx}-validFrom"></div>
                     </div>
 
                     <div class="col-6 col-md-3">
+                      <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-validTo">Valid To</label>
                       <input type="date" class="form-control form-control-sm" id="vs-rule-${idx}-validTo" value="${esc(r.validTo ?? '')}" />
                       <div class="text-danger small mt-1" id="err-vs-rule-${idx}-validTo"></div>
                     </div>
 
-                    <div class="col-12 col-md-6 d-flex align-items-end">
+                    <div class="col-12 col-md-6">
+                      <label class="form-label mb-1 small text-muted d-block" for="vs-rule-${idx}-active">Active</label>
                       <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="vs-rule-${idx}-active" ${r.isActive ? 'checked' : ''} />
-                        <label class="form-check-label">Active</label>
+                        <label class="form-check-label" for="vs-rule-${idx}-active">Active</label>
                       </div>
-                      <div class="text-danger small mt-1 ms-3" id="err-vs-rule-${idx}-active"></div>
+                      <div class="text-danger small mt-1" id="err-vs-rule-${idx}-active"></div>
+                    </div>
+
+                    <!-- Advanced expressions (same inputs, hidden by default) -->
+                    <div class="col-12 d-none" id="vs-rule-${idx}-advWrap">
+                      <div class="row g-2">
+                        <div class="col-12 col-md-8">
+                          <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-valueExpr">Value Expr</label>
+                          <input class="form-control form-control-sm" id="vs-rule-${idx}-valueExpr" value="${esc(r.valueExpr ?? '0')}" placeholder="ValueExpr" />
+                          <div class="text-danger small mt-1" id="err-vs-rule-${idx}-valueExpr"></div>
+                        </div>
+
+                        <div class="col-12">
+                          <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-conditionExpr">Condition Expr</label>
+                          <input class="form-control form-control-sm" id="vs-rule-${idx}-conditionExpr" value="${esc(r.conditionExpr ?? 'true')}" placeholder="ConditionExpr" />
+                          <div class="text-danger small mt-1" id="err-vs-rule-${idx}-conditionExpr"></div>
+                        </div>
+                      </div>
                     </div>
 
                   </div>
@@ -371,6 +612,16 @@
             setEnumSelect($(`vs-rule-${idx}-scope`), r.scope);
             setEnumSelect($(`vs-rule-${idx}-action`), r.action);
         });
+
+        // wire builder فقط للي عم تنعدل
+        if (editingRuleIndex !== null && editingRuleIndex >= 0) {
+            const idx = editingRuleIndex;
+            vcWireBuilder(`vs-rule-${idx}`, {
+                conditionId: `vs-rule-${idx}-conditionExpr`,
+                valueId: `vs-rule-${idx}-valueExpr`,
+                actionId: `vs-rule-${idx}-action`
+            });
+        }
     }
 
     function renderService(svc) {
@@ -401,6 +652,9 @@
         renderRules(svc?.pricingRules ?? []);
 
         currentService = svc;
+
+        // inject builder into Add Rule area
+        ensureAddRuleBuilder();
     }
 
     // ---------- Modal open ----------
@@ -463,6 +717,22 @@
         const action = b.getAttribute('data-vc-action');
         const idx = Number(b.getAttribute('data-index') ?? -1);
 
+        // toggle advanced expressions
+        if (action === 'toggle-advanced') {
+            const prefix = b.getAttribute('data-prefix');
+            if (!prefix) return;
+
+            // add rule advanced
+            if (prefix === 'vs-add-rule') {
+                document.getElementById('vs-add-rule-advWrap')?.classList.toggle('d-none');
+                return;
+            }
+
+            // edit rule advanced
+            vcToggleAdvanced(prefix);
+            return;
+        }
+
         if (!currentService) return;
 
         if (action === 'edit-basic') { setBasicMode(true); return; }
@@ -475,7 +745,7 @@
             clearErrors('vs-basic');
 
             const cfg = $('vs-basic-config')?.value ?? '';
-            const cfgToSend = cfg.trim() === '' ? null : cfg; // ✅ لا تمسح بالغلط
+            const cfgToSend = cfg.trim() === '' ? null : cfg;
 
             const payload = {
                 serviceId: currentService.id,
