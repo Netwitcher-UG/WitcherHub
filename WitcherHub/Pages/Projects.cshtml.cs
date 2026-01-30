@@ -19,22 +19,30 @@ namespace WitcherHub.Pages
         private readonly IProject _projects;
         private readonly ICustomer _customers;
         private readonly IQuote _quotes;
+        private readonly IInvoice _invoices;
+        private readonly IContract _contracts;
+
         private readonly IValidator<CreateProjectDto> _createValidator;
         private readonly IValidator<UpdateProjectDto> _updateValidator;
 
         public ProjectsModel(
-            IProject projects,
-            ICustomer customers,
-            IQuote quotes,
-            IValidator<CreateProjectDto> createValidator,
-            IValidator<UpdateProjectDto> updateValidator)
+      IProject projects,
+      ICustomer customers,
+      IQuote quotes,
+      IInvoice invoices,
+      IContract contracts,
+      IValidator<CreateProjectDto> createValidator,
+      IValidator<UpdateProjectDto> updateValidator)
         {
             _projects = projects;
             _customers = customers;
             _quotes = quotes;
+            _invoices = invoices;
+            _contracts = contracts;
             _createValidator = createValidator;
             _updateValidator = updateValidator;
         }
+
 
         // query-string
         [BindProperty(SupportsGet = true, Name = "p")] public new int Page { get; set; } = 1;
@@ -87,8 +95,9 @@ namespace WitcherHub.Pages
             if (Project.CustomerId == Guid.Empty) { /* leave empty until user fills */ }
 
             OpenTab ??= "overview";
-            if (OpenTab != "overview" && OpenTab != "quotes")
+            if (OpenTab != "overview" && OpenTab != "quotes" && OpenTab != "invoices" && OpenTab != "contracts")
                 OpenTab = "overview";
+
         }
 
         // =========================
@@ -228,6 +237,58 @@ namespace WitcherHub.Pages
                 return ToastServerError();
             }
         }
+
+        public async Task<IActionResult> OnGetProjectInvoicesAsync(
+    Guid projectId,
+    int p = 1,
+    int pageSize = 10,
+    string? q = null,
+    CancellationToken ct = default)
+        {
+            try
+            {
+                if (projectId == Guid.Empty)
+                    return ToastBadRequest("Error", "ProjectId is empty.");
+
+                var prj = await _projects.GetProjectAsync(projectId, ct);
+                if (prj is null)
+                    return ToastNotFound("Not found", "Project not found.");
+
+                var res = await _invoices.GetInvoicesByProjectAsync(projectId, p, pageSize, q, ct);
+
+                return new JsonResult(new { ok = true, data = res });
+            }
+            catch (BadRequestAppException ex) { return ToastBadRequest("Not allowed", ex.Message); }
+            catch (NotFoundAppException ex) { return ToastNotFound("Not found", ex.Message); }
+            catch { return ToastServerError(); }
+        }
+
+
+        public async Task<IActionResult> OnGetProjectContractsAsync(
+            Guid projectId,
+            int p = 1,
+            int pageSize = 10,
+            string? q = null,
+            CancellationToken ct = default)
+        {
+            try
+            {
+                if (projectId == Guid.Empty)
+                    return ToastBadRequest("Error", "ProjectId is empty.");
+
+                var prj = await _projects.GetProjectAsync(projectId, ct);
+                if (prj is null)
+                    return ToastNotFound("Not found", "Project not found.");
+
+                var res = await _contracts.GetContractsByProjectAsync(projectId, p, pageSize, q, ct);
+
+                return new JsonResult(new { ok = true, data = res });
+            }
+            catch (BadRequestAppException ex) { return ToastBadRequest("Not allowed", ex.Message); }
+            catch (NotFoundAppException ex) { return ToastNotFound("Not found", ex.Message); }
+            catch { return ToastServerError(); }
+        }
+
 
         // =========================
         // POST: Update Basic (Ajax JSON)

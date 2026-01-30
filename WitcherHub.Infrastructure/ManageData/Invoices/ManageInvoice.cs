@@ -249,8 +249,10 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                     IssueDate = dto.Invoice.IssueDate,
                     DueDate = dto.Invoice.DueDate,
 
-                    IssuedAt = dto.Invoice.IssuedAt,
-                    PaidAt = dto.Invoice.PaidAt,
+                 
+                    IssuedAt = dto.Invoice.IssuedAt?.ToUniversalTime(),
+                    PaidAt = dto.Invoice.PaidAt?.ToUniversalTime(),
+
 
                     InvoiceDiscountType = dto.Invoice.InvoiceDiscountType,
                     InvoiceDiscountValue = dto.Invoice.InvoiceDiscountValue,
@@ -338,8 +340,9 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
             invoice.ContractId = dto.Invoice.ContractId;
             invoice.IssueDate = dto.Invoice.IssueDate;
             invoice.DueDate = dto.Invoice.DueDate;
-            invoice.IssuedAt = dto.Invoice.IssuedAt;
-            invoice.PaidAt = dto.Invoice.PaidAt;
+            invoice.IssuedAt = dto.Invoice.IssuedAt?.ToUniversalTime();
+            invoice.PaidAt = dto.Invoice.PaidAt?.ToUniversalTime();
+
 
             invoice.InvoiceDiscountType = dto.Invoice.InvoiceDiscountType;
             invoice.InvoiceDiscountValue = dto.Invoice.InvoiceDiscountValue;

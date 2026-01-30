@@ -8,8 +8,10 @@ namespace WitcherHub.Application.Validators.Invoice
         public InvoiceValidator()
         {
             RuleFor(x => x.Invoice).NotNull().SetValidator(new InvoiceDtoValidator());
-            RuleFor(x => x.Items).NotNull();
-            RuleForEach(x => x.Items).SetValidator(new InvoiceItemDtoValidator());
+            When(x => x.Items != null && x.Items.Count > 0, () =>
+            {
+                RuleForEach(x => x.Items).SetValidator(new InvoiceItemDtoValidator());
+            });
         }
     }
 
@@ -56,6 +58,7 @@ namespace WitcherHub.Application.Validators.Invoice
         {
             RuleFor(x => x.Invoice).NotNull().SetValidator(new InvoiceDtoValidator());
             RuleForEach(x => x.Items).SetValidator(new InvoiceItemDtoValidator());
+
         }
     }
 

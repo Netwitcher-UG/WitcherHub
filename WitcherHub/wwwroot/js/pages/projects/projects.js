@@ -127,7 +127,24 @@
     }
 
     // =========================
-    // Quotes: fetching + rendering inside modal
+    // Shared helpers for lists
+    // =========================
+    function fmtDate(d) { return d ? String(d) : '—'; }
+
+    function esc(s) {
+        const div = document.createElement('div');
+        div.textContent = s ?? '';
+        return div.innerHTML;
+    }
+
+    function safeTabShow(btnId) {
+        const btn = $(btnId);
+        if (!btn) return;
+        bootstrap.Tab.getOrCreateInstance(btn).show();
+    }
+
+    // =========================
+    // Quotes state + UI
     // =========================
     const quotesState = {
         projectId: null,
@@ -136,13 +153,6 @@
         q: null,
         loadedOnce: false
     };
-
-    function fmtDate(d) { return d ? String(d) : '—'; }
-    function esc(s) {
-        const div = document.createElement('div');
-        div.textContent = s ?? '';
-        return div.innerHTML;
-    }
 
     function setQuotesLoading(on) {
         $('vpQuotesLoading')?.classList.toggle('d-none', !on);
@@ -192,7 +202,6 @@
 
         addItem('Prev', page - 1, page <= 1, false);
 
-        // show small window of pages
         const start = Math.max(1, page - 2);
         const end = Math.min(totalPages, page + 2);
         for (let p = start; p <= end; p++) addItem(String(p), p, false, p === page);
@@ -229,7 +238,7 @@
                 return;
             }
 
-            const data = json.data ?? json; // handler returns {ok:true,data:...}
+            const data = json.data ?? json;
             const items = data.items ?? data.Items ?? [];
 
             const tbody = $('vpQuotesTbody');
@@ -243,7 +252,6 @@
                 return;
             }
 
-            // render rows
             for (const q of items) {
                 const id = q.id ?? q.Id;
                 const quoteNo = q.quoteNo ?? q.QuoteNo ?? '—';
@@ -277,24 +285,294 @@
     }
 
     function openQuotesTabAndLoad() {
-        // activate tab
-        const btn = $('vp-tab-quotes');
-        if (btn) {
-            // bootstrap tab
-            const tab = bootstrap.Tab.getOrCreateInstance(btn);
-            tab.show();
-        }
+        safeTabShow('vp-tab-quotes');
 
-        // update New Quote link
         const a = $('vp-newQuoteBtn');
         if (a && quotesState.projectId) a.href = `/Quotes/Create?projectId=${encodeURIComponent(quotesState.projectId)}`;
 
-        // load quotes once or always (هنا نحمّل دائماً لتكون fresh)
         loadQuotes({ page: 1, q: $('vp-quotes-q')?.value?.trim() || '' });
     }
 
     // =========================
-    // ---- state ----
+    // Invoices state + UI
+    // =========================
+    const invoicesState = {
+        projectId: null,
+        page: 1,
+        pageSize: 10,
+        q: null,
+        loadedOnce: false
+    };
+
+    function setInvoicesLoading(on) {
+        $('vpInvoicesLoading')?.classList.toggle('d-none', !on);
+    }
+
+    function setInvoicesEmpty(on) {
+        $('vpInvoicesEmpty')?.classList.toggle('d-none', !on);
+    }
+
+    function setInvoicesVisible(on) {
+        $('vpInvoicesTable')?.classList.toggle('d-none', !on);
+        $('vpInvoicesPagerWrap')?.classList.toggle('d-none', !on);
+    }
+
+    function invoiceStatusBadge(st) {
+        const s = (st ?? '').toString().toLowerCase();
+        if (s === 'paid') return `<span class="badge bg-success bg-opacity-10 text-success">Paid</span>`;
+        if (s === 'void') return `<span class="badge bg-secondary bg-opacity-10 text-secondary">Void</span>`;
+        if (s === 'issued') return `<span class="badge bg-info bg-opacity-10 text-info">Issued</span>`;
+        return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
+    }
+
+    function buildInvoicesPager(res) {
+        const ul = $('vpInvoicesPager');
+        if (!ul) return;
+        ul.innerHTML = '';
+
+        const totalPages = res.totalPages ?? res.TotalPages ?? 0;
+        const page = res.page ?? res.Page ?? 1;
+
+        function addItem(label, targetPage, disabled, active) {
+            const li = document.createElement('li');
+            li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`;
+            const a = document.createElement('a');
+            a.className = 'page-link';
+            a.href = '#';
+            a.textContent = label;
+            if (!disabled && !active) {
+                a.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    loadInvoices({ page: targetPage });
+                });
+            }
+            li.appendChild(a);
+            ul.appendChild(li);
+        }
+
+        addItem('Prev', page - 1, page <= 1, false);
+
+        const start = Math.max(1, page - 2);
+        const end = Math.min(totalPages, page + 2);
+        for (let p = start; p <= end; p++) addItem(String(p), p, false, p === page);
+
+        addItem('Next', page + 1, page >= totalPages, false);
+    }
+
+    async function loadInvoices(opts) {
+        if (!invoicesState.projectId) return;
+        const urlBase = $('vcProjectInvoicesUrl')?.value;
+        if (!urlBase) return toastError('vcProjectInvoicesUrl not found', 'Error');
+
+        if (opts?.page) invoicesState.page = opts.page;
+        if (opts?.q !== undefined) invoicesState.q = opts.q;
+
+        setInvoicesLoading(true);
+        setInvoicesEmpty(false);
+        setInvoicesVisible(false);
+
+        const joiner = urlBase.includes('?') ? '&' : '?';
+        const url =
+            `${urlBase}${joiner}` +
+            `projectId=${encodeURIComponent(invoicesState.projectId)}` +
+            `&p=${encodeURIComponent(invoicesState.page)}` +
+            `&pageSize=${encodeURIComponent(invoicesState.pageSize)}` +
+            `&q=${encodeURIComponent(invoicesState.q || '')}`;
+
+        try {
+            const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+            const json = await res.json();
+
+            if (!res.ok) {
+                toastFromPayload(json, 'Error', 'Failed to load invoices.');
+                return;
+            }
+
+            const data = json.data ?? json;
+            const items = data.items ?? data.Items ?? [];
+
+            const tbody = $('vpInvoicesTbody');
+            if (tbody) tbody.innerHTML = '';
+
+            if (!items.length) {
+                setInvoicesLoading(false);
+                setInvoicesEmpty(true);
+                setInvoicesVisible(false);
+                invoicesState.loadedOnce = true;
+                return;
+            }
+
+            for (const inv of items) {
+                const id = inv.id ?? inv.Id;
+                const invoiceNo = inv.invoiceNo ?? inv.InvoiceNo ?? '—';
+                const status = inv.status ?? inv.Status;
+                const createdAt = inv.createdAt ?? inv.CreatedAt;
+                const issueDate = inv.issueDate ?? inv.IssueDate;
+                const dueDate = inv.dueDate ?? inv.DueDate;
+                const total = inv.total ?? inv.Total ?? inv.itemsTotal ?? inv.ItemsTotal ?? 0;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${esc(invoiceNo)}</td>
+                    <td>${invoiceStatusBadge(status)}</td>
+                    <td>${esc(fmtDate(createdAt))}</td>
+                    <td>${esc(fmtDate(issueDate))}</td>
+                    <td>${esc(fmtDate(dueDate))}</td>
+                    <td class="text-end">${Number(total).toFixed(2)}</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" href="/Invoices/Details?id=${encodeURIComponent(id)}">Details</a>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            setInvoicesLoading(false);
+            setInvoicesEmpty(false);
+            setInvoicesVisible(true);
+            buildInvoicesPager(data);
+            invoicesState.loadedOnce = true;
+        } catch (err) {
+            console.error(err);
+            setInvoicesLoading(false);
+            toastError('Failed to load invoices.', 'Error');
+        }
+    }
+
+    // =========================
+    // Contracts state + UI
+    // =========================
+    const contractsState = {
+        projectId: null,
+        page: 1,
+        pageSize: 10,
+        q: null,
+        loadedOnce: false
+    };
+
+    function setContractsLoading(on) {
+        $('vpContractsLoading')?.classList.toggle('d-none', !on);
+    }
+
+    function setContractsEmpty(on) {
+        $('vpContractsEmpty')?.classList.toggle('d-none', !on);
+    }
+
+    function setContractsVisible(on) {
+        $('vpContractsTable')?.classList.toggle('d-none', !on);
+        $('vpContractsPagerWrap')?.classList.toggle('d-none', !on);
+    }
+
+    function buildContractsPager(res) {
+        const ul = $('vpContractsPager');
+        if (!ul) return;
+        ul.innerHTML = '';
+
+        const totalPages = res.totalPages ?? res.TotalPages ?? 0;
+        const page = res.page ?? res.Page ?? 1;
+
+        function addItem(label, targetPage, disabled, active) {
+            const li = document.createElement('li');
+            li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`;
+            const a = document.createElement('a');
+            a.className = 'page-link';
+            a.href = '#';
+            a.textContent = label;
+            if (!disabled && !active) {
+                a.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    loadContracts({ page: targetPage });
+                });
+            }
+            li.appendChild(a);
+            ul.appendChild(li);
+        }
+
+        addItem('Prev', page - 1, page <= 1, false);
+
+        const start = Math.max(1, page - 2);
+        const end = Math.min(totalPages, page + 2);
+        for (let p = start; p <= end; p++) addItem(String(p), p, false, p === page);
+
+        addItem('Next', page + 1, page >= totalPages, false);
+    }
+
+    async function loadContracts(opts) {
+        if (!contractsState.projectId) return;
+        const urlBase = $('vcProjectContractsUrl')?.value;
+        if (!urlBase) return toastError('vcProjectContractsUrl not found', 'Error');
+
+        if (opts?.page) contractsState.page = opts.page;
+        if (opts?.q !== undefined) contractsState.q = opts.q;
+
+        setContractsLoading(true);
+        setContractsEmpty(false);
+        setContractsVisible(false);
+
+        const joiner = urlBase.includes('?') ? '&' : '?';
+        const url =
+            `${urlBase}${joiner}` +
+            `projectId=${encodeURIComponent(contractsState.projectId)}` +
+            `&p=${encodeURIComponent(contractsState.page)}` +
+            `&pageSize=${encodeURIComponent(contractsState.pageSize)}` +
+            `&q=${encodeURIComponent(contractsState.q || '')}`;
+
+        try {
+            const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+            const json = await res.json();
+
+            if (!res.ok) {
+                toastFromPayload(json, 'Error', 'Failed to load contracts.');
+                return;
+            }
+
+            const data = json.data ?? json;
+            const items = data.items ?? data.Items ?? [];
+
+            const tbody = $('vpContractsTbody');
+            if (tbody) tbody.innerHTML = '';
+
+            if (!items.length) {
+                setContractsLoading(false);
+                setContractsEmpty(true);
+                setContractsVisible(false);
+                contractsState.loadedOnce = true;
+                return;
+            }
+
+            for (const c of items) {
+                const id = c.id ?? c.Id;
+                const contractNo = c.contractNo ?? c.ContractNo ?? c.number ?? c.Number ?? '—';
+                const status = c.status ?? c.Status ?? '—';
+                const startDate = c.startDate ?? c.StartDate;
+                const endDate = c.endDate ?? c.EndDate;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${esc(contractNo)}</td>
+                    <td>${esc(String(status))}</td>
+                    <td>${esc(fmtDate(startDate))}</td>
+                    <td>${esc(fmtDate(endDate))}</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" href="/Contracts/Details?id=${encodeURIComponent(id)}">Details</a>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            setContractsLoading(false);
+            setContractsEmpty(false);
+            setContractsVisible(true);
+            buildContractsPager(data);
+            contractsState.loadedOnce = true;
+        } catch (err) {
+            console.error(err);
+            setContractsLoading(false);
+            toastError('Failed to load contracts.', 'Error');
+        }
+    }
+
+    // =========================
+    // ---- main state ----
     // =========================
     let currentProject = null;
     let editingBasic = false;
@@ -365,61 +643,126 @@
             const id = btn?.getAttribute('data-project-id');
             const openTab = btn?.getAttribute('data-open-tab') || 'overview';
 
-            // reset quotes state for this project
+            // reset states for this project
             quotesState.projectId = id;
             quotesState.page = 1;
             quotesState.q = null;
             quotesState.loadedOnce = false;
             if ($('vp-quotes-q')) $('vp-quotes-q').value = '';
 
-            $('vpLoading').classList.remove('d-none');
-            $('vpBody').classList.add('d-none');
-            $('vpLoading').textContent = 'Loading...';
+            invoicesState.projectId = id;
+            invoicesState.page = 1;
+            invoicesState.q = null;
+            invoicesState.loadedOnce = false;
+            if ($('vp-invoices-q')) $('vp-invoices-q').value = '';
+
+            contractsState.projectId = id;
+            contractsState.page = 1;
+            contractsState.q = null;
+            contractsState.loadedOnce = false;
+            if ($('vp-contracts-q')) $('vp-contracts-q').value = '';
+
+            // update create links
+            const q = $('vp-newQuoteBtn');
+            if (q) q.href = id ? `/Quotes/Create?projectId=${encodeURIComponent(id)}` : '#';
+
+            const c = $('vp-newContractBtn');
+            if (c) c.href = id ? `/Contracts/Create?projectId=${encodeURIComponent(id)}` : '#';
+
+            const i = $('vp-newInvoiceBtn');
+            if (i) i.href = id ? `/Invoices/Create?projectId=${encodeURIComponent(id)}` : '#';
+
+            // optional buttons if موجودين في تبويباتهم
+            const c2 = $('vp-newContractBtn2');
+            if (c2) c2.href = id ? `/Contracts/Create?projectId=${encodeURIComponent(id)}` : '#';
+
+            const i2 = $('vp-newInvoiceBtn2');
+            if (i2) i2.href = id ? `/Invoices/Create?projectId=${encodeURIComponent(id)}` : '#';
+
+            $('vpLoading')?.classList.remove('d-none');
+            $('vpBody')?.classList.add('d-none');
+            if ($('vpLoading')) $('vpLoading').textContent = 'Loading...';
 
             try {
                 const data = await fetchProjectById(id);
                 renderProject(normalizeProject(data));
 
-                $('vpLoading').classList.add('d-none');
-                $('vpBody').classList.remove('d-none');
+                $('vpLoading')?.classList.add('d-none');
+                $('vpBody')?.classList.remove('d-none');
 
                 // open tab requested
                 if (openTab === 'quotes') {
                     openQuotesTabAndLoad();
+                } else if (openTab === 'invoices') {
+                    safeTabShow('vp-tab-invoices');
+                } else if (openTab === 'contracts') {
+                    safeTabShow('vp-tab-contracts');
                 } else {
-                    // show overview
-                    const ov = $('vp-tab-overview');
-                    if (ov) bootstrap.Tab.getOrCreateInstance(ov).show();
+                    safeTabShow('vp-tab-overview');
                 }
             } catch (err) {
                 console.error(err);
-                $('vpLoading').textContent = 'Failed to load project.';
+                if ($('vpLoading')) $('vpLoading').textContent = 'Failed to load project.';
             }
         });
     }
 
-    // ---- quotes tab: load on first show (when user clicks tab)
+    // ---- load on tab show (lazy)
     document.addEventListener('shown.bs.tab', function (e) {
         const target = e.target;
-        if (target && target.id === 'vp-tab-quotes') {
+
+        if (target?.id === 'vp-tab-quotes') {
             const a = $('vp-newQuoteBtn');
             if (a && quotesState.projectId) a.href = `/Quotes/Create?projectId=${encodeURIComponent(quotesState.projectId)}`;
-
-            // load when user opens quotes tab (if not loaded)
             if (!quotesState.loadedOnce) loadQuotes({ page: 1, q: $('vp-quotes-q')?.value?.trim() || '' });
+        }
+
+        if (target?.id === 'vp-tab-invoices') {
+            const a = $('vp-newInvoiceBtn2');
+            if (a && invoicesState.projectId) a.href = `/Invoices/Create?projectId=${encodeURIComponent(invoicesState.projectId)}`;
+            if (!invoicesState.loadedOnce) loadInvoices({ page: 1, q: $('vp-invoices-q')?.value?.trim() || '' });
+        }
+
+        if (target?.id === 'vp-tab-contracts') {
+            const a = $('vp-newContractBtn2');
+            if (a && contractsState.projectId) a.href = `/Contracts/Create?projectId=${encodeURIComponent(contractsState.projectId)}`;
+            if (!contractsState.loadedOnce) loadContracts({ page: 1, q: $('vp-contracts-q')?.value?.trim() || '' });
         }
     });
 
-    // quotes search button
+    // ---- Quotes search
     $('vp-quotes-searchBtn')?.addEventListener('click', function () {
         loadQuotes({ page: 1, q: $('vp-quotes-q')?.value?.trim() || '' });
     });
 
-    // search by Enter
     $('vp-quotes-q')?.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
             e.preventDefault();
             loadQuotes({ page: 1, q: $('vp-quotes-q')?.value?.trim() || '' });
+        }
+    });
+
+    // ---- Invoices search
+    $('vp-invoices-searchBtn')?.addEventListener('click', function () {
+        loadInvoices({ page: 1, q: $('vp-invoices-q')?.value?.trim() || '' });
+    });
+
+    $('vp-invoices-q')?.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            loadInvoices({ page: 1, q: $('vp-invoices-q')?.value?.trim() || '' });
+        }
+    });
+
+    // ---- Contracts search
+    $('vp-contracts-searchBtn')?.addEventListener('click', function () {
+        loadContracts({ page: 1, q: $('vp-contracts-q')?.value?.trim() || '' });
+    });
+
+    $('vp-contracts-q')?.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            loadContracts({ page: 1, q: $('vp-contracts-q')?.value?.trim() || '' });
         }
     });
 

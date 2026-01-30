@@ -214,8 +214,8 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                     Status = dto.Quote.Status,
                     Currency = (dto.Quote.Currency ?? "EUR").Trim(),
                     Notes = string.IsNullOrWhiteSpace(dto.Quote.Notes) ? null : dto.Quote.Notes.Trim(),
-                    IssuedAt = dto.Quote.IssuedAt,
-                    ExpiresAt = dto.Quote.ExpiresAt
+                    IssuedAt = dto.Quote.IssuedAt?.ToUniversalTime(),
+                    ExpiresAt = dto.Quote.ExpiresAt?.ToUniversalTime()
                 };
 
                 // Items (optional)
@@ -275,8 +275,9 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
 
             quote.Currency = (dto.Quote.Currency ?? quote.Currency ?? "EUR").Trim();
             quote.Notes = string.IsNullOrWhiteSpace(dto.Quote.Notes) ? null : dto.Quote.Notes.Trim();
-            quote.IssuedAt = dto.Quote.IssuedAt;
-            quote.ExpiresAt = dto.Quote.ExpiresAt;
+            quote.IssuedAt = dto.Quote.IssuedAt?.ToUniversalTime();
+            quote.ExpiresAt = dto.Quote.ExpiresAt?.ToUniversalTime();
+
 
             EnsureValidQuoteStatus(dto.Quote.Status);
             quote.Status = dto.Quote.Status;

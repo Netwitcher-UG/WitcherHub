@@ -46,6 +46,28 @@
                                 Quotes
                             </button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link"
+                                    id="vp-tab-invoices"
+                                    data-bs-toggle="tab"
+                                    data-bs-target="#vp-pane-invoices"
+                                    type="button"
+                                    role="tab">
+                                Invoices
+                            </button>
+                        </li>
+
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link"
+                                    id="vp-tab-contracts"
+                                    data-bs-toggle="tab"
+                                    data-bs-target="#vp-pane-contracts"
+                                    type="button"
+                                    role="tab">
+                                Contracts
+                            </button>
+                        </li>
+
                     </ul>
 
                     <div class="tab-content pt-3">
@@ -184,6 +206,84 @@
                                 <ul class="pagination pagination-sm mb-0" id="vpQuotesPager"></ul>
                             </nav>
                         </div>
+                        <!-- ===================== Invoices ===================== -->
+                        <div class="tab-pane fade" id="vp-pane-invoices" role="tabpanel">
+
+                            <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
+                                <div class="input-group" style="max-width: 520px;">
+                                    <input class="form-control" id="vp-invoices-q" placeholder="Search invoices..." />
+                                    <button class="btn btn-outline-secondary" type="button" id="vp-invoices-searchBtn">Search</button>
+                                </div>
+
+                                <a class="btn btn-primary" href="#" id="vp-newInvoiceBtn2">+ New Invoice</a>
+                            </div>
+
+                            <div id="vpInvoicesLoading" class="text-muted small d-none">Loading invoices...</div>
+
+                            <div id="vpInvoicesEmpty" class="alert alert-light border d-none">
+                                No invoices yet.
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-2 d-none" id="vpInvoicesTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Invoice No</th>
+                                            <th>Status</th>
+                                            <th>Created</th>
+                                            <th>Issue</th>
+                                            <th>Due</th>
+                                            <th class="text-end">Total</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="vpInvoicesTbody"></tbody>
+                                </table>
+                            </div>
+
+                            <nav class="d-none" id="vpInvoicesPagerWrap">
+                                <ul class="pagination pagination-sm mb-0" id="vpInvoicesPager"></ul>
+                            </nav>
+                        </div>
+
+                        <!-- ===================== Contracts ===================== -->
+                        <div class="tab-pane fade" id="vp-pane-contracts" role="tabpanel">
+
+                            <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
+                                <div class="input-group" style="max-width: 520px;">
+                                    <input class="form-control" id="vp-contracts-q" placeholder="Search contracts..." />
+                                    <button class="btn btn-outline-secondary" type="button" id="vp-contracts-searchBtn">Search</button>
+                                </div>
+
+                                <a class="btn btn-primary" href="#" id="vp-newContractBtn2">+ New Contract</a>
+                            </div>
+
+                            <div id="vpContractsLoading" class="text-muted small d-none">Loading contracts...</div>
+
+                            <div id="vpContractsEmpty" class="alert alert-light border d-none">
+                                No contracts yet.
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-2 d-none" id="vpContractsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Contract No</th>
+                                            <th>Status</th>
+                                            <th>Start</th>
+                                            <th>End</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="vpContractsTbody"></tbody>
+                                </table>
+                            </div>
+
+                            <nav class="d-none" id="vpContractsPagerWrap">
+                                <ul class="pagination pagination-sm mb-0" id="vpContractsPager"></ul>
+                            </nav>
+                        </div>
+
 
                     </div>
                 </div>
