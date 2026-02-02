@@ -250,38 +250,66 @@
                         <div class="tab-pane fade" id="vp-pane-contracts" role="tabpanel">
 
                             <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
-                                <div class="input-group" style="max-width: 520px;">
-                                    <input class="form-control" id="vp-contracts-q" placeholder="Search contracts..." />
-                                    <button class="btn btn-outline-secondary" type="button" id="vp-contracts-searchBtn">Search</button>
+                                <div>
+                                    <div class="text-muted small">Contract</div>
+                                    <div class="fw-semibold" id="vpContractTitle">—</div>
+                                    <div class="text-muted small" id="vpContractMeta">—</div>
                                 </div>
 
-                                <a class="btn btn-primary" href="#" id="vp-newContractBtn2">+ New Contract</a>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <!-- يظهر فقط إذا لا يوجد عقد -->
+                                    <button class="btn btn-primary d-none"
+                                            type="button"
+                                            id="vpContractCreateBtn">
+                                        Add Contract
+                                    </button>
+
+                                    <!-- يظهر فقط إذا يوجد عقد -->
+                                    <button class="btn btn-primary d-none"
+                                            type="button"
+                                            id="vpContractGenerateBtn">
+                                        Update Contract
+                                    </button>
+
+                                    <a class="btn btn-outline-secondary d-none"
+                                       id="vpContractEditLink"
+                                       href="#"
+                                       target="_blank">Edit</a>
+
+                                    <a class="btn btn-outline-primary d-none"
+                                       id="vpContractDetailsLink"
+                                       href="#"
+                                       target="_blank">Details</a>
+
+                                    <button class="btn btn-outline-success d-none"
+                                            type="button"
+                                            id="vpContractSendBtn"
+                                            disabled>
+                                        Send
+                                    </button>
+                                </div>
+
                             </div>
 
-                            <div id="vpContractsLoading" class="text-muted small d-none">Loading contracts...</div>
+                            <div id="vpContractLoading" class="text-muted small d-none">Loading contract...</div>
 
-                            <div id="vpContractsEmpty" class="alert alert-light border d-none">
-                                No contracts yet.
+                            <div id="vpContractEmpty" class="alert alert-light border d-none">
+                                No contract yet for this project.
                             </div>
 
-                            <div class="table-responsive">
-                                <table class="table table-sm align-middle mb-2 d-none" id="vpContractsTable">
-                                    <thead>
-                                        <tr>
-                                            <th>Contract No</th>
-                                            <th>Status</th>
-                                            <th>Start</th>
-                                            <th>End</th>
-                                            <th class="text-end">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="vpContractsTbody"></tbody>
-                                </table>
+                            <div id="vpContractPreviewWrap" class="card border-0 shadow-sm rounded-4 d-none">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <h6 class="mb-0">Preview</h6>
+                                        <span id="vpContractStatusBadge"></span>
+                                    </div>
+
+                                    <div id="vpContractPreview"
+                                         style="max-height: 520px; overflow:auto; border:1px solid rgba(0,0,0,.08); border-radius:12px; padding:14px;">
+                                    </div>
+                                </div>
                             </div>
 
-                            <nav class="d-none" id="vpContractsPagerWrap">
-                                <ul class="pagination pagination-sm mb-0" id="vpContractsPager"></ul>
-                            </nav>
                         </div>
 
 

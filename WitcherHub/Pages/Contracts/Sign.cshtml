@@ -1,0 +1,175 @@
+﻿@page "/contracts/sign/{id:guid}"
+@using Microsoft.Extensions.Localization
+@using WitcherHub.Resources
+@model WitcherHub.Pages.Contracts.SignModel
+@inject IStringLocalizer<SharedResource> T
+
+@{
+    ViewData["Title"] = T["contractPage_Title"];
+    Layout = "_ContractsLayout";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/contracts/contract-sign.css" asp-append-version="true" />
+}
+
+<!-- Anti-forgery token (we will send it via header from JS) -->
+<form method="post" id="afForm">
+    @Html.AntiForgeryToken()
+</form>
+
+<input type="hidden" id="signEndpoint"
+       value="@Url.Page("/Contracts/Sign", new { id = Model.Id, handler = "Sign" })" />
+
+<script>
+    window.contractServerState = {
+        isSigned: @(Model.IsSigned ? "true" : "false"),
+        signedAtIso: "@(Model.SignedAtIso ?? "")",
+        signatureDataUrl: "@(Model.SignatureDataUrl ?? "")",
+        signerName: "@(Model.SignerNamePrefill ?? "")",
+        signerEmail: "@(Model.SignerEmailPrefill ?? "")"
+    };
+</script>
+
+<div class="contractPage">
+    <div class="contractPage__langFab" aria-label="Language switch">
+        <button class="contractPage__langBtn" type="button" data-culture="en">EN</button>
+        <button class="contractPage__langBtn" type="button" data-culture="de">DE</button>
+    </div>
+
+    <div class="contractPage__container">
+        <div class="contractPage__paper" id="paper">
+
+            <div class="contractPage__contractHtml">
+                @Html.Raw(Model.ContractHtml)
+            </div>
+
+            <div class="contractActions" id="contractActions">
+                <label class="contractActions__agree">
+                    <input type="checkbox" id="chkAgree" />
+                    <span>
+                        <strong>@T["contractPage_AgreeTitle"]</strong><br />
+                        <span class="contractActions__text">@T["contractPage_AgreeText"]</span>
+                    </span>
+                </label>
+
+                <div class="contractActions__right">
+                    <div class="contractActions__badge" id="signedBadge">@T["contractPage_Unsigned"]</div>
+
+                    <button class="contractActions__btn contractActions__btn--primary" type="button" id="btnOpen" disabled>
+                        @T["contractPage_SignAccept"]
+                    </button>
+
+                    <button class="contractActions__btn" type="button" id="btnPrint">@T["contractPage_Print"]</button>
+                    <button class="contractActions__btn" type="button" id="btnReset">@T["contractPage_Reset"]</button>
+                </div>
+            </div>
+
+            <section class="contractSign" aria-label="Unterschriften">
+                <h2 class="contractSign__title">Unterschriften</h2>
+
+                <div class="contractSign__grid">
+                    <div>
+                        <div class="contractSign__party">Kunde</div>
+
+                        <div class="contractSign__row">
+                            <div class="contractSign__label">Name</div>
+                            <input id="customerName"
+                                   class="contractSign__input"
+                                   type="text"
+                                   value=""
+                                   autocomplete="name"
+                                   placeholder="" />
+                        </div>
+
+                        <div class="contractSign__row">
+                            <div class="contractSign__label">E-Mail</div>
+                            <input id="customerEmail"
+                                   class="contractSign__input"
+                                   type="email"
+                                   value=""
+                                   autocomplete="email"
+                                   placeholder="" />
+                        </div>
+
+                        <div class="contractSign__row">
+                            <div class="contractSign__label">Datum</div>
+                            <div class="contractSign__line"><span id="customerDate"></span></div>
+                        </div>
+
+                        <div class="contractSign__row">
+                            <div class="contractSign__label">Unterschrift</div>
+                            <div id="sigBoxClick" class="contractSign__sigLine" role="button" tabindex="0"
+                                 aria-label="Unterschrift hinzufügen">
+                                <img id="sigImage" class="contractSign__sigImg" alt="Unterschrift" />
+                                <span id="sigPlaceholder" class="contractSign__placeholder"></span>
+                            </div>
+                        </div>
+
+                        <div class="contractSign__meta">
+                            Unterzeichnet am: <span id="signedAt"></span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="contractSign__party">Anbieter</div>
+
+                        <div class="contractSign__providerBlock">
+                            <div class="contractSign__providerName">@Model.ProviderName</div>
+                            <div class="contractSign__providerAddress">@Model.ProviderAddress</div>
+                        </div>
+
+                        <div class="contractSign__providerNote">
+                            (Unterschrift Anbieter erfolgt intern)
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <div class="contractPage__toast" id="toast"></div>
+
+    <div class="contractPage__modal" id="sigModal" aria-hidden="true">
+        <div class="contractPage__modalCard" role="dialog" aria-modal="true">
+            <div class="contractPage__modalHead">
+                <div>@T["contractPage_ModalTitle"]</div>
+                <button class="contractPage__btn" type="button" id="btnClose">✕</button>
+            </div>
+
+            <div class="contractPage__modalBody">
+                <div class="contractPage__modalHint">@T["contractPage_ModalHint"]</div>
+
+                <div class="contractPage__sigPad">
+                    <canvas id="sigCanvas" tabindex="0"></canvas>
+                </div>
+
+                <div class="contractPage__modalActions">
+                    <button class="contractPage__btn" type="button" id="btnClear">@T["contractPage_Clear"]</button>
+                    <button class="contractPage__btn contractPage__btn--primary" type="button" id="btnAccept">
+                        @T["contractPage_AcceptSignature"]
+                    </button>
+                    <button class="contractPage__btn" type="button" id="btnCancel">@T["contractPage_Cancel"]</button>
+                </div>
+
+                <div class="contractPage__modalStatus" id="modalStatus"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        window.contractPageI18n = {
+            fillName: "Please enter your name before signing",
+            emptyCanvas: "@T["contractPage_ErrEmptyCanvas"]",
+            mustAgree: "@T["contractPage_ErrMustAgree"]",
+            cleared: "@T["contractPage_Cleared"]",
+            signedOk: "@T["contractPage_SignedOk"]",
+            signed: "@T["contractPage_Signed"]",
+            unsigned: "@T["contractPage_Unsigned"]"
+        };
+    </script>
+    <script src="~/js/pages/contracts/contract-sign.js" asp-append-version="true"></script>
+}

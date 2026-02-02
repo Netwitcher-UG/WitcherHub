@@ -33,6 +33,10 @@
 <input type="hidden" id="vcProjectQuotesUrl" value="@Url.Page("./Projects", "ProjectQuotes")" />
 <input type="hidden" id="vcProjectInvoicesUrl" value="@Url.Page("./Projects", "ProjectInvoices")" />
 <input type="hidden" id="vcProjectContractsUrl" value="@Url.Page("./Projects", "ProjectContracts")" />
+<input type="hidden" id="vcProjectContractSnapshotUrl" value="@Url.Page("./Projects", "ProjectContractSnapshot")" />
+<input type="hidden" id="vcProjectContractGenerateUrl" value="@Url.Page("./Projects", "GenerateProjectContract")" />
+
+<input type="hidden" id="vcProjectContractCreateUrl" value="@Url.Page("./Projects", "CreateProjectContract")" />
 
 
 <input type="hidden" id="antiForgeryToken" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />

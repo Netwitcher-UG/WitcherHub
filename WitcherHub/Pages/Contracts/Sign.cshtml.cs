@@ -1,10 +1,10 @@
-﻿using Ganss.Xss;
+using Ganss.Xss;
 using Markdig;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Infrastructure.Data.Context;
@@ -14,14 +14,13 @@ using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Pages.Contracts
 {
-    [Authorize]
-    public class DetailsModel : PageModel
+    public class SignModel : PageModel
     {
         private readonly AppDbContext _db;
         private readonly IContractDocumentGenerator _generator;
         private readonly ContractTemplateOptions _opt;
 
-        public DetailsModel(AppDbContext db, IContractDocumentGenerator generator, IOptions<ContractTemplateOptions> opt)
+        public SignModel(AppDbContext db, IContractDocumentGenerator generator, IOptions<ContractTemplateOptions> opt)
         {
             _db = db;
             _generator = generator;
@@ -32,9 +31,17 @@ namespace WitcherHub.Pages.Contracts
         public Guid Id { get; set; }
 
         public string ContractHtml { get; private set; } = "";
+        public string ProviderName { get; private set; } = "";
+        public string ProviderAddress { get; private set; } = "";
 
+        // Existing signature (if already signed)
         public bool IsSigned { get; private set; }
         public string? SignedAtIso { get; private set; }
+        public string? SignatureDataUrl { get; private set; }
+
+        // Prefill customer fields
+        public string? SignerNamePrefill { get; private set; }
+        public string? SignerEmailPrefill { get; private set; }
 
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
@@ -44,7 +51,7 @@ namespace WitcherHub.Pages.Contracts
                 .Include(c => c.Project)
                     .ThenInclude(p => p.Customer)
                         .ThenInclude(cu => cu.Addresses)
-            .Include(c => c.Project)
+                .Include(c => c.Project)
                     .ThenInclude(p => p.Customer)
                         .ThenInclude(cu => cu.EmailAddresses)
                 .Include(c => c.Items)
@@ -54,7 +61,31 @@ namespace WitcherHub.Pages.Contracts
 
             if (contract is null) return NotFound();
 
-            // Generate terms once if missing (نفس Sign)
+            // Provider block split
+            var pb = NormalizeNewLines(_opt.ProviderBlock ?? "");
+            var lines = pb.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            ProviderName = lines.Length > 0 ? lines[0] : "";
+            ProviderAddress = lines.Length > 1 ? string.Join("\n", lines.Skip(1)) : "";
+
+            // Prefill from customer
+            var customer = contract.Project.Customer;
+            SignerNamePrefill = customer.Name;
+
+            var email =
+                customer.Contacts?
+                    .OrderByDescending(c => c.IsPrimary)
+                    .Select(c => c.Email)
+                    .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e))
+                ?? customer.EmailAddresses?
+                    .Where(ea => ea.Kind == "business")
+                    .Select(ea => ea.Email)
+                    .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e))
+                ?? customer.EmailAddresses?
+                    .Select(ea => ea.Email)
+                    .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
+            SignerEmailPrefill = email;
+
+            // If not generated yet: generate once and store in Contract.Terms
             if (string.IsNullOrWhiteSpace(contract.Terms))
             {
                 var req = BuildRequestFromDb(contract);
@@ -62,13 +93,14 @@ namespace WitcherHub.Pages.Contracts
 
                 contract.Terms = NormalizeNewLines(doc.FullDocument);
 
+                // optional: when generated we can mark as Sent later when you implement "Send"
                 if (contract.Status == DocumentStatus.Draft)
                     contract.Status = DocumentStatus.Draft;
 
                 await _db.SaveChangesAsync(ct);
             }
 
-            // Signed status
+            // Existing signature (latest)
             var sig = contract.Signatures
                 .OrderByDescending(s => s.CreatedAt)
                 .FirstOrDefault();
@@ -77,11 +109,17 @@ namespace WitcherHub.Pages.Contracts
             {
                 IsSigned = true;
                 SignedAtIso = sig.SignedAt.Value.UtcDateTime.ToString("o");
-            }
-            else
-            {
-                // fallback based on status
-                IsSigned = contract.Status == DocumentStatus.Signed;
+
+                if (sig.SignatureData is not null &&
+                    sig.SignatureData.RootElement.TryGetProperty("dataUrl", out var p) &&
+                    p.ValueKind == JsonValueKind.String)
+                {
+                    SignatureDataUrl = p.GetString();
+                }
+
+                // prefer signed name/email if present
+                if (!string.IsNullOrWhiteSpace(sig.SignerName)) SignerNamePrefill = sig.SignerName;
+                if (!string.IsNullOrWhiteSpace(sig.SignerEmail)) SignerEmailPrefill = sig.SignerEmail;
             }
 
             // Markdown -> HTML
@@ -94,6 +132,60 @@ namespace WitcherHub.Pages.Contracts
             ContractHtml = sanitizer.Sanitize(html);
 
             return Page();
+        }
+
+        public async Task<IActionResult> OnPostSignAsync(CancellationToken ct)
+        {
+            if (Id == Guid.Empty) return new JsonResult(new { ok = false, message = "Invalid contract id." }) { StatusCode = 400 };
+
+            var signerName = (Request.Form["SignerName"].ToString() ?? "").Trim();
+            var signerEmail = (Request.Form["SignerEmail"].ToString() ?? "").Trim();
+            var signatureDataUrl = (Request.Form["SignatureDataUrl"].ToString() ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(signerName))
+                return new JsonResult(new { ok = false, message = "Signer name is required." }) { StatusCode = 400 };
+
+            if (string.IsNullOrWhiteSpace(signatureDataUrl) || !signatureDataUrl.StartsWith("data:image/"))
+                return new JsonResult(new { ok = false, message = "Invalid signature data." }) { StatusCode = 400 };
+
+            var contract = await _db.Contracts
+                .Include(c => c.Signatures)
+                .FirstOrDefaultAsync(c => c.Id == Id, ct);
+
+            if (contract is null)
+                return new JsonResult(new { ok = false, message = "Contract not found." }) { StatusCode = 404 };
+
+            if (contract.Status == DocumentStatus.Signed || contract.SignedAt is not null)
+                return new JsonResult(new { ok = false, message = "Contract already signed." }) { StatusCode = 409 };
+
+            var now = DateTimeOffset.UtcNow;
+
+            var payload = JsonSerializer.SerializeToDocument(new
+            {
+                dataUrl = signatureDataUrl,
+                userAgent = Request.Headers.UserAgent.ToString(),
+                signedAt = now.UtcDateTime.ToString("o")
+            });
+
+            contract.Signatures.Add(new ContractSignature
+            {
+                ContractId = contract.Id,
+                SignerName = signerName,
+                SignerEmail = string.IsNullOrWhiteSpace(signerEmail) ? null : signerEmail,
+                SignedAt = now,
+                SignatureData = payload
+            });
+
+            contract.SignedAt = now;
+            contract.Status = DocumentStatus.Signed;
+
+            await _db.SaveChangesAsync(ct);
+
+            return new JsonResult(new
+            {
+                ok = true,
+                signedAtIso = now.UtcDateTime.ToString("o")
+            });
         }
 
         private GenerateContractDocumentRequest BuildRequestFromDb(Contract contract)
@@ -136,7 +228,7 @@ namespace WitcherHub.Pages.Contracts
                     AgreedPrice = i.AgreedPrice,
                     Config = i.Config is null
                         ? new Dictionary<string, object>()
-                        : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(i.Config.RootElement.GetRawText()) ?? new()
+                        : JsonSerializer.Deserialize<Dictionary<string, object>>(i.Config.RootElement.GetRawText()) ?? new()
                 })
                 .ToList();
 
@@ -151,7 +243,7 @@ namespace WitcherHub.Pages.Contracts
                 IncludePricesInServicesSection = true,
                 CustomerBlockOverride = customerBlock,
                 Services = lines,
-                SignerName = ""
+                SignerName = "" // will be filled by user on page
             };
         }
 

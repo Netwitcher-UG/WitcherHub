@@ -439,138 +439,236 @@
     }
 
     // =========================
-    // Contracts state + UI
+    // Contract (single per project) + UI
     // =========================
-    const contractsState = {
+    const contractOneState = {
         projectId: null,
-        page: 1,
-        pageSize: 10,
-        q: null,
         loadedOnce: false
     };
 
-    function setContractsLoading(on) {
-        $('vpContractsLoading')?.classList.toggle('d-none', !on);
+    function setContractLoading(on) {
+        $('vpContractLoading')?.classList.toggle('d-none', !on);
     }
 
-    function setContractsEmpty(on) {
-        $('vpContractsEmpty')?.classList.toggle('d-none', !on);
+    function showContractEmpty(on) {
+        $('vpContractEmpty')?.classList.toggle('d-none', !on);
     }
 
-    function setContractsVisible(on) {
-        $('vpContractsTable')?.classList.toggle('d-none', !on);
-        $('vpContractsPagerWrap')?.classList.toggle('d-none', !on);
+    function showContractPreview(on) {
+        $('vpContractPreviewWrap')?.classList.toggle('d-none', !on);
     }
 
-    function buildContractsPager(res) {
-        const ul = $('vpContractsPager');
-        if (!ul) return;
-        ul.innerHTML = '';
-
-        const totalPages = res.totalPages ?? res.TotalPages ?? 0;
-        const page = res.page ?? res.Page ?? 1;
-
-        function addItem(label, targetPage, disabled, active) {
-            const li = document.createElement('li');
-            li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`;
-            const a = document.createElement('a');
-            a.className = 'page-link';
-            a.href = '#';
-            a.textContent = label;
-            if (!disabled && !active) {
-                a.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    loadContracts({ page: targetPage });
-                });
-            }
-            li.appendChild(a);
-            ul.appendChild(li);
-        }
-
-        addItem('Prev', page - 1, page <= 1, false);
-
-        const start = Math.max(1, page - 2);
-        const end = Math.min(totalPages, page + 2);
-        for (let p = start; p <= end; p++) addItem(String(p), p, false, p === page);
-
-        addItem('Next', page + 1, page >= totalPages, false);
+    function badgeHtml(status) {
+        const s = (status || '').toString().toLowerCase();
+        if (s === 'signed') return `<span class="badge bg-success bg-opacity-10 text-success">Signed</span>`;
+        if (s === 'sent') return `<span class="badge bg-primary bg-opacity-10 text-primary">Sent</span>`;
+        if (s === 'draft') return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
+        return `<span class="badge bg-secondary bg-opacity-10 text-secondary">${esc(status || '—')}</span>`;
     }
 
-    async function loadContracts(opts) {
-        if (!contractsState.projectId) return;
-        const urlBase = $('vcProjectContractsUrl')?.value;
-        if (!urlBase) return toastError('vcProjectContractsUrl not found', 'Error');
+    async function loadProjectContractSnapshot() {
+        if (!contractOneState.projectId) return;
 
-        if (opts?.page) contractsState.page = opts.page;
-        if (opts?.q !== undefined) contractsState.q = opts.q;
+        const urlBase = $('vcProjectContractSnapshotUrl')?.value;
+        if (!urlBase) return toastError('vcProjectContractSnapshotUrl not found', 'Error');
 
-        setContractsLoading(true);
-        setContractsEmpty(false);
-        setContractsVisible(false);
+        const btnCreate = document.getElementById('vpContractCreateBtn');
+        const btnUpdate = document.getElementById('vpContractGenerateBtn');
+        const editLink = document.getElementById('vpContractEditLink');
+        const detailsLink = document.getElementById('vpContractDetailsLink');
+        const sendBtn = document.getElementById('vpContractSendBtn');
+
+        setContractLoading(true);
+        showContractEmpty(false);
+        showContractPreview(false);
 
         const joiner = urlBase.includes('?') ? '&' : '?';
-        const url =
-            `${urlBase}${joiner}` +
-            `projectId=${encodeURIComponent(contractsState.projectId)}` +
-            `&p=${encodeURIComponent(contractsState.page)}` +
-            `&pageSize=${encodeURIComponent(contractsState.pageSize)}` +
-            `&q=${encodeURIComponent(contractsState.q || '')}`;
+        const url = `${urlBase}${joiner}projectId=${encodeURIComponent(contractOneState.projectId)}`;
 
         try {
             const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
             const json = await res.json();
 
             if (!res.ok) {
-                toastFromPayload(json, 'Error', 'Failed to load contracts.');
+                toastFromPayload(json, 'Error', 'Failed to load contract.');
                 return;
             }
 
             const data = json.data ?? json;
-            const items = data.items ?? data.Items ?? [];
 
-            const tbody = $('vpContractsTbody');
-            if (tbody) tbody.innerHTML = '';
+            // ---------- حالة: لا يوجد عقد ----------
+            if (!data.exists) {
+                $('vpContractTitle').textContent = 'No contract';
+                $('vpContractMeta').textContent = '—';
+                $('vpContractStatusBadge').innerHTML = '';
+                $('vpContractPreview').innerHTML =
+                    '<div class="text-muted">No contract yet. Click Add Contract to create one.</div>';
 
-            if (!items.length) {
-                setContractsLoading(false);
-                setContractsEmpty(true);
-                setContractsVisible(false);
-                contractsState.loadedOnce = true;
+                btnCreate?.classList.remove('d-none');
+                btnUpdate?.classList.add('d-none');
+                editLink?.classList.add('d-none');
+                detailsLink?.classList.add('d-none');
+                sendBtn?.classList.add('d-none');
+
+                showContractEmpty(true);
+                showContractPreview(true);
+                contractOneState.loadedOnce = true;
                 return;
             }
 
-            for (const c of items) {
-                const id = c.id ?? c.Id;
-                const contractNo = c.contractNo ?? c.ContractNo ?? c.number ?? c.Number ?? '—';
-                const status = c.status ?? c.Status ?? '—';
-                const startDate = c.startDate ?? c.StartDate;
-                const endDate = c.endDate ?? c.EndDate;
+            // ---------- حالة: يوجد عقد ----------
+            $('vpContractTitle').textContent = data.contractNo || 'Contract';
+            $('vpContractMeta').textContent = data.signedAt ? `Signed at: ${fmtDateTime(data.signedAt)}` : 'Not signed yet';
+            $('vpContractStatusBadge').innerHTML = badgeHtml(data.status);
 
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${esc(contractNo)}</td>
-                    <td>${esc(String(status))}</td>
-                    <td>${esc(fmtDate(startDate))}</td>
-                    <td>${esc(fmtDate(endDate))}</td>
-                    <td class="text-end">
-                        <a class="btn btn-sm btn-outline-primary" href="/Contracts/Details?id=${encodeURIComponent(id)}">Details</a>
-                    </td>
-                `;
-                tbody.appendChild(tr);
+            btnCreate?.classList.add('d-none');          // ممنوع Add لأن موجود
+            btnUpdate?.classList.remove('d-none');       // يظهر Update (حسب الشروط)
+            detailsLink?.classList.remove('d-none');     // Details يظهر
+            if (detailsLink) {
+                let href = data.detailsUrl || '';
+                const cid = data.contractId || data.id || null;
+
+                if (!href && cid) href = `/Contracts/Details?id=${encodeURIComponent(cid)}`;
+
+                if (href && href.toLowerCase().includes('/contracts/sign/')) {
+                    const idPart = href.split('/contracts/sign/')[1];
+                    if (idPart) href = `/Contracts/Details?id=${encodeURIComponent(idPart)}`;
+                }
+
+                detailsLink.href = href || '#';
             }
 
-            setContractsLoading(false);
-            setContractsEmpty(false);
-            setContractsVisible(true);
-            buildContractsPager(data);
-            contractsState.loadedOnce = true;
+
+            const itemsCount = Number(data.itemsCount || 0);
+            const hasItems = itemsCount > 0;
+
+            // Preview
+            $('vpContractPreview').innerHTML = data.previewHtml || '<div class="text-muted">No contract terms yet.</div>';
+
+            // إذا ماكو Line Items => لا توليد ولا إرسال، بس وجّه المستخدم للإضافة
+            if (!hasItems) {
+                if (btnUpdate) {
+                    btnUpdate.textContent = 'Update Contract';
+                    btnUpdate.disabled = true; // ممنوع توليد لأن ماكو items
+                }
+
+                sendBtn?.classList.add('d-none');
+
+                if (editLink) {
+                    editLink.href = data.editUrl || '#';
+                    editLink.classList.remove('d-none');
+                    editLink.textContent = 'Add services';
+                }
+
+                $('vpContractPreview').innerHTML =
+                    '<div class="alert alert-warning mb-0">Please add at least one service (line item) to this contract before you can generate the terms and send it.</div>';
+
+                showContractEmpty(false);
+                showContractPreview(true);
+                contractOneState.loadedOnce = true;
+                return;
+            }
+
+            // إذا يوجد Line Items => فعّل Update حسب canUpdate
+            const canUpdate = !!data.canUpdate;
+
+            if (btnUpdate) {
+                btnUpdate.disabled = !canUpdate;
+                btnUpdate.textContent = canUpdate ? 'Update Contract' : 'Locked (Signed)';
+            }
+
+            if (editLink) {
+                editLink.href = data.editUrl || '#';
+                editLink.classList.toggle('d-none', !canUpdate);
+                editLink.textContent = 'Edit';
+            }
+
+            // send يظهر فقط إذا اكو items (وإنت لاحقاً تقدر تقيده بشرط status)
+            sendBtn?.classList.remove('d-none');
+
+            showContractEmpty(false);
+            showContractPreview(true);
+            contractOneState.loadedOnce = true;
         } catch (err) {
             console.error(err);
-            setContractsLoading(false);
-            toastError('Failed to load contracts.', 'Error');
+            toastError('Failed to load contract.', 'Error');
+        } finally {
+            setContractLoading(false);
         }
     }
 
+    // Generate/Update
+    document.getElementById('vpContractGenerateBtn')?.addEventListener('click', async function () {
+        if (!contractOneState.projectId) return;
+
+        const urlBase = document.getElementById('vcProjectContractGenerateUrl')?.value;
+        if (!urlBase) return toastError('Contract generate endpoint is missing.', 'Error');
+
+        const btn = document.getElementById('vpContractGenerateBtn');
+
+        try {
+            btn.disabled = true;
+            window.UI?.loading?.show?.('Updating contract...');
+
+            const token = document.getElementById('antiForgeryToken')?.value || '';
+            const joiner = urlBase.includes('?') ? '&' : '?';
+            const url = `${urlBase}${joiner}projectId=${encodeURIComponent(contractOneState.projectId)}`;
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: token
+                    ? { 'RequestVerificationToken': token, 'Accept': 'application/json' }
+                    : { 'Accept': 'application/json' }
+            });
+
+            const json = await res.json().catch(() => ({}));
+
+            // ❌ فشل
+            if (!res.ok) {
+                // مهم: خزّن التوست قبل أي redirect
+                if (json?.toast) saveToastForReload(json.toast);
+
+                // Redirect لو السيرفر قال
+                if (json?.action === 'openEdit' && json?.editUrl) {
+                    window.location.href = json.editUrl;
+                    return;
+                }
+
+                // إذا ماكو redirect، اعرض التوست هنا
+                if (json?.toast) showToast(json.toast);
+                else showToast({ type: 'error', title: 'Error', message: 'Unable to update the contract.' });
+
+                return;
+            }
+
+            // ✅ نجاح
+            if (json?.toast) showToast(json.toast);
+            else showToast({ type: 'success', title: 'Success', message: 'The contract has been updated successfully.' });
+
+            await loadProjectContractSnapshot();
+
+        } catch (err) {
+            console.error(err);
+            toastError('Failed to generate contract.', 'Error');
+        } finally {
+            window.UI?.loading?.hide?.();
+            btn.disabled = false;
+        }
+    });
+
+    // helper for datetime in UI
+    function fmtDateTime(v) {
+        if (!v) return '—';
+        try {
+            const d = new Date(v);
+            return d.toLocaleString();
+        } catch { return String(v); }
+    }
+
+
+    
+
+    
     // =========================
     // ---- main state ----
     // =========================
@@ -656,11 +754,8 @@
             invoicesState.loadedOnce = false;
             if ($('vp-invoices-q')) $('vp-invoices-q').value = '';
 
-            contractsState.projectId = id;
-            contractsState.page = 1;
-            contractsState.q = null;
-            contractsState.loadedOnce = false;
-            if ($('vp-contracts-q')) $('vp-contracts-q').value = '';
+            contractOneState.projectId = id;
+            contractOneState.loadedOnce = false;
 
             // update create links
             const q = $('vp-newQuoteBtn');
@@ -725,9 +820,12 @@
 
         if (target?.id === 'vp-tab-contracts') {
             const a = $('vp-newContractBtn2');
-            if (a && contractsState.projectId) a.href = `/Contracts/Create?projectId=${encodeURIComponent(contractsState.projectId)}`;
-            if (!contractsState.loadedOnce) loadContracts({ page: 1, q: $('vp-contracts-q')?.value?.trim() || '' });
+            if (a && contractOneState.projectId)
+                a.href = `/Contracts/Create?projectId=${encodeURIComponent(contractOneState.projectId)}`;
+
+            if (!contractOneState.loadedOnce) loadProjectContractSnapshot();
         }
+
     });
 
     // ---- Quotes search
@@ -754,17 +852,7 @@
         }
     });
 
-    // ---- Contracts search
-    $('vp-contracts-searchBtn')?.addEventListener('click', function () {
-        loadContracts({ page: 1, q: $('vp-contracts-q')?.value?.trim() || '' });
-    });
-
-    $('vp-contracts-q')?.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            loadContracts({ page: 1, q: $('vp-contracts-q')?.value?.trim() || '' });
-        }
-    });
+   
 
     // ---- table delete ----
     document.addEventListener('click', async function (e) {
@@ -860,6 +948,54 @@
                 toastFromPayload(err?.payload, 'Error', 'Failed to update status.');
             }
             return;
+        }
+    });
+    document.getElementById('vpContractCreateBtn')?.addEventListener('click', async function () {
+        if (!contractOneState.projectId) return;
+
+        const urlBase = document.getElementById('vcProjectContractCreateUrl')?.value;
+        if (!urlBase) return toastError('Create endpoint is missing.', 'Error');
+
+        const btn = document.getElementById('vpContractCreateBtn');
+
+        try {
+            btn.disabled = true;
+            window.UI?.loading?.show?.('Creating contract...');
+
+            const token = document.getElementById('antiForgeryToken')?.value || '';
+            const joiner = urlBase.includes('?') ? '&' : '?';
+            const url = `${urlBase}${joiner}projectId=${encodeURIComponent(contractOneState.projectId)}`;
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    ...(token ? { 'RequestVerificationToken': token } : {}),
+                    'Accept': 'application/json'
+                }
+            });
+
+            const json = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                if (json?.toast) showToast(json.toast);
+                else toastError('Failed to create contract.', 'Error');
+                return;
+            }
+
+            // ✅ احفظ التوست حتى يظهر في صفحة Edit
+            if (json?.toast) saveToastForReload(json.toast);
+
+            const editUrl = json?.data?.editUrl;
+            if (editUrl) {
+                window.location.href = editUrl;
+                return;
+            }
+
+            showToast({ type: 'success', title: 'Success', message: 'Contract created.' });
+            await loadProjectContractSnapshot();
+        } finally {
+            window.UI?.loading?.hide?.();
+            btn.disabled = false;
         }
     });
 

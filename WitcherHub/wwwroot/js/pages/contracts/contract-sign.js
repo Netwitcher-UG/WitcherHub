@@ -1,6 +1,7 @@
 ﻿// wwwroot/js/pages/contracts/contract-sign.js
 (function () {
     const i18n = window.contractPageI18n || {};
+    const serverState = window.contractServerState || {};
     const $ = (id) => document.getElementById(id);
 
     const chkAgree = $("chkAgree");
@@ -24,15 +25,14 @@
     const signedAt = $("signedAt");
     const customerDate = $("customerDate");
     const customerName = $("customerName");
+    const customerEmail = $("customerEmail");
 
     const canvas = $("sigCanvas");
-    if (!chkAgree || !btnOpen || !sigModal || !canvas || !customerName) return;
+    const signEndpoint = $("signEndpoint");
+
+    if (!chkAgree || !btnOpen || !sigModal || !canvas || !customerName || !signEndpoint) return;
 
     const ctx = canvas.getContext("2d");
-
-    const STORAGE_SIG = "fekrahub.contract.signature";
-    const STORAGE_AT = "fekrahub.contract.signedAt";
-    const STORAGE_NAME = "fekrahub.contract.customerName";
 
     function formatSignedAt(iso) {
         try {
@@ -58,6 +58,7 @@
         toast.textContent = "";
         toast.classList.remove("error");
     }
+
     function decodeHtmlEntities(s) {
         if (!s) return s;
         const t = document.createElement("textarea");
@@ -67,9 +68,7 @@
 
     function showToast(msg, isError) {
         if (!toast) return;
-
         msg = decodeHtmlEntities(msg);
-
         if (!msg) {
             hideToast();
             return;
@@ -80,7 +79,6 @@
         clearTimeout(showToast._t);
         showToast._t = setTimeout(hideToast, 2600);
     }
-
 
     function showModalStatus(msg, isError) {
         if (!modalStatus) return;
@@ -97,7 +95,7 @@
 
     function canSignNow() {
         const nameOk = (customerName.value || "").trim().length > 0;
-        return chkAgree.checked && nameOk;
+        return chkAgree.checked && nameOk && !serverState.isSigned;
     }
 
     function refreshSignButton() {
@@ -119,10 +117,12 @@
             signedBadge.classList.add("signed");
         }
 
-        // lock fields after sign (production)
         customerName.readOnly = true;
+        if (customerEmail) customerEmail.readOnly = true;
         chkAgree.disabled = true;
         btnOpen.disabled = true;
+
+        serverState.isSigned = true;
     }
 
     function setUnsignedUI() {
@@ -141,7 +141,10 @@
         }
 
         customerName.readOnly = false;
+        if (customerEmail) customerEmail.readOnly = false;
         chkAgree.disabled = false;
+
+        serverState.isSigned = false;
         refreshSignButton();
     }
 
@@ -156,7 +159,6 @@
 
         ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
 
-        // ✅ darker + thicker signature
         ctx.lineWidth = 3.6;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
@@ -181,6 +183,8 @@
     }
 
     function openModal() {
+        if (serverState.isSigned) return;
+
         if (!chkAgree.checked) {
             showToast(i18n.mustAgree || "Please confirm agreement before signing", true);
             return;
@@ -202,12 +206,40 @@
         canvas.focus?.();
     }
 
-
     function closeModal() {
         sigModal.style.display = "none";
         sigModal.setAttribute("aria-hidden", "true");
         document.body.style.overflow = "";
         showModalStatus("", false);
+    }
+
+    function getAntiForgeryToken() {
+        const el = document.querySelector('input[name="__RequestVerificationToken"]');
+        return el ? el.value : "";
+    }
+
+    async function postSignatureToServer(dataUrl) {
+        const token = getAntiForgeryToken();
+        const fd = new FormData();
+        fd.append("SignerName", (customerName.value || "").trim());
+        fd.append("SignerEmail", (customerEmail?.value || "").trim());
+        fd.append("SignatureDataUrl", dataUrl);
+
+        const res = await fetch(signEndpoint.value, {
+            method: "POST",
+            headers: token ? { "RequestVerificationToken": token } : {},
+            body: fd
+        });
+
+        let json = null;
+        try { json = await res.json(); } catch { }
+
+        if (!res.ok || !json || json.ok !== true) {
+            const msg = (json && json.message) ? json.message : ("HTTP " + res.status);
+            throw new Error(msg);
+        }
+
+        return json;
     }
 
     // Events
@@ -216,10 +248,8 @@
         if (chkAgree.checked) hideToast();
     });
 
-    customerName.addEventListener("input", () => {
-        localStorage.setItem(STORAGE_NAME, customerName.value || "");
-        refreshSignButton();
-    });
+    customerName.addEventListener("input", refreshSignButton);
+    if (customerEmail) customerEmail.addEventListener("input", refreshSignButton);
 
     btnOpen.addEventListener("click", openModal);
     sigBoxClick?.addEventListener("click", openModal);
@@ -282,33 +312,42 @@
         showModalStatus(i18n.cleared || "Cleared.", false);
     });
 
-    btnAccept?.addEventListener("click", () => {
+    btnAccept?.addEventListener("click", async () => {
         if (isBlank()) {
             showModalStatus(i18n.emptyCanvas || "Please sign first.", true);
             return;
         }
 
         const dataUrl = canvas.toDataURL("image/png");
-        const whenIso = new Date().toISOString();
 
-        localStorage.setItem(STORAGE_SIG, dataUrl);
-        localStorage.setItem(STORAGE_AT, whenIso);
+        try {
+            btnAccept.disabled = true;
+            showModalStatus("Saving...", false);
 
-        setSignedUI(whenIso, dataUrl);
-        showToast(i18n.signedOk || "Signed successfully ✅", false);
-        closeModal();
+            const result = await postSignatureToServer(dataUrl);
+            const whenIso = result.signedAtIso || new Date().toISOString();
+
+            setSignedUI(whenIso, dataUrl);
+            showToast(i18n.signedOk || "Signed successfully ✅", false);
+            closeModal();
+        } catch (err) {
+            showModalStatus(err.message || "Failed to save signature.", true);
+        } finally {
+            btnAccept.disabled = false;
+        }
     });
 
     btnPrint?.addEventListener("click", () => window.print());
 
+    // Reset is UI-only now (does NOT delete from DB)
     btnReset?.addEventListener("click", () => {
-        localStorage.removeItem(STORAGE_SIG);
-        localStorage.removeItem(STORAGE_AT);
-        localStorage.removeItem(STORAGE_NAME);
-
+        if (serverState.isSigned) {
+            showToast("This contract is already signed. Reset is disabled.", true);
+            return;
+        }
         customerName.value = "";
+        if (customerEmail) customerEmail.value = "";
         chkAgree.checked = false;
-
         setUnsignedUI();
         hideToast();
         clearCanvas();
@@ -318,17 +357,14 @@
         if (sigModal.style.display === "block") resizeCanvas();
     });
 
-    function initFromStorage() {
-        const savedName = localStorage.getItem(STORAGE_NAME);
-        if (savedName) customerName.value = savedName;
+    function initFromServer() {
+        // Prefill fields
+        if (serverState.signerName && !customerName.value) customerName.value = serverState.signerName;
+        if (customerEmail && serverState.signerEmail && !customerEmail.value) customerEmail.value = serverState.signerEmail;
 
-        const savedSig = localStorage.getItem(STORAGE_SIG);
-        const savedAt = localStorage.getItem(STORAGE_AT);
-
-        if (savedSig && savedAt) {
-            // already signed
+        if (serverState.isSigned && serverState.signatureDataUrl && serverState.signedAtIso) {
             chkAgree.checked = true;
-            setSignedUI(savedAt, savedSig);
+            setSignedUI(serverState.signedAtIso, serverState.signatureDataUrl);
         } else {
             setUnsignedUI();
         }
@@ -338,5 +374,5 @@
 
     resizeCanvas();
     clearCanvas();
-    initFromStorage();
+    initFromServer();
 })();

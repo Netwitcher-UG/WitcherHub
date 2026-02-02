@@ -1,4 +1,4 @@
-@using System.Security.Claims
+﻿@using System.Security.Claims
 @using WitcherHub.Domain.SeedData
 
 
@@ -473,6 +473,43 @@
             });
         </script>
     }
+    <script>
+        (function () {
+          'use strict';
+
+          const KEY = 'vc.toast.afterReload';
+
+          function showToast(t) {
+            if (!t) return;
+            const UI = window.UI || {};
+            const type = String(t.type || '').toLowerCase();
+            const title = t.title || '';
+            const msg = t.message || '';
+
+            // fallback لو UI.toast غير موجودة
+            const fallback = (m) => alert((title ? title + ": " : "") + m);
+
+            if (UI.toast?.success && type === 'success') return UI.toast.success(msg, title);
+            if (UI.toast?.warning && (type === 'warning' || type === 'warn')) return UI.toast.warning(msg, title);
+            if (UI.toast?.info && type === 'info') return UI.toast.info(msg, title);
+            if (UI.toast?.error) return UI.toast.error(msg, title);
+
+            return fallback(msg);
+          }
+
+          document.addEventListener('DOMContentLoaded', function () {
+            try {
+              const raw = sessionStorage.getItem(KEY);
+              if (!raw) return;
+              sessionStorage.removeItem(KEY);
+              showToast(JSON.parse(raw));
+            } catch {
+              try { sessionStorage.removeItem(KEY); } catch {}
+            }
+          });
+        })();
+    </script>
+
 </body>
 </html>
 

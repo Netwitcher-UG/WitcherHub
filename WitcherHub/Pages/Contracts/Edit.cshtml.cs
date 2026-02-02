@@ -1,4 +1,6 @@
-using FluentValidation;
+﻿using FluentValidation;
+using Ganss.Xss;
+using Markdig;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -34,6 +36,10 @@ namespace WitcherHub.Pages.Contracts
         [BindProperty(SupportsGet = true)]
         public Guid Id { get; set; } // ContractId
 
+        public string ContractHtml { get; private set; } = "";
+        public string RawTerms { get; private set; } = "";
+        public bool IsSigned { get; private set; }
+
         public ContractViews.ContractDetailsView? Contract { get; private set; }
 
         [BindProperty]
@@ -67,17 +73,40 @@ namespace WitcherHub.Pages.Contracts
         {
             if (Id == Guid.Empty) return NotFound();
 
-            Contract = await _contracts.GetContractAsync(Id, ct);
+            await LoadPageStateAsync(Id, ct, termsOverride: null);
             if (Contract is null) return NotFound();
+
+            return Page();
+        }
+
+        private async Task LoadPageStateAsync(Guid contractId, CancellationToken ct, string? termsOverride)
+        {
+            Contract = await _contracts.GetContractAsync(contractId, ct);
+            if (Contract is null) return;
 
             // Map View -> Header DTO
             Header.Contract.ProjectId = Contract.ProjectId;
             Header.Contract.Currency = Contract.Currency;
             Header.Contract.Status = Contract.Status;
-            Header.Contract.Terms = Contract.Terms;
             Header.Contract.StartDate = Contract.StartDate;
             Header.Contract.EndDate = Contract.EndDate;
             Header.Contract.SignedAt = Contract.SignedAt;
+
+            // Terms: use override if provided (important for validation failure)
+            Header.Contract.Terms = termsOverride ?? Contract.Terms;
+
+            // Safety defaults
+            Header.Contract.StartDate ??= DateOnly.FromDateTime(DateTime.UtcNow);
+            Header.Contract.EndDate ??= DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1));
+
+            // Signed badge
+            IsSigned = Contract.Status == DocumentStatus.Signed || Contract.SignedAt is not null;
+
+            // Raw terms used by inline editor
+            RawTerms = Header.Contract.Terms ?? "";
+
+            // Render Terms -> HTML (Markdown)
+            ContractHtml = RenderMarkdownToSafeHtml(RawTerms);
 
             // Defaults for new item
             NewItem.ContractId = Contract.Id;
@@ -90,8 +119,22 @@ namespace WitcherHub.Pages.Contracts
             // Defaults for edit item (will be filled by UI when editing)
             EditItem.ContractId = Contract.Id;
             EditItemConfigJson = "{}";
+        }
 
-            return Page();
+        private static string RenderMarkdownToSafeHtml(string markdown)
+        {
+            markdown ??= "";
+            markdown = markdown.Replace("\r\n", "\n");
+
+            var pipeline = new MarkdownPipelineBuilder()
+                .UseAdvancedExtensions()
+                .Build();
+
+            var html = Markdown.ToHtml(markdown, pipeline);
+
+            var sanitizer = new HtmlSanitizer();
+            sanitizer.AllowedSchemes.Add("mailto");
+            return sanitizer.Sanitize(html);
         }
 
         public async Task<IActionResult> OnPostUpdateHeaderAsync(CancellationToken ct)
@@ -108,7 +151,9 @@ namespace WitcherHub.Pages.Contracts
                     foreach (var err in vr.Errors)
                         ModelState.AddModelError("Header." + err.PropertyName, err.ErrorMessage);
 
-                    await OnGetAsync(ct);
+                    // ✅ IMPORTANT: keep user's edited terms on the page
+                    await LoadPageStateAsync(Id, ct, termsOverride: Header.Contract.Terms);
+
                     TempData["Toast.Type"] = "error";
                     TempData["Toast.Title"] = "Validation";
                     TempData["Toast.Message"] = "Please fix the highlighted fields.";
@@ -129,7 +174,7 @@ namespace WitcherHub.Pages.Contracts
                 TempData["Toast.Title"] = "Not allowed";
                 TempData["Toast.Message"] = ex.Message;
 
-                await OnGetAsync(ct);
+                await LoadPageStateAsync(Id, ct, termsOverride: Header.Contract.Terms);
                 return Page();
             }
             catch (NotFoundAppException ex)
@@ -164,7 +209,7 @@ namespace WitcherHub.Pages.Contracts
                 catch
                 {
                     ModelState.AddModelError(nameof(NewItemConfigJson), "Invalid JSON.");
-                    await OnGetAsync(ct);
+                    await LoadPageStateAsync(Id, ct, termsOverride: null);
                     return Page();
                 }
 
@@ -176,7 +221,7 @@ namespace WitcherHub.Pages.Contracts
                     foreach (var err in vr.Errors)
                         ModelState.AddModelError("NewItem." + err.PropertyName, err.ErrorMessage);
 
-                    await OnGetAsync(ct);
+                    await LoadPageStateAsync(Id, ct, termsOverride: null);
                     TempData["Toast.Type"] = "error";
                     TempData["Toast.Title"] = "Validation";
                     TempData["Toast.Message"] = "Please fix the item fields.";
@@ -197,7 +242,7 @@ namespace WitcherHub.Pages.Contracts
                 TempData["Toast.Title"] = "Error";
                 TempData["Toast.Message"] = ex.Message;
 
-                await OnGetAsync(ct);
+                await LoadPageStateAsync(Id, ct, termsOverride: null);
                 return Page();
             }
         }
@@ -224,7 +269,7 @@ namespace WitcherHub.Pages.Contracts
                 catch
                 {
                     ModelState.AddModelError(nameof(EditItemConfigJson), "Invalid JSON.");
-                    await OnGetAsync(ct);
+                    await LoadPageStateAsync(Id, ct, termsOverride: null);
                     return Page();
                 }
 
@@ -240,7 +285,7 @@ namespace WitcherHub.Pages.Contracts
                     TempData["Toast.Title"] = "Validation";
                     TempData["Toast.Message"] = "Please fix the item fields.";
 
-                    await OnGetAsync(ct);
+                    await LoadPageStateAsync(Id, ct, termsOverride: null);
                     return Page();
                 }
 
@@ -258,7 +303,7 @@ namespace WitcherHub.Pages.Contracts
                 TempData["Toast.Title"] = "Error";
                 TempData["Toast.Message"] = ex.Message;
 
-                await OnGetAsync(ct);
+                await LoadPageStateAsync(Id, ct, termsOverride: null);
                 return RedirectToPage("./Edit", new { id = Id });
             }
         }

@@ -1,12 +1,18 @@
 using FluentValidation;
+using Ganss.Xss;
+using Markdig;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Common.Pagination;
+using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
+using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Models.DTO.Project;
+using WitcherHub.Application.Models.View.Contracts;
 using WitcherHub.Application.Models.View.Project;
 using WitcherHub.Application.Models.View.Quotes;
 using WitcherHub.Pages.Models.UI;
@@ -21,26 +27,30 @@ namespace WitcherHub.Pages
         private readonly IQuote _quotes;
         private readonly IInvoice _invoices;
         private readonly IContract _contracts;
-
+        private readonly IContractDocumentGenerator _contractDocumentGenerator;
         private readonly IValidator<CreateProjectDto> _createValidator;
         private readonly IValidator<UpdateProjectDto> _updateValidator;
-
+        private readonly ILogger<ProjectsModel> _logger;
         public ProjectsModel(
-      IProject projects,
-      ICustomer customers,
-      IQuote quotes,
-      IInvoice invoices,
-      IContract contracts,
-      IValidator<CreateProjectDto> createValidator,
-      IValidator<UpdateProjectDto> updateValidator)
+  IProject projects,
+  ICustomer customers,
+  IQuote quotes,
+  IInvoice invoices,
+  IContract contracts,
+  IContractDocumentGenerator contractDocumentGenerator,
+  IValidator<CreateProjectDto> createValidator,
+  IValidator<UpdateProjectDto> updateValidator,
+  ILogger<ProjectsModel> logger)
         {
             _projects = projects;
             _customers = customers;
             _quotes = quotes;
             _invoices = invoices;
             _contracts = contracts;
+            _contractDocumentGenerator = contractDocumentGenerator;
             _createValidator = createValidator;
             _updateValidator = updateValidator;
+            _logger = logger;
         }
 
 
@@ -538,5 +548,335 @@ namespace WitcherHub.Pages
                 Text = "-- Select customer --"
             });
         }
+        public async Task<IActionResult> OnGetProjectContractSnapshotAsync(Guid projectId, CancellationToken ct = default)
+        {
+            try
+            {
+                if (projectId == Guid.Empty)
+                    return BadRequest(new { toast = new { type = "error", title = "Error", message = "Invalid project." } });
+
+                var prj = await _projects.GetProjectAsync(projectId, ct);
+                if (prj is null)
+                    return NotFound(new { toast = new { type = "error", title = "Not found", message = "Project not found." } });
+
+                // Latest contract only (single per project)
+                var list = await _contracts.GetContractsByProjectAsync(projectId, page: 1, pageSize: 1, search: null, ct);
+                var latest = list.Items?.FirstOrDefault();
+
+                if (latest is null)
+                {
+                    return new JsonResult(new
+                    {
+                        ok = true,
+                        data = new { exists = false }
+                    });
+                }
+
+                var details = await _contracts.GetContractAsync(latest.Id, ct);
+                if (details is null)
+                {
+                    return new JsonResult(new
+                    {
+                        ok = true,
+                        data = new { exists = false }
+                    });
+                }
+
+                var previewHtml = MarkdownToSafeHtml(details.Terms ?? "");
+
+                var isSigned = details.SignedAt is not null || details.Status == DocumentStatus.Signed;
+                var canUpdate = !isSigned;
+
+                var itemsCount = details.Items?.Count ?? 0;
+
+                return new JsonResult(new
+                {
+                    ok = true,
+                    data = new
+                    {
+                        exists = true,
+                        contractId = details.Id,
+                        contractNo = details.ContractNo,
+                        status = details.Status.ToString(),
+                        signedAt = details.SignedAt,
+                        canUpdate,
+                        itemsCount,
+                        previewHtml,
+                        editUrl = $"/Contracts/Edit?id={details.Id}",
+                        detailsUrl = $"/Contracts/Details?id={details.Id}"
+                    }
+                });
+            }
+            catch (BadRequestAppException ex)
+            {
+                return BadRequest(new { toast = new { type = "error", title = "Not allowed", message = ex.Message } });
+            }
+            catch (NotFoundAppException ex)
+            {
+                return NotFound(new { toast = new { type = "error", title = "Not found", message = ex.Message } });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ProjectContractSnapshot failed. projectId={ProjectId}", projectId);
+                return StatusCode(500, new { toast = new { type = "error", title = "Server error", message = "Something went wrong." } });
+            }
+        }
+
+        public async Task<IActionResult> OnPostGenerateProjectContractAsync(Guid projectId, CancellationToken ct = default)
+        {
+            try
+            {
+                if (projectId == Guid.Empty)
+                    return ToastBadRequest("Error", "Invalid project.");
+
+                var prj = await _projects.GetProjectAsync(projectId, ct);
+                if (prj is null)
+                    return ToastNotFound("Not found", "Project not found.");
+
+                // latest contract only (ONE contract per project)
+                var list = await _contracts.GetContractsByProjectAsync(projectId, page: 1, pageSize: 1, search: null, ct);
+                var latest = list.Items?.FirstOrDefault();
+
+                Guid contractId;
+
+                // 1) No contract yet -> create header only and redirect to edit
+                if (latest is null)
+                {
+                    var create = new ContractDTOs
+                    {
+                        Contract = new ContractDto
+                        {
+                            ProjectId = projectId,
+                            Currency = "EUR",
+                            Status = DocumentStatus.Draft,
+                            StartDate = prj.StartDate,
+                            EndDate = prj.EndDate,
+                            Terms = null
+                        },
+                        Items = new List<ContractItemDto>()
+                    };
+
+                    contractId = await _contracts.CreateAsync(create, ct);
+
+                    return new JsonResult(new
+                    {
+                        ok = true,
+                        data = new
+                        {
+                            contractId,
+                            next = "edit",
+                            editUrl = $"/Contracts/Edit?id={contractId}"
+                        },
+                        toast = new
+                        {
+                            type = "info",
+                            title = "Contract created",
+                            message = "Add at least one service (line item), then click Update Contract to generate the contract terms."
+                        }
+                    });
+                }
+
+                contractId = latest.Id;
+
+                var details = await _contracts.GetContractAsync(contractId, ct);
+                if (details is null)
+                    return ToastNotFound("غير موجود", "العقد غير موجود.");
+
+                
+                
+
+                // rule: if signed => cannot regenerate
+                if (details.SignedAt is not null || details.Status == DocumentStatus.Signed)
+                    return ToastBadRequest("Not allowed", "This contract is already signed. You cannot generate a new one.");
+
+                // ✅ NEW: Must have at least one line item before generating
+                var itemsCount = details.Items?.Count ?? 0;
+                if (itemsCount == 0)
+                {
+                    // رسالة للمستخدم النهائي (مو للمبرمج)
+                    return BadRequest(new
+                    {
+                        toast = new
+                        {
+                            type = "warning",
+                            title = "Missing services",
+                            message = "Please add at least one service to this contract before generating it."
+                        },
+                        action = "openEdit",
+                        editUrl = $"/Contracts/Edit?id={details.Id}",
+                        contractId = details.Id
+                    });
+                }
+
+                // بعد ذلك فقط نولّد العقد
+                var req = BuildGenerateRequest(prj, details);
+                var doc = await _contractDocumentGenerator.GenerateAsync(req, ct);
+
+
+                var update = new UpdateContractDto
+                {
+                    Contract = new ContractDto
+                    {
+                        ProjectId = projectId,
+                        Currency = details.Currency,
+                        Status = DocumentStatus.Draft,
+                        StartDate = details.StartDate,
+                        EndDate = details.EndDate,
+                        Terms = doc.FullDocument,
+                        SignedAt = null
+                    },
+                    Items = null // IMPORTANT: don't clear items
+                };
+
+                await _contracts.UpdateAsync(contractId, update, ct);
+
+                return new JsonResult(new
+                {
+                    ok = true,
+                    data = new
+                    {
+                        contractId,
+                        next = "snapshot"
+                    },
+                    toast = new
+                    {
+                        type = "success",
+                        title = "Updated",
+                        message = "Contract terms have been generated/updated successfully."
+
+                    }
+                });
+            }
+            catch (BadRequestAppException ex)
+            {
+                return ToastBadRequest("Warning", ex.Message);
+            }
+            catch (NotFoundAppException ex)
+            {
+                return ToastNotFound("Not found", ex.Message);
+            }
+            catch
+            {
+                return ToastServerError();
+            }
+        }
+
+        private GenerateContractDocumentRequest BuildGenerateRequest(
+            WitcherHub.Application.Models.View.Project.ProjectViews.ProjectDetailsView prj,
+            ContractViews.ContractDetailsView contract)
+        {
+            var customerName = prj.Customer?.Name ?? "";
+            var customerEmail = prj.Customer?.Email ?? "";
+
+            var customerBlock =
+                $"Name/Firma: {customerName}\n" +
+                (string.IsNullOrWhiteSpace(customerEmail) ? "" : $"E-Mail: {customerEmail}\n");
+
+            var lines = (contract.Items ?? new List<ContractViews.ContractItemItemView>())
+                .OrderBy(x => x.Position)
+                .Select(x => new ContractServiceLineDto
+                {
+                    Position = x.Position,
+                    Title = x.Title,
+                    ServiceName = x.ServiceName,
+                    AgreedPrice = x.AgreedPrice,
+                    Config = x.Config is null
+                        ? new Dictionary<string, object>()
+                        : JsonSerializer.Deserialize<Dictionary<string, object>>(x.Config.RootElement.GetRawText()) ?? new()
+                })
+                .ToList();
+
+            return new GenerateContractDocumentRequest
+            {
+                ContractNo = contract.ContractNo,
+                ProjectTitle = prj.Title ?? "Project",
+                Currency = contract.Currency ?? "EUR",
+                StartDate = contract.StartDate ?? prj.StartDate,
+                EndDate = contract.EndDate ?? prj.EndDate,
+
+                SignerName = "",
+                SignerEmail = customerEmail,
+
+                LeaveCustomerFieldsBlank = false,
+                IncludePricesInServicesSection = true,
+                CustomerBlockOverride = customerBlock,
+
+                Services = lines
+            };
+        }
+
+        private static string MarkdownToSafeHtml(string markdown)
+        {
+            if (string.IsNullOrWhiteSpace(markdown)) return "";
+
+            var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+            var html = Markdown.ToHtml(markdown.Replace("\r\n", "\n"), pipeline);
+
+            var sanitizer = new HtmlSanitizer();
+            sanitizer.AllowedSchemes.Add("mailto");
+            return sanitizer.Sanitize(html);
+        }
+        public async Task<IActionResult> OnPostCreateProjectContractAsync(Guid projectId, CancellationToken ct = default)
+        {
+            try
+            {
+                if (projectId == Guid.Empty)
+                    return BadRequest(new { toast = new { type = "error", title = "Error", message = "Invalid project." } });
+
+
+                var prj = await _projects.GetProjectAsync(projectId, ct);
+                if (prj is null)
+                    return NotFound(new { toast = new { type = "error", title = "Not found", message = "Project not found." } });
+
+
+                // تأكد أنه لا يوجد عقد مسبقاً لهذا المشروع (عقد واحد فقط)
+                var list = await _contracts.GetContractsByProjectAsync(projectId, page: 1, pageSize: 1, search: null, ct);
+                var latest = list.Items?.FirstOrDefault();
+                if (latest is not null)
+                {
+                    return new JsonResult(new
+                    {
+                        ok = true,
+                        data = new { contractId = latest.Id, editUrl = $"/Contracts/Edit?id={latest.Id}" },
+                        toast = new { type = "info", title = "Already exists", message = "A contract already exists for this project." }
+
+                    });
+                }
+
+                // أنشئ Header فقط
+                var create = new ContractDTOs
+                {
+                    Contract = new ContractDto
+                    {
+                        ProjectId = projectId,
+                        Currency = "EUR",
+                        Status = DocumentStatus.Draft,
+                        StartDate = prj.StartDate,
+                        EndDate = prj.EndDate,
+                        Terms = null
+                    },
+                    Items = new List<ContractItemDto>()
+                };
+
+                var contractId = await _contracts.CreateAsync(create, ct);
+
+                return new JsonResult(new
+                {
+                    ok = true,
+                    data = new { contractId, editUrl = $"/Contracts/Edit?id={contractId}" },
+                    toast = new
+                    {
+                        type = "info",
+                        title = "Contract created",
+                        message = "Add at least one service (line item), then come back and click Update Contract to generate the terms."
+                    }
+                });
+            }
+            catch
+            {
+                return StatusCode(500, new { toast = new { type = "error", title = "Server error", message = "حدث خطأ غير متوقع." } });
+            }
+        }
+
     }
 }
