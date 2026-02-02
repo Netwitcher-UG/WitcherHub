@@ -55,8 +55,19 @@ namespace WitcherHub.Pages.Contracts
             if (contract is null) return NotFound();
 
             // Generate terms once if missing (نفس Sign)
+            // Generate terms once if missing (same as Sign, but must have line items)
             if (string.IsNullOrWhiteSpace(contract.Terms))
             {
+                // ✅ IMPORTANT: prevent generation when there are no line items
+                if (contract.Items == null || contract.Items.Count == 0)
+                {
+                    TempData["Toast.Type"] = "warning";
+                    TempData["Toast.Title"] = "Line items required";
+                    TempData["Toast.Message"] = "Please add at least one line item before viewing the contract details.";
+
+                    return RedirectToPage("/Contracts/Items/Create", new { contractId = contract.Id });
+                }
+
                 var req = BuildRequestFromDb(contract);
                 var doc = await _generator.GenerateAsync(req, ct);
 
@@ -67,6 +78,7 @@ namespace WitcherHub.Pages.Contracts
 
                 await _db.SaveChangesAsync(ct);
             }
+
 
             // Signed status
             var sig = contract.Signatures

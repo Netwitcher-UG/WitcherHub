@@ -123,7 +123,7 @@ namespace WitcherHub.Pages.Contracts.Items
                 TempData["Toast.Title"] = "Added";
                 TempData["Toast.Message"] = "Line item added.";
 
-                return RedirectToPage("/Contracts/Edit", new { id = ContractId });
+                return RedirectToPage("/Contracts/Details", new { id = ContractId });
             }
             catch (Exception ex) when (ex is BadRequestAppException or NotFoundAppException)
             {

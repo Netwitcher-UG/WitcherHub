@@ -2,6 +2,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Models.DTO.Contracts;
 
@@ -19,13 +20,17 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         }
 
         public async Task<GenerateContractDocumentResponse> GenerateAsync(
-            GenerateContractDocumentRequest request,
-            CancellationToken ct = default)
+    GenerateContractDocumentRequest request,
+    CancellationToken ct = default)
         {
+            if (request is null)
+                throw new ArgumentNullException(nameof(request));
+
             request.SignerName ??= "";
 
+            // ✅ هذا مكانه الصحيح: نرمي Exception فقط (ولا نرجع JsonResult)
             if (request.Services == null || request.Services.Count == 0)
-                throw new InvalidOperationException("At least one service is required.");
+                throw new BadRequestAppException("At least one service (line item) is required.");
 
             // 1) Template
             var templatePath = Path.Combine(AppContext.BaseDirectory, _opt.BaseDePath);
@@ -82,7 +87,8 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 servicesPayload: servicesPayload,
                 additionalInstructions: request.AdditionalInstructions);
 
-            var servicesSection = await _ai.GenerateTextAsync(prompt);
+            // إذا دالتك تدعم ct استخدمها، إذا لا تدعم اتركها كما كانت
+            var servicesSection = await _ai.GenerateTextAsync(prompt /*, ct*/);
             servicesSection = CleanModelOutput(servicesSection);
 
             if (string.IsNullOrWhiteSpace(servicesSection))
@@ -109,6 +115,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 FullDocument = full
             };
         }
+
 
         private static string StripHtml(string input)
         {

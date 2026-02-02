@@ -89,6 +89,14 @@ namespace WitcherHub.Pages.Contracts
             if (string.IsNullOrWhiteSpace(contract.Terms))
             {
                 var req = BuildRequestFromDb(contract);
+                if (contract.Items == null || contract.Items.Count == 0)
+                {
+                    TempData["Toast.Type"] = "warning";
+                    TempData["Toast.Title"] = "Line items required";
+                    TempData["Toast.Message"] = "Please add at least one line item before signing.";
+
+                    return RedirectToPage("/Contracts/Items/Create", new { contractId = contract.Id });
+                }
                 var doc = await _generator.GenerateAsync(req, ct);
 
                 contract.Terms = NormalizeNewLines(doc.FullDocument);

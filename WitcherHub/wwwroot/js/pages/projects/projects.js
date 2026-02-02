@@ -547,21 +547,37 @@
 
             // إذا ماكو Line Items => لا توليد ولا إرسال، بس وجّه المستخدم للإضافة
             if (!hasItems) {
+
+                btnUpdate?.classList.add('d-none');
+                detailsLink?.classList.add('d-none');
+                sendBtn?.classList.add('d-none');
                 if (btnUpdate) {
                     btnUpdate.textContent = 'Update Contract';
-                    btnUpdate.disabled = true; // ممنوع توليد لأن ماكو items
+                    btnUpdate.disabled = true;
                 }
 
                 sendBtn?.classList.add('d-none');
 
-                if (editLink) {
-                    editLink.href = data.editUrl || '#';
+                // ✅ لا تعرض زر "Add services" الغبي
+                // بدلًا من ذلك: توجيه واضح لصفحة line items
+                const guidFromUrl = (u) => {
+                    const m = (u || '').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+                    return m ? m[0] : null;
+                };
+
+                const contractId = data.contractId || data.id || guidFromUrl(data.editUrl) || guidFromUrl(data.detailsUrl);
+                const lineItemUrl = data.lineItemUrl || (contractId ? `/Contracts/Items/Create?contractId=${encodeURIComponent(contractId)}` : null);
+
+                if (editLink && lineItemUrl) {
+                    editLink.href = lineItemUrl;
                     editLink.classList.remove('d-none');
-                    editLink.textContent = 'Add services';
+                    editLink.textContent = 'Add line items';
+                } else {
+                    editLink?.classList.add('d-none');
                 }
 
                 $('vpContractPreview').innerHTML =
-                    '<div class="alert alert-warning mb-0">Please add at least one service (line item) to this contract before you can generate the terms and send it.</div>';
+                    '<div class="alert alert-warning mb-0">This contract has no line items. Please add at least one line item to continue.</div>';
 
                 showContractEmpty(false);
                 showContractPreview(true);
@@ -625,21 +641,25 @@
 
             // ❌ فشل
             if (!res.ok) {
-                // مهم: خزّن التوست قبل أي redirect
                 if (json?.toast) saveToastForReload(json.toast);
 
-                // Redirect لو السيرفر قال
+                // ✅ NEW: redirectUrl support
+                if (json?.data?.redirectUrl) {
+                    window.location.href = json.data.redirectUrl;
+                    return;
+                }
+
                 if (json?.action === 'openEdit' && json?.editUrl) {
                     window.location.href = json.editUrl;
                     return;
                 }
 
-                // إذا ماكو redirect، اعرض التوست هنا
                 if (json?.toast) showToast(json.toast);
                 else showToast({ type: 'error', title: 'Error', message: 'Unable to update the contract.' });
 
                 return;
             }
+
 
             // ✅ نجاح
             if (json?.toast) showToast(json.toast);
@@ -976,23 +996,77 @@
 
             const json = await res.json().catch(() => ({}));
 
+            // ---------- FAIL ----------
             if (!res.ok) {
+                // اعرض التوست
                 if (json?.toast) showToast(json.toast);
                 else toastError('Failed to create contract.', 'Error');
+
+                // ✅ إذا السيرفر عطى redirectUrl اتبعه
+                if (json?.data?.redirectUrl) {
+                    if (json?.toast) saveToastForReload(json.toast);
+                    window.location.href = json.data.redirectUrl;
+                    return;
+                }
+
+                // ✅ fallback: لو الرسالة تشير إلى عدم وجود خدمات/line items
+                const msg = (json?.toast?.message || json?.message || '').toString().toLowerCase();
+                if (msg.includes('at least one service') || msg.includes('line item')) {
+                    saveToastForReload(json?.toast || { type: 'warning', title: 'Line items', message: 'Please add at least one line item first.' });
+                    window.location.href = `/Contracts/Items/Create?projectId=${encodeURIComponent(contractOneState.projectId)}`;
+                    return;
+                }
+
                 return;
             }
 
-            // ✅ احفظ التوست حتى يظهر في صفحة Edit
+
+            // ---------- SUCCESS ----------
             if (json?.toast) saveToastForReload(json.toast);
 
-            const editUrl = json?.data?.editUrl;
-            if (editUrl) {
-                window.location.href = editUrl;
+            const data = json?.data || {};
+            const contractId = data.contractId || data.id || null;
+
+            // تفاصيل العقد (المطلوب: الانتقال إلى Details عند النجاح)
+            let detailsUrl = data.detailsUrl;
+            if (!detailsUrl && data.editUrl) detailsUrl = data.editUrl.replace(/\/Contracts\/Edit/i, '/Contracts/Details');
+            if (!detailsUrl && contractId) detailsUrl = `/Contracts/Details?id=${encodeURIComponent(contractId)}`;
+
+            // صفحة line items (إذا ماكو items)
+            let lineItemUrl = data.lineItemUrl;
+            if (!lineItemUrl && contractId) lineItemUrl = `/Contracts/Items/Create?contractId=${encodeURIComponent(contractId)}`;
+
+            const itemsCountRaw = data.itemsCount;
+            const hasItemsFlag = data.hasItems;
+
+            // ✅ default safe: if server didn't tell us, assume NO items
+            let hasItems = false;
+
+            if (typeof itemsCountRaw === 'number') {
+                hasItems = itemsCountRaw > 0;
+            } else if (typeof hasItemsFlag === 'boolean') {
+                hasItems = hasItemsFlag;
+            }
+
+
+            // ✅ إذا ماكو line items: روح لصفحة line items + التوست يظهر هناك
+            if (!hasItems && lineItemUrl) {
+                // نضمن وجود توست تحذيري لو السيرفر ما أرسله
+                if (!json?.toast) saveToastForReload({ type: 'warning', title: 'Line items', message: 'Please add at least one line item first.' });
+                window.location.href = lineItemUrl;
                 return;
             }
 
+            // ✅ نجاح طبيعي: Details
+            if (detailsUrl) {
+                window.location.href = detailsUrl;
+                return;
+            }
+
+            // fallback
             showToast({ type: 'success', title: 'Success', message: 'Contract created.' });
             await loadProjectContractSnapshot();
+
         } finally {
             window.UI?.loading?.hide?.();
             btn.disabled = false;

@@ -693,20 +693,22 @@ namespace WitcherHub.Pages
                 var itemsCount = details.Items?.Count ?? 0;
                 if (itemsCount == 0)
                 {
-                    // رسالة للمستخدم النهائي (مو للمبرمج)
                     return BadRequest(new
                     {
                         toast = new
                         {
                             type = "warning",
-                            title = "Missing services",
-                            message = "Please add at least one service to this contract before generating it."
+                            title = "Line items required",
+                            message = "Please add at least one line item before generating the contract."
                         },
-                        action = "openEdit",
-                        editUrl = $"/Contracts/Edit?id={details.Id}",
-                        contractId = details.Id
+                        data = new
+                        {
+                            redirectUrl = $"/Contracts/Items/Create?contractId={details.Id}",
+                            contractId = details.Id
+                        }
                     });
                 }
+
 
                 // بعد ذلك فقط نولّد العقد
                 var req = BuildGenerateRequest(prj, details);
@@ -834,14 +836,30 @@ namespace WitcherHub.Pages
                 var latest = list.Items?.FirstOrDefault();
                 if (latest is not null)
                 {
+                    var details = await _contracts.GetContractAsync(latest.Id, ct);
+                    var itemsCount = details?.Items?.Count ?? 0;
+
                     return new JsonResult(new
                     {
                         ok = true,
-                        data = new { contractId = latest.Id, editUrl = $"/Contracts/Edit?id={latest.Id}" },
-                        toast = new { type = "info", title = "Already exists", message = "A contract already exists for this project." }
-
+                        data = new
+                        {
+                            contractId = latest.Id,
+                            itemsCount,
+                            hasItems = itemsCount > 0,
+                            lineItemUrl = $"/Contracts/Items/Create?contractId={latest.Id}",
+                            detailsUrl = $"/Contracts/Details?id={latest.Id}",
+                            editUrl = $"/Contracts/Edit?id={latest.Id}"
+                        },
+                        toast = new
+                        {
+                            type = "info",
+                            title = "Already exists",
+                            message = "A contract already exists for this project."
+                        }
                     });
                 }
+
 
                 // أنشئ Header فقط
                 var create = new ContractDTOs
@@ -863,12 +881,20 @@ namespace WitcherHub.Pages
                 return new JsonResult(new
                 {
                     ok = true,
-                    data = new { contractId, editUrl = $"/Contracts/Edit?id={contractId}" },
+                    data = new
+                    {
+                        contractId,
+                        itemsCount = 0,
+                        hasItems = false,
+                        lineItemUrl = $"/Contracts/Items/Create?contractId={contractId}",
+                        detailsUrl = $"/Contracts/Details?id={contractId}",
+                        editUrl = $"/Contracts/Edit?id={contractId}" // اختياري تبقيه
+                    },
                     toast = new
                     {
-                        type = "info",
-                        title = "Contract created",
-                        message = "Add at least one service (line item), then come back and click Update Contract to generate the terms."
+                        type = "warning",
+                        title = "Line items required",
+                        message = "Please add at least one line item first."
                     }
                 });
             }
