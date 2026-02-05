@@ -5,16 +5,21 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
 using System.Text.Json;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Common.Pagination;
 using WitcherHub.Application.Interfaces;
+using WitcherHub.Application.Interfaces.Email;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Models.DTO.Project;
+using WitcherHub.Application.Models.Email;
 using WitcherHub.Application.Models.View.Contracts;
 using WitcherHub.Application.Models.View.Project;
 using WitcherHub.Application.Models.View.Quotes;
+using WitcherHub.Infrastructure.Data.Context;
+using WitcherHub.Infrastructure.Data.Models;
 using WitcherHub.Pages.Models.UI;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
@@ -31,6 +36,9 @@ namespace WitcherHub.Pages
         private readonly IValidator<CreateProjectDto> _createValidator;
         private readonly IValidator<UpdateProjectDto> _updateValidator;
         private readonly ILogger<ProjectsModel> _logger;
+        private readonly AppDbContext _db;
+        private readonly IEmailTemplateRenderer _templates;
+        private readonly IEmailSender _emailSender;
         public ProjectsModel(
   IProject projects,
   ICustomer customers,
@@ -40,7 +48,8 @@ namespace WitcherHub.Pages
   IContractDocumentGenerator contractDocumentGenerator,
   IValidator<CreateProjectDto> createValidator,
   IValidator<UpdateProjectDto> updateValidator,
-  ILogger<ProjectsModel> logger)
+  ILogger<ProjectsModel> logger,
+  AppDbContext db, IEmailTemplateRenderer templates, IEmailSender emailSender)
         {
             _projects = projects;
             _customers = customers;
@@ -51,6 +60,9 @@ namespace WitcherHub.Pages
             _createValidator = createValidator;
             _updateValidator = updateValidator;
             _logger = logger;
+            _db = db;
+            _templates = templates;
+            _emailSender = emailSender;
         }
 
 
@@ -879,6 +891,152 @@ namespace WitcherHub.Pages
                     toast = new { type = "error", title = "Server error", message = "An unexpected error occurred." }
                 });
             }
+        }
+        public async Task<IActionResult> OnPostSendProjectContractAsync(Guid projectId, CancellationToken ct)
+        {
+            if (projectId == Guid.Empty)
+                return new JsonResult(new { ok = false, toast = new { type = "error", title = "Error", message = "Invalid project id." } }) { StatusCode = 400 };
+
+            // 1) Load contract for this project
+            var contract = await _db.Contracts
+                .Include(c => c.Items)
+                .Include(c => c.Project)
+                    .ThenInclude(p => p.Customer)
+                        .ThenInclude(cu => cu.Contacts)
+                .Include(c => c.Project)
+                    .ThenInclude(p => p.Customer)
+                        .ThenInclude(cu => cu.EmailAddresses)
+                .FirstOrDefaultAsync(c => c.ProjectId == projectId, ct);
+
+
+            if (contract is null)
+                return new JsonResult(new { ok = false, toast = new { type = "warning", title = "No contract", message = "There is no contract for this project." } }) { StatusCode = 404 };
+
+            // شرطك: لازم يوجد عقد + line items
+            var hasItems = contract.Items != null && contract.Items.Count > 0;
+            if (!hasItems)
+                return new JsonResult(new { ok = false, toast = new { type = "warning", title = "Missing line items", message = "Please add at least one line item before sending." } }) { StatusCode = 409 };
+
+            // لا ترسل إذا Signed (اختياري احترافي)
+            if (contract.Status == DocumentStatus.Signed || contract.SignedAt != null)
+                return new JsonResult(new { ok = false, toast = new { type = "info", title = "Already signed", message = "This contract is already signed." } }) { StatusCode = 409 };
+
+            // 2) resolve recipient email (نفس منطقك: primary contact أولاً)
+            var customer = contract.Project.Customer;
+
+            string? recipientEmail =
+                customer.Contacts?
+                    .OrderByDescending(c => c.IsPrimary)
+                    .Select(c => (c.Email ?? "").Trim())
+                    .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
+
+            if (string.IsNullOrWhiteSpace(recipientEmail))
+            {
+                recipientEmail =
+                    customer.EmailAddresses?
+                        .OrderByDescending(ea => (ea.Kind ?? "").Trim().Equals("business", StringComparison.OrdinalIgnoreCase))
+                        .Select(ea => (ea.Email ?? "").Trim())
+                        .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
+            }
+
+            if (string.IsNullOrWhiteSpace(recipientEmail))
+            {
+                return new JsonResult(new
+                {
+                    ok = false,
+                    toast = new { type = "error", title = "No email", message = "Customer email not found (Contacts/EmailAddresses empty)." }
+                })
+                { StatusCode = 409 };
+            }
+
+
+
+            if (string.IsNullOrWhiteSpace(recipientEmail))
+                return new JsonResult(new { ok = false, toast = new { type = "error", title = "No email", message = "Customer email not found." } }) { StatusCode = 409 };
+
+            var recipientName = customer.Name ?? "Customer";
+
+            // 3) Create secure token + store hash in ContractAccessLinks
+            var rawToken = GenerateUrlSafeToken(32); // raw shown once
+            var tokenHash = ContractAccessLink.HashToken(rawToken);
+
+            var link = new ContractAccessLink
+            {
+                ContractId = contract.Id,
+                RecipientEmail = recipientEmail.Trim(),
+                TokenHash = tokenHash,
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(14), // عدلها كما تريد
+                RevokedAtUtc = null,
+                LastOpenedAtUtc = null
+            };
+
+            _db.ContractAccessLinks.Add(link);
+
+            // mark as sent (اختياري)
+            if (contract.Status == DocumentStatus.Draft)
+                contract.Status = DocumentStatus.Sent;
+
+            await _db.SaveChangesAsync(ct);
+
+            // 4) Build action url (absolute) -> /Contracts/Sign/{id}?t=token
+            var actionUrl = Url.Page(
+                pageName: "/Contracts/Sign",
+                pageHandler: null,
+                values: new { id = contract.Id, t = rawToken },
+                protocol: Request.Scheme,
+                host: Request.Host.ToUriComponent()
+            );
+
+            if (string.IsNullOrWhiteSpace(actionUrl))
+                return new JsonResult(new { ok = false, toast = new { type = "error", title = "Error", message = "Failed to build contract link." } }) { StatusCode = 500 };
+
+            // 5) Pick template: هنا اختيار بسيط (لو عندك لغة عميل خزنتها استخدمها)
+            // حالياً: إن كان الإيميل ينتهي بـ .de أو الدومين ألماني... استخدم de وإلا en (عدل حسب نظامك)
+            var template = "ContractReady.en";
+            if (recipientEmail.EndsWith(".de", StringComparison.OrdinalIgnoreCase))
+                template = "ContractReady.de";
+
+            var subject = template.EndsWith(".de", StringComparison.OrdinalIgnoreCase)
+                ? $"Vertrag {contract.ContractNo} – Bitte prüfen und unterschreiben"
+                : $"Contract {contract.ContractNo} – Please review and sign";
+
+            var html = await _templates.RenderAsync(template, new
+            {
+                Subject = subject,
+                UserName = recipientName,
+                ActionUrl = actionUrl,
+                ContractNo = contract.ContractNo,
+                ProjectTitle = contract.Project?.Title ?? "Project"
+            }, ct);
+
+            // ⚠️ مهم: MailKitEmailSender عندك يتطلب BCC
+            var msg = new EmailMessage
+            {
+                From = new EmailAddress("placeholder@local", "placeholder"), // سيتم تجاهله من MailKitEmailSender واستبداله من SmtpOptions
+                Subject = subject,
+                HtmlBody = html,
+                TextBody = $"Open: {actionUrl}",
+                Bcc = new List<EmailAddress> { new EmailAddress(recipientEmail.Trim(), recipientName) }
+            };
+
+            await _emailSender.SendAsync(msg, ct);
+
+            return new JsonResult(new
+            {
+                ok = true,
+                toast = new { type = "success", title = "Sent", message = "Contract email sent successfully." }
+            });
+        }
+
+        // helper: safe URL token
+        private static string GenerateUrlSafeToken(int bytes)
+        {
+            var data = RandomNumberGenerator.GetBytes(bytes);
+            return Convert.ToBase64String(data)
+                .Replace("+", "-")
+                .Replace("/", "_")
+                .Replace("=", "");
         }
 
     }

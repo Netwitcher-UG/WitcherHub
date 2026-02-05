@@ -94,6 +94,7 @@
 
 
 <input type="hidden" id="antiForgeryToken" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />
+<input type="hidden" id="vcProjectContractSendUrl" value="@Url.Page("./Projects", "SendProjectContract")" />
 
 
 @section Scripts {

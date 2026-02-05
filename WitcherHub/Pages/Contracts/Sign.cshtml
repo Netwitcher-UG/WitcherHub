@@ -20,7 +20,7 @@
 </form>
 
 <input type="hidden" id="signEndpoint"
-       value="@Url.Page("/Contracts/Sign", new { id = Model.Id, handler = "Sign" })" />
+       value="@Url.Page("/Contracts/Sign", "Sign", new { id = Model.Id, t = Model.Token })" />
 
 <script>
     window.contractServerState = @Html.Raw(JsonSerializer.Serialize(new {

@@ -606,6 +606,16 @@
             // Send button (يظهر فقط إذا مو Signed)
             if (isSigned) sendBtn?.classList.add('d-none');
             else sendBtn?.classList.remove('d-none');
+            // Send button (يظهر فقط إذا مو Signed) + يتفعل إذا hasItems
+            if (sendBtn) {
+                if (isSigned) {
+                    sendBtn.classList.add('d-none');
+                    sendBtn.disabled = true;
+                } else {
+                    sendBtn.classList.remove('d-none');
+                    sendBtn.disabled = !hasItems; // ✅ شرطك + احترافي
+                }
+            }
 
             showContractEmpty(false);
             showContractPreview(true);
@@ -1046,6 +1056,54 @@
         } catch (err) {
             console.error(err);
             toastError('Failed to create contract.', 'Error');
+        } finally {
+            window.UI?.loading?.hide?.();
+            btn.disabled = false;
+        }
+    });
+    // =========================
+    // ✅ Send Contract Email (button binding)
+    // =========================
+    document.getElementById('vpContractSendBtn')?.addEventListener('click', async function () {
+        if (!contractOneState.projectId) return;
+
+        const urlBase = document.getElementById('vcProjectContractSendUrl')?.value;
+        if (!urlBase) return toastError('vcProjectContractSendUrl not found', 'Error');
+
+        const btn = document.getElementById('vpContractSendBtn');
+
+        try {
+            btn.disabled = true;
+            window.UI?.loading?.show?.('Sending contract email...');
+
+            const token = document.getElementById('antiForgeryToken')?.value || '';
+            const joiner = urlBase.includes('?') ? '&' : '?';
+            const url = `${urlBase}${joiner}projectId=${encodeURIComponent(contractOneState.projectId)}`;
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    ...(token ? { 'RequestVerificationToken': token } : {}),
+                    'Accept': 'application/json'
+                }
+            });
+
+            const json = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                if (json?.toast) showToast(json.toast);
+                else showToast({ type: 'error', title: 'Error', message: 'Failed to send contract email.' });
+                return;
+            }
+
+            if (json?.toast) showToast(json.toast);
+            else showToast({ type: 'success', title: 'Sent', message: 'Contract email sent successfully.' });
+
+            await loadProjectContractSnapshot();
+
+        } catch (err) {
+            console.error(err);
+            toastError('Failed to send contract email.', 'Error');
         } finally {
             window.UI?.loading?.hide?.();
             btn.disabled = false;

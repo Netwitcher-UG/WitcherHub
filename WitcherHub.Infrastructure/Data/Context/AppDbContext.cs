@@ -49,6 +49,7 @@ namespace WitcherHub.Infrastructure.Data.Context
         // -------- Attachments & Audit --------
         public DbSet<Attachment> Attachments => Set<Attachment>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+        public DbSet<ContractAccessLink> ContractAccessLinks => Set<ContractAccessLink>();
 
         protected override void OnModelCreating(ModelBuilder b)
         {
@@ -259,6 +260,18 @@ namespace WitcherHub.Infrastructure.Data.Context
 
             b.Entity<Attachment>().HasIndex(x => new { x.OwnerType, x.OwnerId });
             b.Entity<AuditLog>().HasIndex(x => new { x.EntityType, x.EntityId });
+            b.Entity<ContractAccessLink>()
+                .HasIndex(x => x.TokenHash)
+                .IsUnique();
+
+            b.Entity<ContractAccessLink>()
+                .HasOne(x => x.Contract)
+                .WithMany()
+                .HasForeignKey(x => x.ContractId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.Entity<ContractAccessLink>()
+                .HasIndex(x => new { x.ContractId, x.RecipientEmail });
 
 
             // =========================

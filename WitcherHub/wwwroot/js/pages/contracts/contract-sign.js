@@ -267,16 +267,65 @@
         return el ? el.value : "";
     }
 
+    //async function postSignatureToServer(dataUrl) {
+    //    const token = getAntiForgeryToken();
+
+    //    const url = new URL(signEndpoint.value, window.location.origin);
+
+    //    // ✅ لو التوكن غير موجود بالـ URL أضفه من URL الصفحة الحالية
+    //    if (!url.searchParams.get("t")) {
+    //        const t = new URLSearchParams(window.location.search).get("t");
+    //        if (t) url.searchParams.set("t", t);
+    //    }
+
+    //    const fd = new FormData();
+    //    fd.append("SignerName", (customerName.value || "").trim());
+    //    fd.append("SignerEmail", (customerEmail?.value || "").trim());
+    //    fd.append("SignatureDataUrl", dataUrl);
+
+    //    const res = await fetch(url.toString(), {
+    //        method: "POST",
+    //        headers: token ? { "RequestVerificationToken": token } : {},
+    //        body: fd
+    //    });
+
+    //    let json = null;
+    //    try { json = await res.json(); } catch { }
+
+    //    if (!res.ok || !json || json.ok !== true) {
+    //        const code = json && json.code ? json.code : "";
+    //        const msg =
+    //            (code === "FIELDS_REQUIRED") ? (i18n.fillFields || "Please fill name and email before signing") :
+    //                (code === "INVALID_EMAIL") ? (i18n.invalidEmail || "Please enter a valid email address") :
+    //                    (json && json.message) ? json.message :
+    //                        ("HTTP " + res.status);
+
+    //        throw new Error(msg);
+    //    }
+
+
+    //    return json;
+    //}
     async function postSignatureToServer(dataUrl) {
         const token = getAntiForgeryToken();
+
+        const url = new URL(signEndpoint.value, window.location.origin);
+
+        // تأكيد وجود t
+        if (!url.searchParams.get("t")) {
+            const t = new URLSearchParams(window.location.search).get("t");
+            if (t) url.searchParams.set("t", t);
+        }
+
         const fd = new FormData();
+        fd.append("__RequestVerificationToken", token); // ✅ مهم جداً
         fd.append("SignerName", (customerName.value || "").trim());
         fd.append("SignerEmail", (customerEmail?.value || "").trim());
         fd.append("SignatureDataUrl", dataUrl);
 
-        const res = await fetch(signEndpoint.value, {
+        const res = await fetch(url.toString(), {
             method: "POST",
-            headers: token ? { "RequestVerificationToken": token } : {},
+            credentials: "same-origin",                 // ✅ مهم
             body: fd
         });
 
@@ -286,18 +335,15 @@
         if (!res.ok || !json || json.ok !== true) {
             const code = json && json.code ? json.code : "";
             const msg =
-                (code === "FIELDS_REQUIRED") ? (i18n.fillFields || "Please fill name and email before signing") :
-                    (code === "INVALID_EMAIL") ? (i18n.invalidEmail || "Please enter a valid email address") :
+                (code === "FIELDS_REQUIRED") ? (i18n.fillFields || "Fill fields") :
+                    (code === "INVALID_EMAIL") ? (i18n.invalidEmail || "Invalid email") :
                         (json && json.message) ? json.message :
                             ("HTTP " + res.status);
-
             throw new Error(msg);
         }
 
-
         return json;
     }
-
     // Events
     chkAgree.addEventListener("change", () => {
         refreshSignButton();
