@@ -138,17 +138,44 @@
   <data name="contractPage_Cleared" xml:space="preserve">
     <value>Signature pad cleared</value>
   </data>
+  <data name="contractPage_CustomerParty" xml:space="preserve">
+    <value>Customer</value>
+  </data>
   <data name="contractPage_CustomerSignature" xml:space="preserve">
     <value>Customer Signature</value>
   </data>
   <data name="contractPage_ErrEmptyCanvas" xml:space="preserve">
     <value>Please sign first (signature field is empty)</value>
   </data>
+  <data name="contractPage_ErrFillEmail" xml:space="preserve">
+    <value>Please enter your email before signing.</value>
+  </data>
+  <data name="contractPage_ErrFillFields" xml:space="preserve">
+    <value>Please fill in your name and email before signing.</value>
+  </data>
+  <data name="contractPage_ErrFillName" xml:space="preserve">
+    <value>Please enter your name before signing.</value>
+  </data>
+  <data name="contractPage_ErrInvalidEmail" xml:space="preserve">
+    <value>Please enter a valid email address.</value>
+  </data>
   <data name="contractPage_ErrMustAgree" xml:space="preserve">
     <value>Please confirm agreement before signing</value>
   </data>
   <data name="contractPage_InfoText" xml:space="preserve">
     <value>Review the contract, confirm agreement, then sign</value>
+  </data>
+  <data name="contractPage_LabelDate" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="contractPage_LabelEmail" xml:space="preserve">
+    <value>Email</value>
+  </data>
+  <data name="contractPage_LabelName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="contractPage_LabelSignature" xml:space="preserve">
+    <value>Signature</value>
   </data>
   <data name="contractPage_ModalHint" xml:space="preserve">
     <value>Draw your signature below, then click “Accept Signature"</value>
@@ -162,11 +189,20 @@
   <data name="contractPage_Provider" xml:space="preserve">
     <value>Provider</value>
   </data>
+  <data name="contractPage_ProviderParty" xml:space="preserve">
+    <value>Provider</value>
+  </data>
+  <data name="contractPage_ProviderSignsInternally" xml:space="preserve">
+    <value>Provider signature is handled internally</value>
+  </data>
   <data name="contractPage_Reset" xml:space="preserve">
     <value>Reset</value>
   </data>
   <data name="contractPage_SignAccept" xml:space="preserve">
     <value>Sign &amp; Accept</value>
+  </data>
+  <data name="contractPage_SignaturesTitle" xml:space="preserve">
+    <value>Signatures</value>
   </data>
   <data name="contractPage_SignatureWillAppear" xml:space="preserve">
     <value>Signature will appear here after acceptance</value>
@@ -176,6 +212,9 @@
   </data>
   <data name="contractPage_SignedAt" xml:space="preserve">
     <value>Signed at</value>
+  </data>
+  <data name="contractPage_SignedAtLabel" xml:space="preserve">
+    <value>Signed on</value>
   </data>
   <data name="contractPage_SignedOk" xml:space="preserve">
     <value>Signed successfully ✅</value>

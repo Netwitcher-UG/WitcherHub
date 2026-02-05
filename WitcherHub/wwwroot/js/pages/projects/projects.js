@@ -477,6 +477,7 @@
         const editLink = document.getElementById('vpContractEditLink');
         const detailsLink = document.getElementById('vpContractDetailsLink');
         const sendBtn = document.getElementById('vpContractSendBtn');
+        const itemsLink = document.getElementById('vpContractItemsLink');
 
         setContractLoading(true);
         showContractEmpty(false);
@@ -496,48 +497,50 @@
 
             const data = json.data ?? json;
 
-            // ---------- حالة: لا يوجد عقد ----------
+            // ---------- no contract ----------
             if (!data.exists) {
                 $('vpContractTitle').textContent = 'No contract';
                 $('vpContractMeta').textContent = '—';
                 $('vpContractStatusBadge').innerHTML = '';
-                $('vpContractPreview').innerHTML =
-                    '<div class="text-muted">No contract yet. Click Add Contract to create one.</div>';
+
+                // ✅ لا تكرر شرح داخل Preview
+                $('vpContractPreview').innerHTML = '';
 
                 btnCreate?.classList.remove('d-none');
+                btnCreate.textContent = 'Add Contract';
+
                 btnUpdate?.classList.add('d-none');
                 editLink?.classList.add('d-none');
                 detailsLink?.classList.add('d-none');
                 sendBtn?.classList.add('d-none');
+                itemsLink?.classList.add('d-none');
 
+                // ✅ اعرض رسالة واحدة فقط
                 showContractEmpty(true);
-                showContractPreview(true);
+                showContractPreview(false);
+
                 contractOneState.loadedOnce = true;
                 return;
             }
 
-            // ---------- حالة: يوجد عقد ----------
+            // ---------- contract exists ----------
+            const status = (data.status || '').toString().toLowerCase();
+            const isSigned = status === 'signed' || !!data.signedAt;
+            const canUpdate = !!data.canUpdate && !isSigned;
+
             $('vpContractTitle').textContent = data.contractNo || 'Contract';
             $('vpContractMeta').textContent = data.signedAt ? `Signed at: ${fmtDateTime(data.signedAt)}` : 'Not signed yet';
             $('vpContractStatusBadge').innerHTML = badgeHtml(data.status);
 
-            btnCreate?.classList.add('d-none');          // ممنوع Add لأن موجود
-            btnUpdate?.classList.remove('d-none');       // يظهر Update (حسب الشروط)
-            detailsLink?.classList.remove('d-none');     // Details يظهر
-            if (detailsLink) {
-                let href = data.detailsUrl || '';
-                const cid = data.contractId || data.id || null;
+            const cid = data.contractId || data.id || null;
 
-                if (!href && cid) href = `/Contracts/Details?id=${encodeURIComponent(cid)}`;
-
-                if (href && href.toLowerCase().includes('/contracts/sign/')) {
-                    const idPart = href.split('/contracts/sign/')[1];
-                    if (idPart) href = `/Contracts/Details?id=${encodeURIComponent(idPart)}`;
-                }
-
-                detailsLink.href = href || '#';
+            // Line Items button (قبل التوقيع فقط)
+            if (itemsLink && cid && canUpdate) {
+                itemsLink.href = `/Contracts/Items/Manage?contractId=${encodeURIComponent(cid)}&returnTo=items`;
+                itemsLink.classList.remove('d-none');
+            } else {
+                itemsLink?.classList.add('d-none');
             }
-
 
             const itemsCount = Number(data.itemsCount || 0);
             const hasItems = itemsCount > 0;
@@ -545,37 +548,27 @@
             // Preview
             $('vpContractPreview').innerHTML = data.previewHtml || '<div class="text-muted">No contract terms yet.</div>';
 
-            // إذا ماكو Line Items => لا توليد ولا إرسال، بس وجّه المستخدم للإضافة
+            // ---------- header only (no line items) ----------
             if (!hasItems) {
 
+                // ✅ خلي زر واحد فقط: Line Items
+                if (itemsLink && cid && canUpdate) {
+                    itemsLink.href = `/Contracts/Items/Manage?contractId=${encodeURIComponent(cid)}&toast=noItems`;
+                    itemsLink.classList.remove('d-none');
+                    itemsLink.textContent = 'Add line items'; // أو خلّها Line Items إذا تحب
+                } else {
+                    itemsLink?.classList.add('d-none');
+                }
+
+                // ❌ أخفِ زر Create بالكامل بهذه الحالة
+                btnCreate?.classList.add('d-none');
+
                 btnUpdate?.classList.add('d-none');
+                editLink?.classList.add('d-none');
                 detailsLink?.classList.add('d-none');
                 sendBtn?.classList.add('d-none');
-                if (btnUpdate) {
-                    btnUpdate.textContent = 'Update Contract';
-                    btnUpdate.disabled = true;
-                }
 
-                sendBtn?.classList.add('d-none');
-
-                // ✅ لا تعرض زر "Add services" الغبي
-                // بدلًا من ذلك: توجيه واضح لصفحة line items
-                const guidFromUrl = (u) => {
-                    const m = (u || '').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-                    return m ? m[0] : null;
-                };
-
-                const contractId = data.contractId || data.id || guidFromUrl(data.editUrl) || guidFromUrl(data.detailsUrl);
-                const lineItemUrl = data.lineItemUrl || (contractId ? `/Contracts/Items/Create?contractId=${encodeURIComponent(contractId)}` : null);
-
-                if (editLink && lineItemUrl) {
-                    editLink.href = lineItemUrl;
-                    editLink.classList.remove('d-none');
-                    editLink.textContent = 'Add line items';
-                } else {
-                    editLink?.classList.add('d-none');
-                }
-
+                // (اختياري) خلي التحذير داخل الـ Preview فقط
                 $('vpContractPreview').innerHTML =
                     '<div class="alert alert-warning mb-0">This contract has no line items. Please add at least one line item to continue.</div>';
 
@@ -585,22 +578,34 @@
                 return;
             }
 
-            // إذا يوجد Line Items => فعّل Update حسب canUpdate
-            const canUpdate = !!data.canUpdate;
+            // ---------- has line items ----------
+            btnCreate?.classList.add('d-none');
 
+            // Update button
             if (btnUpdate) {
+                btnUpdate.classList.remove('d-none');
                 btnUpdate.disabled = !canUpdate;
                 btnUpdate.textContent = canUpdate ? 'Update Contract' : 'Locked (Signed)';
             }
 
+            // Edit link
             if (editLink) {
                 editLink.href = data.editUrl || '#';
                 editLink.classList.toggle('d-none', !canUpdate);
                 editLink.textContent = 'Edit';
             }
 
-            // send يظهر فقط إذا اكو items (وإنت لاحقاً تقدر تقيده بشرط status)
-            sendBtn?.classList.remove('d-none');
+            // Details link (يظهر فقط إذا مو Signed حسب طلبك)
+            if (detailsLink) {
+                let href = data.detailsUrl || '';
+                if (!href && cid) href = `/Contracts/Details?id=${encodeURIComponent(cid)}`;
+                detailsLink.href = href || '#';
+                detailsLink.classList.toggle('d-none', isSigned);
+            }
+
+            // Send button (يظهر فقط إذا مو Signed)
+            if (isSigned) sendBtn?.classList.add('d-none');
+            else sendBtn?.classList.remove('d-none');
 
             showContractEmpty(false);
             showContractPreview(true);
@@ -640,20 +645,25 @@
             const json = await res.json().catch(() => ({}));
 
             // ❌ فشل
+            // ❌ فشل
             if (!res.ok) {
-                if (json?.toast) saveToastForReload(json.toast);
 
-                // ✅ NEW: redirectUrl support
+                // ✅ إذا السيرفر رجّع redirectUrl
                 if (json?.data?.redirectUrl) {
-                    window.location.href = json.data.redirectUrl;
+                    const to = String(json.data.redirectUrl || '');
+
+                    // ✅ نفس القاعدة: إذا toast=noItems لا تحفظ أي toast
+                    if (to.includes('toast=noItems')) {
+                        try { sessionStorage.removeItem('vc.toast.afterReload'); } catch { }
+                    } else if (json?.toast) {
+                        saveToastForReload(json.toast);
+                    }
+
+                    window.location.href = to;
                     return;
                 }
 
-                if (json?.action === 'openEdit' && json?.editUrl) {
-                    window.location.href = json.editUrl;
-                    return;
-                }
-
+                // باقي الأخطاء بدون redirect
                 if (json?.toast) showToast(json.toast);
                 else showToast({ type: 'error', title: 'Error', message: 'Unable to update the contract.' });
 
@@ -980,7 +990,7 @@
 
         try {
             btn.disabled = true;
-            window.UI?.loading?.show?.('Creating contract...');
+            window.UI?.loading?.show?.('Preparing line items...');
 
             const token = document.getElementById('antiForgeryToken')?.value || '';
             const joiner = urlBase.includes('?') ? '&' : '?';
@@ -995,78 +1005,47 @@
             });
 
             const json = await res.json().catch(() => ({}));
+            const data = json?.data || {};
 
-            // ---------- FAIL ----------
+            // ✅ redirectUrl priority + save toast for the destination page
+            if (data.redirectUrl) {
+                const u = new URL(data.redirectUrl, window.location.origin);
+
+                // أضف toast=noItems دائماً عند التحويل إلى Manage بعد إنشاء/إجبار إضافة line items
+                u.searchParams.set('toast', 'noItems');
+
+                // امنع أي توست محفوظ سابقاً (حتى لا يظهر الأخضر أو غيره)
+                try { sessionStorage.removeItem('vc.toast.afterReload'); } catch { }
+
+                window.location.href = u.pathname + u.search;
+                return;
+            }
+
+
             if (!res.ok) {
-                // اعرض التوست
                 if (json?.toast) showToast(json.toast);
                 else toastError('Failed to create contract.', 'Error');
-
-                // ✅ إذا السيرفر عطى redirectUrl اتبعه
-                if (json?.data?.redirectUrl) {
-                    if (json?.toast) saveToastForReload(json.toast);
-                    window.location.href = json.data.redirectUrl;
-                    return;
-                }
-
-                // ✅ fallback: لو الرسالة تشير إلى عدم وجود خدمات/line items
-                const msg = (json?.toast?.message || json?.message || '').toString().toLowerCase();
-                if (msg.includes('at least one service') || msg.includes('line item')) {
-                    saveToastForReload(json?.toast || { type: 'warning', title: 'Line items', message: 'Please add at least one line item first.' });
-                    window.location.href = `/Contracts/Items/Create?projectId=${encodeURIComponent(contractOneState.projectId)}`;
-                    return;
-                }
-
                 return;
             }
 
-
-            // ---------- SUCCESS ----------
-            if (json?.toast) saveToastForReload(json.toast);
-
-            const data = json?.data || {};
-            const contractId = data.contractId || data.id || null;
-
-            // تفاصيل العقد (المطلوب: الانتقال إلى Details عند النجاح)
-            let detailsUrl = data.detailsUrl;
-            if (!detailsUrl && data.editUrl) detailsUrl = data.editUrl.replace(/\/Contracts\/Edit/i, '/Contracts/Details');
-            if (!detailsUrl && contractId) detailsUrl = `/Contracts/Details?id=${encodeURIComponent(contractId)}`;
-
-            // صفحة line items (إذا ماكو items)
-            let lineItemUrl = data.lineItemUrl;
-            if (!lineItemUrl && contractId) lineItemUrl = `/Contracts/Items/Create?contractId=${encodeURIComponent(contractId)}`;
-
-            const itemsCountRaw = data.itemsCount;
-            const hasItemsFlag = data.hasItems;
-
-            // ✅ default safe: if server didn't tell us, assume NO items
-            let hasItems = false;
-
-            if (typeof itemsCountRaw === 'number') {
-                hasItems = itemsCountRaw > 0;
-            } else if (typeof hasItemsFlag === 'boolean') {
-                hasItems = hasItemsFlag;
-            }
-
-
-            // ✅ إذا ماكو line items: روح لصفحة line items + التوست يظهر هناك
-            if (!hasItems && lineItemUrl) {
-                // نضمن وجود توست تحذيري لو السيرفر ما أرسله
-                if (!json?.toast) saveToastForReload({ type: 'warning', title: 'Line items', message: 'Please add at least one line item first.' });
-                window.location.href = lineItemUrl;
+            if (json?.ok !== true) {
+                if (json?.toast) showToast(json.toast);
+                else showToast({ type: 'warning', title: 'Warning', message: 'Action not allowed.' });
                 return;
             }
 
-            // ✅ نجاح طبيعي: Details
-            if (detailsUrl) {
-                window.location.href = detailsUrl;
+            if (json?.toast) showToast(json.toast);
+
+            if (data.detailsUrl) {
+                window.location.href = data.detailsUrl;
                 return;
             }
 
-            // fallback
-            showToast({ type: 'success', title: 'Success', message: 'Contract created.' });
             await loadProjectContractSnapshot();
 
+        } catch (err) {
+            console.error(err);
+            toastError('Failed to create contract.', 'Error');
         } finally {
             window.UI?.loading?.hide?.();
             btn.disabled = false;

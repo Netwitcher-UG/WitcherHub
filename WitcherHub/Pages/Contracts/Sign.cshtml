@@ -1,5 +1,6 @@
-﻿@page "/contracts/sign/{id:guid}"
+﻿@page "/contracts/sign/{id:guid?}"
 @using Microsoft.Extensions.Localization
+@using System.Text.Json
 @using WitcherHub.Resources
 @model WitcherHub.Pages.Contracts.SignModel
 @inject IStringLocalizer<SharedResource> T
@@ -22,13 +23,13 @@
        value="@Url.Page("/Contracts/Sign", new { id = Model.Id, handler = "Sign" })" />
 
 <script>
-    window.contractServerState = {
-        isSigned: @(Model.IsSigned ? "true" : "false"),
-        signedAtIso: "@(Model.SignedAtIso ?? "")",
-        signatureDataUrl: "@(Model.SignatureDataUrl ?? "")",
-        signerName: "@(Model.SignerNamePrefill ?? "")",
-        signerEmail: "@(Model.SignerEmailPrefill ?? "")"
-    };
+    window.contractServerState = @Html.Raw(JsonSerializer.Serialize(new {
+        isSigned = Model.IsSigned,
+        signedAtIso = Model.SignedAtIso ?? "",
+        signatureDataUrl = Model.SignatureDataUrl ?? "",
+        signerName = Model.SignerNamePrefill ?? "",
+        signerEmail = Model.SignerEmailPrefill ?? ""
+    }));
 </script>
 
 <div class="contractPage">
@@ -65,54 +66,55 @@
                 </div>
             </div>
 
-            <section class="contractSign" aria-label="Unterschriften">
-                <h2 class="contractSign__title">Unterschriften</h2>
+            <section class="contractSign" aria-label="@T["contractPage_SignaturesTitle"]">
+                <h2 class="contractSign__title">@T["contractPage_SignaturesTitle"]</h2>
 
                 <div class="contractSign__grid">
                     <div>
-                        <div class="contractSign__party">Kunde</div>
+                        <div class="contractSign__party">@T["contractPage_CustomerParty"]</div>
 
                         <div class="contractSign__row">
-                            <div class="contractSign__label">Name</div>
+                            <div class="contractSign__label">@T["contractPage_LabelName"]</div>
                             <input id="customerName"
                                    class="contractSign__input"
                                    type="text"
-                                   value=""
-                                   autocomplete="name"
-                                   placeholder="" />
+                                   value="@Model.SignerNamePrefill"
+                                   autocomplete="name" />
                         </div>
 
                         <div class="contractSign__row">
-                            <div class="contractSign__label">E-Mail</div>
+                            <div class="contractSign__label">@T["contractPage_LabelEmail"]</div>
                             <input id="customerEmail"
                                    class="contractSign__input"
                                    type="email"
-                                   value=""
-                                   autocomplete="email"
-                                   placeholder="" />
+                                   value="@Model.SignerEmailPrefill"
+                                   autocomplete="email" />
                         </div>
 
                         <div class="contractSign__row">
-                            <div class="contractSign__label">Datum</div>
+                            <div class="contractSign__label">@T["contractPage_LabelDate"]</div>
                             <div class="contractSign__line"><span id="customerDate"></span></div>
                         </div>
 
                         <div class="contractSign__row">
-                            <div class="contractSign__label">Unterschrift</div>
-                            <div id="sigBoxClick" class="contractSign__sigLine" role="button" tabindex="0"
-                                 aria-label="Unterschrift hinzufügen">
-                                <img id="sigImage" class="contractSign__sigImg" alt="Unterschrift" />
+                            <div class="contractSign__label">@T["contractPage_LabelSignature"]</div>
+                            <div id="sigBoxClick"
+                                 class="contractSign__sigLine"
+                                 role="button"
+                                 tabindex="0"
+                                 aria-label="@T["contractPage_AddSignatureAria"]">
+                                <img id="sigImage" class="contractSign__sigImg" alt="@T["contractPage_LabelSignature"]" />
                                 <span id="sigPlaceholder" class="contractSign__placeholder"></span>
                             </div>
                         </div>
 
                         <div class="contractSign__meta">
-                            Unterzeichnet am: <span id="signedAt"></span>
+                            @T["contractPage_SignedAtLabel"]: <span id="signedAt"></span>
                         </div>
                     </div>
 
                     <div>
-                        <div class="contractSign__party">Anbieter</div>
+                        <div class="contractSign__party">@T["contractPage_ProviderParty"]</div>
 
                         <div class="contractSign__providerBlock">
                             <div class="contractSign__providerName">@Model.ProviderName</div>
@@ -120,7 +122,7 @@
                         </div>
 
                         <div class="contractSign__providerNote">
-                            (Unterschrift Anbieter erfolgt intern)
+                            (@T["contractPage_ProviderSignsInternally"])
                         </div>
                     </div>
                 </div>
@@ -135,7 +137,7 @@
         <div class="contractPage__modalCard" role="dialog" aria-modal="true">
             <div class="contractPage__modalHead">
                 <div>@T["contractPage_ModalTitle"]</div>
-                <button class="contractPage__btn" type="button" id="btnClose">✕</button>
+                <button class="contractPage__btn" type="button" id="btnClose" aria-label="@T["contractPage_Close"]">✕</button>
             </div>
 
             <div class="contractPage__modalBody">
@@ -162,7 +164,10 @@
 @section Scripts {
     <script>
         window.contractPageI18n = {
-            fillName: "Please enter your name before signing",
+            fillName: "@T["contractPage_ErrFillName"]",
+            fillEmail: "@T["contractPage_ErrFillEmail"]",
+            fillFields: "@T["contractPage_ErrFillFields"]",
+            invalidEmail: "@T["contractPage_ErrInvalidEmail"]",
             emptyCanvas: "@T["contractPage_ErrEmptyCanvas"]",
             mustAgree: "@T["contractPage_ErrMustAgree"]",
             cleared: "@T["contractPage_Cleared"]",

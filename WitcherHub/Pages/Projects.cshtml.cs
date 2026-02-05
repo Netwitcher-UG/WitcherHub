@@ -637,59 +637,30 @@ namespace WitcherHub.Pages
                 var list = await _contracts.GetContractsByProjectAsync(projectId, page: 1, pageSize: 1, search: null, ct);
                 var latest = list.Items?.FirstOrDefault();
 
-                Guid contractId;
-
-                // 1) No contract yet -> create header only and redirect to edit
                 if (latest is null)
                 {
-                    var create = new ContractDTOs
+                    return BadRequest(new
                     {
-                        Contract = new ContractDto
-                        {
-                            ProjectId = projectId,
-                            Currency = "EUR",
-                            Status = DocumentStatus.Draft,
-                            StartDate = prj.StartDate,
-                            EndDate = prj.EndDate,
-                            Terms = null
-                        },
-                        Items = new List<ContractItemDto>()
-                    };
-
-                    contractId = await _contracts.CreateAsync(create, ct);
-
-                    return new JsonResult(new
-                    {
-                        ok = true,
-                        data = new
-                        {
-                            contractId,
-                            next = "edit",
-                            editUrl = $"/Contracts/Edit?id={contractId}"
-                        },
                         toast = new
                         {
-                            type = "info",
-                            title = "Contract created",
-                            message = "Add at least one service (line item), then click Update Contract to generate the contract terms."
+                            type = "warning",
+                            title = "No contract",
+                            message = "No contract exists yet. Click Add Contract when you're ready to create it."
                         }
                     });
                 }
 
-                contractId = latest.Id;
+                var contractId = latest.Id;
 
                 var details = await _contracts.GetContractAsync(contractId, ct);
                 if (details is null)
-                    return ToastNotFound("غير موجود", "العقد غير موجود.");
-
-                
-                
+                    return ToastNotFound("Not found", "Contract not found.");
 
                 // rule: if signed => cannot regenerate
                 if (details.SignedAt is not null || details.Status == DocumentStatus.Signed)
                     return ToastBadRequest("Not allowed", "This contract is already signed. You cannot generate a new one.");
 
-                // ✅ NEW: Must have at least one line item before generating
+                // Must have at least one line item before generating
                 var itemsCount = details.Items?.Count ?? 0;
                 if (itemsCount == 0)
                 {
@@ -699,21 +670,19 @@ namespace WitcherHub.Pages
                         {
                             type = "warning",
                             title = "Line items required",
-                            message = "Please add at least one line item before generating the contract."
+                            message = "You were redirected to add line items first."
                         },
                         data = new
                         {
-                            redirectUrl = $"/Contracts/Items/Create?contractId={details.Id}",
+                            redirectUrl = $"/Contracts/Items/Manage?contractId={details.Id}&returnTo=items&toast=noItems",
                             contractId = details.Id
                         }
                     });
                 }
 
-
-                // بعد ذلك فقط نولّد العقد
+                // generate contract terms
                 var req = BuildGenerateRequest(prj, details);
                 var doc = await _contractDocumentGenerator.GenerateAsync(req, ct);
-
 
                 var update = new UpdateContractDto
                 {
@@ -745,7 +714,6 @@ namespace WitcherHub.Pages
                         type = "success",
                         title = "Updated",
                         message = "Contract terms have been generated/updated successfully."
-
                     }
                 });
             }
@@ -823,84 +791,93 @@ namespace WitcherHub.Pages
             try
             {
                 if (projectId == Guid.Empty)
-                    return BadRequest(new { toast = new { type = "error", title = "Error", message = "Invalid project." } });
-
+                    return new JsonResult(new
+                    {
+                        ok = false,
+                        toast = new { type = "error", title = "Error", message = "Invalid project." }
+                    });
 
                 var prj = await _projects.GetProjectAsync(projectId, ct);
                 if (prj is null)
-                    return NotFound(new { toast = new { type = "error", title = "Not found", message = "Project not found." } });
+                    return new JsonResult(new
+                    {
+                        ok = false,
+                        toast = new { type = "error", title = "Not found", message = "Project not found." }
+                    });
 
-
-                // تأكد أنه لا يوجد عقد مسبقاً لهذا المشروع (عقد واحد فقط)
                 var list = await _contracts.GetContractsByProjectAsync(projectId, page: 1, pageSize: 1, search: null, ct);
                 var latest = list.Items?.FirstOrDefault();
+
+                // ✅ Contract exists
                 if (latest is not null)
                 {
                     var details = await _contracts.GetContractAsync(latest.Id, ct);
                     var itemsCount = details?.Items?.Count ?? 0;
 
+                    // Has items -> go to details (no toast param)
+                    if (itemsCount > 0)
+                    {
+                        return new JsonResult(new
+                        {
+                            ok = true,
+                            data = new
+                            {
+                                contractId = latest.Id,
+                                detailsUrl = $"/Contracts/Details?id={latest.Id}"
+                            },
+                            toast = new { type = "info", title = "Already exists", message = "Contract already exists." }
+                        });
+                    }
+
+                    // Header only -> go manage items with toast flag
                     return new JsonResult(new
                     {
                         ok = true,
                         data = new
                         {
                             contractId = latest.Id,
-                            itemsCount,
-                            hasItems = itemsCount > 0,
-                            lineItemUrl = $"/Contracts/Items/Create?contractId={latest.Id}",
-                            detailsUrl = $"/Contracts/Details?id={latest.Id}",
-                            editUrl = $"/Contracts/Edit?id={latest.Id}"
+                            redirectUrl = $"/Contracts/Items/Manage?contractId={latest.Id}&returnTo=items&toast=noItems"
                         },
-                        toast = new
-                        {
-                            type = "info",
-                            title = "Already exists",
-                            message = "A contract already exists for this project."
-                        }
+                        toast = new { type = "warning", title = "Line items required", message = "You were redirected to add line items first." }
                     });
                 }
 
-
-                // أنشئ Header فقط
-                var create = new ContractDTOs
+                // ✅ No contract -> create header only then go manage items with toast flag
+                var dto = new ContractDTOs
                 {
                     Contract = new ContractDto
                     {
                         ProjectId = projectId,
-                        Currency = "EUR",
                         Status = DocumentStatus.Draft,
+                        Currency = "EUR",
                         StartDate = prj.StartDate,
                         EndDate = prj.EndDate,
-                        Terms = null
+                        Terms = null,
+                        SignedAt = null
                     },
-                    Items = new List<ContractItemDto>()
+                    Items = null
                 };
 
-                var contractId = await _contracts.CreateAsync(create, ct);
+                var newContractId = await _contracts.CreateAsync(dto, ct);
 
                 return new JsonResult(new
                 {
                     ok = true,
                     data = new
                     {
-                        contractId,
-                        itemsCount = 0,
-                        hasItems = false,
-                        lineItemUrl = $"/Contracts/Items/Create?contractId={contractId}",
-                        detailsUrl = $"/Contracts/Details?id={contractId}",
-                        editUrl = $"/Contracts/Edit?id={contractId}" // اختياري تبقيه
+                        contractId = newContractId,
+                        redirectUrl = $"/Contracts/Items/Manage?contractId={newContractId}&returnTo=items&toast=noItems"
                     },
-                    toast = new
-                    {
-                        type = "warning",
-                        title = "Line items required",
-                        message = "Please add at least one line item first."
-                    }
+                    toast = new { type = "success", title = "Created", message = "Contract header created. Add line items now." }
                 });
             }
             catch
             {
-                return StatusCode(500, new { toast = new { type = "error", title = "Server error", message = "حدث خطأ غير متوقع." } });
+                return new JsonResult(new
+                {
+                    ok = false,
+                    toast = new { type = "error", title = "Server error", message = "An unexpected error occurred." }
+                });
             }
         }
 

@@ -170,6 +170,8 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                         Phone = entity.Phone,
                         TaxId = entity.TaxId,
                         Notes = entity.Notes,
+                        FirstName = entity.FirstName,
+                        LastName = entity.LastName,
                         LexwareType = entity.LexwareType,
 
                         // ✅ Lexware read-only fields
@@ -315,31 +317,18 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             if (dto is null) throw new BadRequestAppException("Invalid payload.");
 
             var customerRepo = _unitOfWork.Repo<CustomerEntity>();
+            var emailRepo = _unitOfWork.Repo<EmailEntity>(); // ✅ مهم
 
             var customer = await customerRepo.GetByIdAsync(
-    id, ct: ct, asNoTracking: false, x => x.EmailAddresses);
+                id, ct: ct, asNoTracking: false, x => x.EmailAddresses);
 
             if (customer is null) throw new NotFoundAppException("Customer not found.");
 
-            var dbGroups = customer.EmailAddresses
-                .GroupBy(e => NormEmail(e.Email))
-                .Where(g => !string.IsNullOrWhiteSpace(g.Key))
-                .ToList();
+            static string NormEmail(string? e) => (e ?? "").Trim().ToLowerInvariant();
+            static string NormKind(string? k) => string.IsNullOrWhiteSpace(k) ? "business" : k.Trim().ToLowerInvariant();
 
-            foreach (var g in dbGroups)
-            {
-                if (g.Count() <= 1) continue;
-
-                var keep = g.OrderByDescending(x => KindRank(NormKind(x.Kind)))
-                            .ThenBy(x => x.Id)
-                            .First();
-
-                foreach (var dup in g.Where(x => x.Id != keep.Id).ToList())
-                    customer.EmailAddresses.Remove(dup);
-            }
-
+            // ===== 1) تحديث بيانات العميل الأساسية =====
             var basic = dto.Customer ?? throw new BadRequestAppException("Missing customer data.");
-
 
             customer.Type = basic.Type;
             customer.FirstName = basic.FirstName?.Trim();
@@ -348,71 +337,120 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             customer.Name = customer.Type == CustomerType.Individual
                 ? $"{customer.FirstName} {customer.LastName}".Trim()
                 : (basic.Name ?? "").Trim();
+
             customer.Phone = string.IsNullOrWhiteSpace(basic.Phone) ? null : basic.Phone.Trim();
             customer.TaxId = string.IsNullOrWhiteSpace(basic.TaxId) ? null : basic.TaxId.Trim();
             customer.Notes = string.IsNullOrWhiteSpace(basic.Notes) ? null : basic.Notes.Trim();
 
-            static string NormEmail(string? e) => (e ?? "").Trim().ToLowerInvariant();
-            static string NormKind(string? k) =>
-                string.IsNullOrWhiteSpace(k) ? "business" : k.Trim().ToLowerInvariant();
+            // ===== 2) incoming emails (مع Id اختياري) =====
+            var incomingRaw = (basic.EmailAddresses ?? new List<EmailAddressDto>())
+                .Select(x => new
+                {
+                    Id = (x.Id.HasValue && x.Id.Value != Guid.Empty) ? x.Id.Value : (Guid?)null,
+                    Email = NormEmail(x.Email),
+                    Kind = NormKind(x.Kind)
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x.Email))
+                .ToList();
 
-            var incoming = DistinctEmails(
-                (basic.EmailAddresses ?? new List<EmailAddressDto>())
-                    .Select(x => (x.Email ?? "", x.Kind ?? "business"))
-            );
-
-            if (incoming.Count == 0)
+            if (incomingRaw.Count == 0)
                 throw new BadRequestAppException("At least one email address is required.");
-            var dbByEmail = customer.EmailAddresses
+
+            // منع تكرار الإيميل داخل نفس الطلب
+            var dup = incomingRaw.GroupBy(x => x.Email, StringComparer.OrdinalIgnoreCase)
+                                 .FirstOrDefault(g => g.Count() > 1);
+            if (dup != null)
+                throw new BadRequestAppException($"Duplicate email in request: {dup.Key}");
+
+            // ===== 3) فهارس من DB =====
+            var dbEmails = customer.EmailAddresses.ToList(); // tracked
+            var dbById = dbEmails.ToDictionary(x => x.Id, x => x);
+            var dbByEmail = dbEmails
                 .Where(x => !string.IsNullOrWhiteSpace(NormEmail(x.Email)))
                 .ToDictionary(x => NormEmail(x.Email), x => x, StringComparer.OrdinalIgnoreCase);
 
-            var inByEmail = incoming
-                .ToDictionary(x => x.Email, x => x, StringComparer.OrdinalIgnoreCase);
+            var incomingEmailSet = new HashSet<string>(incomingRaw.Select(x => x.Email), StringComparer.OrdinalIgnoreCase);
+            var keepIds = new HashSet<Guid>(); // كل اللي لازم يبقى
 
-
-            bool sameCount = dbByEmail.Count == inByEmail.Count;
-
-            bool sameContent = sameCount && dbByEmail.All(kvp =>
-                inByEmail.TryGetValue(kvp.Key, out var inc) &&
-                NormKind(kvp.Value.Kind) == inc.Kind);
-
-            if (!sameContent)
+            // ===== 4) Update/Add بشكل مضمون =====
+            foreach (var inc in incomingRaw)
             {
-                foreach (var db in customer.EmailAddresses.ToList())
+                // A) إذا جاء Id صحيح
+                if (inc.Id.HasValue && dbById.TryGetValue(inc.Id.Value, out var dbRowById))
                 {
-                    var key = NormEmail(db.Email);
-                    if (!inByEmail.ContainsKey(key))
-                    {
-                        customer.EmailAddresses.Remove(db);
-                    }
+                    if (NormEmail(dbRowById.Email) != inc.Email) dbRowById.Email = inc.Email;
+                    if (NormKind(dbRowById.Kind) != inc.Kind) dbRowById.Kind = inc.Kind;
+
+                    keepIds.Add(dbRowById.Id);
+                    continue;
                 }
 
-                foreach (var kv in dbByEmail)
+                // B) إذا id ضاع من الفرونت، طابق على الإيميل (يحميك من حذف/إعادة إدراج غلط)
+                if (dbByEmail.TryGetValue(inc.Email, out var dbRowByEmail))
                 {
-                    if (inByEmail.TryGetValue(kv.Key, out var inc))
-                    {
-                        if (NormKind(kv.Value.Kind) != inc.Kind)
-                            kv.Value.Kind = inc.Kind; // tracked update
-                    }
+                    if (NormKind(dbRowByEmail.Kind) != inc.Kind) dbRowByEmail.Kind = inc.Kind;
+
+                    keepIds.Add(dbRowByEmail.Id);
+                    continue;
                 }
 
-                foreach (var inc in incoming)
+                // C) جديد تمامًا => INSERT مضمون عبر repo
+                var newEmail = new EmailEntity
                 {
-                    if (!dbByEmail.ContainsKey(inc.Email))
-                    {
-                        customer.EmailAddresses.Add(new CustomerEmailAddress
-                        {
-                            CustomerId = customer.Id,
-                            Email = inc.Email,
-                            Kind = inc.Kind
-                        });
+                    Id = Guid.NewGuid(),
+                    CustomerId = customer.Id,
+                    Email = inc.Email,
+                    Kind = inc.Kind
+                };
 
-                    }
+                // ✅ هذا يضمن أن EF يعتبرها Added وليس Modified
+                await emailRepo.AddAsync(newEmail, ct);
+
+                // (اختياري) للمزامنة داخل الذاكرة
+                customer.EmailAddresses.Add(newEmail);
+
+                keepIds.Add(newEmail.Id);
+            }
+
+            // ===== 5) Delete: احذف أي DB row غير موجود في الطلب =====
+            foreach (var db in dbEmails)
+            {
+                var dbEmail = NormEmail(db.Email);
+
+                // احتفظ به لو جاء نفس Id أو نفس Email
+                var keep = keepIds.Contains(db.Id) || incomingEmailSet.Contains(dbEmail);
+
+                if (!keep)
+                {
+                    // ✅ حذف مضمون عبر repo (Deleted)
+                    emailRepo.Remove(db);
+
+                    // (اختياري) للمزامنة داخل الذاكرة
+                    customer.EmailAddresses.Remove(db);
                 }
             }
 
-            await _unitOfWork.SaveChangesAsync(ct);
+            // ===== 6) حفظ =====
+            try
+            {
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                foreach (var e in ex.Entries)
+                {
+                    var type = e.Metadata.ClrType.Name;
+                    var state = e.State;
+                    var pk = e.Properties.First(p => p.Metadata.IsPrimaryKey()).CurrentValue;
+
+                    _log.LogError("Concurrency on {Type} pk={Pk} state={State}", type, pk, state);
+
+                    var dbValues = await e.GetDatabaseValuesAsync(ct);
+                    _log.LogError("DB values exist? {Exists}", dbValues != null);
+                }
+                throw;
+            }
+
             await InvalidateAfterCustomerChangeAsync(id, ct);
             _log.LogInformation("Customer updated. {CustomerId}", id);
         }

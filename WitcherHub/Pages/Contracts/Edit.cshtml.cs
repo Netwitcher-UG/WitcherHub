@@ -108,7 +108,7 @@ namespace WitcherHub.Pages.Contracts
             // Render Terms -> HTML (Markdown)
             ContractHtml = RenderMarkdownToSafeHtml(RawTerms);
 
-            // Defaults for new item
+            // Defaults for new item (kept as-is if you still use them later)
             NewItem.ContractId = Contract.Id;
             NewItem.Item.Position = (Contract.Items?.Count ?? 0) + 1;
             NewItem.Item.Title = "";
@@ -116,7 +116,6 @@ namespace WitcherHub.Pages.Contracts
             NewItem.Item.AgreedPrice = null;
             NewItemConfigJson = "{}";
 
-            // Defaults for edit item (will be filled by UI when editing)
             EditItem.ContractId = Contract.Id;
             EditItemConfigJson = "{}";
         }
@@ -151,7 +150,7 @@ namespace WitcherHub.Pages.Contracts
                     foreach (var err in vr.Errors)
                         ModelState.AddModelError("Header." + err.PropertyName, err.ErrorMessage);
 
-                    // ✅ IMPORTANT: keep user's edited terms on the page
+                    // keep user's edited terms
                     await LoadPageStateAsync(Id, ct, termsOverride: Header.Contract.Terms);
 
                     TempData["Toast.Type"] = "error";
@@ -200,7 +199,6 @@ namespace WitcherHub.Pages.Contracts
 
                 NewItem.ContractId = Id;
 
-                // parse JSON config
                 JsonDocument config;
                 try
                 {
@@ -222,6 +220,7 @@ namespace WitcherHub.Pages.Contracts
                         ModelState.AddModelError("NewItem." + err.PropertyName, err.ErrorMessage);
 
                     await LoadPageStateAsync(Id, ct, termsOverride: null);
+
                     TempData["Toast.Type"] = "error";
                     TempData["Toast.Title"] = "Validation";
                     TempData["Toast.Message"] = "Please fix the item fields.";
@@ -260,7 +259,6 @@ namespace WitcherHub.Pages.Contracts
 
                 EditItem.ContractId = Id;
 
-                // parse JSON config
                 JsonDocument config;
                 try
                 {
@@ -352,7 +350,8 @@ namespace WitcherHub.Pages.Contracts
                 TempData["Toast.Title"] = "Deleted";
                 TempData["Toast.Message"] = "Contract deleted.";
 
-                return RedirectToPage("/Projects", new { openProjectId = c.ProjectId, tab = "overview" });
+                // ✅ ارجعه للـ Projects على تبويب contracts
+                return RedirectToPage("/Projects", new { openProjectId = c.ProjectId, tab = "contracts" });
             }
             catch (Exception ex) when (ex is BadRequestAppException or NotFoundAppException)
             {

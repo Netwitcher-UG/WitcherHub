@@ -1,4 +1,4 @@
-using FluentValidation;
+﻿using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -44,7 +44,8 @@ namespace WitcherHub.Pages.Contracts.Items
 
         [BindProperty]
         public CreateContractItemDto Form { get; set; } = new();
-
+        [BindProperty(SupportsGet = true)]
+        public string? ReturnTo { get; set; }
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             if (ContractId == Guid.Empty) return NotFound();
@@ -56,8 +57,16 @@ namespace WitcherHub.Pages.Contracts.Items
 
             Form.ContractId = Contract.Id;
             Form.Item.Position = (Contract.Items?.Count ?? 0) + 1;
-            Form.Item.AgreedPrice = null; // user can override, we'll default from service on post if empty
+            Form.Item.AgreedPrice = null;
             ConfigJson = "{}";
+
+            // ✅ Toast عند الوصول من التحويل
+            if (string.Equals(ReturnTo, "items", StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["Toast.Type"] = "info";
+                TempData["Toast.Title"] = "Next step";
+                TempData["Toast.Message"] = "You were redirected here to add contract line items. Please add at least one item to continue.";
+            }
 
             return Page();
         }
@@ -123,7 +132,14 @@ namespace WitcherHub.Pages.Contracts.Items
                 TempData["Toast.Title"] = "Added";
                 TempData["Toast.Message"] = "Line item added.";
 
+                if (string.Equals(ReturnTo, "items", StringComparison.OrdinalIgnoreCase))
+                {
+                    return RedirectToPage("/Contracts/Items/Create", new { contractId = ContractId, returnTo = "items" });
+
+                }
+
                 return RedirectToPage("/Contracts/Details", new { id = ContractId });
+
             }
             catch (Exception ex) when (ex is BadRequestAppException or NotFoundAppException)
             {

@@ -761,11 +761,19 @@
         const wrap = $('vc-basic-email-list');
         if (!wrap) return;
 
-        const emails = (list && list.length ? list : [{ kind: 'business', email: '' }])
-            .map(x => ({ kind: (x.kind || 'business'), email: (x.email || '') }));
+        const emails = (list && list.length ? list : [{ id: null, kind: 'business', email: '' }])
+            .map(x => ({
+                id: x.id ?? x.Id ?? null,
+                kind: x.kind ?? x.Kind ?? 'business',
+                email: x.email ?? x.Email ?? ''
+            }));
 
         wrap.innerHTML = emails.map((x, i) => `
-        <div class="row g-2 align-items-end" data-email-row="basic" data-index="${i}">
+        <div class="row g-2 align-items-end"
+             data-email-row="basic"
+             data-index="${i}"
+             data-email-id="${x.id ?? ''}">
+
             <div class="col-12 col-md-4">
                 <select class="form-select form-select-sm" id="vc-basic-email-kind-${i}">
                     <option value="business" ${String(x.kind).toLowerCase() === 'business' ? 'selected' : ''}>business</option>
@@ -776,7 +784,11 @@
             </div>
 
             <div class="col-12 col-md-7">
-                <input class="form-control form-control-sm" id="vc-basic-email-email-${i}" type="email" value="${esc(x.email)}" placeholder="email@domain.com" />
+                <input class="form-control form-control-sm"
+                       id="vc-basic-email-email-${i}"
+                       type="email"
+                       value="${esc(x.email)}"
+                       placeholder="email@domain.com" />
                 <div class="text-danger small mt-1" id="err-vc-basic-email-email-${i}"></div>
             </div>
 
@@ -792,17 +804,23 @@
     `).join('');
     }
 
+
     function collectEmailEditRows() {
         const rows = Array.from(document.querySelectorAll('[data-email-row="basic"]'));
         const items = rows.map((row, idx) => {
             const i = Number(row.getAttribute('data-index') ?? idx);
             const kind = document.getElementById(`vc-basic-email-kind-${i}`)?.value ?? 'business';
             const email = (document.getElementById(`vc-basic-email-email-${i}`)?.value ?? '').trim();
-            return { kind, email };
+
+            const rawId = row.getAttribute('data-email-id') || null;
+            const id = rawId && rawId.length ? rawId : null;
+
+            return { id, kind, email };
         }).filter(x => x.email.length > 0);
 
         return items;
     }
+
 
     function buildMapUpdateBasicDynamic(emailCount) {
         const map = { ...mapUpdateBasic };
@@ -1504,6 +1522,7 @@
             lastName: root.lastName ?? root.LastName ?? '',
             email: primaryEmail,
             emailAddresses: (rawEmails || []).map(e => ({
+                id: e.id ?? e.Id ?? null,
                 kind: e.kind ?? e.Kind ?? 'business',
                 email: e.email ?? e.Email ?? ''
             })),
@@ -1734,7 +1753,7 @@
         if (e.target.closest('#vc-basic-email-add')) {
             e.preventDefault();
             const existing = collectEmailEditRows();
-            existing.push({ kind: 'business', email: '' });
+            existing.push({ id: null, kind: 'business', email: '' });
             renderEmailEditRows(existing.length ? existing : [{ kind: 'business', email: '' }]);
             return;
         }

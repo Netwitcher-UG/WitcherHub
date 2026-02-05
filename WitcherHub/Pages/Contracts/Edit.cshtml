@@ -16,27 +16,82 @@
 @section Styles {
     <link rel="stylesheet" href="~/css/contracts/contract-sign.css" asp-append-version="true" />
     <style>
-        .contractTopActions {
+        /* ===== Topbar like Details ===== */
+        .contractTopbar {
+            position: sticky;
+            top: 12px;
+            z-index: 50;
             display: flex;
+            align-items: center;
             justify-content: space-between;
-            gap: 10px;
-            flex-wrap: wrap;
+            gap: 12px;
+            padding: 10px 12px;
             margin-bottom: 12px;
+            border-radius: 14px;
+            background: rgba(255,255,255,.88);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,0,0,.06);
         }
 
-            .contractTopActions .btns {
-                display: flex;
-                gap: 8px;
-                flex-wrap: wrap;
-                align-items: center;
+        .contractTopbar__left {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 240px;
+        }
+
+        .contractTopbar__title {
+            font-weight: 800;
+            font-size: 16px;
+            line-height: 1.2;
+        }
+
+        .contractTopbar__sub {
+            color: rgba(0,0,0,.55);
+            font-size: 12px;
+        }
+
+        .contractTopbar__right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .contractTopbar__badge {
+            font-size: 12px;
+            font-weight: 700;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(0,0,0,.08);
+            background: rgba(0,0,0,.03);
+        }
+
+            .contractTopbar__badge.is-signed {
+                background: rgba(25,135,84,.10);
+                border-color: rgba(25,135,84,.25);
+                color: #198754;
             }
 
-        /* Inline editor inside the same paper area */
+            .contractTopbar__badge.is-unsigned {
+                background: rgba(13,110,253,.08);
+                border-color: rgba(13,110,253,.20);
+                color: #0d6efd;
+            }
+
+            .contractTopbar__badge.is-locked {
+                background: rgba(220,53,69,.08);
+                border-color: rgba(220,53,69,.20);
+                color: #dc3545;
+            }
+
+        /* ===== Inline editor inside paper ===== */
         .contractInlineEditor {
             white-space: pre-wrap;
             word-break: break-word;
             outline: none;
-            min-height: 55vh;
+            min-height: 60vh;
             font-family: inherit;
             font-size: inherit;
             line-height: inherit;
@@ -44,167 +99,182 @@
 
             .contractInlineEditor.is-editing {
                 border: 1px dashed rgba(0,0,0,.20);
-                border-radius: 10px;
+                border-radius: 12px;
                 padding: 14px;
                 background: rgba(255,255,255,.55);
             }
+
+        /* Hide default bottom action bar if exists in CSS */
+        .contractActions {
+            display: none !important;
+        }
     </style>
 }
 
-<div class="contractTopActions">
-    <div>
-        <div class="text-muted small">Contract</div>
-        <div style="font-weight:700; font-size:18px;">@Model.Contract.ContractNo</div>
-        <div class="text-muted small">
-            Status: <strong>@Model.Contract.Status</strong>
-            | Currency: <strong>@Model.Contract.Currency</strong>
+<div class="contractPage">
+
+    <!-- ✅ Topbar -->
+    <div class="contractTopbar">
+        <div class="contractTopbar__left">
+            <div class="contractTopbar__title">@Model.Contract.ContractNo</div>
+            <div class="contractTopbar__sub">
+                Status:
+                <span class="statusPill statusPill--@Model.Contract.Status.ToString().ToLowerInvariant()">
+                    @Model.Contract.Status
+                </span>
+                <span class="mx-1">|</span>
+                Currency: <strong>@Model.Contract.Currency</strong>
+            </div>
+        </div>
+
+
+        <div class="contractTopbar__right">
+            @* Save/Cancel only when Draft *@
+            @if (Model.Contract.Status == WitcherHub.Infrastructure.Data.Models.Enums.DocumentStatus.Draft)
+            {
+                <button class="btn btn-primary btn-sm" type="button" id="btnSave">Save</button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="btnCancel">Cancel</button>
+            }
+            <button class="btn btn-outline-dark btn-sm" type="button" id="btnPrint">Print</button>
+            <a class="btn btn-outline-secondary btn-sm"
+               asp-page="/Contracts/Details"
+               asp-route-id="@Model.Contract.Id">
+                Details
+            </a>
+            <a class="btn btn-outline-secondary btn-sm"
+               asp-page="/Projects"
+               asp-route-openProjectId="@Model.Contract.ProjectId"
+               asp-route-tab="contracts">
+                Back →
+            </a>
+
+            
+
+            
+
+            
+
+            
         </div>
     </div>
 
-    <div class="btns">
-        <a class="btn btn-outline-secondary"
-           asp-page="/Projects"
-           asp-route-openProjectId="@Model.Contract.ProjectId"
-           asp-route-tab="overview">Back</a>
-
-        <a class="btn btn-outline-secondary"
-           asp-page="/Contracts/Details"
-           asp-route-id="@Model.Contract.Id">Details / Preview</a>
-
-        <button class="btn btn-outline-dark" type="button" id="btnPrint">Print</button>
-    </div>
-</div>
-
-<div class="contractPage">
     <div class="contractPage__container">
         <div class="contractPage__paper" id="paper">
 
-            <!-- VIEW MODE: formatted contract (same demo look) -->
+            <!-- VIEW MODE: formatted contract -->
             <div id="contractView" class="contractPage__contractHtml">
                 @Html.Raw(Model.ContractHtml)
             </div>
 
-            <!-- EDIT MODE: SAME PLACE, plain text only -->
-            <pre id="contractEditor"
-                 class="d-none contractInlineEditor"
-                 contenteditable="true"
-                 spellcheck="false">@Html.Raw(HtmlEncoder.Default.Encode(Model.RawTerms ?? ""))</pre>
-
-            <!-- Actions -->
-            <div class="contractActions">
-                <div class="contractActions__right">
-                    <div class="contractActions__badge">
-                        @(Model.IsSigned ? "Signed" : "Unsigned")
-                    </div>
-
-                    @if (Model.Contract.Status != WitcherHub.Infrastructure.Data.Models.Enums.DocumentStatus.Draft)
-                    {
-                        <button class="contractActions__btn" type="button" disabled
-                                title="Editing is locked because contract is not Draft.">
-                            Edit text
-                        </button>
-                    }
-                    else
-                    {
-                        <button class="contractActions__btn" type="button" id="btnEdit">Edit text</button>
-                        <button class="contractActions__btn d-none" type="button" id="btnSave">Save</button>
-                        <button class="contractActions__btn d-none" type="button" id="btnCancel">Cancel</button>
-                    }
-                </div>
-            </div>
-
-            <!-- Hidden Save Form -> uses your existing handler OnPostUpdateHeaderAsync -->
-            <form id="saveForm" method="post" asp-page-handler="UpdateHeader" asp-route-id="@Model.Id" class="d-none">
-                <input type="hidden" asp-for="Id" />
-
-                <!-- required hidden fields (to satisfy validator) -->
-                <input type="hidden" asp-for="Header.Contract.ProjectId" />
-                <input type="hidden" asp-for="Header.Contract.Currency" />
-                <input type="hidden" asp-for="Header.Contract.Status" />
-                <input type="hidden" asp-for="Header.Contract.StartDate" />
-                <input type="hidden" asp-for="Header.Contract.EndDate" />
-                <input type="hidden" asp-for="Header.Contract.SignedAt" />
-
-                <!-- will be filled from editor text on Save -->
-                <input type="hidden" asp-for="Header.Contract.Terms" id="termsHidden" />
-            </form>
-
+            <!-- EDIT MODE: plain text editor in same paper -->
+            @if (Model.Contract.Status == WitcherHub.Infrastructure.Data.Models.Enums.DocumentStatus.Draft)
+            {
+                <pre id="contractEditor"
+                     class="contractInlineEditor"
+                     contenteditable="true"
+                     spellcheck="false">@Html.Raw(HtmlEncoder.Default.Encode(Model.RawTerms ?? ""))</pre>
+            }
         </div>
     </div>
+
+    <!-- Hidden Save Form -> uses your existing handler OnPostUpdateHeaderAsync -->
+    <form id="saveForm" method="post" asp-page-handler="UpdateHeader" asp-route-id="@Model.Id" class="d-none">
+        <input type="hidden" asp-for="Id" />
+
+        <!-- required hidden fields (to satisfy validator) -->
+        <input type="hidden" asp-for="Header.Contract.ProjectId" />
+        <input type="hidden" asp-for="Header.Contract.Currency" />
+        <input type="hidden" asp-for="Header.Contract.Status" />
+        <input type="hidden" asp-for="Header.Contract.StartDate" />
+        <input type="hidden" asp-for="Header.Contract.EndDate" />
+        <input type="hidden" asp-for="Header.Contract.SignedAt" />
+
+        <!-- will be filled from editor text on Save -->
+        <input type="hidden" asp-for="Header.Contract.Terms" id="termsHidden" />
+    </form>
+
 </div>
 
 @section Scripts {
     <script>
         (function () {
-            const view = document.getElementById('contractView');
-            const editor = document.getElementById('contractEditor');
+          const view = document.getElementById('contractView');
+          const editor = document.getElementById('contractEditor');
+          const btnSave = document.getElementById('btnSave');
+          const btnCancel = document.getElementById('btnCancel');
+          const btnPrint = document.getElementById('btnPrint');
+          const saveForm = document.getElementById('saveForm');
+          const termsHidden = document.getElementById('termsHidden');
 
-            const btnEdit = document.getElementById('btnEdit');
-            const btnSave = document.getElementById('btnSave');
-            const btnCancel = document.getElementById('btnCancel');
-            const btnPrint = document.getElementById('btnPrint');
+          // ----- Print should print formatted HTML -----
+          if (btnPrint) {
+            btnPrint.addEventListener('click', function () {
+              const wasEditing = !!editor && !editor.classList.contains('d-none');
 
-            const saveForm = document.getElementById('saveForm');
-            const termsHidden = document.getElementById('termsHidden');
+              // Show formatted view for print
+              if (editor) editor.classList.add('d-none');
+              if (view) view.classList.remove('d-none');
 
-            if (btnPrint) {
-                btnPrint.addEventListener('click', () => window.print());
-            }
+              window.print();
 
-            if (!btnEdit || !btnSave || !btnCancel || !editor || !view) return;
-
-            const originalText = editor.textContent ?? "";
-
-            function toEditMode() {
-                view.classList.add('d-none');
-                editor.classList.remove('d-none');
-                editor.classList.add('is-editing');
-
-                btnEdit.classList.add('d-none');
-                btnSave.classList.remove('d-none');
-                btnCancel.classList.remove('d-none');
-
+              // Restore editing view
+              if (wasEditing) {
+                if (view) view.classList.add('d-none');
+                if (editor) editor.classList.remove('d-none');
                 editor.focus();
                 placeCaretAtEnd(editor);
-            }
-
-            function toViewMode(reset) {
-                if (reset) editor.textContent = originalText;
-
-                editor.classList.add('d-none');
-                editor.classList.remove('is-editing');
-                view.classList.remove('d-none');
-
-                btnEdit.classList.remove('d-none');
-                btnSave.classList.add('d-none');
-                btnCancel.classList.add('d-none');
-            }
-
-            // Force paste as plain text (no formatting)
-            editor.addEventListener('paste', (e) => {
-                e.preventDefault();
-                const text = (e.clipboardData || window.clipboardData).getData('text/plain');
-                document.execCommand('insertText', false, text);
+              }
             });
+          }
 
-            btnEdit.addEventListener('click', toEditMode);
+          // لو مافي editor => العقد مقفل (مش Draft) => لا تفعل edit
+          if (!editor) return;
 
-            btnCancel.addEventListener('click', () => toViewMode(true));
+          // ✅ ادخل Edit mode مباشرة عند الفتح (Draft)
+          if (view) view.classList.add('d-none');
+          editor.classList.remove('d-none');
+          editor.classList.add('is-editing');
 
+          const originalText = editor.textContent ?? "";
+
+          // Paste as plain text only
+          editor.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+            document.execCommand('insertText', false, text);
+          });
+
+          // Focus at end
+          editor.focus();
+          placeCaretAtEnd(editor);
+
+          // ✅ Cancel اختياري
+          if (btnCancel) {
+            btnCancel.addEventListener('click', () => {
+              editor.textContent = originalText;
+              editor.focus();
+              placeCaretAtEnd(editor);
+            });
+          }
+
+          // ✅ Save (يشتغل فقط لو الزر موجود)
+          if (btnSave && saveForm && termsHidden) {
             btnSave.addEventListener('click', () => {
-                const text = (editor.textContent ?? "").replace(/\r\n/g, "\n");
-                termsHidden.value = text;
-                saveForm.submit();
+              const text = (editor.textContent ?? "").replace(/\r\n/g, "\n");
+              termsHidden.value = text;
+              saveForm.submit();
             });
+          }
 
-            function placeCaretAtEnd(el) {
-                const range = document.createRange();
-                range.selectNodeContents(el);
-                range.collapse(false);
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(range);
-            }
+          function placeCaretAtEnd(el) {
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            range.collapse(false);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
         })();
     </script>
+
 }

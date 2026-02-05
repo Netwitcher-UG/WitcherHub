@@ -11,32 +11,80 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/contracts/contract-sign.css" asp-append-version="true" />
+    <style>
+        /* ===== Topbar (Back right, other actions left) ===== */
+        .contractTopbar {
+            position: sticky;
+            top: 12px;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            border-radius: 14px;
+            background: rgba(255,255,255,.88);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,0,0,.06);
+        }
+
+        .contractTopbar__leftActions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-start; /* أقصى اليسار */
+        }
+
+        .contractTopbar__rightActions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end; /* أقصى اليمين */
+        }
+
+        .contractTopbar__badge {
+            font-size: 12px;
+            font-weight: 700;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(0,0,0,.08);
+            background: rgba(0,0,0,.03);
+        }
+    </style>
 }
 
 <div class="contractPage">
-    <div class="contractPage__langFab" aria-label="Language switch">
-        <button class="contractPage__langBtn" type="button" data-culture="en">EN</button>
-        <button class="contractPage__langBtn" type="button" data-culture="de">DE</button>
+
+    <div class="contractTopbar">
+        <!-- ✅ Left side: badge + print -->
+        <div class="contractTopbar__leftActions">
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="btnPrint">
+                @T["contractPage_Print"]
+            </button>
+            <span class="contractTopbar__badge" id="signedBadge">
+                @(Model.IsSigned? T["contractPage_Signed"] : T["contractPage_Unsigned"])
+            </span>
+
+            
+        </div>
+
+        <!-- ✅ Right side: Back (arrow reversed) -->
+        <div class="contractTopbar__rightActions">
+            <a class="btn btn-outline-secondary btn-sm"
+               href="/Projects?openProjectId=@Model.ProjectId&tab=contracts">
+                Back →
+            </a>
+        </div>
     </div>
 
     <div class="contractPage__container">
         <div class="contractPage__paper" id="paper">
-
             <div class="contractPage__contractHtml">
                 @Html.Raw(Model.ContractHtml)
             </div>
-
-            <!-- View only actions (بدون agree وبدون توقيع) -->
-            <div class="contractActions" id="contractActions">
-                <div class="contractActions__right">
-                    <div class="contractActions__badge" id="signedBadge">
-                        @(Model.IsSigned? T["contractPage_Signed"] : T["contractPage_Unsigned"])
-                    </div>
-
-                    <button class="contractActions__btn" type="button" id="btnPrint">@T["contractPage_Print"]</button>
-                </div>
-            </div>
-
         </div>
     </div>
 
@@ -49,15 +97,10 @@
             document.getElementById('btnPrint')?.addEventListener('click', function () {
                 window.print();
             });
-
-            document.querySelectorAll('.contractPage__langBtn').forEach(btn => {
-                btn.addEventListener('click', function () {
-                    const culture = btn.getAttribute('data-culture');
-                    if (!culture) return;
-                    document.cookie = `.AspNetCore.Culture=c=${culture}|uic=${culture}; path=/; max-age=31536000`;
-                    location.reload();
-                });
-            });
         })();
     </script>
 }
+
+
+
+

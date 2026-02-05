@@ -35,7 +35,9 @@ namespace WitcherHub.Pages.Contracts
 
         public bool IsSigned { get; private set; }
         public string? SignedAtIso { get; private set; }
-
+        public Guid ProjectId { get; private set; }
+        public Guid ContractId => Id;
+        public Contract? Contract { get; private set; }
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             if (Id == Guid.Empty) return NotFound();
@@ -51,32 +53,37 @@ namespace WitcherHub.Pages.Contracts
                     .ThenInclude(i => i.Service)
                 .Include(c => c.Signatures)
                 .FirstOrDefaultAsync(c => c.Id == Id, ct);
-
+            
             if (contract is null) return NotFound();
-
+            ProjectId = contract.ProjectId;
+            Contract = contract;
             // Generate terms once if missing (نفس Sign)
             // Generate terms once if missing (same as Sign, but must have line items)
+            // ✅ بدل التوليد التلقائي:
+            if (contract.Items == null || contract.Items.Count == 0)
+            {
+                TempData["Toast.Type"] = "warning";
+                TempData["Toast.Title"] = "Line items required";
+                TempData["Toast.Message"] = "Please add at least one line item first.";
+
+                return RedirectToPage("/Contracts/Items/Create", new
+                {
+                    contractId = contract.Id,
+                    returnTo = "items"
+                });
+
+            }
+
             if (string.IsNullOrWhiteSpace(contract.Terms))
             {
-                // ✅ IMPORTANT: prevent generation when there are no line items
-                if (contract.Items == null || contract.Items.Count == 0)
-                {
-                    TempData["Toast.Type"] = "warning";
-                    TempData["Toast.Title"] = "Line items required";
-                    TempData["Toast.Message"] = "Please add at least one line item before viewing the contract details.";
+                TempData["Toast.Type"] = "info";
+                TempData["Toast.Title"] = "Not generated";
+                TempData["Toast.Message"] = "Contract terms are not generated yet. Click Update Contract from the project.";
 
-                    return RedirectToPage("/Contracts/Items/Create", new { contractId = contract.Id });
-                }
-
-                var req = BuildRequestFromDb(contract);
-                var doc = await _generator.GenerateAsync(req, ct);
-
-                contract.Terms = NormalizeNewLines(doc.FullDocument);
-
-                if (contract.Status == DocumentStatus.Draft)
-                    contract.Status = DocumentStatus.Draft;
-
-                await _db.SaveChangesAsync(ct);
+                // ✅ لا توليد هنا أبداً
+                // خليه يكمل يعرض صفحة فيها رسالة بدل HTML
+                ContractHtml = "<div class='alert alert-info'>Contract is not generated yet.</div>";
+                return Page();
             }
 
 
@@ -104,7 +111,6 @@ namespace WitcherHub.Pages.Contracts
             var sanitizer = new HtmlSanitizer();
             sanitizer.AllowedSchemes.Add("mailto");
             ContractHtml = sanitizer.Sanitize(html);
-
             return Page();
         }
 

@@ -424,3 +424,199 @@
         border-radius: 0;
     }
 }
+/* Contract typography (global-ish, readable, print-friendly) */
+.contractPage__contractHtml {
+    font-size: 15px;
+    line-height: 1.65;
+    color: #111;
+}
+
+    /* Reduce big markdown headings inside the contract HTML */
+    .contractPage__contractHtml h1 {
+        font-size: 28px; /* ~ 21pt */
+        line-height: 1.2;
+        margin: 18px 0 10px;
+        font-weight: 700;
+    }
+
+    .contractPage__contractHtml h2 {
+        font-size: 20px; /* ~ 15pt */
+        line-height: 1.25;
+        margin: 16px 0 8px;
+        font-weight: 700;
+    }
+
+    .contractPage__contractHtml h3 {
+        font-size: 16px; /* ~ 12pt */
+        line-height: 1.3;
+        margin: 12px 0 6px;
+        font-weight: 700;
+    }
+
+    .contractPage__contractHtml h4,
+    .contractPage__contractHtml h5,
+    .contractPage__contractHtml h6 {
+        font-size: 15px;
+        line-height: 1.35;
+        margin: 10px 0 6px;
+        font-weight: 700;
+    }
+
+    /* Paragraphs + lists */
+    .contractPage__contractHtml p {
+        margin: 0 0 10px;
+    }
+
+    .contractPage__contractHtml ul,
+    .contractPage__contractHtml ol {
+        margin: 0 0 10px 18px;
+    }
+
+    .contractPage__contractHtml li {
+        margin: 0 0 6px;
+    }
+
+    /* Make horizontal rules subtle (if any) */
+    .contractPage__contractHtml hr {
+        border: 0;
+        border-top: 1px solid rgba(0,0,0,.12);
+        margin: 14px 0;
+    }
+
+/* Print tuning */
+@media print {
+    .contractPage__contractHtml {
+        font-size: 12pt;
+        line-height: 1.5;
+    }
+
+        .contractPage__contractHtml h1 {
+            font-size: 18pt;
+        }
+
+        .contractPage__contractHtml h2 {
+            font-size: 14pt;
+        }
+
+        .contractPage__contractHtml h3 {
+            font-size: 12pt;
+        }
+}
+.contractTopbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    margin: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,.08);
+    background: rgba(255,255,255,.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+}
+
+.contractTopbar__left,
+.contractTopbar__right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.contractTopbar__btn {
+    border-radius: 999px;
+}
+
+.contractTopbar__lang .btn {
+    border-radius: 999px;
+}
+
+.contractTopbar__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.9);
+    font-size: 12px;
+    font-weight: 600;
+}
+.contractTopbar {
+    position: sticky;
+    top: 12px;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    border-radius: 14px;
+    background: rgba(255,255,255,.88);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0,0,0,.06);
+}
+
+.contractTopbar__left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 320px;
+    text-align: left; /* ✅ */
+}
+
+.contractTopbar__title {
+    font-weight: 800;
+    font-size: 18px; /* ✅ أوضح */
+    line-height: 1.2;
+    width:100%;
+}
+
+.contractTopbar__sub {
+    color: rgba(0,0,0,.55);
+    font-size: 12px;
+    width: 100%;
+}
+
+/* ✅ Status pill داخل النص */
+.statusPill {
+    display: inline-block;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,.10);
+    background: rgba(0,0,0,.04);
+    color: rgba(0,0,0,.75);
+    vertical-align: middle;
+}
+
+/* لو عندك statuses أخرى أضفها */
+.statusPill--draft {
+    background: rgba(13,110,253,.08);
+    border-color: rgba(13,110,253,.22);
+    color: #0d6efd;
+}
+
+.statusPill--signed {
+    background: rgba(25,135,84,.10);
+    border-color: rgba(25,135,84,.25);
+    color: #198754;
+}
+
+.statusPill--sent {
+    background: rgba(255,193,7,.14);
+    border-color: rgba(255,193,7,.25);
+    color: #b58100;
+}
+
+.statusPill--canceled {
+    background: rgba(220,53,69,.10);
+    border-color: rgba(220,53,69,.22);
+    color: #dc3545;
+}

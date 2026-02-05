@@ -51,9 +51,11 @@ namespace WitcherHub.Application.Models.View.Customers
         }
 
 
-        public class CustomerEmailAddressItemView : EmailAddressDto
+        public class CustomerEmailAddressItemView
         {
             public Guid Id { get; set; }
+            public string Kind { get; set; } = "business";
+            public string Email { get; set; } = "";
         }
 
         public class CustomerAddressItemView : AddressDto

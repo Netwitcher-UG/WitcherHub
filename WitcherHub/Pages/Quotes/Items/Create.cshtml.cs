@@ -53,7 +53,8 @@ namespace WitcherHub.Pages.Quotes.Items
 
         [BindProperty]
         public CreateQuoteItemDto Form { get; set; } = new();
-
+        [BindProperty(SupportsGet = true)]
+        public string? ReturnUrl { get; set; }
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             if (QuoteId == Guid.Empty) return NotFound();
@@ -136,7 +137,11 @@ namespace WitcherHub.Pages.Quotes.Items
                 TempData["Toast.Title"] = "Added";
                 TempData["Toast.Message"] = "Line item added.";
 
+                //if (!string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl))
+                //    return LocalRedirect(ReturnUrl);
+
                 return RedirectToPage("/Quotes/Edit", new { id = QuoteId });
+
             }
             catch (Exception ex) when (ex is BadRequestAppException or NotFoundAppException)
             {

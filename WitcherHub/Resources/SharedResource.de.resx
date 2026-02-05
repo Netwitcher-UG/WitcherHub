@@ -138,17 +138,44 @@
   <data name="contractPage_Cleared" xml:space="preserve">
     <value>Unterschriftsfeld geleert</value>
   </data>
+  <data name="contractPage_CustomerParty" xml:space="preserve">
+    <value>Kunde</value>
+  </data>
   <data name="contractPage_CustomerSignature" xml:space="preserve">
     <value>Kundensignatur</value>
   </data>
   <data name="contractPage_ErrEmptyCanvas" xml:space="preserve">
     <value>Bitte zuerst unterschreiben (Feld ist leer)</value>
   </data>
+  <data name="contractPage_ErrFillEmail" xml:space="preserve">
+    <value>Bitte geben Sie Ihre E-Mail-Adresse ein, bevor Sie unterschreiben.</value>
+  </data>
+  <data name="contractPage_ErrFillFields" xml:space="preserve">
+    <value>Bitte füllen Sie Ihren Namen und Ihre E-Mail-Adresse aus, bevor Sie unterschreiben.</value>
+  </data>
+  <data name="contractPage_ErrFillName" xml:space="preserve">
+    <value>Bitte geben Sie Ihren Namen ein, bevor Sie unterschreiben.</value>
+  </data>
+  <data name="contractPage_ErrInvalidEmail" xml:space="preserve">
+    <value>Bitte geben Sie eine gültige E-Mail-Adresse ein.</value>
+  </data>
   <data name="contractPage_ErrMustAgree" xml:space="preserve">
     <value>Bitte zuerst die Zustimmung bestätigen</value>
   </data>
   <data name="contractPage_InfoText" xml:space="preserve">
     <value>Bitte Vertrag prüfen, Zustimmung bestätigen und anschließend unterschreiben</value>
+  </data>
+  <data name="contractPage_LabelDate" xml:space="preserve">
+    <value>Datum</value>
+  </data>
+  <data name="contractPage_LabelEmail" xml:space="preserve">
+    <value>E-Mail</value>
+  </data>
+  <data name="contractPage_LabelName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="contractPage_LabelSignature" xml:space="preserve">
+    <value>Unterschrift</value>
   </data>
   <data name="contractPage_ModalHint" xml:space="preserve">
     <value>Zeichnen Sie Ihre Unterschrift und klicken Sie anschließend auf „Unterschrift bestätigen“.</value>
@@ -162,11 +189,20 @@
   <data name="contractPage_Provider" xml:space="preserve">
     <value>Anbieter</value>
   </data>
+  <data name="contractPage_ProviderParty" xml:space="preserve">
+    <value>Anbieter</value>
+  </data>
+  <data name="contractPage_ProviderSignsInternally" xml:space="preserve">
+    <value>Unterschrift Anbieter erfolgt intern</value>
+  </data>
   <data name="contractPage_Reset" xml:space="preserve">
     <value>Zurücksetzen</value>
   </data>
   <data name="contractPage_SignAccept" xml:space="preserve">
     <value>Unterschreiben &amp; Akzeptieren</value>
+  </data>
+  <data name="contractPage_SignaturesTitle" xml:space="preserve">
+    <value>Unterschriften</value>
   </data>
   <data name="contractPage_SignatureWillAppear" xml:space="preserve">
     <value>Die Unterschrift erscheint hier nach der Bestätigung.</value>
@@ -176,6 +212,9 @@
   </data>
   <data name="contractPage_SignedAt" xml:space="preserve">
     <value>Unterschrieben am</value>
+  </data>
+  <data name="contractPage_SignedAtLabel" xml:space="preserve">
+    <value>Unterzeichnet am</value>
   </data>
   <data name="contractPage_SignedOk" xml:space="preserve">
     <value>Erfolgreich unterschrieben ✅</value>

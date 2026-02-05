@@ -26,6 +26,7 @@ namespace WitcherHub.Application.Models.DTO.Customers
 
     public class EmailAddressDto
     {
+        public Guid? Id { get; set; }
         public string Kind { get; set; } = "business"; // business / private / other
         public string Email { get; set; } = "";
     }

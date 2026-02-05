@@ -1,0 +1,361 @@
+﻿@page
+@model WitcherHub.Pages.Contracts.Items.ManageModel
+@using static WitcherHub.Infrastructure.Data.Models.Enums
+
+@{
+    ViewData["Title"] = "Contract Line Items";
+}
+
+@if (Model.Contract is null)
+{
+    <div class="alert alert-danger">Contract not found.</div>
+    return;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h3 class="mb-1">Contract Line Items</h3>
+        <div class="text-muted small">
+            Contract: <strong>@Model.Contract.ContractNo</strong> |
+            Status: <strong>@Model.Contract.Status</strong> |
+            Currency: <strong>@Model.Contract.Currency</strong>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-secondary"
+           href="/Projects?openProjectId=@Model.Contract.ProjectId&tab=contracts">
+            Back to Project
+        </a>
+
+        <button class="btn btn-outline-primary"
+                type="button"
+                data-bs-toggle="modal"
+                data-bs-target="#addItemModal"
+                @(Model.IsLocked ? "disabled" : "")>
+            + Add Item
+        </button>
+
+        <form method="post" asp-page-handler="GenerateContract" class="d-inline">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="ContractId" value="@Model.ContractId" />
+            <button class="btn btn-primary"
+                    type="submit"
+                    @(Model.IsLocked || (Model.Contract.Items?.Count ?? 0) == 0 ? "disabled" : "")>
+                Generate Contract
+            </button>
+        </form>
+    </div>
+</div>
+
+@if (Model.IsLocked)
+{
+    <div class="alert alert-warning">
+        This contract is locked (signed or not editable). You can view items, but you cannot add/edit/delete.
+    </div>
+}
+
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body">
+        @if ((Model.Contract.Items?.Count ?? 0) == 0)
+        {
+            <div class="alert alert-light border mb-0">
+                No line items yet. Click <strong>Add Item</strong> to create the first one.
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:80px;">#</th>
+                            <th style="width:220px;">Service</th>
+                            <th>Title</th>
+                            <th class="text-end" style="width:140px;">Price</th>
+                            <th style="width:260px;">Config</th>
+                            <th class="text-end" style="width:180px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var it in Model.Contract.Items!.OrderBy(x => x.Position).ThenBy(x => x.Id))
+                        {
+                            var rawJson = it.Config?.RootElement.GetRawText() ?? "{}";
+                            var b64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(rawJson));
+                            <tr>
+                                <td>@it.Position</td>
+                                <td>@(it.ServiceName ?? "—")</td>
+                                <td>@it.Title</td>
+                                <td class="text-end">@((it.AgreedPrice ?? 0m).ToString("0.00"))</td>
+                                <td>
+                                    <code class="small text-muted">@rawJson</code>
+                                </td>
+                                <td class="text-end">
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-primary"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#editItemModal"
+                                            data-item-id="@it.Id"
+                                            data-service-id="@(it.ServiceId?.ToString() ?? "")"
+                                            data-title="@it.Title"
+                                            data-price="@(it.AgreedPrice?.ToString() ?? "")"
+                                            data-position="@it.Position"
+                                            data-config-b64="@b64"
+                                            @(Model.IsLocked ? "disabled" : "")>
+                                        Edit
+                                    </button>
+
+                                    <form method="post" asp-page-handler="DeleteItem" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="ContractId" value="@Model.ContractId" />
+                                        <input type="hidden" name="ItemId" value="@it.Id" />
+                                        <button type="submit"
+                                                class="btn btn-sm btn-outline-danger"
+                                                data-confirm="Are you sure you want to delete this item?"
+                                                @(Model.IsLocked ? "disabled" : "")>
+                                            Delete
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- ========================= Add Item Modal ========================= -->
+<div class="modal fade" id="addItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content rounded-4">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Line Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <form method="post" asp-page-handler="CreateItem">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <input type="hidden" name="ContractId" value="@Model.ContractId" />
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Find service</label>
+                            <div class="input-group">
+                                <span class="input-group-text">🔎</span>
+                                <input class="form-control" id="addServiceFilter" placeholder="Type to filter services..." />
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label">Service</label>
+                            <select class="form-select" id="addServiceSelect" name="CreateServiceId" asp-items="Model.ServiceOptions"></select>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label">Title</label>
+                            <input class="form-control" name="CreateTitle" placeholder="Line item title" />
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <label class="form-label">Agreed Price</label>
+                            <input class="form-control" name="CreateAgreedPrice" placeholder="0.00" />
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <label class="form-label">Position</label>
+                            <input class="form-control" name="CreatePosition" value="@Model.NextPosition" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Config (JSON)</label>
+                            <div class="d-flex justify-content-end">
+                                <button class="btn btn-sm btn-outline-secondary" type="button" onclick="formatJson('addCfg')">Format</button>
+                            </div>
+                            <textarea class="form-control mt-2" rows="7" name="CreateConfigJson" id="addCfg">{}</textarea>
+                            <div class="form-text">Example: {"hours": 12, "rush": true}</div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary" type="submit" @(Model.IsLocked ? "disabled" : "")>Add</button>
+                    <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+<!-- ========================= Edit Item Modal ========================= -->
+<div class="modal fade" id="editItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content rounded-4">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Line Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <form method="post" asp-page-handler="UpdateItem">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <input type="hidden" name="ContractId" value="@Model.ContractId" />
+                    <input type="hidden" name="EditItemId" id="editItemId" />
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Find service</label>
+                            <div class="input-group">
+                                <span class="input-group-text">🔎</span>
+                                <input class="form-control" id="editServiceFilter" placeholder="Type to filter services..." />
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label">Service</label>
+                            <select class="form-select" id="editServiceSelect" name="EditServiceId" asp-items="Model.ServiceOptions"></select>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label">Title</label>
+                            <input class="form-control" name="EditTitle" id="editTitle" placeholder="Line item title" />
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <label class="form-label">Agreed Price</label>
+                            <input class="form-control" name="EditAgreedPrice" id="editPrice" placeholder="0.00" />
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <label class="form-label">Position</label>
+                            <input class="form-control" name="EditPosition" id="editPosition" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Config (JSON)</label>
+                            <div class="d-flex justify-content-end">
+                                <button class="btn btn-sm btn-outline-secondary" type="button" onclick="formatJson('editCfg')">Format</button>
+                            </div>
+                            <textarea class="form-control mt-2" rows="7" name="EditConfigJson" id="editCfg">{}</textarea>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary" type="submit" @(Model.IsLocked ? "disabled" : "")>Save</button>
+                    <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function formatJson(textareaId) {
+            const el = document.getElementById(textareaId);
+            if (!el) return;
+            try {
+                const obj = JSON.parse(el.value || "{}");
+                el.value = JSON.stringify(obj, null, 2);
+            } catch {
+                alert("Invalid JSON. Please fix it first.");
+            }
+        }
+
+        function setupFilter(filterId, selectId) {
+            const filter = document.getElementById(filterId);
+            const select = document.getElementById(selectId);
+            if (!filter || !select) return;
+
+            const options = Array.from(select.options);
+            function apply() {
+                const q = (filter.value || '').trim().toLowerCase();
+                options.forEach(o => {
+                    const t = (o.text || '').toLowerCase();
+                    o.hidden = (!!q && !t.includes(q));
+                });
+                const sel = select.options[select.selectedIndex];
+                if (sel) sel.hidden = false;
+            }
+            filter.addEventListener('input', apply);
+        }
+
+        setupFilter('addServiceFilter', 'addServiceSelect');
+        setupFilter('editServiceFilter', 'editServiceSelect');
+
+        // confirm delete
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('button[data-confirm]');
+            if (!btn) return;
+            const msg = btn.getAttribute('data-confirm') || 'Confirm?';
+            if (!confirm(msg)) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+
+        // fill edit modal
+        const editModal = document.getElementById('editItemModal');
+        if (editModal) {
+            editModal.addEventListener('show.bs.modal', function (ev) {
+                const trigger = ev.relatedTarget;
+                if (!trigger) return;
+
+                const itemId = trigger.getAttribute('data-item-id') || '';
+                const serviceId = trigger.getAttribute('data-service-id') || '';
+                const title = trigger.getAttribute('data-title') || '';
+                const price = trigger.getAttribute('data-price') || '';
+                const position = trigger.getAttribute('data-position') || '';
+                const cfgB64 = trigger.getAttribute('data-config-b64') || '';
+
+                document.getElementById('editItemId').value = itemId;
+                document.getElementById('editTitle').value = title;
+                document.getElementById('editPrice').value = price;
+                document.getElementById('editPosition').value = position;
+
+                const sel = document.getElementById('editServiceSelect');
+                if (sel) sel.value = serviceId;
+
+                try {
+                    const jsonText = atob(cfgB64 || '');
+                    document.getElementById('editCfg').value = jsonText || "{}";
+                } catch {
+                    document.getElementById('editCfg').value = "{}";
+                }
+            });
+        }
+    </script>
+    <script>
+                (function () {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('toast') !== 'noItems') return;
+
+            // ✅ safety: امسح أي توست محفوظ من قبل
+            try { sessionStorage.removeItem('vc.toast.afterReload'); } catch { }
+
+            const title = 'Next step';
+            const msg = 'You were redirected here because this contract has no line items yet. Please add at least one line item to continue.';
+
+            const ui = window.UI || {};
+            const toast = ui.toast || {};
+
+            if (toast.info) toast.info(msg, title);
+            else alert(title + ': ' + msg);
+
+            params.delete('toast');
+            const qs = params.toString();
+            const newUrl = window.location.pathname + (qs ? ('?' + qs) : '');
+            window.history.replaceState({}, document.title, newUrl);
+        })();
+
+
+    </script>
+
+}

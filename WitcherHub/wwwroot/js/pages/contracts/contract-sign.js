@@ -33,24 +33,37 @@
     if (!chkAgree || !btnOpen || !sigModal || !canvas || !customerName || !signEndpoint) return;
 
     const ctx = canvas.getContext("2d");
+    function setCulture(culture) {
+        document.cookie = `.AspNetCore.Culture=c=${culture}|uic=${culture}; path=/; samesite=lax`;
+        location.reload();
+    }
+
+    document.querySelectorAll(".contractPage__langBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const c = btn.getAttribute("data-culture");
+            if (c) setCulture(c);
+        });
+    });
 
     function formatSignedAt(iso) {
         try {
             const d = new Date(iso);
-            return d.toLocaleString(document.documentElement.lang || undefined, {
+            return new Intl.DateTimeFormat("de-DE", {
                 year: "numeric", month: "2-digit", day: "2-digit",
                 hour: "2-digit", minute: "2-digit"
-            });
+            }).format(d);
         } catch { return iso; }
     }
+
     function formatDateOnly(iso) {
         try {
             const d = new Date(iso);
-            return d.toLocaleDateString(document.documentElement.lang || undefined, {
+            return new Intl.DateTimeFormat("de-DE", {
                 year: "numeric", month: "2-digit", day: "2-digit"
-            });
+            }).format(d);
         } catch { return ""; }
     }
+
 
     function hideToast() {
         if (!toast) return;
@@ -95,7 +108,8 @@
 
     function canSignNow() {
         const nameOk = (customerName.value || "").trim().length > 0;
-        return chkAgree.checked && nameOk && !serverState.isSigned;
+        const emailOk = (customerEmail?.value || "").trim().length > 0;
+        return chkAgree.checked && nameOk && emailOk && !serverState.isSigned;
     }
 
     function refreshSignButton() {
@@ -103,7 +117,7 @@
     }
 
     function setSignedUI(whenIso, dataUrl) {
-        if (sigImage) {
+        if (sigImage && dataUrl) {
             sigImage.src = dataUrl;
             sigImage.style.display = "block";
         }
@@ -117,10 +131,21 @@
             signedBadge.classList.add("signed");
         }
 
+        // lock everything
         customerName.readOnly = true;
         if (customerEmail) customerEmail.readOnly = true;
+
+        chkAgree.checked = true;
         chkAgree.disabled = true;
-        btnOpen.disabled = true;
+
+        if (btnOpen) btnOpen.style.display = "none";
+        if (btnReset) btnReset.style.display = "none";
+
+        // prevent modal open
+        if (sigBoxClick) {
+            sigBoxClick.style.pointerEvents = "none";
+            sigBoxClick.setAttribute("aria-disabled", "true");
+        }
 
         serverState.isSigned = true;
     }
@@ -142,11 +167,21 @@
 
         customerName.readOnly = false;
         if (customerEmail) customerEmail.readOnly = false;
+
         chkAgree.disabled = false;
+
+        if (btnOpen) btnOpen.style.display = "";
+        if (btnReset) btnReset.style.display = "";
+
+        if (sigBoxClick) {
+            sigBoxClick.style.pointerEvents = "";
+            sigBoxClick.removeAttribute("aria-disabled");
+        }
 
         serverState.isSigned = false;
         refreshSignButton();
     }
+
 
     function resizeCanvas() {
         const ratio = window.devicePixelRatio || 1;
@@ -197,6 +232,20 @@
             return;
         }
 
+        const email = (customerEmail?.value || "").trim();
+        if (!email) {
+            showToast(i18n.fillEmail || "Please enter your email before signing", true);
+            customerEmail?.focus();
+            return;
+        }
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            showToast(i18n.invalidEmail || "Please enter a valid email address", true);
+            customerEmail?.focus();
+            return;
+        }
+
+
         sigModal.style.display = "block";
         sigModal.setAttribute("aria-hidden", "false");
         document.body.style.overflow = "hidden";
@@ -235,9 +284,16 @@
         try { json = await res.json(); } catch { }
 
         if (!res.ok || !json || json.ok !== true) {
-            const msg = (json && json.message) ? json.message : ("HTTP " + res.status);
+            const code = json && json.code ? json.code : "";
+            const msg =
+                (code === "FIELDS_REQUIRED") ? (i18n.fillFields || "Please fill name and email before signing") :
+                    (code === "INVALID_EMAIL") ? (i18n.invalidEmail || "Please enter a valid email address") :
+                        (json && json.message) ? json.message :
+                            ("HTTP " + res.status);
+
             throw new Error(msg);
         }
+
 
         return json;
     }
@@ -341,12 +397,12 @@
 
     // Reset is UI-only now (does NOT delete from DB)
     btnReset?.addEventListener("click", () => {
-        if (serverState.isSigned) {
-            showToast("This contract is already signed. Reset is disabled.", true);
-            return;
-        }
-        customerName.value = "";
-        if (customerEmail) customerEmail.value = "";
+        if (serverState.isSigned) return;
+
+        // restore prefill from server
+        customerName.value = serverState.signerName || "";
+        if (customerEmail) customerEmail.value = serverState.signerEmail || "";
+
         chkAgree.checked = false;
         setUnsignedUI();
         hideToast();

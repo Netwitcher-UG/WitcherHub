@@ -43,29 +43,142 @@ namespace WitcherHub.Pages.Contracts
         public string? SignerNamePrefill { get; private set; }
         public string? SignerEmailPrefill { get; private set; }
 
+        //public async Task<IActionResult> OnGetAsync(CancellationToken ct)
+        //{
+        //    if (Id == Guid.Empty) return NotFound();
+
+        //    var contract = await _db.Contracts
+        //        .Include(c => c.Project)
+        //            .ThenInclude(p => p.Customer)
+        //                .ThenInclude(cu => cu.Addresses)
+        //        .Include(c => c.Project)
+        //            .ThenInclude(p => p.Customer)
+        //                .ThenInclude(cu => cu.EmailAddresses)
+        //        .Include(c => c.Items)
+        //            .ThenInclude(i => i.Service)
+        //        .Include(c => c.Signatures)
+        //        .FirstOrDefaultAsync(c => c.Id == Id, ct);
+
+        //    if (contract is null) return NotFound();
+
+        //    // Provider block split
+        //    var pb = NormalizeNewLines(_opt.ProviderBlock ?? "");
+        //    var lines = pb.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        //    ProviderName = lines.Length > 0 ? lines[0] : "";
+        //    ProviderAddress = lines.Length > 1 ? string.Join("\n", lines.Skip(1)) : "";
+
+        //    // Prefill from customer
+        //    var customer = contract.Project.Customer;
+        //    SignerNamePrefill = customer.Name;
+
+        //    var email =
+        //        customer.Contacts?
+        //            .OrderByDescending(c => c.IsPrimary)
+        //            .Select(c => c.Email)
+        //            .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e))
+        //        ?? customer.EmailAddresses?
+        //            .Where(ea => ea.Kind == "business")
+        //            .Select(ea => ea.Email)
+        //            .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e))
+        //        ?? customer.EmailAddresses?
+        //            .Select(ea => ea.Email)
+        //            .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
+        //    SignerEmailPrefill = email;
+
+        //    // If not generated yet: generate once and store in Contract.Terms
+        //    if (string.IsNullOrWhiteSpace(contract.Terms))
+        //    {
+        //        var req = BuildRequestFromDb(contract);
+        //        if (contract.Items == null || contract.Items.Count == 0)
+        //        {
+        //            TempData["Toast.Type"] = "warning";
+        //            TempData["Toast.Title"] = "Line items required";
+        //            TempData["Toast.Message"] = "Please add at least one line item before signing.";
+
+        //            return RedirectToPage("/Contracts/Items/Create", new { contractId = contract.Id });
+        //        }
+        //        var doc = await _generator.GenerateAsync(req, ct);
+
+        //        contract.Terms = NormalizeNewLines(doc.FullDocument);
+
+        //        // optional: when generated we can mark as Sent later when you implement "Send"
+        //        if (contract.Status == DocumentStatus.Draft)
+        //            contract.Status = DocumentStatus.Draft;
+
+        //        await _db.SaveChangesAsync(ct);
+        //    }
+
+        //    // Existing signature (latest)
+        //    var sig = contract.Signatures
+        //        .OrderByDescending(s => s.CreatedAt)
+        //        .FirstOrDefault();
+
+        //    if (sig is not null && sig.SignedAt is not null)
+        //    {
+        //        IsSigned = true;
+        //        SignedAtIso = sig.SignedAt.Value.UtcDateTime.ToString("o");
+
+        //        if (sig.SignatureData is not null &&
+        //            sig.SignatureData.RootElement.TryGetProperty("dataUrl", out var p) &&
+        //            p.ValueKind == JsonValueKind.String)
+        //        {
+        //            SignatureDataUrl = p.GetString();
+        //        }
+
+        //        // prefer signed name/email if present
+        //        if (!string.IsNullOrWhiteSpace(sig.SignerName)) SignerNamePrefill = sig.SignerName;
+        //        if (!string.IsNullOrWhiteSpace(sig.SignerEmail)) SignerEmailPrefill = sig.SignerEmail;
+        //    }
+
+        //    // Markdown -> HTML
+        //    var markdown = NormalizeNewLines(contract.Terms ?? "");
+        //    var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+        //    var html = Markdown.ToHtml(markdown, pipeline);
+
+        //    var sanitizer = new HtmlSanitizer();
+        //    sanitizer.AllowedSchemes.Add("mailto");
+        //    ContractHtml = sanitizer.Sanitize(html);
+
+        //    return Page();
+        //}
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
-            if (Id == Guid.Empty) return NotFound();
-
-            var contract = await _db.Contracts
+            var q = _db.Contracts
                 .Include(c => c.Project)
                     .ThenInclude(p => p.Customer)
                         .ThenInclude(cu => cu.Addresses)
                 .Include(c => c.Project)
                     .ThenInclude(p => p.Customer)
                         .ThenInclude(cu => cu.EmailAddresses)
+                .Include(c => c.Project)
+                    .ThenInclude(p => p.Customer)
+                        .ThenInclude(cu => cu.Contacts)
                 .Include(c => c.Items)
                     .ThenInclude(i => i.Service)
                 .Include(c => c.Signatures)
-                .FirstOrDefaultAsync(c => c.Id == Id, ct);
+                .AsQueryable();
+
+            Contract? contract;
+
+            if (Id == Guid.Empty)
+            {
+                contract = await q
+                    .OrderByDescending(c => c.CreatedAt)
+                    .FirstOrDefaultAsync(ct);
+                if (contract != null) Id = contract.Id;
+            }
+            else
+            {
+                contract = await q.FirstOrDefaultAsync(c => c.Id == Id, ct);
+            }
 
             if (contract is null) return NotFound();
 
             // Provider block split
             var pb = NormalizeNewLines(_opt.ProviderBlock ?? "");
-            var lines = pb.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            ProviderName = lines.Length > 0 ? lines[0] : "";
-            ProviderAddress = lines.Length > 1 ? string.Join("\n", lines.Skip(1)) : "";
+            var linesPb = pb.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            ProviderName = linesPb.Length > 0 ? linesPb[0] : "";
+            ProviderAddress = linesPb.Length > 1 ? string.Join("\n", linesPb.Skip(1)) : "";
 
             // Prefill from customer
             var customer = contract.Project.Customer;
@@ -83,25 +196,25 @@ namespace WitcherHub.Pages.Contracts
                 ?? customer.EmailAddresses?
                     .Select(ea => ea.Email)
                     .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
+
             SignerEmailPrefill = email;
 
-            // If not generated yet: generate once and store in Contract.Terms
+            // Generate once and store in Contract.Terms
             if (string.IsNullOrWhiteSpace(contract.Terms))
             {
-                var req = BuildRequestFromDb(contract);
                 if (contract.Items == null || contract.Items.Count == 0)
                 {
                     TempData["Toast.Type"] = "warning";
                     TempData["Toast.Title"] = "Line items required";
                     TempData["Toast.Message"] = "Please add at least one line item before signing.";
-
                     return RedirectToPage("/Contracts/Items/Create", new { contractId = contract.Id });
                 }
+
+                var req = BuildRequestFromDb(contract);
                 var doc = await _generator.GenerateAsync(req, ct);
 
                 contract.Terms = NormalizeNewLines(doc.FullDocument);
 
-                // optional: when generated we can mark as Sent later when you implement "Send"
                 if (contract.Status == DocumentStatus.Draft)
                     contract.Status = DocumentStatus.Draft;
 
@@ -109,14 +222,25 @@ namespace WitcherHub.Pages.Contracts
             }
 
             // Existing signature (latest)
+            // Signed state from contract itself (even if signature row missing)
+            if (contract.Status == DocumentStatus.Signed || contract.SignedAt is not null)
+            {
+                IsSigned = true;
+                SignedAtIso = (contract.SignedAt ?? DateTimeOffset.UtcNow).UtcDateTime.ToString("o");
+            }
+
+            // Existing signature (latest) - for image + signed name/email
             var sig = contract.Signatures
                 .OrderByDescending(s => s.CreatedAt)
                 .FirstOrDefault();
 
-            if (sig is not null && sig.SignedAt is not null)
+            if (sig is not null)
             {
-                IsSigned = true;
-                SignedAtIso = sig.SignedAt.Value.UtcDateTime.ToString("o");
+                if (sig.SignedAt is not null)
+                {
+                    IsSigned = true;
+                    SignedAtIso = sig.SignedAt.Value.UtcDateTime.ToString("o");
+                }
 
                 if (sig.SignatureData is not null &&
                     sig.SignatureData.RootElement.TryGetProperty("dataUrl", out var p) &&
@@ -125,10 +249,10 @@ namespace WitcherHub.Pages.Contracts
                     SignatureDataUrl = p.GetString();
                 }
 
-                // prefer signed name/email if present
                 if (!string.IsNullOrWhiteSpace(sig.SignerName)) SignerNamePrefill = sig.SignerName;
                 if (!string.IsNullOrWhiteSpace(sig.SignerEmail)) SignerEmailPrefill = sig.SignerEmail;
             }
+
 
             // Markdown -> HTML
             var markdown = NormalizeNewLines(contract.Terms ?? "");
@@ -142,32 +266,46 @@ namespace WitcherHub.Pages.Contracts
             return Page();
         }
 
+
         public async Task<IActionResult> OnPostSignAsync(CancellationToken ct)
         {
-            if (Id == Guid.Empty) return new JsonResult(new { ok = false, message = "Invalid contract id." }) { StatusCode = 400 };
+            if (Id == Guid.Empty)
+                return new JsonResult(new { ok = false, message = "Invalid contract id." }) { StatusCode = 400 };
 
             var signerName = (Request.Form["SignerName"].ToString() ?? "").Trim();
             var signerEmail = (Request.Form["SignerEmail"].ToString() ?? "").Trim();
             var signatureDataUrl = (Request.Form["SignatureDataUrl"].ToString() ?? "").Trim();
 
-            if (string.IsNullOrWhiteSpace(signerName))
-                return new JsonResult(new { ok = false, message = "Signer name is required." }) { StatusCode = 400 };
+            if (string.IsNullOrWhiteSpace(signerName) || string.IsNullOrWhiteSpace(signerEmail))
+                return new JsonResult(new { ok = false, code = "FIELDS_REQUIRED" }) { StatusCode = 400 };
+
+            if (!System.Text.RegularExpressions.Regex.IsMatch(signerEmail, @"^[^\s@]+@[^\s@]+\.[^\s@]+$"))
+                return new JsonResult(new { ok = false, code = "INVALID_EMAIL" }) { StatusCode = 400 };
 
             if (string.IsNullOrWhiteSpace(signatureDataUrl) || !signatureDataUrl.StartsWith("data:image/"))
                 return new JsonResult(new { ok = false, message = "Invalid signature data." }) { StatusCode = 400 };
 
-            var contract = await _db.Contracts
-                .Include(c => c.Signatures)
-                .FirstOrDefaultAsync(c => c.Id == Id, ct);
-
-            if (contract is null)
-                return new JsonResult(new { ok = false, message = "Contract not found." }) { StatusCode = 404 };
-
-            if (contract.Status == DocumentStatus.Signed || contract.SignedAt is not null)
-                return new JsonResult(new { ok = false, message = "Contract already signed." }) { StatusCode = 409 };
-
             var now = DateTimeOffset.UtcNow;
 
+            // 1) Update contract atomically (no tracking / no concurrency token issues)
+            var updated = await _db.Contracts
+                .Where(c => c.Id == Id && c.SignedAt == null && c.Status != DocumentStatus.Signed)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(c => c.SignedAt, now)
+                    .SetProperty(c => c.Status, DocumentStatus.Signed),
+                    ct);
+
+            if (updated == 0)
+            {
+                // either not found OR already signed
+                var exists = await _db.Contracts.AnyAsync(c => c.Id == Id, ct);
+                if (!exists)
+                    return new JsonResult(new { ok = false, message = "Contract not found." }) { StatusCode = 404 };
+
+                return new JsonResult(new { ok = false, message = "Contract already signed." }) { StatusCode = 409 };
+            }
+
+            // 2) Insert signature row
             var payload = JsonSerializer.SerializeToDocument(new
             {
                 dataUrl = signatureDataUrl,
@@ -175,17 +313,14 @@ namespace WitcherHub.Pages.Contracts
                 signedAt = now.UtcDateTime.ToString("o")
             });
 
-            contract.Signatures.Add(new ContractSignature
+            _db.ContractSignatures.Add(new ContractSignature
             {
-                ContractId = contract.Id,
+                ContractId = Id,
                 SignerName = signerName,
                 SignerEmail = string.IsNullOrWhiteSpace(signerEmail) ? null : signerEmail,
                 SignedAt = now,
                 SignatureData = payload
             });
-
-            contract.SignedAt = now;
-            contract.Status = DocumentStatus.Signed;
 
             await _db.SaveChangesAsync(ct);
 
@@ -195,6 +330,7 @@ namespace WitcherHub.Pages.Contracts
                 signedAtIso = now.UtcDateTime.ToString("o")
             });
         }
+
 
         private GenerateContractDocumentRequest BuildRequestFromDb(Contract contract)
         {
