@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
 using WitcherHub.Application.Models.DTO.Services;
+using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Application.Validators.Services
 {
@@ -19,7 +20,19 @@ namespace WitcherHub.Application.Validators.Services
             When(x => x.PricingRules is not null && x.PricingRules.Count > 0, () =>
             {
                 RuleForEach(x => x.PricingRules).SetValidator(new PricingRuleDtoValidator());
+
+                RuleFor(x => x.PricingRules)
+              .Must(HaveUniquePriorities)
+              .WithMessage("Priority must be unique per service (duplicates found).");
             });
+        }
+
+        private static bool HaveUniquePriorities(IReadOnlyCollection<PricingRuleDto>? rules)
+        {
+            if (rules is null || rules.Count == 0) return true;
+
+            var priorities = rules.Select(r => r.Priority).ToList();
+            return priorities.Distinct().Count() == priorities.Count;
         }
     }
 
@@ -92,10 +105,6 @@ namespace WitcherHub.Application.Validators.Services
                 .NotEmpty()
                 .MaximumLength(2000);
 
-            RuleFor(x => x.Label)
-                .MaximumLength(200)
-                .When(x => !string.IsNullOrWhiteSpace(x.Label));
-
             RuleFor(x => x.Scope)
                 .NotEmpty()
                 .MaximumLength(30)
@@ -105,6 +114,47 @@ namespace WitcherHub.Application.Validators.Services
             RuleFor(x => x)
                 .Must(x => x.ValidFrom is null || x.ValidTo is null || x.ValidFrom <= x.ValidTo)
                 .WithMessage("ValidFrom must be <= ValidTo.");
+
+            // ✅ أهم جزء: Expression + Action-based validation
+            RuleFor(x => x).Custom((rule, ctx) =>
+            {
+                // 1) ConditionExpr لازم يكون Expression صالح
+                if (!JsExprGuard.TryParseExpression(rule.ConditionExpr, out var condErr))
+                    ctx.AddFailure(nameof(rule.ConditionExpr), $"Invalid ConditionExpr: {condErr}");
+
+                // 2) ValueExpr حسب Action
+                if (rule.Action == RuleAction.Discount)
+                {
+                    // Discount عندك بالداتا: 0.10 = 10%
+                    if (!JsExprGuard.TryParseDecimalLiteral(rule.ValueExpr, out var d))
+                    {
+                        ctx.AddFailure(nameof(rule.ValueExpr),
+                            "Discount ValueExpr must be a numeric literal like 0.10 (10%).");
+                        return;
+                    }
+
+                    // منع 0 أو قيم سالبة أو أكبر من 1
+                    if (d <= 0 || d > 1)
+                    {
+                        ctx.AddFailure(nameof(rule.ValueExpr),
+                            "Discount must be > 0 and <= 1 (e.g. 0.10 = 10%).");
+                    }
+                }
+                else
+                {
+                    // باقي الـ actions: ValueExpr غالبًا expression (أو رقم literal) => نتحقق syntax
+                    if (!JsExprGuard.TryParseExpression(rule.ValueExpr, out var valErr))
+                        ctx.AddFailure(nameof(rule.ValueExpr), $"Invalid ValueExpr: {valErr}");
+
+                    // (اختياري) إذا Multiply وكان literal، امنعي <=0 لأنه خطر
+                    if (rule.Action == RuleAction.Multiply &&
+                        JsExprGuard.TryParseDecimalLiteral(rule.ValueExpr, out var m) &&
+                        m <= 0)
+                    {
+                        ctx.AddFailure(nameof(rule.ValueExpr), "Multiply factor must be > 0.");
+                    }
+                }
+            });
         }
     }
 

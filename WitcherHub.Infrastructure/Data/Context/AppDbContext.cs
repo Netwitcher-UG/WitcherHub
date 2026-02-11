@@ -274,6 +274,10 @@ namespace WitcherHub.Infrastructure.Data.Context
                 .HasIndex(x => new { x.ContractId, x.RecipientEmail });
 
 
+            b.Entity<PricingRule>()
+                .HasIndex(x => new { x.ServiceId, x.Priority })
+                .IsUnique();
+
             // =========================
             // Enums -> string (مهم)
             // =========================
