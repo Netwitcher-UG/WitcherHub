@@ -32,6 +32,8 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgssapi-krb5-2 libkrb5-3 \
+    libfontconfig1 libfreetype6 \
+    libx11-6 libxext6 libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=publish /app/publish .

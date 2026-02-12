@@ -37,8 +37,12 @@ namespace WitcherHub.Infrastructure.Services.Email_Sender.Sender
             await client.SendAsync(mime, ct);
             await client.DisconnectAsync(true, ct);
 
-            _logger.LogInformation("Email sent (BCC count: {Count}). Subject: {Subject}",
-                message.Bcc?.Count ?? 0, message.Subject);
+            var attCount = message.Attachments?.Count ?? 0;
+            var attBytes = message.Attachments?.Sum(a => a.Content?.Length ?? 0) ?? 0;
+
+            _logger.LogInformation(
+                "Email sent (BCC count: {BccCount}). Attachments: {AttCount} (bytes: {AttBytes}). Subject: {Subject}",
+                message.Bcc?.Count ?? 0, attCount, attBytes, message.Subject);
         }
 
         private MimeMessage BuildMimeMessage(EmailMessage msg)

@@ -1,3 +1,5 @@
+using DinkToPdf;
+using DinkToPdf.Contracts;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -33,6 +35,7 @@ using WitcherHub.Infrastructure.Services.Email_Sender.Sender;
 using WitcherHub.Infrastructure.Services.HostedServices;
 using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Infrastructure.Services.OpenAI;
+using WitcherHub.Infrastructure.Services.Pdf;
 
 namespace WitcherHub.Infrastructure
 {
@@ -149,7 +152,8 @@ namespace WitcherHub.Infrastructure
     configuration.GetSection(ContractTemplateOptions.SectionName));
 
             services.AddScoped<IContractDocumentGenerator, ContractDocumentGenerator>();
-
+            services.AddSingleton<IConverter>(new SynchronizedConverter(new PdfTools()));
+            services.AddSingleton<IPdfGenerator, DinkToPdfGenerator>();
             return services;
         }
     }

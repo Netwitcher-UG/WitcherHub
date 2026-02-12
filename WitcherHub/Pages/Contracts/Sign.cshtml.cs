@@ -6,7 +6,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using WitcherHub.Application.Interfaces;
+using WitcherHub.Application.Interfaces.Email;
 using WitcherHub.Application.Models.DTO.Contracts;
+using WitcherHub.Application.Models.Email;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
 using WitcherHub.Infrastructure.Services.Contracts;
@@ -19,13 +21,29 @@ namespace WitcherHub.Pages.Contracts
         private readonly AppDbContext _db;
         private readonly IContractDocumentGenerator _generator;
         private readonly ContractTemplateOptions _opt;
+        private readonly IEmailTemplateRenderer _templates;
+        private readonly IEmailSender _emailSender;
+        private readonly ILogger<SignModel> _logger;
+        private readonly IPdfGenerator _pdf;
 
-        public SignModel(AppDbContext db, IContractDocumentGenerator generator, IOptions<ContractTemplateOptions> opt)
+        public SignModel(
+    AppDbContext db,
+    IContractDocumentGenerator generator,
+    IOptions<ContractTemplateOptions> opt,
+    IEmailTemplateRenderer templates,
+    IEmailSender emailSender,
+    ILogger<SignModel> logger,
+    IPdfGenerator pdf)
         {
             _db = db;
             _generator = generator;
             _opt = opt.Value;
+            _templates = templates;
+            _emailSender = emailSender;
+            _logger = logger;
+            _pdf = pdf;
         }
+
 
         [BindProperty(SupportsGet = true)]
         public Guid Id { get; set; }
@@ -171,18 +189,25 @@ namespace WitcherHub.Pages.Contracts
 
         public async Task<IActionResult> OnPostSignAsync([FromQuery(Name = "t")] string? t, CancellationToken ct)
         {
-            if (Id == Guid.Empty) return new JsonResult(new { ok = false, message = "Invalid contract id." }) { StatusCode = 400 };
-            if (string.IsNullOrWhiteSpace(t)) return new JsonResult(new { ok = false, message = "Unauthorized." }) { StatusCode = 401 };
+            if (Id == Guid.Empty)
+                return new JsonResult(new { ok = false, message = "Invalid contract id." }) { StatusCode = 400 };
 
-            Token = t;
-            var tokenHash = ContractAccessLink.HashToken(Token.Trim());
-            var linkOk = await _db.ContractAccessLinks.AnyAsync(x =>
-                x.ContractId == Id &&
-                x.TokenHash == tokenHash &&
-                x.RevokedAtUtc == null &&
-                x.ExpiresAt > DateTimeOffset.UtcNow, ct);
+            if (string.IsNullOrWhiteSpace(t))
+                return new JsonResult(new { ok = false, message = "Unauthorized." }) { StatusCode = 401 };
 
-            if (!linkOk) return new JsonResult(new { ok = false, message = "Unauthorized." }) { StatusCode = 401 };
+            Token = t.Trim();
+            var tokenHash = ContractAccessLink.HashToken(Token);
+
+            var link = await _db.ContractAccessLinks
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.ContractId == Id &&
+                    x.TokenHash == tokenHash &&
+                    x.RevokedAtUtc == null &&
+                    x.ExpiresAt > DateTimeOffset.UtcNow, ct);
+
+            if (link is null)
+                return new JsonResult(new { ok = false, message = "Unauthorized." }) { StatusCode = 401 };
 
             var signerName = (Request.Form["SignerName"].ToString() ?? "").Trim();
             var signerEmail = (Request.Form["SignerEmail"].ToString() ?? "").Trim();
@@ -231,7 +256,178 @@ namespace WitcherHub.Pages.Contracts
 
             await _db.SaveChangesAsync(ct);
 
+            // ✅ إشعار: الإيميل لازم ينرسل حتى لو الـ PDF فشل
+            try
+            {
+                var info = await _db.Contracts
+                    .AsNoTracking()
+                    .Include(c => c.Project)
+                    .FirstOrDefaultAsync(c => c.Id == Id, ct);
+
+                var contractNo = info?.ContractNo ?? Id.ToString();
+                var projectTitle = info?.Project?.Title ?? "Project";
+                var termsMarkdown = info?.Terms ?? "";
+
+                var actionUrl = Url.Page(
+                    pageName: "/Contracts/Sign",
+                    pageHandler: null,
+                    values: new { id = Id, t = Token },
+                    protocol: Request.Scheme,
+                    host: Request.Host.ToUriComponent()
+                );
+
+                var subject = $"Vertrag {contractNo} – erfolgreich unterschrieben";
+
+                var html = await _templates.RenderAsync("ContractSigned.de", new
+                {
+                    Subject = subject,
+                    UserName = signerName,
+                    ContractNo = contractNo,
+                    ProjectTitle = projectTitle,
+                    SignedAt = now.ToLocalTime().ToString("dd.MM.yyyy HH:mm"),
+                    ActionUrl = actionUrl
+                }, ct);
+
+                byte[]? pdfBytes = null;
+                string? pdfError = null;
+
+                // ✅ PDF لوحده (لو فشل ما يمنع الإيميل)
+                try
+                {
+                    var pdfHtml = BuildSignedPdfHtml(
+                        contractNo: contractNo,
+                        projectTitle: projectTitle,
+                        termsMarkdown: termsMarkdown,
+                        signerName: signerName,
+                        signerEmail: signerEmail,
+                        signedAt: now,
+                        signatureDataUrl: signatureDataUrl
+                    );
+
+                    _logger.LogInformation("PDF HTML length={Len}. ContractId={ContractId}", pdfHtml.Length, Id);
+
+                    pdfBytes = _pdf.FromHtml(pdfHtml, $"Vertrag {contractNo}");
+
+                    _logger.LogInformation("PDF generated bytes={Bytes}. ContractId={ContractId}",
+                        pdfBytes?.Length ?? 0, Id);
+
+                    if (pdfBytes is { Length: 0 }) pdfBytes = null;
+                }
+                catch (Exception exPdf)
+                {
+                    pdfError = exPdf.ToString();
+                    _logger.LogError(exPdf, "PDF generation failed. ContractId={ContractId}", Id);
+                    pdfBytes = null;
+                }
+
+                var msg = new EmailMessage
+                {
+                    From = new EmailAddress("placeholder@local", "placeholder"),
+                    Subject = subject,
+                    HtmlBody = html,
+                    TextBody = $"Vertrag unterschrieben. Link: {actionUrl}",
+                    Bcc = new List<EmailAddress> { new EmailAddress(link.RecipientEmail, signerName) },
+                    Attachments = pdfBytes is null
+                        ? new List<EmailAttachment>()
+                        : new List<EmailAttachment>
+                        {
+                    new EmailAttachment($"Vertrag-{contractNo}.pdf", "application/pdf", pdfBytes)
+                        }
+                };
+
+#if DEBUG
+                // ✅ لإثبات هل المشكلة من PDF أو من الإرسال: إذا فشل الـ PDF أرفق ملف نصي بالخطأ
+                if (pdfBytes is null && !string.IsNullOrWhiteSpace(pdfError))
+                {
+                    msg.Attachments.Add(new EmailAttachment(
+                        "pdf-error.txt",
+                        "text/plain; charset=utf-8",
+                        System.Text.Encoding.UTF8.GetBytes(pdfError)
+                    ));
+                }
+#endif
+
+                _logger.LogInformation("Sending ContractSigned email. Attachments={Count}. ContractId={ContractId}",
+                    msg.Attachments?.Count ?? 0, Id);
+
+                await _emailSender.SendAsync(msg, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send ContractSigned email. ContractId={ContractId}", Id);
+            }
+
             return new JsonResult(new { ok = true, signedAtIso = now.UtcDateTime.ToString("o") });
+        }
+
+        private static string BuildSignedPdfHtml(
+            string contractNo,
+            string projectTitle,
+            string termsMarkdown,
+            string signerName,
+            string signerEmail,
+            DateTimeOffset signedAt,
+            string signatureDataUrl)
+        {
+            termsMarkdown ??= "";
+            termsMarkdown = NormalizeNewLines(termsMarkdown);
+
+            var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+            var body = Markdown.ToHtml(termsMarkdown, pipeline);
+
+            var sanitizer = new HtmlSanitizer();
+            sanitizer.AllowedSchemes.Add("mailto");
+            body = sanitizer.Sanitize(body);
+
+            var css = """
+<style>
+  @page { size: A4; margin: 12mm 12mm 12mm 12mm; }
+  body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12.5px;line-height:1.55;}
+  h1{font-size:20px;margin:0 0 10px;page-break-after:avoid;}
+  h2{font-size:16px;margin:16px 0 8px;page-break-after:avoid;}
+  h3{font-size:14px;margin:12px 0 6px;page-break-after:avoid;}
+  p{margin:0 0 8px;}
+  hr{margin:14px 0;border:0;border-top:1px solid #ddd;}
+
+  /* ✅ لا تفصل كتلة التوقيع */
+  .sigWrap{break-inside:avoid;page-break-inside:avoid;}
+  .meta{margin-bottom:10px;font-size:12px;color:#333;}
+  .sig img{max-width:260px;height:auto;display:block;margin-top:6px;}
+  .sigLine{margin-top:6px;border-top:1px solid #111;width:260px;}
+</style>
+""";
+
+            var sigBlock = $"""
+<hr/>
+<div class="sigWrap">
+  <h2>Unterschrift</h2>
+  <div class="meta">
+    <div><strong>Vertragsnummer:</strong> {System.Net.WebUtility.HtmlEncode(contractNo)}</div>
+    <div><strong>Projekt:</strong> {System.Net.WebUtility.HtmlEncode(projectTitle)}</div>
+    <div><strong>Name:</strong> {System.Net.WebUtility.HtmlEncode(signerName)}</div>
+    <div><strong>E-Mail:</strong> {System.Net.WebUtility.HtmlEncode(signerEmail)}</div>
+    <div><strong>Datum:</strong> {System.Net.WebUtility.HtmlEncode(signedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))}</div>
+  </div>
+  <div class="sig">
+    <img src="{signatureDataUrl}" />
+    <div class="sigLine"></div>
+  </div>
+</div>
+""";
+
+            return $"""
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  {css}
+</head>
+<body>
+  {body}
+  {sigBlock}
+</body>
+</html>
+""";
         }
 
         // (نفس BuildRequestFromDb + NormalizeNewLines عندك)

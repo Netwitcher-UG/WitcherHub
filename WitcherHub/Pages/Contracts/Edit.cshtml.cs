@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Contracts;
@@ -37,7 +38,8 @@ namespace WitcherHub.Pages.Contracts
         public Guid Id { get; set; } // ContractId
 
         public string ContractHtml { get; private set; } = "";
-        public string RawTerms { get; private set; } = "";
+        public string RawTerms { get; private set; } = "";        
+        public string RawTermsEditable { get; private set; } = "";
         public bool IsSigned { get; private set; }
 
         public ContractViews.ContractDetailsView? Contract { get; private set; }
@@ -102,13 +104,17 @@ namespace WitcherHub.Pages.Contracts
             // Signed badge
             IsSigned = Contract.Status == DocumentStatus.Signed || Contract.SignedAt is not null;
 
-            // Raw terms used by inline editor
-            RawTerms = Header.Contract.Terms ?? "";
+            // ✅ FULL terms (للعرض/الطباعة)
+            RawTerms = (Header.Contract.Terms ?? "").Replace("\r\n", "\n");
 
-            // Render Terms -> HTML (Markdown)
+            // ✅ EDITOR terms (بدون القسم الثابت)
+            var parts = SplitLockedAgbForEditor(RawTerms);
+            RawTermsEditable = parts.editable;
+
+            // Render FULL Terms -> HTML (Markdown)
             ContractHtml = RenderMarkdownToSafeHtml(RawTerms);
 
-            // Defaults for new item (kept as-is if you still use them later)
+            // Defaults for new item
             NewItem.ContractId = Contract.Id;
             NewItem.Item.Position = (Contract.Items?.Count ?? 0) + 1;
             NewItem.Item.Title = "";
@@ -142,7 +148,34 @@ namespace WitcherHub.Pages.Contracts
             {
                 if (Id == Guid.Empty) throw new BadRequestAppException("Invalid contract id.");
 
+                // احضر النسخة الحالية FULL حتى نثبت القسم الثابت
+                var current = await _contracts.GetContractAsync(Id, ct);
+                if (current is null) throw new NotFoundAppException("Contract not found.");
+
+                if (current.Status != DocumentStatus.Draft)
+                    throw new BadRequestAppException("Contract is locked because status is not Draft.");
+
                 Header.Items = null;
+
+                // النص القادم من الـ editor = فقط الجزء المتغير
+                var editableFromForm = (Header.Contract.Terms ?? "").Replace("\r\n", "\n").TrimEnd();
+
+                // استخرج القسم الثابت (Anlage B / AGB) من النسخة الحالية
+                var currentFull = (current.Terms ?? "").Replace("\r\n", "\n");
+                var (locked, _) = SplitLockedAgbForEditor(currentFull);
+
+                // ✅ حافظ على ترتيبك: المتغير أولاً ثم الثابت في النهاية
+                Header.Contract.Terms = string.IsNullOrWhiteSpace(locked)
+                    ? editableFromForm
+                    : (editableFromForm + "\n\n" + locked.TrimStart());
+
+                // ثبت حقول الهيدر كما هي (حتى لا تتغير)
+                Header.Contract.ProjectId = current.ProjectId;
+                Header.Contract.Currency = current.Currency;
+                Header.Contract.Status = current.Status;
+                Header.Contract.StartDate = current.StartDate;
+                Header.Contract.EndDate = current.EndDate;
+                Header.Contract.SignedAt = current.SignedAt;
 
                 var vr = await _updateValidator.ValidateAsync(Header, ct);
                 if (!vr.IsValid)
@@ -150,7 +183,6 @@ namespace WitcherHub.Pages.Contracts
                     foreach (var err in vr.Errors)
                         ModelState.AddModelError("Header." + err.PropertyName, err.ErrorMessage);
 
-                    // keep user's edited terms
                     await LoadPageStateAsync(Id, ct, termsOverride: Header.Contract.Terms);
 
                     TempData["Toast.Type"] = "error";
@@ -361,5 +393,33 @@ namespace WitcherHub.Pages.Contracts
                 return RedirectToPage("./Edit", new { id = Id });
             }
         }
+        private static (string locked, string editable) SplitLockedAgbForEditor(string terms)
+        {
+            terms ??= "";
+            terms = terms.Replace("\r\n", "\n");
+
+            // 1) الأفضل: قص من عنوان Anlage B (Heading) إلى نهاية المستند
+            // هذا بالضبط مكان الـ AGB عندك
+            var m = Regex.Match(terms, @"(?im)^\s*##\s*Anlage\s*B\b.*$", RegexOptions.CultureInvariant);
+            if (m.Success)
+            {
+                var editable = terms.Substring(0, m.Index).TrimEnd();
+                var locked = terms.Substring(m.Index).TrimStart(); // يشمل heading + كل AGB
+                return (locked, editable);
+            }
+
+            // 2) fallback: إذا ما لقى heading، قص من أول <h1><strong>Allgemeine Geschäftsbedingungen</strong> إلى نهاية المستند
+            var idx = terms.IndexOf("<h1><strong>Allgemeine Geschäftsbedingungen", StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0)
+            {
+                var editable = terms.Substring(0, idx).TrimEnd();
+                var locked = terms.Substring(idx).TrimStart();
+                return (locked, editable);
+            }
+
+            // 3) لا يوجد AGB => كل شيء editable
+            return ("", terms.TrimEnd());
+        }
+
     }
 }

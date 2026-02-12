@@ -172,7 +172,8 @@
                 <pre id="contractEditor"
                      class="contractInlineEditor"
                      contenteditable="true"
-                     spellcheck="false">@Html.Raw(HtmlEncoder.Default.Encode(Model.RawTerms ?? ""))</pre>
+                     spellcheck="false">@Html.Raw(HtmlEncoder.Default.Encode(Model.RawTermsEditable ?? ""))</pre>
+
             }
         </div>
     </div>

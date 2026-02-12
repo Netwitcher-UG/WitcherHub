@@ -1,0 +1,26 @@
+﻿<h2 style="margin:0 0 12px 0;font-size:20px;color:#111827;">
+    Hallo {{UserName}} ✅
+</h2>
+
+<p style="margin:0 0 14px 0;color:#374151;font-size:14px;line-height:1.7;">
+    Ihr Vertrag wurde erfolgreich unterschrieben.
+</p>
+
+<p style="margin:0 0 14px 0;color:#374151;font-size:13px;line-height:1.7;">
+    Vertragsnummer: <strong>{{ContractNo}}</strong><br />
+    Projekt: <strong>{{ProjectTitle}}</strong><br />
+    Unterzeichnet am: <strong>{{SignedAt}}</strong>
+</p>
+
+<div style="margin:18px 0;">
+    <a href="{{{ActionUrl}}}"
+       style="display:inline-block;background:#0d6efd;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:700;">
+        Vertrag ansehen
+    </a>
+</div>
+
+<p style="margin:0;color:#6b7280;font-size:12px;line-height:1.6;">
+    Falls der Button nicht funktioniert, kopieren Sie bitte diesen Link:
+    <br />
+    <span style="word-break:break-all;">{{{ActionUrl}}}</span>
+</p>
