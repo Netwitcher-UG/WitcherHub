@@ -140,7 +140,7 @@
                                     <div class="text-danger small mt-1 ms-3" id="err-vs-basic-active"></div>
                                 </div>
 
-                                <div class="col-12">
+                           @*      <div class="col-12">
                                     <label class="form-label text-light opacity-75">Config Schema JSON</label>
                                     <textarea class="form-control" rows="6" id="vs-basic-config"
                                               placeholder='{"example": true}'></textarea>
@@ -149,7 +149,59 @@
                                     <div class="form-text">
                                         Leave empty = no change. Write JSON to update. Use empty string only if you want to clear (depends on backend behavior).
                                     </div>
+                                </div> *@
+                                <div class="col-12">
+                                    <label class="form-label text-light opacity-75">Config Schema</label>
+
+                                    <ul class="nav nav-tabs mt-1" id="vs-config-tabs" role="tablist">
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link active"
+                                                    id="vs-config-builder-tab"
+                                                    data-bs-toggle="tab"
+                                                    data-bs-target="#vs-config-builder"
+                                                    type="button"
+                                                    role="tab"
+                                                    aria-controls="vs-config-builder"
+                                                    aria-selected="true"
+                                                    data-sb-container="#csb-view">
+                                                Schema Builder
+                                            </button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link"
+                                                    id="vs-config-json-tab"
+                                                    data-bs-toggle="tab"
+                                                    data-bs-target="#vs-config-json"
+                                                    type="button"
+                                                    role="tab"
+                                                    aria-controls="vs-config-json"
+                                                    aria-selected="false">
+                                                JSON
+                                            </button>
+                                        </li>
+                                    </ul>
+
+                                    <div class="tab-content border border-top-0 rounded-bottom p-3 bg-dark bg-opacity-10">
+                                        <!-- Builder -->
+                                        <div class="tab-pane fade show active" id="vs-config-builder" role="tabpanel" aria-labelledby="vs-config-builder-tab">
+                                            <div id="csb-view"
+                                                 data-schema-builder
+                                                 data-schema-textarea="#vs-basic-config"></div>
+                                        </div>
+
+                                        <!-- JSON -->
+                                        <div class="tab-pane fade" id="vs-config-json" role="tabpanel" aria-labelledby="vs-config-json-tab">
+                                            <textarea class="form-control font-monospace" rows="6" id="vs-basic-config"
+                                                      placeholder='{"example": true}'></textarea>
+                                            <div class="text-danger small mt-1" id="err-vs-basic-config"></div>
+
+                                            <div class="form-text">
+                                                Leave empty = no change. Write JSON to update. Use empty string only if you want to clear (depends on backend behavior).
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
+
 
                                 <div class="col-12 d-flex gap-2">
                                     <button type="button" class="btn btn-success" data-vc-action="save-basic">

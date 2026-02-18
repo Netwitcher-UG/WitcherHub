@@ -44,26 +44,68 @@
         <input type="hidden" asp-for="QuoteId" />
         <input type="hidden" asp-for="Form.QuoteId" />
         <input type="hidden" asp-for="ReturnUrl" />
+
         <div class="row g-3">
-            <div class="col-12">
-                <label class="form-label">Find service</label>
-                <input class="form-control" id="serviceFilter" placeholder="Type to filter services..." />
+
+            <!-- Service -->
+            <div class="col-12 col-lg-6">
+                <label class="form-label">Service</label>
+
+                <div class="dropdown">
+                    <input type="text"
+                           class="form-control dropdown-toggle"
+                           id="serviceCombo"
+                           data-bs-toggle="dropdown"
+                           aria-expanded="false"
+                           autocomplete="off"
+                           placeholder="Search & select service..." />
+
+                    <ul class="dropdown-menu w-100" id="serviceMenu" aria-labelledby="serviceCombo"></ul>
+                </div>
+
+                <!-- hidden select for model binding -->
+                <select asp-for="SelectedServiceId"
+                        asp-items="Model.ServiceOptions"
+                        id="serviceSelect"
+                        class="form-select"
+                        style="position:absolute; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden;">
+                    <option value="">-- choose --</option>
+                </select>
+
+                <span class="text-danger small" asp-validation-for="SelectedServiceId"></span>
                 <div class="form-text">Tip: start typing a keyword (website, design, video...).</div>
             </div>
 
-            <div class="col-12">
-                <label class="form-label">Service</label>
-                <select class="form-select" asp-for="SelectedServiceId" asp-items="Model.ServiceOptions" id="serviceSelect"></select>
-                <span class="text-danger small" asp-validation-for="SelectedServiceId"></span>
+            <!-- Pricing Rules -->
+            <div class="col-12 col-lg-6" id="rulesBlock" style="display:none;">
+                <label class="form-label">Pricing Rules</label>
+
+                <div class="dropdown">
+                    <input type="text"
+                           class="form-control dropdown-toggle"
+                           id="ruleCombo"
+                           data-bs-toggle="dropdown"
+                           aria-expanded="false"
+                           autocomplete="off"
+                           placeholder="Search & select pricing rule..." />
+
+                    <ul class="dropdown-menu w-100" id="ruleMenu" aria-labelledby="ruleCombo"></ul>
+                </div>
+
+                <div class="form-text">Select one or more rules (they will be applied in order of priority).</div>
+
+                <div class="mt-2 d-flex flex-wrap gap-2" id="selectedRules"></div>
+                <div id="ruleHiddenInputs"></div>
             </div>
 
-            <div class="col-6 col-md-3">
+            <!-- Qty / Tax / Discount -->
+            <div class="col-12 col-md-3">
                 <label class="form-label">Quantity</label>
                 <input class="form-control" asp-for="Form.Item.Quantity" />
                 <span class="text-danger small" asp-validation-for="Form.Item.Quantity"></span>
             </div>
 
-            <div class="col-6 col-md-3">
+            <div class="col-12 col-md-3">
                 <label class="form-label">Tax Rate</label>
                 <select class="form-select" asp-for="Form.Item.TaxRateId" asp-items="Model.TaxRateOptions">
                     <option value="">-- none --</option>
@@ -85,32 +127,56 @@
                 <input class="form-control" asp-for="Form.Item.DiscountValue" />
             </div>
 
-            <div class="col-12">
-                <div class="accordion" id="cfgAccordion">
-                    <div class="accordion-item">
-                        <h2 class="accordion-header" id="cfgHeading">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cfgBody">
-                                Config (JSON) – only if you need it
+            <!-- ✅ Config dynamic UI -->
+            <div class="col-12" id="configBlock" style="display:none;">
+                <div class="card border bg-transparent">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="fw-semibold">Config</div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="cfgResetBtn">
+                                Reset
                             </button>
-                        </h2>
-                        <div id="cfgBody" class="accordion-collapse collapse" data-bs-parent="#cfgAccordion">
-                            <div class="accordion-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <label class="form-label mb-0">Config (JSON)</label>
-                                    <button class="btn btn-sm btn-outline-secondary" type="button" onclick="formatJson('cfg-json')">Format</button>
-                                </div>
-                                <textarea class="form-control mt-2" rows="7" asp-for="ConfigJson" id="cfg-json"></textarea>
-                                <div class="form-text">Example: {"hours": 12, "rush": true}</div>
-                                <span class="text-danger small" asp-validation-for="ConfigJson"></span>
-                            </div>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#cfgRawCollapse"
+                                    aria-expanded="false">
+                                Raw JSON
+                            </button>
                         </div>
+                    </div>
+
+                    <div class="card-body">
+                        <div id="cfgLoading" class="text-muted small d-none">Loading config schema…</div>
+
+                        <div id="cfgEmpty" class="text-muted small d-none">
+                            This service has no config schema. You can still use Raw JSON if needed.
+                        </div>
+
+                        <div id="cfgFields" class="row g-3"></div>
+
+                        <!-- Advanced: raw JSON -->
+                        <div class="collapse mt-3" id="cfgRawCollapse">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label class="form-label mb-0">Config (JSON)</label>
+                                <button class="btn btn-sm btn-outline-secondary" type="button" id="cfgFormatBtn">Format</button>
+                            </div>
+
+                            <textarea class="form-control mt-2 font-monospace" rows="7" asp-for="ConfigJson" id="cfg-json"></textarea>
+                            <div class="form-text">You normally don’t need to edit this manually.</div>
+                            <span class="text-danger small" asp-validation-for="ConfigJson"></span>
+                        </div>
+
+                        <!-- Important: keep textarea posted even if collapse closed -->
+                        <textarea asp-for="ConfigJson" id="cfg-json-hidden" style="display:none;"></textarea>
                     </div>
                 </div>
             </div>
+
         </div>
 
         <div class="d-flex gap-2 mt-3">
-            <button class="btn btn-primary" type="submit">Add Item</button>
+            <button class="btn btn-primary" type="submit" id="btnSubmit">Add Item</button>
             <a class="btn btn-outline-secondary"
                asp-page="/Quotes/Edit"
                asp-route-id="@Model.Quote.Id">Cancel</a>
@@ -120,42 +186,5 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-
-    <script>
-        // Filter select options by text
-        (function () {
-            const filter = document.getElementById('serviceFilter');
-            const select = document.getElementById('serviceSelect');
-            if (!filter || !select) return;
-
-            const options = Array.from(select.options);
-
-            function apply() {
-                const q = (filter.value || '').trim().toLowerCase();
-                options.forEach(o => {
-                    const t = (o.text || '').toLowerCase();
-                    o.hidden = (!!q && !t.includes(q));
-                });
-
-                // keep current selection visible
-                const sel = select.options[select.selectedIndex];
-                if (sel) sel.hidden = false;
-            }
-
-            filter.addEventListener('input', apply);
-        })();
-
-        function formatJson(textareaId) {
-            const el = document.getElementById(textareaId);
-            if (!el) return;
-
-            try {
-                const obj = JSON.parse(el.value || "{}");
-                el.value = JSON.stringify(obj, null, 2);
-            } catch {
-                alert("Invalid JSON. Please fix it first.");
-            }
-        }
-        window.formatJson = formatJson;
-    </script>
+    <script src="~/js/pages/quotes/items-create.js" asp-append-version="true"></script>
 }

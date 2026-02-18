@@ -297,7 +297,7 @@ namespace WitcherHub.Pages
             {
                 Id = "FormModal",
                 Title = "Add Service",
-                SizeClass = "modal-lg",
+                SizeClass = "modal-xl",
                 SubmitText = "Save",
                 CancelText = "Cancel",
                 Handler = null, // OnPostAsync

@@ -5,12 +5,13 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using WitcherHub.Application.Common.ConfigSchema;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Quotes;
 using WitcherHub.Application.Models.View.Quotes;
-using WitcherHub.Infrastructure.Data;
 using WitcherHub.Infrastructure.Data.Context;
+using WitcherHub.Infrastructure.Data.Models;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Pages.Quotes.Items
@@ -21,8 +22,6 @@ namespace WitcherHub.Pages.Quotes.Items
         private readonly IQuote _quotes;
         private readonly IServiceCatalog _services;
         private readonly IValidator<CreateQuoteItemDto> _validator;
-
-        // مؤقتًا للضرائب فقط (إذا عندك ITaxRates منبدّلها)
         private readonly AppDbContext _db;
 
         public CreateModel(
@@ -53,8 +52,10 @@ namespace WitcherHub.Pages.Quotes.Items
 
         [BindProperty]
         public CreateQuoteItemDto Form { get; set; } = new();
+
         [BindProperty(SupportsGet = true)]
         public string? ReturnUrl { get; set; }
+
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             if (QuoteId == Guid.Empty) return NotFound();
@@ -70,6 +71,23 @@ namespace WitcherHub.Pages.Quotes.Items
             ConfigJson = "{}";
 
             return Page();
+        }
+
+        // ✅ handler: ?handler=ServiceSchema&serviceId=...
+        public async Task<IActionResult> OnGetServiceSchemaAsync(Guid serviceId, CancellationToken ct)
+        {
+            if (serviceId == Guid.Empty)
+                return new ContentResult { Content = "null", ContentType = "application/json" };
+
+            var service = await _services.GetServiceAsync(serviceId, ct);
+            if (service?.ConfigSchema is null)
+                return new ContentResult { Content = "null", ContentType = "application/json" };
+
+            return new ContentResult
+            {
+                Content = service.ConfigSchema.RootElement.GetRawText(),
+                ContentType = "application/json"
+            };
         }
 
         public async Task<IActionResult> OnPostAsync(CancellationToken ct)
@@ -92,10 +110,10 @@ namespace WitcherHub.Pages.Quotes.Items
                 }
 
                 // Parse config JSON
-                JsonDocument config;
+                JsonDocument configDoc;
                 try
                 {
-                    config = JsonDocument.Parse(string.IsNullOrWhiteSpace(ConfigJson) ? "{}" : ConfigJson);
+                    configDoc = JsonDocument.Parse(string.IsNullOrWhiteSpace(ConfigJson) ? "{}" : ConfigJson);
                 }
                 catch
                 {
@@ -104,22 +122,45 @@ namespace WitcherHub.Pages.Quotes.Items
                     return Page();
                 }
 
-                // Load service details (for snapshot fields)
+                // Load service details (includes ConfigSchema + BasePrice)
                 var service = await _services.GetServiceAsync(SelectedServiceId, ct);
                 if (service is null) throw new NotFoundAppException("Service not found.");
+
+                // ✅ Apply defaults + Validate config vs schema (if exists)
+                var finalConfig = configDoc;
+
+                if (service.ConfigSchema is not null)
+                {
+                    finalConfig = ConfigSchemaLite.ApplyDefaults(service.ConfigSchema, configDoc);
+                    var errs = ConfigSchemaLite.Validate(service.ConfigSchema, finalConfig);
+
+                    if (errs.Count > 0)
+                    {
+                        foreach (var e in errs)
+                            ModelState.AddModelError(nameof(ConfigJson), $"{e.Field}: {e.Message}");
+
+                        ConfigJson = JsonSerializer.Serialize(
+                            finalConfig.RootElement,
+                            new JsonSerializerOptions { WriteIndented = true });
+
+                        await LoadLookupsAsync(ct);
+                        return Page();
+                    }
+
+                    // keep pretty json (optional)
+                    ConfigJson = JsonSerializer.Serialize(
+                        finalConfig.RootElement,
+                        new JsonSerializerOptions { WriteIndented = true });
+                }
 
                 // Fill dto
                 Form.QuoteId = QuoteId;
                 Form.Item.ServiceId = SelectedServiceId;
-                Form.Item.Config = config;
+                Form.Item.Config = finalConfig;
 
-                // Snapshot (حتى يمر الـ validator + حتى لو backend لاحقًا صار يحسب لحاله)
+                // Snapshot fields (for validator only; backend pricing recalculates anyway)
                 Form.Item.Title = service.Name ?? "";
                 Form.Item.UnitPrice = service.BasePrice;
-
-                // إذا بدك تضمن العملة
-                // (عادة Quote.Currency هو الحاكم)
-                // Form.Item.Currency? ما عندك على item، فخلاص.
 
                 var vr = await _validator.ValidateAsync(Form, ct);
                 if (!vr.IsValid)
@@ -137,11 +178,7 @@ namespace WitcherHub.Pages.Quotes.Items
                 TempData["Toast.Title"] = "Added";
                 TempData["Toast.Message"] = "Line item added.";
 
-                //if (!string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl))
-                //    return LocalRedirect(ReturnUrl);
-
                 return RedirectToPage("/Quotes/Edit", new { id = QuoteId });
-
             }
             catch (Exception ex) when (ex is BadRequestAppException or NotFoundAppException)
             {
@@ -156,10 +193,7 @@ namespace WitcherHub.Pages.Quotes.Items
 
         private async Task LoadLookupsAsync(CancellationToken ct)
         {
-            // Services: عبر IServiceCatalog
             var result = await _services.GetServicesAsync(page: 1, pageSize: 500, search: null, ct: ct);
-
-            // إذا PagedResult عندك اسمها مو Items، غيّر هذا السطر حسب الكلاس عندك
             var items = result.Items;
 
             ServiceOptions = items
@@ -167,15 +201,36 @@ namespace WitcherHub.Pages.Quotes.Items
                 .Select(s => new SelectListItem(s.Name, s.Id.ToString()))
                 .ToList();
 
-            if (SelectedServiceId == Guid.Empty && ServiceOptions.Count > 0)
-                SelectedServiceId = Guid.Parse(ServiceOptions[0].Value!);
-
-            // Taxes: مؤقتًا من DB (إذا عندك Interface للضرائب منبدّلها)
             TaxRateOptions = await _db.TaxRates
                 .Where(t => t.IsActive)
                 .OrderBy(t => t.Name)
                 .Select(t => new SelectListItem($"{t.Name} ({t.RatePercent}%)", t.Id.ToString()))
                 .ToListAsync(ct);
+        }
+
+        public async Task<IActionResult> OnGetPricingRulesAsync(Guid serviceId, CancellationToken ct)
+        {
+            if (serviceId == Guid.Empty)
+                return new JsonResult(Array.Empty<object>());
+
+            var rules = await _db.Set<PricingRule>()
+                .AsNoTracking()
+                .Where(r =>
+                    r.ServiceId == serviceId &&
+                    r.IsActive &&
+                    r.Scope == "LINE_ITEM")
+                .OrderBy(r => r.Priority)
+                .Select(r => new
+                {
+                    id = r.Id,
+                    name = r.Name,
+                    label = r.Label,
+                    action = r.Action.ToString(),
+                    priority = r.Priority
+                })
+                .ToListAsync(ct);
+
+            return new JsonResult(rules);
         }
     }
 }

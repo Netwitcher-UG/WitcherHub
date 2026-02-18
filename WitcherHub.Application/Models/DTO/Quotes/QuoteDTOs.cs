@@ -40,6 +40,7 @@ namespace WitcherHub.Application.Models.DTO.Quotes
         public Guid? TaxRateId { get; set; }
         public DiscountType? DiscountType { get; set; }
         public decimal? DiscountValue { get; set; }
+        public List<Guid> PricingRuleIds { get; set; } = new();
 
         public int Position { get; set; } = 1;
     }

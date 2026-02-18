@@ -4,12 +4,17 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
+using NCalc;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using WitcherHub.Application.Common.CacheKeys;
 using WitcherHub.Application.Common.Caching;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Common.Pagination;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
+using WitcherHub.Application.Common.ConfigSchema;
+using WitcherHub.Infrastructure.Data.Models; // ServiceCatalogItem موجود هون
 using WitcherHub.Application.Models.DTO.Quotes;
 using WitcherHub.Application.Models.View.Quotes;
 using WitcherHub.Infrastructure.Data.Models;
@@ -358,7 +363,8 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                     .Select(x => (int?)x.Position)
                     .MaxAsync(ct) ?? 0;
 
-                var breakdown = await BuildBreakdownAsync(dto.Item, ct);
+                //var breakdown = await BuildBreakdownAsync(dto.Item, ct);
+                var (breakdown, effectiveUnit) = await BuildBreakdownAsync(dto.Item, ct);
 
                 var item = new QuoteItem
                 {
@@ -366,8 +372,9 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                     Title = (dto.Item.Title ?? "").Trim(),
                     ServiceId = dto.Item.ServiceId,
                     Quantity = dto.Item.Quantity,
-                    UnitPrice = dto.Item.UnitPrice,
+                    //UnitPrice = dto.Item.UnitPrice,
                     Config = dto.Item.Config ?? JsonDocument.Parse("{}"),
+                    UnitPrice = effectiveUnit,
                     PriceBreakdown = breakdown,
                     TaxRateId = dto.Item.TaxRateId,
                     DiscountType = dto.Item.DiscountType,
@@ -415,13 +422,19 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 item.ServiceId = dto.Item.ServiceId;
                 item.Quantity = dto.Item.Quantity;
                 item.UnitPrice = dto.Item.UnitPrice;
-                item.Config = dto.Item.Config ?? item.Config ?? JsonDocument.Parse("{}");
                 item.TaxRateId = dto.Item.TaxRateId;
                 item.DiscountType = dto.Item.DiscountType;
                 item.DiscountValue = dto.Item.DiscountValue;
 
                 // Recalculate breakdown every update
-                item.PriceBreakdown = await BuildBreakdownAsync(dto.Item, ct);
+                // Recalculate breakdown (this will normalize dto.Item.Config if schema exists)
+                var (breakdown, effectiveUnit) = await BuildBreakdownAsync(dto.Item, ct);
+
+                // ✅ بعد التطبيع
+                item.Config = dto.Item.Config ?? item.Config ?? JsonDocument.Parse("{}");
+                item.UnitPrice = effectiveUnit;
+                item.PriceBreakdown = breakdown;
+
 
                 if (dto.Item.Position > 0)
                     item.Position = dto.Item.Position;
@@ -540,19 +553,203 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
         // =========================
         // Price breakdown helper (strongly typed)
         // =========================
-        private async Task<JsonDocument> BuildBreakdownAsync(QuoteItemDto itemDto, CancellationToken ct)
+        private async Task<(JsonDocument Breakdown, decimal EffectiveUnitPrice)> BuildBreakdownAsync(QuoteItemDto itemDto, CancellationToken ct)
         {
             var qty = itemDto.Quantity;
-            var unit = itemDto.UnitPrice;
 
-            var baseTotal = qty * unit;
+            // ✅ Trust base price from Service (not from UI)
+            decimal baseUnit = itemDto.UnitPrice;
+            JsonDocument? schemaDoc = null;
+            PricingModel? pricingModel = null;
 
-            decimal discountAmount = 0m;
+            if (itemDto.ServiceId.HasValue)
+            {
+                var svcRepo = _unitOfWork.Repo<ServiceCatalogItem>();
+                var svc = await svcRepo.Query(asNoTracking: true)
+                    .Where(s => s.Id == itemDto.ServiceId.Value)
+                    .Select(s => new { s.BasePrice, s.ConfigSchema, s.PricingModel })
+                    .FirstOrDefaultAsync(ct);
+
+                if (svc is not null)
+                {
+                    baseUnit = svc.BasePrice;
+                    schemaDoc = svc.ConfigSchema;
+                    pricingModel = svc.PricingModel;
+                }
+            }
+
+            // ✅ Apply defaults + validate config before rule evaluation
+            if (schemaDoc is not null)
+            {
+                itemDto.Config ??= JsonDocument.Parse("{}");
+                var normalized = ConfigSchemaLite.ApplyDefaults(schemaDoc, itemDto.Config);
+                var errs = ConfigSchemaLite.Validate(schemaDoc, normalized);
+
+                if (errs.Count > 0)
+                {
+                    var msg = string.Join("; ", errs.Take(5).Select(e => $"{e.Field}: {e.Message}"));
+                    throw new BadRequestAppException("Invalid config for selected service. " + msg);
+                }
+
+                itemDto.Config = normalized;
+            }
+
+            var unit = baseUnit;
+            var baseTotalBeforeRules = qty * baseUnit;
+            var baseTotal = baseTotalBeforeRules;
+
+            // ✅ discounts from rules are tracked separately
+            decimal rulesDiscountAmount = 0m;
+            var appliedRules = new List<object>();
+
+            // ✅ IMPORTANT (as you requested):
+            // Apply rules ONLY when PricingRuleIds is not empty (selected rules only)
+            if (itemDto.ServiceId.HasValue && itemDto.PricingRuleIds is not null && itemDto.PricingRuleIds.Count > 0)
+            {
+                var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+                var rulesRepo = _unitOfWork.Repo<PricingRule>();
+                var rules = await rulesRepo.Query(asNoTracking: true)
+                    .Where(r =>
+                        r.ServiceId == itemDto.ServiceId.Value &&
+                        r.IsActive &&
+                        r.Scope == "LINE_ITEM" &&
+                        itemDto.PricingRuleIds.Contains(r.Id))
+                    .OrderBy(r => r.Priority)
+                    .ThenBy(r => r.Name)
+                    .ToListAsync(ct);
+
+                var (vars, nameMap) = BuildVars(qty, baseUnit, unit, baseTotal, rulesDiscountAmount, itemDto.Config, pricingModel);
+
+                foreach (var r in rules)
+                {
+                    if (r.ValidFrom.HasValue && today < r.ValidFrom.Value) continue;
+                    if (r.ValidTo.HasValue && today > r.ValidTo.Value) continue;
+
+                    var condExpr = NormalizeExpr(r.ConditionExpr, nameMap);
+
+                    bool ok;
+                    try { ok = EvalBool(condExpr, vars); }
+                    catch (Exception ex)
+                    {
+                        _log.LogWarning(ex, "PricingRule condition eval failed. RuleId={RuleId} Expr={Expr}", r.Id, condExpr);
+                        continue;
+                    }
+                    if (!ok) continue;
+
+                    var valueExprNorm = NormalizeExpr(r.ValueExpr, nameMap);
+
+                    decimal value;
+                    try { value = EvalDecimal(valueExprNorm, vars); }
+                    catch (Exception ex)
+                    {
+                        _log.LogWarning(ex, "PricingRule value eval failed. RuleId={RuleId} Expr={Expr}", r.Id, valueExprNorm);
+                        continue;
+                    }
+
+                    var beforeTotal = baseTotal;
+                    var beforeUnit = unit;
+                    var beforeDiscount = rulesDiscountAmount;
+
+                    string? interpretedAs = null;
+
+                    switch (r.Action)
+                    {
+                        case RuleAction.Add:
+                            baseTotal = baseTotal + value;
+                            unit = qty != 0 ? baseTotal / qty : unit;
+                            break;
+
+                        case RuleAction.Multiply:
+                            // Support % inputs if ValueExpr is numeric literal: 20 => +20% (x1.2)
+                            if (IsNumericLiteral(r.ValueExpr) && value > 1m && value <= 100m)
+                            {
+                                interpretedAs = "Multiply(Percent)";
+                                baseTotal = baseTotal * (1m + (value / 100m));
+                            }
+                            else
+                            {
+                                baseTotal = baseTotal * value;
+                            }
+                            unit = qty != 0 ? baseTotal / qty : unit;
+                            break;
+
+                        case RuleAction.SetUnit:
+                            unit = value;
+                            baseTotal = qty * unit;
+                            break;
+
+                        case RuleAction.SetTotal:
+                            // Common UI case: value is numeric literal 1.2 meaning +20%
+                            if (IsNumericLiteral(r.ValueExpr) && value > 0m && value < 10m)
+                            {
+                                interpretedAs = "SetTotal(Multiply)";
+                                baseTotal = baseTotal * value;
+                            }
+                            else
+                            {
+                                baseTotal = value;
+                            }
+                            unit = qty != 0 ? baseTotal / qty : unit;
+                            break;
+
+                        case RuleAction.Discount:
+                            // Key point:
+                            // - If ValueExpr is numeric literal => interpret (0.10 or 10) as percent, big numbers as amount
+                            // - If ValueExpr is NOT literal (computed) => treat as amount
+                            {
+                                var discountBase = Math.Max(0m, baseTotal - rulesDiscountAmount); // sequential discount base
+
+                                decimal disc;
+                                if (IsNumericLiteral(r.ValueExpr))
+                                    disc = ComputeDiscountFromLiteral(value, discountBase);
+                                else
+                                    disc = Math.Min(discountBase, Math.Max(0m, value)); // computed => amount
+
+                                if (disc > 0m)
+                                    rulesDiscountAmount += disc;
+                            }
+                            break;
+
+                        default:
+                            break;
+                    }
+
+                    // Keep vars updated for subsequent rules
+                    SetMoneyVar(vars, "unitPrice", unit);
+                    SetMoneyVar(vars, "unit", unit);
+                    SetMoneyVar(vars, "baseTotal", baseTotal);
+                    SetMoneyVar(vars, "total", baseTotal);
+                    SetMoneyVar(vars, "discountSoFar", rulesDiscountAmount);
+                    SetMoneyVar(vars, "netTotal", Math.Max(0m, baseTotal - rulesDiscountAmount));
+
+                    appliedRules.Add(new
+                    {
+                        id = r.Id,
+                        name = r.Name,
+                        action = r.Action.ToString(),
+                        interpretedAs,
+                        priority = r.Priority,
+                        conditionExpr = r.ConditionExpr,
+                        valueExpr = r.ValueExpr,
+                        evaluatedValueExpr = valueExprNorm,
+                        value,
+                        beforeUnitPrice = beforeUnit,
+                        afterUnitPrice = unit,
+                        beforeTotal,
+                        afterTotal = baseTotal,
+                        discountApplied = Math.Max(0m, rulesDiscountAmount - beforeDiscount),
+                        discountSoFar = rulesDiscountAmount
+                    });
+                }
+            }
+
+            // manual discount from item fields
+            decimal fieldDiscountAmount = 0m;
             if (itemDto.DiscountType is not null && itemDto.DiscountValue is not null)
             {
                 var dv = itemDto.DiscountValue.Value;
-
-                discountAmount = itemDto.DiscountType switch
+                fieldDiscountAmount = itemDto.DiscountType switch
                 {
                     DiscountType.Fixed => Math.Min(baseTotal, dv),
                     DiscountType.Amount => Math.Min(baseTotal, dv),
@@ -561,8 +758,11 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 };
             }
 
-            var subTotal = Math.Max(0m, baseTotal - discountAmount);
+            rulesDiscountAmount = Math.Min(baseTotal, Math.Max(0m, rulesDiscountAmount));
+            var totalDiscount = Math.Min(baseTotal, Math.Max(0m, fieldDiscountAmount + rulesDiscountAmount));
+            var subTotal = Math.Max(0m, baseTotal - totalDiscount);
 
+            // tax
             decimal taxRatePercent = 0m;
             decimal taxAmount = 0m;
 
@@ -586,13 +786,19 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
             var breakdownObj = new
             {
                 qty,
+                pricingModel = pricingModel?.ToString(),
+                baseUnitPrice = baseUnit,
                 unitPrice = unit,
+                baseTotalBeforeRules,
+                pricingRules = appliedRules,
                 baseTotal,
                 discount = new
                 {
                     type = itemDto.DiscountType?.ToString(),
                     value = itemDto.DiscountValue,
-                    amount = discountAmount
+                    fromField = fieldDiscountAmount,
+                    fromRules = rulesDiscountAmount,
+                    amount = totalDiscount
                 },
                 tax = new
                 {
@@ -604,8 +810,224 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 total
             };
 
-            return JsonSerializer.SerializeToDocument(breakdownObj);
+            return (JsonSerializer.SerializeToDocument(breakdownObj), unit);
         }
+
+        private static (Dictionary<string, object?> Vars, Dictionary<string, string> NameMap) BuildVars(
+            decimal qty,
+            decimal baseUnit,
+            decimal unit,
+            decimal baseTotal,
+            decimal discountSoFar,
+            JsonDocument? config,
+            PricingModel? pricingModel)
+        {
+            var vars = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["qty"] = (double)qty,
+                ["quantity"] = (double)qty,
+
+                ["baseUnitPrice"] = (double)baseUnit,
+                ["basePrice"] = (double)baseUnit,
+                ["baseUnit"] = (double)baseUnit,
+
+                ["unitPrice"] = (double)unit,
+                ["unit"] = (double)unit,
+
+                ["baseTotal"] = (double)baseTotal,
+                ["total"] = (double)baseTotal,
+
+                ["discountSoFar"] = (double)discountSoFar,
+                ["netTotal"] = (double)Math.Max(0m, baseTotal - discountSoFar),
+
+                ["pricingModel"] = pricingModel?.ToString()
+            };
+
+            var nameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["qty"] = "qty",
+                ["quantity"] = "qty",
+                ["baseUnitPrice"] = "baseUnitPrice",
+                ["basePrice"] = "basePrice",
+                ["unitPrice"] = "unitPrice",
+                ["unit"] = "unit",
+                ["baseTotal"] = "baseTotal",
+                ["total"] = "total",
+                ["discountSoFar"] = "discountSoFar",
+                ["netTotal"] = "netTotal",
+                ["pricingModel"] = "pricingModel"
+            };
+
+            if (config is not null && config.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var p in config.RootElement.EnumerateObject())
+                {
+                    object? val = p.Value.ValueKind switch
+                    {
+                        JsonValueKind.Number => p.Value.TryGetDouble(out var d) ? d : 0d,
+                        JsonValueKind.True => true,
+                        JsonValueKind.False => false,
+                        JsonValueKind.String => p.Value.GetString(),
+                        _ => null
+                    };
+
+                    var safe = ToSafeVarName(p.Name);
+
+                    if (vars.ContainsKey(safe))
+                    {
+                        if (!(nameMap.TryGetValue(p.Name, out var existing) && string.Equals(existing, safe, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            var i = 2;
+                            var candidate = $"{safe}_{i}";
+                            while (vars.ContainsKey(candidate)) { i++; candidate = $"{safe}_{i}"; }
+                            safe = candidate;
+                        }
+                    }
+
+                    nameMap[p.Name] = safe;
+                    nameMap[safe] = safe;
+                    vars[safe] = val;
+                }
+
+                // derived convenience var
+                if (TryGetDouble(vars, "durationMinutes", out var mins) && !vars.ContainsKey("hours"))
+                {
+                    vars["hours"] = mins / 60d;
+                    nameMap["hours"] = "hours";
+                }
+            }
+
+            return (vars, nameMap);
+        }
+
+        private static bool TryGetDouble(Dictionary<string, object?> vars, string key, out double value)
+        {
+            value = 0d;
+            if (!vars.TryGetValue(key, out var v) || v is null) return false;
+
+            try
+            {
+                value = v switch
+                {
+                    double d => d,
+                    float f => f,
+                    int i => i,
+                    long l => l,
+                    decimal m => (double)m,
+                    _ => Convert.ToDouble(v, CultureInfo.InvariantCulture)
+                };
+                return true;
+            }
+            catch { return false; }
+        }
+
+        private static void SetMoneyVar(Dictionary<string, object?> vars, string key, decimal value)
+            => vars[key] = (double)value;
+
+        private static string NormalizeExpr(string expr, Dictionary<string, string> nameMap)
+        {
+            if (string.IsNullOrWhiteSpace(expr)) return expr;
+
+            var s = expr.Replace("\\\"", "\"").Trim();
+
+            // params["x"] / params['x']  ==> mapped var name
+            s = Regex.Replace(
+                s,
+                @"\bparams\s*\[\s*([""'])(?<k>[^""']+)\1\s*\]",
+                m =>
+                {
+                    var key = m.Groups["k"].Value;
+                    if (nameMap.TryGetValue(key, out var mapped)) return mapped;
+                    return ToSafeVarName(key);
+                },
+                RegexOptions.IgnoreCase);
+
+            // params.x ==> mapped
+            s = Regex.Replace(
+                s,
+                @"\bparams\.(?<k>[A-Za-z_][A-Za-z0-9_]*)\b",
+                m =>
+                {
+                    var key = m.Groups["k"].Value;
+                    return nameMap.TryGetValue(key, out var mapped) ? mapped : key;
+                },
+                RegexOptions.IgnoreCase);
+
+            return s;
+        }
+
+        private static string ToSafeVarName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return "p";
+
+            var sb = new StringBuilder(name.Length);
+            foreach (var ch in name)
+            {
+                if (char.IsLetterOrDigit(ch) || ch == '_') sb.Append(ch);
+                else sb.Append('_');
+            }
+
+            var s = sb.ToString();
+            if (char.IsDigit(s[0])) s = "_" + s;
+            return s;
+        }
+
+        private static bool IsNumericLiteral(string expr)
+        {
+            if (string.IsNullOrWhiteSpace(expr)) return false;
+            var s = expr.Trim();
+            return decimal.TryParse(s, NumberStyles.Number, CultureInfo.InvariantCulture, out _);
+        }
+
+        private static decimal ComputeDiscountFromLiteral(decimal value, decimal baseAmount)
+        {
+            if (baseAmount <= 0m) return 0m;
+            if (value <= 0m) return 0m;
+
+            // 0.10 => 10% ; 10 => 10% ; 250 => amount
+            if (value <= 1m)
+                return Math.Min(baseAmount, baseAmount * value);
+
+            if (value <= 100m)
+                return Math.Min(baseAmount, baseAmount * (value / 100m));
+
+            return Math.Min(baseAmount, value);
+        }
+
+        private static bool EvalBool(string expr, Dictionary<string, object?> vars)
+        {
+            var e = new Expression(expr, EvaluateOptions.IgnoreCase);
+
+            // default missing vars to 0 instead of throwing
+            e.EvaluateParameter += (_, args) => { args.Result = 0d; };
+
+            foreach (var kv in vars) e.Parameters[kv.Key] = kv.Value;
+
+            var r = e.Evaluate();
+            return r is bool b ? b : Convert.ToBoolean(r, CultureInfo.InvariantCulture);
+        }
+
+        private static decimal EvalDecimal(string expr, Dictionary<string, object?> vars)
+        {
+            var e = new Expression(expr, EvaluateOptions.IgnoreCase);
+
+            e.EvaluateParameter += (_, args) => { args.Result = 0d; };
+
+            foreach (var kv in vars) e.Parameters[kv.Key] = kv.Value;
+
+            var r = e.Evaluate();
+
+            return r switch
+            {
+                decimal m => m,
+                double d => (decimal)d,
+                float f => (decimal)f,
+                int i => i,
+                long l => l,
+                _ => Convert.ToDecimal(r, CultureInfo.InvariantCulture)
+            };
+        }
+
 
         // =========================
         // Helpers

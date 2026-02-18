@@ -72,7 +72,7 @@
 </div>
 
 <!-- Advanced -->
-<div class="form-section">
+@* <div class="form-section">
     <div class="form-section-header">
         <i class="material-icons-outlined">tune</i>
         <span>Advanced</span>
@@ -90,5 +90,73 @@
                       placeholder='{"example": true}'></textarea>
             <span class="text-danger" asp-validation-for="Service.ConfigSchemaJson"></span>
         </div>
+    </div> *@
+</div>
+<div class="form-section">
+    <div class="form-section-header">
+        <i class="material-icons-outlined">tune</i>
+        <span>Advanced</span>
+    </div>
+    <div class="form-section-divider"></div>
+
+    <div class="row g-3 mt-0">
+        <div class="col-12">
+            <label class="form-label text-light opacity-75">
+                Config Schema <small>(optional)</small>
+            </label>
+
+            <!-- Tabs: Builder / JSON -->
+            <ul class="nav nav-tabs mt-1" id="cs-create-tabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active"
+                            id="cs-create-builder-tab"
+                            data-bs-toggle="tab"
+                            data-bs-target="#cs-create-builder"
+                            type="button"
+                            role="tab"
+                            aria-controls="cs-create-builder"
+                            aria-selected="true"
+                            data-sb-container="#csb-create">
+                        Schema Builder
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link"
+                            id="cs-create-json-tab"
+                            data-bs-toggle="tab"
+                            data-bs-target="#cs-create-json"
+                            type="button"
+                            role="tab"
+                            aria-controls="cs-create-json"
+                            aria-selected="false">
+                        JSON
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content border border-top-0 rounded-bottom p-3 bg-dark bg-opacity-10">
+                <!-- Builder -->
+                <div class="tab-pane fade show active" id="cs-create-builder" role="tabpanel" aria-labelledby="cs-create-builder-tab">
+                    <div id="csb-create"
+                         data-schema-builder
+                         data-schema-textarea="#Service_ConfigSchemaJson"></div>
+                </div>
+
+                <!-- JSON -->
+                <div class="tab-pane fade" id="cs-create-json" role="tabpanel" aria-labelledby="cs-create-json-tab">
+                    <textarea class="form-control font-monospace"
+                              asp-for="Service.ConfigSchemaJson"
+                              rows="8"
+                              placeholder='{"type":"object","properties":{...}}'></textarea>
+
+                    <span class="text-danger" asp-validation-for="Service.ConfigSchemaJson"></span>
+
+                    <div class="form-text">
+                        You can still paste/edit JSON manually here. Builder will generate JSON for you.
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+

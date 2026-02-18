@@ -54,6 +54,9 @@
 
         "Rule.ValidTo": "vs-add-rule-validTo",
         "ValidTo": "vs-add-rule-validTo",
+
+        "Rule.IsActive": "vs-add-rule-active",
+        "IsActive": "vs-add-rule-active",
     };
 
     function mapUpdateRule(idx) {
@@ -137,6 +140,20 @@
         }
     }
 
+    function toDateOnly(v) {
+        if (!v) return '';
+        if (typeof v === 'string') {
+            const s = v.trim();
+            const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+            return m ? m[1] : '';
+        }
+        try {
+            const d = new Date(v);
+            if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+        } catch { }
+        return '';
+    }
+
     async function postJson(url, body) {
         const token = document.getElementById('antiForgeryToken')?.value;
 
@@ -205,20 +222,23 @@
                 label: r.label ?? r.Label,
                 scope: r.scope ?? r.Scope,
                 isActive: r.isActive ?? r.IsActive,
-                validFrom: r.validFrom ?? r.ValidFrom,
-                validTo: r.validTo ?? r.ValidTo
+                validFrom: toDateOnly(r.validFrom ?? r.ValidFrom),
+                validTo: toDateOnly(r.validTo ?? r.ValidTo)
             }))
         };
     }
 
     // ---------- Expr Builder (UI helper) ----------
-    // (واجهة فقط - ما بتغيّر الباك اند)
-    const VC_RULE_VARS = [
+    // VC_RULE_VARS تُبنى ديناميكياً من ConfigSchema تبع الخدمة + مفاتيح أساسية مشتركة
+    const VC_BASE_RULE_VARS = [
         { key: 'qty', label: 'Quantity (qty)' },
-        { key: 'pages', label: 'Pages (pages)' },
+        { key: 'basePrice', label: 'Base price (basePrice)' },
+        { key: 'baseUnitPrice', label: 'Base unit price (baseUnitPrice)' },
         { key: 'subtotal', label: 'Subtotal (subtotal)' },
         { key: 'total', label: 'Total (total)' }
     ];
+
+    let VC_RULE_VARS = [...VC_BASE_RULE_VARS];
 
     const VC_RULE_OPS = [
         { v: '>=', t: '>=' },
@@ -229,6 +249,67 @@
         { v: '!=', t: '!=' }
     ];
 
+    function vcParseSchema(schema) {
+        if (!schema) return null;
+        if (typeof schema === 'string') {
+            try { return JSON.parse(schema); } catch { return null; }
+        }
+        return schema;
+    }
+
+    function vcExtractSchemaVars(schemaObj) {
+        const schema = vcParseSchema(schemaObj);
+        if (!schema || typeof schema !== 'object') return [];
+
+        const props = schema.properties || schema.Properties;
+        if (!props || typeof props !== 'object') return [];
+
+        const vars = [];
+        Object.keys(props).forEach(k => {
+            const def = props[k] || {};
+            const title = def.title || def.Title || k;
+            vars.push({ key: k, label: `${title} (${k})` });
+        });
+
+        return vars;
+    }
+
+    function vcFillFieldOptions(selectEl, vars, keepValue = true) {
+        if (!selectEl) return;
+        const prev = keepValue ? (selectEl.value || '') : '';
+        const html = (vars || []).map(x => `<option value="${x.key}">${x.label}</option>`).join('');
+        selectEl.innerHTML = `<option value="">— Select field —</option>` + html;
+
+        if (keepValue && prev) {
+            selectEl.value = prev;
+            if (selectEl.value !== prev) selectEl.value = '';
+        }
+    }
+
+    function vcSetRuleVarsForService(service) {
+        const schemaSource = service?.configSchema ?? service?.ConfigSchema;
+        const schemaVars = vcExtractSchemaVars(schemaSource);
+
+        const map = new Map();
+        VC_BASE_RULE_VARS.forEach(v => map.set(v.key, v.label));
+        schemaVars.forEach(v => {
+            if (!map.has(v.key)) map.set(v.key, v.label);
+        });
+
+        VC_RULE_VARS = Array.from(map.entries()).map(([key, label]) => ({ key, label }));
+
+        // Update Add-Rule builder if it already exists
+        document.querySelectorAll('#ViewServiceModal select[id$="-b-field"]').forEach(sel => {
+            vcFillFieldOptions(sel, VC_RULE_VARS);
+        });
+    }
+
+    function vcRefreshBuilderFieldOptions(prefix) {
+        const sel = document.getElementById(`${prefix}-b-field`);
+        if (!sel) return;
+        vcFillFieldOptions(sel, VC_RULE_VARS);
+    }
+
     function vcVarExpr(k) { return k ? `params["${k}"]` : ''; }
 
     function vcBuildCondition(field, op, value) {
@@ -236,6 +317,13 @@
         const left = vcVarExpr(field);
 
         const trimmed = (value ?? '').toString().trim();
+        const low = trimmed.toLowerCase();
+
+        // booleans
+        if (low === 'true' || low === 'false') {
+            return `${left} ${op} ${low}`;
+        }
+
         const num = Number(trimmed);
         const isNum = trimmed !== '' && !Number.isNaN(num);
 
@@ -245,17 +333,28 @@
 
     function vcBuildValueExpr(action, amount, mode, field, threshold) {
         const act = (action ?? '').toString().toLowerCase();
-        const a = Number(amount ?? 0);
+        const amtTxt = (amount ?? '').toString().trim();
+
+        // Discount: نتركها كما هي (0.10) بدون فرض رقم
+        if (act === 'discount') return amtTxt === '' ? '' : amtTxt;
+
+        if (amtTxt === '') return '';
+
+        const a = Number(amtTxt);
+        if (Number.isNaN(a)) return '';
+
         const f = vcVarExpr(field);
 
-        // Discount: غالباً value expr نسبة مثل 0.10
-        if (act === 'discount') return String(a);
-
         if (mode === 'extra_over') {
-            const thr = Number(threshold ?? 0);
+            if (!field) return '';
+            const thrTxt = (threshold ?? '').toString().trim();
+            if (thrTxt === '') return '';
+            const thr = Number(thrTxt);
+            if (Number.isNaN(thr)) return '';
             return `(${f} - ${thr}) * ${a}`;
         }
         if (mode === 'per_unit') {
+            if (!field) return '';
             return `${f} * ${a}`;
         }
         return String(a); // once
@@ -298,7 +397,7 @@
 
     <div class="col-6 col-md-2">
       <label class="form-label mb-1 small text-muted" for="${prefix}-b-val">Value</label>
-      <input class="form-control form-control-sm" id="${prefix}-b-val" placeholder="e.g. 3" />
+      <input class="form-control form-control-sm" id="${prefix}-b-val" placeholder="e.g. 3 or true" />
     </div>
 
     <div class="col-12 col-md-4">
@@ -338,8 +437,89 @@
 `;
     }
 
-    function vcWireBuilder(prefix, ids) {
-        // ids = { conditionId, valueId, actionId }
+    function vcStripOuterParens(s) {
+        if (!s) return s;
+        let t = s.trim();
+        while (t.startsWith('(') && t.endsWith(')')) {
+            let depth = 0;
+            let ok = true;
+            for (let i = 0; i < t.length; i++) {
+                const ch = t[i];
+                if (ch === '(') depth++;
+                else if (ch === ')') depth--;
+                if (depth === 0 && i < t.length - 1) { ok = false; break; }
+            }
+            if (!ok) break;
+            t = t.substring(1, t.length - 1).trim();
+        }
+        return t;
+    }
+
+    function vcTryParseConditionExpr(expr) {
+        const s0 = vcStripOuterParens((expr ?? '').toString());
+        const s = s0.replaceAll('\\"', '"').trim();
+
+        const m = s.match(/^params\s*\[\s*["']([^"']+)["']\s*\]\s*(>=|<=|==|!=|>|<)\s*(.+)$/i);
+        if (!m) return null;
+
+        const field = m[1];
+        const op = m[2];
+        let raw = (m[3] ?? '').trim();
+
+        raw = vcStripOuterParens(raw);
+
+        if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+            raw = raw.substring(1, raw.length - 1).replaceAll('\\"', '"').replaceAll("\\'", "'");
+        }
+
+        return { field, op, value: raw };
+    }
+
+    function vcTryParseValueExpr(expr, action) {
+        const act = (action ?? '').toString().toLowerCase();
+        let s = vcStripOuterParens((expr ?? '').toString()).trim();
+
+        // discount رقم بسيط فقط
+        if (act === 'discount') {
+            const ns = s.replace(/\s+/g, '');
+            if (ns !== '' && !Number.isNaN(Number(ns))) {
+                return { mode: 'once', amount: s, threshold: '', fieldFromValue: '' };
+            }
+            return null;
+        }
+
+        const ns = s.replace(/\s+/g, '');
+
+        // (params["x"]-5)*80
+        let m = ns.match(/^\(?(params\[\s*["']([^"']+)["']\s*\]-([0-9]+(?:\.[0-9]+)?))\)?\*([0-9]+(?:\.[0-9]+)?)$/i);
+        if (m) {
+            return { mode: 'extra_over', fieldFromValue: m[2], threshold: m[3], amount: m[4] };
+        }
+
+        // params["x"]*80
+        m = ns.match(/^params\[\s*["']([^"']+)["']\s*\]\*([0-9]+(?:\.[0-9]+)?)$/i);
+        if (m) {
+            return { mode: 'per_unit', fieldFromValue: m[1], threshold: '', amount: m[2] };
+        }
+
+        // once numeric literal
+        if (!Number.isNaN(Number(ns)) && ns !== '') {
+            return { mode: 'once', fieldFromValue: '', threshold: '', amount: s };
+        }
+
+        return null;
+    }
+
+    function vcSetMode(prefix, mode) {
+        const m = mode || 'once';
+        const el = document.querySelector(`input[name="${prefix}-b-mode"][value="${m}"]`);
+        if (el) el.checked = true;
+    }
+
+    function vcWireBuilder(prefix, ids, options) {
+        options = options || {};
+        const initFromInputs = !!options.initFromInputs;
+
         const fieldEl = document.getElementById(`${prefix}-b-field`);
         const opEl = document.getElementById(`${prefix}-b-op`);
         const valEl = document.getElementById(`${prefix}-b-val`);
@@ -350,11 +530,20 @@
         const condInput = document.getElementById(ids.conditionId);
         const valInput = document.getElementById(ids.valueId);
 
+        vcRefreshBuilderFieldOptions(prefix);
+
         function getMode() {
             return document.querySelector(`input[name="${prefix}-b-mode"]:checked`)?.value || 'once';
         }
 
-        function run() {
+        function getActionTextOrValue() {
+            const sel = document.getElementById(ids.actionId);
+            if (!sel) return '';
+            const opt = sel.options?.[sel.selectedIndex];
+            return (opt?.textContent ?? sel.value ?? '').toString().trim();
+        }
+
+        function run(syncToInputs) {
             const field = fieldEl?.value;
             const op = opEl?.value;
             const v = valEl?.value;
@@ -363,24 +552,57 @@
             const thr = thrEl?.value;
             const amt = amtEl?.value;
 
-            const action = document.getElementById(ids.actionId)?.value || '';
+            const actionName = getActionTextOrValue();
 
-            const cond = vcBuildCondition(field, op, v);
-            const valExpr = vcBuildValueExpr(action, amt, mode, field, thr);
+            const condBuilt = vcBuildCondition(field, op, v);
+            const valBuilt = vcBuildValueExpr(actionName, amt, mode, field, thr);
 
-            if (condInput && cond) condInput.value = cond;
-            if (valInput && valExpr) valInput.value = valExpr;
+            if (syncToInputs) {
+                if (condInput && condBuilt) condInput.value = condBuilt;
 
-            if (previewEl) previewEl.textContent = `IF ${cond || '(...)'} THEN ${valExpr || '(...)'}`;
+                // لا تكتب على ValueExpr إذا المستخدم ما حط Amount (مهم جداً أثناء Edit)
+                if (valInput && valBuilt !== '') valInput.value = valBuilt;
+            }
+
+            const condShown = condBuilt || condInput?.value || '(...)';
+            const valShown = (valBuilt !== '' ? valBuilt : (valInput?.value || '(...)'));
+            if (previewEl) previewEl.textContent = `IF ${condShown} THEN ${valShown}`;
         }
 
-        [fieldEl, opEl, valEl, amtEl, thrEl].forEach(x => x && x.addEventListener('input', run));
-        [fieldEl, opEl].forEach(x => x && x.addEventListener('change', run));
-        document.querySelectorAll(`input[name="${prefix}-b-mode"]`).forEach(r => r.addEventListener('change', run));
+        if (initFromInputs && condInput && valInput) {
+            const c = vcTryParseConditionExpr(condInput.value);
+            const aName = getActionTextOrValue();
+            const v = vcTryParseValueExpr(valInput.value, aName);
 
-        document.getElementById(ids.actionId)?.addEventListener('change', run);
+            const fieldExists = (f) => !!(f && Array.from(fieldEl?.options || []).some(o => o.value === f));
 
-        run();
+            if (c && fieldEl && opEl && valEl && fieldExists(c.field)) {
+                fieldEl.value = c.field;
+                opEl.value = c.op;
+                valEl.value = (c.value ?? '').toString();
+            }
+
+            if (v && amtEl && thrEl) {
+                if (v.fieldFromValue && fieldEl && fieldExists(v.fieldFromValue)) fieldEl.value = v.fieldFromValue;
+                amtEl.value = (v.amount ?? '').toString();
+                thrEl.value = (v.threshold ?? '').toString();
+                vcSetMode(prefix, v.mode);
+            }
+
+            // إذا ما قدرنا نفهمها، خليها Advanced (حتى ما نخرب expressions)
+            if (!(c && v)) {
+                document.getElementById(`${prefix}-advWrap`)?.classList.remove('d-none');
+            }
+
+            run(!!(c && v));
+        } else {
+            run(true);
+        }
+
+        [fieldEl, opEl, valEl, amtEl, thrEl].forEach(x => x && x.addEventListener('input', () => run(true)));
+        [fieldEl, opEl].forEach(x => x && x.addEventListener('change', () => run(true)));
+        document.querySelectorAll(`input[name="${prefix}-b-mode"]`).forEach(r => r.addEventListener('change', () => run(true)));
+        document.getElementById(ids.actionId)?.addEventListener('change', () => run(true));
     }
 
     function vcToggleAdvanced(prefix) {
@@ -413,40 +635,34 @@
         const addWrap = document.getElementById('vsAddRuleForm');
         if (!addWrap) return;
 
-        // إذا انحقن قبل لا تعيد
-        if (document.getElementById('vs-add-rule-builderWrap')) return;
+        // إذا انحقن قبل لا تعيد (بس حدّث الـ fields)
+        if (document.getElementById('vs-add-rule-builderWrap')) {
+            vcRefreshBuilderFieldOptions('vs-add-rule');
+            return;
+        }
 
-        // لازم تكون موجودة inputs الأصلية
         const cond = document.getElementById('vs-add-rule-conditionExpr');
         const val = document.getElementById('vs-add-rule-valueExpr');
         const action = document.getElementById('vs-add-rule-action');
         if (!cond || !val || !action) return;
 
-        // لفّ الحقول الأصلية (Advanced)
-        // إذا عندك wrapper جاهز بالـ cshtml ما رح يأثر، بس هون حل عام
         const advWrap = document.createElement('div');
         advWrap.id = 'vs-add-rule-advWrap';
         advWrap.className = 'd-none';
 
-        // نقل الحقول (Condition/Value) جوّا Advanced
-        // ملاحظة: ما منغيّر IDs ولا Name
         const condCol = cond.closest('.col-12') || cond.parentElement;
         const valCol = val.closest('.col-12') || val.parentElement;
 
-        // في حال structure مختلفة، بنحافظ قد ما فينا
         if (valCol) advWrap.appendChild(valCol);
         if (condCol && condCol !== valCol) advWrap.appendChild(condCol);
 
-        // Inject builder قبل الـ advanced
         const builderWrap = document.createElement('div');
         builderWrap.id = 'vs-add-rule-builderWrap';
         builderWrap.innerHTML = vcBuilderHtml('vs-add-rule');
 
-        // حطهم بأول الفورم (أو قبل زر الحفظ حسب هيكل صفحتك)
         addWrap.prepend(advWrap);
         addWrap.prepend(builderWrap);
 
-        // Wire builder to existing fields
         vcWireBuilder('vs-add-rule', {
             conditionId: 'vs-add-rule-conditionExpr',
             valueId: 'vs-add-rule-valueExpr',
@@ -546,7 +762,7 @@
                       <div class="text-danger small mt-1" id="err-vs-rule-${idx}-active"></div>
                     </div>
 
-                    <!-- Advanced expressions (same inputs, hidden by default) -->
+                    <!-- Advanced expressions -->
                     <div class="col-12 d-none" id="vs-rule-${idx}-advWrap">
                       <div class="row g-2">
                         <div class="col-12 col-md-8">
@@ -613,14 +829,14 @@
             setEnumSelect($(`vs-rule-${idx}-action`), r.action);
         });
 
-        // wire builder فقط للي عم تنعدل
+        // wire builder فقط للي عم تنعدل (وبـ init من DB)
         if (editingRuleIndex !== null && editingRuleIndex >= 0) {
             const idx = editingRuleIndex;
             vcWireBuilder(`vs-rule-${idx}`, {
                 conditionId: `vs-rule-${idx}-conditionExpr`,
                 valueId: `vs-rule-${idx}-valueExpr`,
                 actionId: `vs-rule-${idx}-action`
-            });
+            }, { initFromInputs: true });
         }
     }
 
@@ -647,6 +863,9 @@
 
         $('vs-schema').textContent = svc?.configSchema ? JSON.stringify(svc.configSchema, null, 2) : '';
         $('vs-basic-config').value = ''; // فارغة = لا تغيير
+
+        // ✅ Dynamic fields from schema
+        vcSetRuleVarsForService(svc);
 
         setBasicMode(false);
         renderRules(svc?.pricingRules ?? []);
@@ -722,13 +941,11 @@
             const prefix = b.getAttribute('data-prefix');
             if (!prefix) return;
 
-            // add rule advanced
             if (prefix === 'vs-add-rule') {
                 document.getElementById('vs-add-rule-advWrap')?.classList.toggle('d-none');
                 return;
             }
 
-            // edit rule advanced
             vcToggleAdvanced(prefix);
             return;
         }
