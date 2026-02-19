@@ -1,4 +1,4 @@
-﻿using Ganss.Xss;
+using Ganss.Xss;
 using Markdig;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -139,7 +139,7 @@ namespace WitcherHub.Pages.Contracts
             if (string.IsNullOrWhiteSpace(contract.Terms))
             {
                 if (contract.Items == null || contract.Items.Count == 0)
-                    return BadRequest("Contract has no line items.");
+                    return BadRequest("Contract has no Positions.");
 
                 var req = BuildRequestFromDb(contract);
                 var doc = await _generator.GenerateAsync(req, ct);

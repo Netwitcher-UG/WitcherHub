@@ -3,7 +3,7 @@
 @using static WitcherHub.Infrastructure.Data.Models.Enums
 
 @{
-    ViewData["Title"] = "Add Line Item";
+    ViewData["Title"] = "Add Position";
 }
 
 @if (Model.Quote is null)
@@ -18,7 +18,7 @@
 
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
     <div>
-        <div class="text-muted small">Add line item to</div>
+        <div class="text-muted small">Add Position to</div>
         <h3 class="mb-1">@Model.Quote.QuoteNo</h3>
         <div class="text-muted small">
             Status: <strong>@Model.Quote.Status</strong> &nbsp;|&nbsp;

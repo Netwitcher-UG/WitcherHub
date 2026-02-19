@@ -3,7 +3,7 @@
 @using static WitcherHub.Infrastructure.Data.Models.Enums
 
 @{
-    ViewData["Title"] = "Add Invoice Line Item";
+    ViewData["Title"] = "Add Invoice Position";
 }
 
 @if (Model.Invoice is null)
@@ -14,7 +14,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-        <h3 class="mb-1">Add Line Item</h3>
+        <h3 class="mb-1">Add Position</h3>
         <div class="text-muted small">
             Invoice: <strong>@Model.Invoice.InvoiceNo</strong> |
             Status: <strong>@Model.Invoice.Status</strong> |

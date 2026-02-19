@@ -555,7 +555,7 @@
                 if (itemsLink && cid && canUpdate) {
                     itemsLink.href = `/Contracts/Items/Manage?contractId=${encodeURIComponent(cid)}&toast=noItems`;
                     itemsLink.classList.remove('d-none');
-                    itemsLink.textContent = 'Add line items'; // أو خلّها Line Items إذا تحب
+                    itemsLink.textContent = 'Add Positions'; // أو خلّها Line Items إذا تحب
                 } else {
                     itemsLink?.classList.add('d-none');
                 }
@@ -570,7 +570,7 @@
 
                 // (اختياري) خلي التحذير داخل الـ Preview فقط
                 $('vpContractPreview').innerHTML =
-                    '<div class="alert alert-warning mb-0">This contract has no line items. Please add at least one line item to continue.</div>';
+                    '<div class="alert alert-warning mb-0">This contract has no Positions. Please add at least one line item to continue.</div>';
 
                 showContractEmpty(false);
                 showContractPreview(true);
@@ -1000,7 +1000,7 @@
 
         try {
             btn.disabled = true;
-            window.UI?.loading?.show?.('Preparing line items...');
+            window.UI?.loading?.show?.('Preparing Positions...');
 
             const token = document.getElementById('antiForgeryToken')?.value || '';
             const joiner = urlBase.includes('?') ? '&' : '?';

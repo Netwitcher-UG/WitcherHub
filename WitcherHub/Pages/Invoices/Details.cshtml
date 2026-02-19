@@ -1,9 +1,11 @@
 @page
 @using System.Text.Json
+@using WitcherHub.Application.Models.View.Invoices
 @model WitcherHub.Pages.Invoices.DetailsModel
 
 @{
     ViewData["Title"] = "Invoice Details";
+    // ✅ Keep the site layout (no Layout=null)
 }
 
 @if (Model.Invoice is null)
@@ -20,8 +22,30 @@
             if (doc is null) return fallback;
             var root = doc.RootElement;
             if (!root.TryGetProperty(prop, out var v)) return fallback;
+
             if (v.ValueKind == JsonValueKind.Number && v.TryGetDecimal(out var d)) return d;
             if (v.ValueKind == JsonValueKind.String && decimal.TryParse(v.GetString(), out var ds)) return ds;
+
+            return fallback;
+        }
+        catch { return fallback; }
+    }
+
+    decimal ReadNestedDec(JsonDocument? doc, string parent, string prop, decimal fallback = 0m)
+    {
+        try
+        {
+            if (doc is null) return fallback;
+
+            var root = doc.RootElement;
+            if (!root.TryGetProperty(parent, out var p) || p.ValueKind != JsonValueKind.Object)
+                return fallback;
+
+            if (!p.TryGetProperty(prop, out var v)) return fallback;
+
+            if (v.ValueKind == JsonValueKind.Number && v.TryGetDecimal(out var d)) return d;
+            if (v.ValueKind == JsonValueKind.String && decimal.TryParse(v.GetString(), out var ds)) return ds;
+
             return fallback;
         }
         catch { return fallback; }
@@ -29,70 +53,191 @@
 }
 
 @{
-    var items = Model.Invoice.Items.OrderBy(x => x.Position).ToList();
-    decimal total = 0m;
-    foreach (var it in items)
-        total += ReadDec(it.PriceBreakdown, "total", it.LineTotal);
+    InvoiceViews.InvoiceDetailsView inv = Model.Invoice;
+
+    var items = (inv.Items ?? new List<InvoiceViews.InvoiceItemItemView>())
+        .OrderBy(x => x.Position)
+        .ToList();
+
+    // Totals (prefer inv.Totals if available)
+    decimal subtotal = inv.Totals?.Subtotal ?? 0m;
+    decimal taxTotal = inv.Totals?.TaxTotal ?? 0m;
+    decimal totalAll = inv.Totals?.Total ?? 0m;
+
+    // Fallback if Totals is null
+    if (inv.Totals is null)
+    {
+        foreach (var it in items)
+        {
+            subtotal += ReadDec(it.PriceBreakdown, "subTotal", it.LineTotal);
+            taxTotal += ReadNestedDec(it.PriceBreakdown, "tax", "amount", 0m);
+            totalAll += ReadDec(it.PriceBreakdown, "total", it.LineTotal);
+        }
+    }
+
+    var currency = inv.Currency ?? "EUR";
+
+    // Show like: "Tax (19%)" if TaxName exists, otherwise "Tax"
+    var taxLabel = !string.IsNullOrWhiteSpace(inv.TaxName)
+        ? $"Tax ({inv.TaxName})"
+        : "Tax";
 }
+
+<style>
+    /* PDF-like table inside the existing site layout */
+    .pdf-table-wrap {
+        max-width: 980px;
+        margin: 0 auto;
+    }
+
+    .pdf-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: Arial, Helvetica, sans-serif;
+        background: transparent;
+    }
+
+        .pdf-table thead th {
+            font-size: 12px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,.55); /* dark theme friendly */
+            padding: 10px 8px;
+            border-bottom: 1px solid rgba(255,255,255,.15);
+            font-weight: 600;
+        }
+
+        .pdf-table tbody td {
+            padding: 12px 8px;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+            font-size: 14px;
+            color: rgba(255,255,255,.85);
+            vertical-align: top;
+        }
+
+        .pdf-table .col-desc {
+            width: auto;
+        }
+
+        .pdf-table .col-qty {
+            width: 140px;
+            text-align: right;
+        }
+
+        .pdf-table .col-amt {
+            width: 180px;
+            text-align: right;
+        }
+
+    .pdf-totals {
+        width: 360px;
+        margin-left: auto;
+        margin-top: 12px;
+        font-family: Arial, Helvetica, sans-serif;
+    }
+
+        .pdf-totals .rowx {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+            font-size: 14px;
+            color: rgba(255,255,255,.8);
+        }
+
+            .pdf-totals .rowx:last-child {
+                border-bottom: 0;
+            }
+
+        .pdf-totals .label {
+            color: rgba(255,255,255,.55);
+        }
+
+        .pdf-totals .value {
+            text-align: right;
+            min-width: 140px;
+            font-weight: 600;
+            color: rgba(255,255,255,.9);
+        }
+
+    /* Optional: print-friendly */
+    @@media print {
+        .pdf-table-wrap {
+            max-width: 100%;
+        }
+
+        .card {
+            box-shadow: none !important;
+        }
+    }
+</style>
 
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
     <div>
         <div class="text-muted small">Invoice</div>
-        <h3 class="mb-1">@Model.Invoice.InvoiceNo</h3>
+        <h3 class="mb-1">@inv.InvoiceNo</h3>
         <div class="text-muted small">
-            Status: <strong>@Model.Invoice.Status</strong> | Currency: <strong>@Model.Invoice.Currency</strong>
+            Status: <strong>@inv.Status</strong> &nbsp;|&nbsp;
+            Currency: <strong>@currency</strong>
         </div>
     </div>
 
     <div class="d-flex gap-2 flex-wrap">
-        <a class="btn btn-outline-secondary" asp-page="/Invoices/Edit" asp-route-id="@Model.Invoice.Id">Back to edit</a>
+        <a class="btn btn-outline-secondary" asp-page="/Invoices/Edit" asp-route-id="@inv.Id">Back to edit</a>
         <a class="btn btn-outline-secondary"
            asp-page="/Projects"
-           asp-route-openProjectId="@Model.Invoice.ProjectId"
-           asp-route-tab="overview">Project</a>
+           asp-route-openProjectId="@inv.ProjectId"
+           asp-route-openTab="invoices">Project</a>
     </div>
 </div>
 
-<div class="card">
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-12 col-md-6">
-                <div class="text-muted small">Notes</div>
-                <div>@(string.IsNullOrWhiteSpace(Model.Invoice.Notes) ? "—" : Model.Invoice.Notes)</div>
-            </div>
-            <div class="col-12 col-md-6 text-md-end">
-                <div class="text-muted small">Total</div>
-                <div class="fs-3 fw-bold">@total.ToString("0.00")</div>
-            </div>
-        </div>
-
-        <hr />
-
-        <div class="table-responsive">
-            <table class="table table-sm align-middle">
+<div class="pdf-table-wrap">
+    <div class="card">
+        <div class="card-body">
+            <table class="pdf-table">
                 <thead>
                     <tr>
-                        <th style="width:70px;">#</th>
-                        <th>Item</th>
-                        <th class="text-end" style="width:90px;">Qty</th>
-                        <th class="text-end" style="width:120px;">Unit</th>
-                        <th class="text-end" style="width:160px;">Total</th>
+                        <th class="col-desc">DESCRIPTION</th>
+                        <th class="col-qty">QUANTITY</th>
+                        <th class="col-amt">AMOUNT</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var it in items)
+                    @if (items.Count == 0)
                     {
-                        var t = ReadDec(it.PriceBreakdown, "total", it.LineTotal);
                         <tr>
-                            <td class="text-muted">@it.Position</td>
-                            <td>@it.Title</td>
-                            <td class="text-end">@it.Quantity.ToString("0.##")</td>
-                            <td class="text-end">@it.UnitPrice.ToString("0.00")</td>
-                            <td class="text-end fw-semibold">@t.ToString("0.00")</td>
+                            <td class="col-desc" style="color:rgba(255,255,255,.55);">—</td>
+                            <td class="col-qty" style="color:rgba(255,255,255,.55);">—</td>
+                            <td class="col-amt" style="color:rgba(255,255,255,.55);">0.00 @currency</td>
                         </tr>
+                    }
+                    else
+                    {
+                        @foreach (var it in items)
+                        {
+                            var lineTotal = ReadDec(it.PriceBreakdown, "total", it.LineTotal);
+
+                            <tr>
+                                <td class="col-desc">@it.Title</td>
+                                <td class="col-qty">@it.Quantity.ToString("0.##")</td>
+                                <td class="col-amt">@lineTotal.ToString("0.00") @currency</td>
+                            </tr>
+                        }
                     }
                 </tbody>
             </table>
+
+            <div class="pdf-totals">
+                <div class="rowx">
+                    <div class="label">@taxLabel</div>
+                    <div class="value">@taxTotal.ToString("0.00") @currency</div>
+                </div>
+                <div class="rowx">
+                    <div class="label">Total</div>
+                    <div class="value">@totalAll.ToString("0.00") @currency</div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

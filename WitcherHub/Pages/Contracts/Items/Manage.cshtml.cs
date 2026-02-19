@@ -126,7 +126,7 @@ namespace WitcherHub.Pages.Contracts.Items
 
                 TempData["Toast.Type"] = "success";
                 TempData["Toast.Title"] = "Added";
-                TempData["Toast.Message"] = "Line item added.";
+                TempData["Toast.Message"] = "Position added.";
 
                 return RedirectToPage("/Contracts/Items/Manage", new { contractId = ContractId });
             }
@@ -183,7 +183,7 @@ namespace WitcherHub.Pages.Contracts.Items
 
                 TempData["Toast.Type"] = "success";
                 TempData["Toast.Title"] = "Saved";
-                TempData["Toast.Message"] = "Line item updated.";
+                TempData["Toast.Message"] = "Position updated.";
 
                 return RedirectToPage("/Contracts/Items/Manage", new { contractId = ContractId });
             }
@@ -220,7 +220,7 @@ namespace WitcherHub.Pages.Contracts.Items
 
                 TempData["Toast.Type"] = "success";
                 TempData["Toast.Title"] = "Deleted";
-                TempData["Toast.Message"] = "Line item deleted.";
+                TempData["Toast.Message"] = "Position deleted.";
 
                 return RedirectToPage("/Contracts/Items/Manage", new { contractId = ContractId });
             }
@@ -248,7 +248,7 @@ namespace WitcherHub.Pages.Contracts.Items
 
                 var itemsCount = contract.Items?.Count ?? 0;
                 if (itemsCount == 0)
-                    throw new BadRequestAppException("Please add at least one line item first.");
+                    throw new BadRequestAppException("Please add at least one Position first.");
 
                 var prj = await _projects.GetProjectAsync(contract.ProjectId, ct);
                 if (prj is null) throw new NotFoundAppException("Project not found.");

@@ -126,7 +126,7 @@ namespace WitcherHub.Pages.Invoices.Items
 
                 TempData["Toast.Type"] = "success";
                 TempData["Toast.Title"] = "Added";
-                TempData["Toast.Message"] = "Line item added.";
+                TempData["Toast.Message"] = "Position added.";
 
                 return RedirectToPage("/Invoices/Edit", new { id = InvoiceId });
             }

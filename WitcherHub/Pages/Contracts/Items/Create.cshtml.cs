@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -65,7 +65,7 @@ namespace WitcherHub.Pages.Contracts.Items
             {
                 TempData["Toast.Type"] = "info";
                 TempData["Toast.Title"] = "Next step";
-                TempData["Toast.Message"] = "You were redirected here to add contract line items. Please add at least one item to continue.";
+                TempData["Toast.Message"] = "You were redirected here to add contract Positions. Please add at least one item to continue.";
             }
 
             return Page();
@@ -130,7 +130,7 @@ namespace WitcherHub.Pages.Contracts.Items
 
                 TempData["Toast.Type"] = "success";
                 TempData["Toast.Title"] = "Added";
-                TempData["Toast.Message"] = "Line item added.";
+                TempData["Toast.Message"] = "Position added.";
 
                 if (string.Equals(ReturnTo, "items", StringComparison.OrdinalIgnoreCase))
                 {

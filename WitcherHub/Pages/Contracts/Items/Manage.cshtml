@@ -1,9 +1,9 @@
-﻿@page
+@page
 @model WitcherHub.Pages.Contracts.Items.ManageModel
 @using static WitcherHub.Infrastructure.Data.Models.Enums
 
 @{
-    ViewData["Title"] = "Contract Line Items";
+    ViewData["Title"] = "Contract Positions";
 }
 
 @if (Model.Contract is null)
@@ -14,7 +14,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <div>
-        <h3 class="mb-1">Contract Line Items</h3>
+        <h3 class="mb-1">Contract Positions</h3>
         <div class="text-muted small">
             Contract: <strong>@Model.Contract.ContractNo</strong> |
             Status: <strong>@Model.Contract.Status</strong> |
@@ -60,7 +60,7 @@
         @if ((Model.Contract.Items?.Count ?? 0) == 0)
         {
             <div class="alert alert-light border mb-0">
-                No line items yet. Click <strong>Add Item</strong> to create the first one.
+                No Positions yet. Click <strong>Add Item</strong> to create the first one.
             </div>
         }
         else
@@ -131,7 +131,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content rounded-4">
             <div class="modal-header">
-                <h5 class="modal-title">Add Line Item</h5>
+                <h5 class="modal-title">Add Position</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
 
@@ -156,7 +156,7 @@
 
                         <div class="col-12 col-lg-6">
                             <label class="form-label">Title</label>
-                            <input class="form-control" name="CreateTitle" placeholder="Line item title" />
+                            <input class="form-control" name="CreateTitle" placeholder="Position title" />
                         </div>
 
                         <div class="col-12 col-md-6 col-lg-4">
@@ -196,7 +196,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content rounded-4">
             <div class="modal-header">
-                <h5 class="modal-title">Edit Line Item</h5>
+                <h5 class="modal-title">Edit Position</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
 
@@ -222,7 +222,7 @@
 
                         <div class="col-12 col-lg-6">
                             <label class="form-label">Title</label>
-                            <input class="form-control" name="EditTitle" id="editTitle" placeholder="Line item title" />
+                            <input class="form-control" name="EditTitle" id="editTitle" placeholder="Position title" />
                         </div>
 
                         <div class="col-12 col-md-6 col-lg-4">
@@ -341,7 +341,7 @@
             try { sessionStorage.removeItem('vc.toast.afterReload'); } catch { }
 
             const title = 'Next step';
-            const msg = 'You were redirected here because this contract has no line items yet. Please add at least one line item to continue.';
+            const msg = 'You were redirected here because this contract has no Positions yet. Please add at least one Position to continue.';
 
             const ui = window.UI || {};
             const toast = ui.toast || {};

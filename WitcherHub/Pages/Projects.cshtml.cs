@@ -681,8 +681,8 @@ namespace WitcherHub.Pages
                         toast = new
                         {
                             type = "warning",
-                            title = "Line items required",
-                            message = "You were redirected to add line items first."
+                            title = "Positions required",
+                            message = "You were redirected to add Positions first."
                         },
                         data = new
                         {
@@ -850,7 +850,7 @@ namespace WitcherHub.Pages
                             contractId = latest.Id,
                             redirectUrl = $"/Contracts/Items/Manage?contractId={latest.Id}&returnTo=items&toast=noItems"
                         },
-                        toast = new { type = "warning", title = "Line items required", message = "You were redirected to add line items first." }
+                        toast = new { type = "warning", title = "Positions required", message = "You were redirected to add line items first." }
                     });
                 }
 
@@ -880,7 +880,7 @@ namespace WitcherHub.Pages
                         contractId = newContractId,
                         redirectUrl = $"/Contracts/Items/Manage?contractId={newContractId}&returnTo=items&toast=noItems"
                     },
-                    toast = new { type = "success", title = "Created", message = "Contract header created. Add line items now." }
+                    toast = new { type = "success", title = "Created", message = "Contract header created. Add Positions now." }
                 });
             }
             catch
@@ -915,7 +915,7 @@ namespace WitcherHub.Pages
             // شرطك: لازم يوجد عقد + line items
             var hasItems = contract.Items != null && contract.Items.Count > 0;
             if (!hasItems)
-                return new JsonResult(new { ok = false, toast = new { type = "warning", title = "Missing line items", message = "Please add at least one line item before sending." } }) { StatusCode = 409 };
+                return new JsonResult(new { ok = false, toast = new { type = "warning", title = "Missing Positions", message = "Please add at least one line item before sending." } }) { StatusCode = 409 };
 
             // لا ترسل إذا Signed (اختياري احترافي)
             if (contract.Status == DocumentStatus.Signed || contract.SignedAt != null)

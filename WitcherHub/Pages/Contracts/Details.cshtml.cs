@@ -1,4 +1,4 @@
-﻿using Ganss.Xss;
+using Ganss.Xss;
 using Markdig;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -63,8 +63,8 @@ namespace WitcherHub.Pages.Contracts
             if (contract.Items == null || contract.Items.Count == 0)
             {
                 TempData["Toast.Type"] = "warning";
-                TempData["Toast.Title"] = "Line items required";
-                TempData["Toast.Message"] = "Please add at least one line item first.";
+                TempData["Toast.Title"] = "Positions required";
+                TempData["Toast.Message"] = "Please add at least one Position first.";
 
                 return RedirectToPage("/Contracts/Items/Create", new
                 {

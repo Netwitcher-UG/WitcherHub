@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -30,7 +30,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             // ✅ هذا مكانه الصحيح: نرمي Exception فقط (ولا نرجع JsonResult)
             if (request.Services == null || request.Services.Count == 0)
-                throw new BadRequestAppException("At least one service (line item) is required.");
+                throw new BadRequestAppException("At least one service (Position) is required.");
 
             // 1) Template
             var templatePath = Path.Combine(AppContext.BaseDirectory, _opt.BaseDePath);

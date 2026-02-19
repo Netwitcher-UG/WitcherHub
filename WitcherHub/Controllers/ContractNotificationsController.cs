@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using WitcherHub.Application.Interfaces.Email;
@@ -56,7 +56,7 @@ namespace WitcherHub.Controllers
 
             // احترافي: لا ترسل بدون line items
             if (contract.Items is null || contract.Items.Count == 0)
-                return BadRequest(new { ok = false, toast = Toast("warning", "Missing items", "Please add at least one line item before sending.") });
+                return BadRequest(new { ok = false, toast = Toast("warning", "Missing items", "Please add at least one Position before sending.") });
 
             var customer = contract.Project.Customer;
 

@@ -176,7 +176,7 @@ namespace WitcherHub.Pages.Quotes.Items
 
                 TempData["Toast.Type"] = "success";
                 TempData["Toast.Title"] = "Added";
-                TempData["Toast.Message"] = "Line item added.";
+                TempData["Toast.Message"] = "Position added.";
 
                 return RedirectToPage("/Quotes/Edit", new { id = QuoteId });
             }
