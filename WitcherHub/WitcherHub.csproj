@@ -79,7 +79,7 @@
 		<Content Include="libs\linux\**\*.*" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
 		<Content Include="libs\windows\**\*.*" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
 	</ItemGroup>
-
+	
 
 
 </Project>

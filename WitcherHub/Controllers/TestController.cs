@@ -42,6 +42,82 @@ namespace WitcherHub.Controllers
             T = t;
             _contractDoc = contractDoc;
         }
+
+
+
+        // Endpoint يرسل قالب ContractReady حسب اللغة (en/de)
+        // الملفات الموجودة عندك: ContractReady.de.html و ContractReady.en.html
+        [HttpPost("email/test-contract-ready")]
+        public async Task<IActionResult> SendTestContractReadyEmail(
+            [FromQuery] string lang = "en",
+            CancellationToken ct = default)
+        {
+            // ثبّت إيميلك هنا
+            const string myEmail = "basel.slaby@gmail.com";
+
+            // اختر اسم التيمبلت حسب ملفاتك بالضبط
+            var templateName = (lang ?? "en").Trim().ToLowerInvariant() switch
+            {
+                "de" => "ContractReady.de",
+                _ => "ContractReady.en"
+            };
+
+            var subject = "Contract ready for signature ✅";
+
+            // نفس التوكنز المستخدمة داخل القالب
+            var model = new
+            {
+                Subject = subject,                 // لو _Layout فيه {{Subject}}
+                UserName = "Basel Slaby",           // Hello {{UserName}}
+                ContractNo = "C-2026-000001",
+                ProjectTitle = "website",
+                SignedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm 'UTC'"),
+
+                // مثل اللي ظاهر بالصورة (عدّل المسار إذا عندك مختلف)
+                ActionUrl = $"{Request.Scheme}://{Request.Host}/contracts/sign/{Guid.NewGuid()}"
+            };
+
+            await _email.QueueTemplateAsync(
+                templateName: templateName,
+                model: model,
+                to: new EmailAddress(myEmail, "Me"),
+                subject: subject,
+                ct: ct);
+
+            return Ok(new { message = "Queued", templateName, to = myEmail, subject });
+        }
+
+
+        // Endpoint يرسل قالب ContractSigned.de (حسب ملفك الموجود)
+        // الملف الموجود عندك: ContractSigned.de.html
+        [HttpPost("email/test-contract-signed-de")]
+        public async Task<IActionResult> SendTestContractSignedDeEmail(CancellationToken ct = default)
+        {
+            const string myEmail = "basel.slaby@gmail.com";
+
+            var templateName = "ContractSigned.de";
+            var subject = "Contract signed ✅";
+
+            var model = new
+            {
+                Subject = subject,
+                UserName = "Basel Slaby",
+                ContractNo = "C-2026-000001",
+                ProjectTitle = "website",
+                SignedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm 'UTC'"),
+                ActionUrl = $"{Request.Scheme}://{Request.Host}/contracts/{Guid.NewGuid()}"
+            };
+
+            await _email.QueueTemplateAsync(
+                templateName: templateName,
+                model: model,
+                to: new EmailAddress(myEmail, "Me"),
+                subject: subject,
+                ct: ct);
+
+            return Ok(new { message = "Queued", templateName, to = myEmail, subject });
+        }
+
         [HttpGet("i18n-ping")]
         public IActionResult I18nPing([FromQuery] string? lang = null)
         {

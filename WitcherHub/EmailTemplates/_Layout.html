@@ -1,38 +1,116 @@
 ﻿<!doctype html>
-<html lang="ar">
+<html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>{{Subject}}</title>
+
+    <meta name="color-scheme" content="light dark">
+    <meta name="supported-color-schemes" content="light dark">
+
+    <style>
+        .legalBar {
+            background: #6B4CE6 !important;
+            background-image: linear-gradient(#6B4CE6,#6B4CE6) !important;
+        }
+
+        .legalText {
+            color: #ffffff !important;
+            opacity: 1 !important;
+        }
+
+        [data-ogsc] .legalBar {
+            background: #6B4CE6 !important;
+            background-image: linear-gradient(#6B4CE6,#6B4CE6) !important;
+        }
+
+        [data-ogsc] .legalText {
+            color: #ffffff !important;
+            opacity: 1 !important;
+        }
+
+        [data-ogsc] .pageBg {
+            background: #0b1220 !important;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .pageBg {
+                background: #0b1220 !important;
+            }
+
+            .belowText {
+                color: #cbd5e1 !important;
+            }
+        }
+    </style>
 </head>
-<body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,Helvetica,sans-serif;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;padding:24px 0;">
+
+<body class="pageBg" style="margin:0;padding:0;background:#eef1f6;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef1f6;padding:24px 0;">
         <tr>
-            <td align="center">
-                <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:10px;overflow:hidden;">
+            <td align="center" style="padding:0 12px;">
+
+                <!-- MAIN BOX -->
+                <table role="presentation" width="650" cellspacing="0" cellpadding="0"
+                       style="width:650px;max-width:650px;background:#ffffff;border-radius:28px;overflow:hidden;
+                          box-shadow:0 10px 26px rgba(17,24,39,.10);">
+
+                    <!-- Header -->
                     <tr>
-                        <td style="padding:18px 22px;background:#111827;color:#ffffff;">
-                            <div style="font-size:16px;font-weight:700;">{{AppName}}</div>
-                            <div style="font-size:12px;opacity:.85;">{{BrandLine}}</div>
+                        <td align="center"
+                            bgcolor="#6B4CE6"
+                            style="background:#6B4CE6;background-image:linear-gradient(#6B4CE6,#6B4CE6);
+                               padding:22px 18px;">
+                            <img src="{{{HeaderImageUrl}}}"
+                                 alt="NETWITCHER"
+                                 height="34"
+                                 style="display:block;margin:0 auto;border:0;
+                                    height:34px;width:auto;max-width:560px;" />
                         </td>
                     </tr>
 
+                    <!-- Body -->
                     <tr>
-                        <td style="padding:22px;">
+                        <td bgcolor="#FFFFFF"
+                            style="background:#FFFFFF;background-image:linear-gradient(#FFFFFF,#FFFFFF);
+                               padding:30px 34px;">
                             {{{Body}}}
                         </td>
                     </tr>
 
+                    <!-- Signature image -->
                     <tr>
-                        <td style="padding:14px 22px;background:#f3f4f6;color:#6b7280;font-size:12px;">
-                            {{FooterText}}
+                        <td bgcolor="#FFFFFF"
+                            style="background:#FFFFFF;background-image:linear-gradient(#FFFFFF,#FFFFFF);
+             padding:16px 24px 10px 24px;font-size:0;line-height:0;">
+                            <img src="{{{FooterSignatureUrl}}}"
+                                 width="650"
+                                 alt="Netwitcher Signature"
+                                 style="display:block;width:100%;max-width:650px;height:auto;border:0;margin:0;" />
                         </td>
                     </tr>
+
+                    
+
+                    <!-- Footer bar (NOW PURPLE) -->
+                    <tr>
+                        <td class="legalBar"
+                            align="center"
+                            bgcolor="#6B4CE6"
+                            style="background:#6B4CE6;background-image:linear-gradient(#6B4CE6,#6B4CE6);
+                               padding:14px 16px;">
+                            <div class="legalText" style="font-size:11px;color:#ffffff;">
+                                {{LegalLine}}
+                            </div>
+                        </td>
+                    </tr>
+
                 </table>
 
-                <div style="width:600px;color:#9ca3af;font-size:11px;margin-top:10px;">
-                    {{LegalLine}}
+                <div class="belowText" style="max-width:650px;color:#6b7280;font-size:12px;margin-top:10px;">
+                    {{FooterText}}
                 </div>
+
             </td>
         </tr>
     </table>
