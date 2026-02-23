@@ -43,7 +43,8 @@ namespace WitcherHub.Controllers
             _contractDoc = contractDoc;
         }
 
-#if DEBUG
+
+
         // Endpoint يرسل قالب ContractReady حسب اللغة (en/de)
         // الملفات الموجودة عندك: ContractReady.de.html و ContractReady.en.html
         [HttpPost("email/test-contract-ready")]
@@ -116,7 +117,7 @@ namespace WitcherHub.Controllers
 
             return Ok(new { message = "Queued", templateName, to = myEmail, subject });
         }
-#endif
+
         [HttpGet("i18n-ping")]
         public IActionResult I18nPing([FromQuery] string? lang = null)
         {
