@@ -101,9 +101,9 @@ namespace WitcherHub.Controllers
             var model = new
             {
                 Subject = subject,
-                UserName = "Test2 test2",
+                UserName = "Basel Slaby",
                 ContractNo = "C-2026-000001",
-                ProjectTitle = "Test",
+                ProjectTitle = "website",
                 SignedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm 'UTC'"),
                 ActionUrl = $"{Request.Scheme}://{Request.Host}/contracts/{Guid.NewGuid()}"
             };
