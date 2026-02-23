@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace WitcherHub.Controllers;
 
@@ -14,41 +15,49 @@ public class EmailAssetsController : ControllerBase
         _env = env;
     }
 
-    // 1) صورة الفوتر (Signature)
     [AllowAnonymous]
     [HttpGet("footer-signature")]
     [Produces("image/png")]
-    [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Any)]
     public IActionResult FooterSignature()
-        => PngFromWwwroot("email-assets/footer-signature.png");
+        => ImageFromWwwroot("email-assets/footer-signature.png", "image/png");
 
-    // 2) صورة watermark للبوكس (شفافة)
-    [AllowAnonymous]
-    [HttpGet("box-watermark")]
-    [Produces("image/png")]
-    [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Any)]
-    public IActionResult BoxWatermark()
-        => PngFromWwwroot("email-assets/box-watermark.png");
     [AllowAnonymous]
     [HttpGet("header")]
     [Produces("image/png")]
-    [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Any)]
     public IActionResult Header()
-    {
-        Response.Headers["Cache-Control"] = "public,max-age=31536000,immutable";
-        Response.Headers["Content-Disposition"] = "inline";
-        return PngFromWwwroot("email-assets/header.png");
-    }
-    private IActionResult PngFromWwwroot(string relativePath)
+        => ImageFromWwwroot("email-assets/header.png", "image/png");
+
+    private IActionResult ImageFromWwwroot(string relativePath, string contentType)
     {
         var path = Path.Combine(_env.WebRootPath, relativePath.Replace('/', Path.DirectorySeparatorChar));
 
         if (!System.IO.File.Exists(path))
             return NotFound(new { message = "File not found", relativePath });
 
-        // كاش قوي
-        Response.Headers["Cache-Control"] = "public,max-age=31536000,immutable";
+        var fi = new FileInfo(path);
+        var lastModified = fi.LastWriteTimeUtc;
 
-        return PhysicalFile(path, "image/png", enableRangeProcessing: true);
+        // ETag based on file length + last write time
+        var etagValue = $"\"{fi.Length:x}-{lastModified.Ticks:x}\"";
+        var etag = new EntityTagHeaderValue(etagValue);
+
+        // Force revalidation (kills the old "immutable" behavior for NEW requests)
+        Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue
+        {
+            Public = true,
+            MaxAge = TimeSpan.Zero,
+            MustRevalidate = true
+        };
+        Response.GetTypedHeaders().ETag = etag;
+        Response.GetTypedHeaders().LastModified = lastModified;
+        Response.Headers[HeaderNames.Pragma] = "no-cache";
+        Response.Headers[HeaderNames.Expires] = "0";
+        Response.Headers["Content-Disposition"] = "inline";
+
+        // If client has the same ETag -> 304
+        if (Request.Headers.TryGetValue(HeaderNames.IfNoneMatch, out var inm) && inm.ToString() == etagValue)
+            return StatusCode(StatusCodes.Status304NotModified);
+
+        return PhysicalFile(path, contentType, enableRangeProcessing: true);
     }
 }

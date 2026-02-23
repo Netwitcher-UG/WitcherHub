@@ -81,9 +81,13 @@ namespace WitcherHub.Infrastructure.Services.Email_Sender.EmailTemplates
 
             if (!string.IsNullOrWhiteSpace(publicBaseUrl))
             {
-                dict.TryAdd("FooterSignatureUrl", $"{publicBaseUrl}/api/email-assets/footer-signature");
-                dict.TryAdd("BoxWatermarkUrl", $"{publicBaseUrl}/api/email-assets/box-watermark");
-                dict.TryAdd("HeaderImageUrl", $"{publicBaseUrl}/api/email-assets/header");
+                // Version: set from env if you want, otherwise auto time-based to bust caches immediately
+                var v = Environment.GetEnvironmentVariable("WITCHERHUB_ASSETS_VERSION");
+                if (string.IsNullOrWhiteSpace(v))
+                    v = DateTime.UtcNow.ToString("yyyyMMddHHmmss"); // changes every build/send
+
+                dict.TryAdd("FooterSignatureUrl", $"{publicBaseUrl}/api/email-assets/footer-signature?v={v}");
+                dict.TryAdd("HeaderImageUrl", $"{publicBaseUrl}/api/email-assets/header?v={v}");
             }
 
             return dict;
