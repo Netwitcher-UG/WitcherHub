@@ -24,6 +24,10 @@ namespace WitcherHub.Application.Models.View.Invoices
             public decimal ItemsTotal { get; set; }
             public decimal Total { get; set; }
             public decimal BalanceDue { get; set; }
+
+            // Lexware
+            public string? LexwareVoucherStatus { get; set; }
+            public DateTimeOffset? LexwareSyncedAt { get; set; }
         }
 
         public class InvoiceDetailsView
@@ -52,8 +56,17 @@ namespace WitcherHub.Application.Models.View.Invoices
             public decimal? InvoiceDiscountValue { get; set; }
 
             public InvoiceTotalsView? Totals { get; set; }
-
             public List<InvoiceItemItemView> Items { get; set; } = new();
+
+            // Lexware
+            public string? LexwareInvoiceId { get; set; }
+            public string? LexwareVoucherNumber { get; set; }
+            public string? LexwareVoucherStatus { get; set; }
+            public string? LexwareResourceUri { get; set; }
+            public int? LexwareVersion { get; set; }
+            public DateTimeOffset? LexwareSyncedAt { get; set; }
+            public string? LexwarePdfPath { get; set; }
+            public JsonDocument? LexwareSnapshot { get; set; }
         }
 
         public class InvoiceTotalsView
@@ -87,7 +100,6 @@ namespace WitcherHub.Application.Models.View.Invoices
             public decimal? DiscountValue { get; set; }
 
             public int Position { get; set; }
-
             public decimal LineTotal { get; set; }
         }
     }

@@ -1,4 +1,4 @@
-﻿using System.Threading.Channels;
+using System.Threading.Channels;
 using WitcherHub.Application.Interfaces.BackgroundTasks;
 
 namespace WitcherHub.Infrastructure.Services.BackgroundTasks

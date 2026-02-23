@@ -101,6 +101,9 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                             CreatedAt = x.CreatedAt,
                             IssueDate = x.IssueDate,
                             DueDate = x.DueDate,
+                         
+                            LexwareVoucherStatus = x.LexwareVoucherStatus,
+                            LexwareSyncedAt = x.LexwareSyncedAt,
 
                             ItemsTotal = x.Items.Sum(i => i.Quantity * i.UnitPrice),
                             Total = x.Totals != null ? x.Totals.Total : x.Items.Sum(i => i.Quantity * i.UnitPrice),
@@ -167,7 +170,15 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
 
                             InvoiceDiscountType = x.InvoiceDiscountType,
                             InvoiceDiscountValue = x.InvoiceDiscountValue,
-
+                            LexwareInvoiceId = x.LexwareInvoiceId,
+                            LexwareVoucherNumber = x.LexwareVoucherNumber,
+                            LexwareVoucherStatus = x.LexwareVoucherStatus,
+                            LexwareResourceUri = x.LexwareResourceUri,
+                            LexwareVersion = x.LexwareVersion,
+                            LexwareSyncedAt = x.LexwareSyncedAt,
+                            LexwarePdfPath = x.LexwarePdfPath,
+                            LexwareSnapshot = x.LexwareSnapshot,
+                          
                             Totals = x.Totals == null ? null : new InvoiceViews.InvoiceTotalsView
                             {
                                 Subtotal = x.Totals.Subtotal,
@@ -220,6 +231,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
         // =========================
         public async Task<Guid> CreateAsync(InvoiceDTOs dto, CancellationToken ct = default)
         {
+            EnsureManualInvoicesEnabled();
             if (dto is null) throw new BadRequestAppException("Invalid payload.");
             if (dto.Invoice.ProjectId == Guid.Empty) throw new BadRequestAppException("Invalid project id.");
 
@@ -323,6 +335,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
         // =========================
         public async Task UpdateAsync(Guid id, UpdateInvoiceDto dto, CancellationToken ct = default)
         {
+            EnsureManualInvoicesEnabled();
             if (id == Guid.Empty) throw new BadRequestAppException("Invalid invoice id.");
             if (dto is null) throw new BadRequestAppException("Invalid payload.");
 
@@ -403,6 +416,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
         // =========================
         public async Task DeleteAsync(Guid id, CancellationToken ct = default)
         {
+            EnsureManualInvoicesEnabled();
             if (id == Guid.Empty) throw new BadRequestAppException("Invalid invoice id.");
 
             var repo = _unitOfWork.Repo<Invoice>();
@@ -427,6 +441,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
         // =========================
         public async Task<Guid> CreateItemAsync(CreateInvoiceItemDto dto, CancellationToken ct = default)
         {
+            EnsureManualInvoicesEnabled();
             if (dto is null) throw new BadRequestAppException("Invalid payload.");
             if (dto.InvoiceId == Guid.Empty) throw new BadRequestAppException("Invalid invoice id.");
 
@@ -489,6 +504,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
         // =========================
         public async Task UpdateItemAsync(UpdateInvoiceItemDto dto, CancellationToken ct = default)
         {
+            EnsureManualInvoicesEnabled();
             if (dto is null) throw new BadRequestAppException("Invalid payload.");
             if (dto.InvoiceId == Guid.Empty) throw new BadRequestAppException("Invalid invoice id.");
             if (dto.ItemId == Guid.Empty) throw new BadRequestAppException("Invalid item id.");
@@ -549,6 +565,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
         // =========================
         public async Task DeleteItemAsync(DeleteInvoiceItemDto dto, CancellationToken ct = default)
         {
+            EnsureManualInvoicesEnabled();
             if (dto is null) throw new BadRequestAppException("Invalid payload.");
             if (dto.InvoiceId == Guid.Empty) throw new BadRequestAppException("Invalid invoice id.");
             if (dto.ItemId == Guid.Empty) throw new BadRequestAppException("Invalid item id.");
@@ -908,5 +925,18 @@ private static (decimal subTotal, decimal discountAmount, decimal taxAmount) Rea
                 .Replace("%", "!%")
                 .Replace("_", "!_")
                 .Replace("[", "![");
+        // =========================
+        // FEATURE GATE
+        // =========================
+        // For now we do NOT allow creating/editing invoices inside WitcherHub.
+        // Invoices are generated/managed in Lexware and only displayed here.
+        private const bool ManualInvoicesEnabled = false;
+
+        private static void EnsureManualInvoicesEnabled()
+        {
+            if (!ManualInvoicesEnabled)
+                throw new BadRequestAppException("Manual invoice management is disabled. Invoices are managed in Lexware.");
+        }
     }
-}
+
+    }

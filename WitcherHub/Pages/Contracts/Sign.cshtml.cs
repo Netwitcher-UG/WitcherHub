@@ -3,19 +3,23 @@ using Markdig;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using WitcherHub.Application.Interfaces;
+using WitcherHub.Application.Interfaces.BackgroundTasks;
 using WitcherHub.Application.Interfaces.Email;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Models.Email;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
 using WitcherHub.Infrastructure.Services.Contracts;
+using WitcherHub.Infrastructure.Services.Lexware;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Pages.Contracts
 {
+   
     public class SignModel : PageModel
     {
         private readonly AppDbContext _db;
@@ -25,6 +29,8 @@ namespace WitcherHub.Pages.Contracts
         private readonly IEmailSender _emailSender;
         private readonly ILogger<SignModel> _logger;
         private readonly IPdfGenerator _pdf;
+        private readonly IBackgroundTaskQueue _bg;
+        private readonly IServiceScopeFactory _scopeFactory;
 
         public SignModel(
     AppDbContext db,
@@ -33,7 +39,7 @@ namespace WitcherHub.Pages.Contracts
     IEmailTemplateRenderer templates,
     IEmailSender emailSender,
     ILogger<SignModel> logger,
-    IPdfGenerator pdf)
+    IPdfGenerator pdf, IBackgroundTaskQueue bg, IServiceScopeFactory scopeFactory)
         {
             _db = db;
             _generator = generator;
@@ -42,6 +48,8 @@ namespace WitcherHub.Pages.Contracts
             _emailSender = emailSender;
             _logger = logger;
             _pdf = pdf;
+            _bg = bg;
+            _scopeFactory = scopeFactory;
         }
 
 
@@ -255,6 +263,36 @@ namespace WitcherHub.Pages.Contracts
             });
 
             await _db.SaveChangesAsync(ct);
+
+            // ✅ بعد حفظ التوقيع: ابعث العقد لـ Lexware (بالخلفية)
+            //await _bg.QueueAsync(async token =>
+            //{
+            //    // مهم: استخدم scope جديد لأن DbContext scoped
+            //    using var scope = HttpContext.RequestServices.CreateScope();
+            //    var svc = scope.ServiceProvider.GetRequiredService<LexwareInvoiceSyncService>();
+            //    await svc.CreateFromContractAsync(Id, token);
+            //});
+            var contractId = Id;
+            _logger.LogInformation("Queued lexware job for ContractId={Id}", contractId);
+
+            await _bg.QueueAsync(async token =>
+            {
+                using var scope = _scopeFactory.CreateScope();
+                try
+                {
+                    _logger.LogInformation("Lexware job START ContractId={Id}", contractId);
+
+                    var lex = scope.ServiceProvider.GetRequiredService<LexwareInvoiceSyncService>();
+                    await lex.CreateFromContractAsync(contractId, token);
+
+                    _logger.LogInformation("Lexware job DONE ContractId={Id}", contractId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lexware job FAILED ContractId={Id}", contractId);
+                    throw;
+                }
+            });
 
             // ✅ إشعار: الإيميل لازم ينرسل حتى لو الـ PDF فشل
             try

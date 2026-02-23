@@ -204,9 +204,9 @@
                                     <input class="form-control" id="vp-invoices-q" placeholder="Search invoices..." />
                                     <button class="btn btn-outline-secondary" type="button" id="vp-invoices-searchBtn">Search</button>
                                 </div>
-
-                                <a class="btn btn-primary" href="#" id="vp-newInvoiceBtn2">+ New Invoice</a>
-                            </div>
+                                <span class="badge bg-secondary">Managed in Lexware</span>
+@*                                 <a class="btn btn-primary" href="#" id="vp-newInvoiceBtn2">+ New Invoice</a>
+ *@                            </div>
 
                             <div id="vpInvoicesLoading" class="text-muted small d-none">Loading invoices...</div>
 
@@ -335,8 +335,8 @@
         const c = document.getElementById('vp-newContractBtn');
         if (c) c.href = projectId ? `/Contracts/Create?projectId=${encodeURIComponent(projectId)}` : '#';
 
-        const i = document.getElementById('vp-newInvoiceBtn');
-        if (i) i.href = projectId ? `/Invoices/Create?projectId=${encodeURIComponent(projectId)}` : '#';
+        // const i = document.getElementById('vp-newInvoiceBtn');
+        // if (i) i.href = projectId ? `/Invoices/Create?projectId=${encodeURIComponent(projectId)}` : '#';
       });
 
       modalEl.addEventListener('shown.bs.modal', function () {

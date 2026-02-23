@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Localization;
+using Microsoft.AspNetCore.Localization;
 using Serilog;
 using System.Globalization;
 using System.Text;

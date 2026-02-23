@@ -36,6 +36,7 @@ using WitcherHub.Infrastructure.Services.HostedServices;
 using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Infrastructure.Services.OpenAI;
 using WitcherHub.Infrastructure.Services.Pdf;
+using QueuedHostedService = WitcherHub.Infrastructure.Services.BackgroundTasks.QueuedHostedService;
 
 namespace WitcherHub.Infrastructure
 {
@@ -73,10 +74,11 @@ namespace WitcherHub.Infrastructure
             .AddEntityFrameworkStores<AppDbContext>();
 
             //======= Lexware =======
-            services.Configure<LexwareOptions>(
-                configuration.GetSection(LexwareOptions.SectionName));
+      
+            services.Configure<LexwareOptions>(configuration.GetSection(LexwareOptions.SectionName));
 
-            services.AddHttpClient<ILexwareClient, LexwareClient>((sp, client) =>
+            // سجّل LexwareClient كـ typed client
+            services.AddHttpClient<LexwareClient>((sp, client) =>
             {
                 var options = sp.GetRequiredService<IOptions<LexwareOptions>>().Value;
 
@@ -87,6 +89,9 @@ namespace WitcherHub.Infrastructure
                     new MediaTypeWithQualityHeaderValue("application/json"));
             });
 
+            // وخلي ILexwareClient يرجّع نفس LexwareClient (حتى LexwareSyncService يضل شغال)
+            services.AddScoped<ILexwareClient>(sp => sp.GetRequiredService<LexwareClient>());
+            services.AddScoped<LexwareInvoiceSyncService>();
             //======= OpenAI =======
             services.Configure<OpenAIOptions>(
                 configuration.GetSection(OpenAIOptions.SectionName));
@@ -142,6 +147,7 @@ namespace WitcherHub.Infrastructure
 
             // Hosted background worker
             services.AddHostedService<QueuedHostedService>();
+
 
             // Email sender + template renderer
             services.AddTransient<IEmailSender, MailKitEmailSender>();

@@ -42,6 +42,29 @@ namespace WitcherHub.Infrastructure.Data.Models
         public DateTimeOffset? IssuedAt { get; set; }
         public DateTimeOffset? PaidAt { get; set; }
 
+        // Invoice.cs (داخل class Invoice)
+        [MaxLength(80)]
+        public string? LexwareInvoiceId { get; set; } // UUID من Lexware (نخزنه كنص)
+
+        [MaxLength(50)]
+        public string? LexwareVoucherNumber { get; set; } // رقم الفاتورة الرسمي من Lexware
+
+        [MaxLength(20)]
+        public string? LexwareVoucherStatus { get; set; } // draft/open/paid/voided
+
+        [MaxLength(300)]
+        public string? LexwareResourceUri { get; set; }
+
+        public int? LexwareVersion { get; set; }
+
+        public DateTimeOffset? LexwareSyncedAt { get; set; }
+
+        [MaxLength(400)]
+        public string? LexwarePdfPath { get; set; } // وين خزّنا الـ PDF عندنا
+
+        [Column(TypeName = "jsonb")]
+        public JsonDocument? LexwareSnapshot { get; set; } // نسخة JSON من GET invoice للتشخيص/العرض
+
         public ICollection<InvoiceItem> Items { get; set; } = new List<InvoiceItem>();
         public InvoiceTotal? Totals { get; set; }
 

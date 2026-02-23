@@ -381,18 +381,32 @@
 
         try {
             const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
-            const json = await res.json();
+            const json = await res.json().catch(() => ({}));
 
             if (!res.ok) {
                 toastFromPayload(json, 'Error', 'Failed to load invoices.');
                 return;
             }
 
-            const data = json.data ?? json;
-            const items = data.items ?? data.Items ?? [];
+            const root = json ?? {};
+            const data = root.data ?? root;
+
+            // ✅ مرن مع كل الأشكال: data/items أو data.data.items أو data.result.items
+            const list =
+                (data && (data.items || data.Items)) ? data :
+                    (data.data ?? data.Data ?? data.result ?? data.Result ?? data);
+
+            const itemsRaw = list.items ?? list.Items ?? [];
+            const items = Array.isArray(itemsRaw) ? itemsRaw : [];
 
             const tbody = $('vpInvoicesTbody');
-            if (tbody) tbody.innerHTML = '';
+            if (!tbody) {
+                setInvoicesLoading(false);
+                toastError('Invoices table not found (vpInvoicesTbody).', 'Error');
+                return;
+            }
+
+            tbody.innerHTML = '';
 
             if (!items.length) {
                 setInvoicesLoading(false);
@@ -411,30 +425,40 @@
                 const dueDate = inv.dueDate ?? inv.DueDate;
                 const total = inv.total ?? inv.Total ?? inv.itemsTotal ?? inv.ItemsTotal ?? 0;
 
+                const totalNum = Number(total);
+                const totalText = Number.isFinite(totalNum) ? totalNum.toFixed(2) : '0.00';
+
+                // ✅ يفتح PDF مباشرة (بدون Layout) بتبويب جديد
+                const pdfUrl = `/Invoices/Details?id=${encodeURIComponent(id)}&handler=Pdf`;
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${esc(invoiceNo)}</td>
-                    <td>${invoiceStatusBadge(status)}</td>
-                    <td>${esc(fmtDate(createdAt))}</td>
-                    <td>${esc(fmtDate(issueDate))}</td>
-                    <td>${esc(fmtDate(dueDate))}</td>
-                    <td class="text-end">${Number(total).toFixed(2)}</td>
-                    <td class="text-end">
-                        <a class="btn btn-sm btn-outline-primary" href="/Invoices/Details?id=${encodeURIComponent(id)}">Details</a>
-                    </td>
-                `;
+                <td>${esc(invoiceNo)}</td>
+                <td>${invoiceStatusBadge(status)}</td>
+                <td>${esc(fmtDate(createdAt))}</td>
+                <td>${esc(fmtDate(issueDate))}</td>
+                <td>${esc(fmtDate(dueDate))}</td>
+                <td class="text-end">${totalText}</td>
+                <td class="text-end">
+                    <a class="btn btn-sm btn-outline-primary"
+                       href="${pdfUrl}"
+                       target="_blank" rel="noopener">
+                       Details
+                    </a>
+                </td>
+            `;
                 tbody.appendChild(tr);
             }
 
             setInvoicesLoading(false);
             setInvoicesEmpty(false);
             setInvoicesVisible(true);
-            buildInvoicesPager(data);
+            buildInvoicesPager(list);
             invoicesState.loadedOnce = true;
         } catch (err) {
             console.error(err);
             setInvoicesLoading(false);
-            toastError('Failed to load invoices.', 'Error');
+            toastError(`Failed to load invoices. ${err?.message ?? ''}`, 'Error');
         }
     }
 

@@ -9,6 +9,10 @@ namespace WitcherHub.Application.Models.DTO.Invoices
     {
         public InvoiceDto Invoice { get; set; } = new();
         public List<InvoiceItemDto> Items { get; set; } = new();
+        public string? LexwareInvoiceId { get; set; }
+        public string? LexwareVoucherNumber { get; set; }
+        public string? LexwareVoucherStatus { get; set; }
+        public string? LexwarePdfPath { get; set; }
     }
 
     public class InvoiceDto
