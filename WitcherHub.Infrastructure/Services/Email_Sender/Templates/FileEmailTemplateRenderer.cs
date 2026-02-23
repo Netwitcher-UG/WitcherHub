@@ -67,12 +67,22 @@ namespace WitcherHub.Infrastructure.Services.Email_Sender.EmailTemplates
             var year = DateTime.UtcNow.Year.ToString();
             dict.TryAdd("Year", year);
 
-            // جهّز LegalLine بعد إدخال السنة (بدون nested tokens)
+            // LegalLine with Year
             if (!dict.ContainsKey("LegalLine"))
             {
                 var legal = _opt.LegalLine ?? "";
                 legal = legal.Replace("{{Year}}", year, StringComparison.OrdinalIgnoreCase);
                 dict["LegalLine"] = legal;
+            }
+
+            // ✅ Inject image URLs automatically (no endpoint changes)
+            var publicBaseUrl = Environment.GetEnvironmentVariable("WITCHERHUB_PUBLIC_BASE_URL") ?? "";
+            publicBaseUrl = publicBaseUrl.Trim().TrimEnd('/');
+
+            if (!string.IsNullOrWhiteSpace(publicBaseUrl))
+            {
+                dict.TryAdd("FooterSignatureUrl", $"{publicBaseUrl}/api/email-assets/footer-signature");
+                dict.TryAdd("BoxWatermarkUrl", $"{publicBaseUrl}/api/email-assets/box-watermark");
             }
 
             return dict;
