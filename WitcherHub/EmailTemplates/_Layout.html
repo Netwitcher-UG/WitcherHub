@@ -9,10 +9,10 @@
     <meta name="supported-color-schemes" content="light dark">
 
     <style>
-        /* Default: dark-safe (works best in Gmail too) */
+        /* footer bar (cyan like full box image) */
         .legalBar {
-            background: #6B4CE6 !important; /* logo purple */
-            background-image: linear-gradient(#6B4CE6,#6B4CE6) !important;
+            background: #3CBEE6 !important;
+            background-image: linear-gradient(#3CBEE6,#3CBEE6) !important;
         }
 
         .legalText {
@@ -20,36 +20,10 @@
             opacity: 1 !important;
         }
 
-        /* Light mode: turn it yellow (clients that respect it) */
-        @media (prefers-color-scheme: light) {
-            .legalBar {
-                background: #F7D84B !important; /* logo yellow */
-                background-image: linear-gradient(#F7D84B,#F7D84B) !important;
-            }
-
-            .legalText {
-                color: #111827 !important;
-                opacity: .85 !important;
-            }
-        }
-
-        /* Dark mode: keep purple */
-        @media (prefers-color-scheme: dark) {
-            .legalBar {
-                background: #6B4CE6 !important;
-                background-image: linear-gradient(#6B4CE6,#6B4CE6) !important;
-            }
-
-            .legalText {
-                color: #ffffff !important;
-                opacity: 1 !important;
-            }
-        }
-
-        /* Outlook mobile dark-mode hook */
+        /* Outlook mobile dark-mode hook (keep same colors) */
         [data-ogsc] .legalBar {
-            background: #6B4CE6 !important;
-            background-image: linear-gradient(#6B4CE6,#6B4CE6) !important;
+            background: #3CBEE6 !important;
+            background-image: linear-gradient(#3CBEE6,#3CBEE6) !important;
         }
 
         [data-ogsc] .legalText {
@@ -69,14 +43,6 @@
             .belowText {
                 color: #cbd5e1 !important;
             }
-
-            .sigMuted {
-                color: #94a3b8 !important;
-            }
-
-            .sigTitle, .sigLink {
-                color: #ffffff !important;
-            }
         }
     </style>
 </head>
@@ -91,15 +57,15 @@
                        style="width:650px;max-width:650px;background:#ffffff;border-radius:28px;overflow:hidden;
                       box-shadow:0 10px 26px rgba(17,24,39,.10);">
 
-                    <!-- Header -->
+                    <!-- Header IMAGE (replaces text) -->
                     <tr>
-                        <td align="center"
-                            bgcolor="#6B4CE6"
+                        <td bgcolor="#6B4CE6"
                             style="background:#6B4CE6;background-image:linear-gradient(#6B4CE6,#6B4CE6);
-                       padding:22px 18px;">
-                            <div style="font-size:34px;font-weight:800;letter-spacing:2px;color:#ffffff;line-height:1;">
-                                NETWITCHER
-                            </div>
+                                   padding:0;">
+                            <img src="{{{HeaderImageUrl}}}"
+                                 width="650"
+                                 alt="Netwitcher Header"
+                                 style="display:block;width:100%;max-width:650px;height:auto;border:0;margin:0;" />
                         </td>
                     </tr>
 
@@ -107,26 +73,16 @@
                     <tr>
                         <td bgcolor="#FFFFFF"
                             style="background:#FFFFFF;background-image:linear-gradient(#FFFFFF,#FFFFFF);
-             padding:30px 34px;">
+                                   padding:30px 34px;">
                             {{{Body}}}
                         </td>
                     </tr>
 
-                    <!-- Stars strip -->
+                    <!-- ✅ SIGNATURE IMAGE (contact info) -->
                     <tr>
                         <td bgcolor="#FFFFFF"
                             style="background:#FFFFFF;background-image:linear-gradient(#FFFFFF,#FFFFFF);
-                       padding:14px 10px 10px 10px;">
-                            <div style="text-align:center;color:#F7D84B;font-size:18px;letter-spacing:4px;line-height:1;">
-                                ☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
-                            </div>
-                        </td>
-                    </tr>
-
-                    <!-- ✅ SIGNATURE IMAGE (FIRST) -->
-                    <tr>
-                        <td bgcolor="#FFFFFF"
-                            style="background:#FFFFFF;background-image:linear-gradient(#FFFFFF,#FFFFFF);padding:0;">
+                                   padding:0;font-size:0;line-height:0;">
                             <img src="{{{FooterSignatureUrl}}}"
                                  width="650"
                                  alt="Netwitcher Signature"
@@ -134,13 +90,24 @@
                         </td>
                     </tr>
 
-                    <!-- ✅ Footer bar (legal) NOW UNDER THE IMAGE -->
+                    <!-- ✅ STARS (under footer image) - try same look -->
+                    <tr>
+                        <td bgcolor="#FFFFFF"
+                            style="background:#FFFFFF;background-image:linear-gradient(#FFFFFF,#FFFFFF);
+                                   padding:12px 10px 10px 10px;">
+                            <div style="text-align:center;color:#8EDBF5;font-size:18px;letter-spacing:4px;line-height:1;">
+                                ☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- ✅ Footer bar (cyan) under stars -->
                     <tr>
                         <td class="legalBar"
                             align="center"
-                            bgcolor="#6B4CE6"
-                            style="background:#6B4CE6;background-image:linear-gradient(#6B4CE6,#6B4CE6);
-                       padding:14px 16px;">
+                            bgcolor="#3CBEE6"
+                            style="background:#3CBEE6;background-image:linear-gradient(#3CBEE6,#3CBEE6);
+                                   padding:14px 16px;">
                             <div class="legalText" style="font-size:11px;color:#ffffff;">
                                 {{LegalLine}}
                             </div>

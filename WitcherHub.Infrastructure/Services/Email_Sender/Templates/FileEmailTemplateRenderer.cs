@@ -83,6 +83,7 @@ namespace WitcherHub.Infrastructure.Services.Email_Sender.EmailTemplates
             {
                 dict.TryAdd("FooterSignatureUrl", $"{publicBaseUrl}/api/email-assets/footer-signature");
                 dict.TryAdd("BoxWatermarkUrl", $"{publicBaseUrl}/api/email-assets/box-watermark");
+                dict.TryAdd("HeaderImageUrl", $"{publicBaseUrl}/api/email-assets/header");
             }
 
             return dict;

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace WitcherHub.Controllers;
 
@@ -14,6 +15,7 @@ public class EmailAssetsController : ControllerBase
     }
 
     // 1) صورة الفوتر (Signature)
+    [AllowAnonymous]
     [HttpGet("footer-signature")]
     [Produces("image/png")]
     [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Any)]
@@ -21,12 +23,22 @@ public class EmailAssetsController : ControllerBase
         => PngFromWwwroot("email-assets/footer-signature.png");
 
     // 2) صورة watermark للبوكس (شفافة)
+    [AllowAnonymous]
     [HttpGet("box-watermark")]
     [Produces("image/png")]
     [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Any)]
     public IActionResult BoxWatermark()
         => PngFromWwwroot("email-assets/box-watermark.png");
-
+    [AllowAnonymous]
+    [HttpGet("header")]
+    [Produces("image/png")]
+    [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Any)]
+    public IActionResult Header()
+    {
+        Response.Headers["Cache-Control"] = "public,max-age=31536000,immutable";
+        Response.Headers["Content-Disposition"] = "inline";
+        return PngFromWwwroot("email-assets/header.png");
+    }
     private IActionResult PngFromWwwroot(string relativePath)
     {
         var path = Path.Combine(_env.WebRootPath, relativePath.Replace('/', Path.DirectorySeparatorChar));
