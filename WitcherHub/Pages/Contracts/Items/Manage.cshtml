@@ -141,17 +141,29 @@
                     <input type="hidden" name="ContractId" value="@Model.ContractId" />
 
                     <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label">Find service</label>
-                            <div class="input-group">
-                                <span class="input-group-text">🔎</span>
-                                <input class="form-control" id="addServiceFilter" placeholder="Type to filter services..." />
-                            </div>
-                        </div>
-
                         <div class="col-12 col-lg-6">
                             <label class="form-label">Service</label>
-                            <select class="form-select" id="addServiceSelect" name="CreateServiceId" asp-items="Model.ServiceOptions"></select>
+
+                            <div class="dropdown">
+                                <input type="text"
+                                       class="form-control dropdown-toggle"
+                                       id="addServiceCombo"
+                                       data-bs-toggle="dropdown"
+                                       aria-expanded="false"
+                                       autocomplete="off"
+                                       placeholder="Search & select service..." />
+
+                                <ul class="dropdown-menu w-100" id="addServiceMenu" aria-labelledby="addServiceCombo"></ul>
+                            </div>
+
+                            <!-- hidden select for model binding -->
+                            <select name="CreateServiceId"
+                                    asp-items="Model.ServiceOptions"
+                                    id="addServiceSelect"
+                                    class="form-select"
+                                    style="position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden;">
+                                <option value="">-- choose --</option>
+                            </select>
                         </div>
 
                         <div class="col-12 col-lg-6">
@@ -207,17 +219,29 @@
                     <input type="hidden" name="EditItemId" id="editItemId" />
 
                     <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label">Find service</label>
-                            <div class="input-group">
-                                <span class="input-group-text">🔎</span>
-                                <input class="form-control" id="editServiceFilter" placeholder="Type to filter services..." />
-                            </div>
-                        </div>
-
                         <div class="col-12 col-lg-6">
                             <label class="form-label">Service</label>
-                            <select class="form-select" id="editServiceSelect" name="EditServiceId" asp-items="Model.ServiceOptions"></select>
+
+                            <div class="dropdown">
+                                <input type="text"
+                                       class="form-control dropdown-toggle"
+                                       id="editServiceCombo"
+                                       data-bs-toggle="dropdown"
+                                       aria-expanded="false"
+                                       autocomplete="off"
+                                       placeholder="Search & select service..." />
+
+                                <ul class="dropdown-menu w-100" id="editServiceMenu" aria-labelledby="editServiceCombo"></ul>
+                            </div>
+
+                            <!-- hidden select for model binding -->
+                            <select name="EditServiceId"
+                                    asp-items="Model.ServiceOptions"
+                                    id="editServiceSelect"
+                                    class="form-select"
+                                    style="position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden;">
+                                <option value="">-- choose --</option>
+                            </select>
                         </div>
 
                         <div class="col-12 col-lg-6">
@@ -269,27 +293,113 @@
             }
         }
 
-        function setupFilter(filterId, selectId) {
-            const filter = document.getElementById(filterId);
-            const select = document.getElementById(selectId);
-            if (!filter || !select) return;
+                (function () {
 
-            const options = Array.from(select.options);
-            function apply() {
-                const q = (filter.value || '').trim().toLowerCase();
-                options.forEach(o => {
-                    const t = (o.text || '').toLowerCase();
-                    o.hidden = (!!q && !t.includes(q));
+            const combo = document.getElementById('addServiceCombo');
+            const menu = document.getElementById('addServiceMenu');
+            const select = document.getElementById('addServiceSelect');
+
+            if (!combo || !menu || !select) return;
+
+            const options = Array.from(select.options)
+                .filter(o => o.value);
+
+            function render(filter) {
+                menu.innerHTML = '';
+
+                const q = (filter || '').toLowerCase();
+
+                const filtered = options.filter(o =>
+                    !q || o.text.toLowerCase().includes(q)
+                );
+
+                if (filtered.length === 0) {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span class="dropdown-item text-muted">No results</span>`;
+                    menu.appendChild(li);
+                    return;
+                }
+
+                filtered.forEach(o => {
+                    const li = document.createElement('li');
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'dropdown-item';
+                    btn.textContent = o.text;
+
+                    btn.addEventListener('click', function () {
+                        combo.value = o.text;
+                        select.value = o.value;
+                    });
+
+                    li.appendChild(btn);
+                    menu.appendChild(li);
                 });
-                const sel = select.options[select.selectedIndex];
-                if (sel) sel.hidden = false;
             }
-            filter.addEventListener('input', apply);
-        }
 
-        setupFilter('addServiceFilter', 'addServiceSelect');
-        setupFilter('editServiceFilter', 'editServiceSelect');
+            combo.addEventListener('input', function () {
+                render(this.value);
+            });
 
+            combo.addEventListener('focus', function () {
+                render(this.value);
+            });
+
+        })();
+
+                (function () {
+
+            const combo = document.getElementById('editServiceCombo');
+            const menu = document.getElementById('editServiceMenu');
+            const select = document.getElementById('editServiceSelect');
+
+            if (!combo || !menu || !select) return;
+
+            const options = Array.from(select.options)
+                .filter(o => o.value);
+
+            function render(filter) {
+                menu.innerHTML = '';
+
+                const q = (filter || '').toLowerCase();
+
+                const filtered = options.filter(o =>
+                    !q || o.text.toLowerCase().includes(q)
+                );
+
+                if (filtered.length === 0) {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span class="dropdown-item text-muted">No results</span>`;
+                    menu.appendChild(li);
+                    return;
+                }
+
+                filtered.forEach(o => {
+                    const li = document.createElement('li');
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'dropdown-item';
+                    btn.textContent = o.text;
+
+                    btn.addEventListener('click', function () {
+                        combo.value = o.text;
+                        select.value = o.value;
+                    });
+
+                    li.appendChild(btn);
+                    menu.appendChild(li);
+                });
+            }
+
+            combo.addEventListener('input', function () {
+                render(this.value);
+            });
+
+            combo.addEventListener('focus', function () {
+                render(this.value);
+            });
+
+        })();
         // confirm delete
         document.addEventListener('click', function (e) {
             const btn = e.target.closest('button[data-confirm]');
@@ -321,7 +431,17 @@
                 document.getElementById('editPosition').value = position;
 
                 const sel = document.getElementById('editServiceSelect');
+                const combo = document.getElementById('editServiceCombo');
+
                 if (sel) sel.value = serviceId;
+
+                if (combo && sel) {
+                    const selectedOption = Array.from(sel.options)
+                        .find(o => o.value === serviceId);
+                    if (selectedOption) {
+                        combo.value = selectedOption.text;
+                    }
+                }
 
                 try {
                     const jsonText = atob(cfgB64 || '');

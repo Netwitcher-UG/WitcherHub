@@ -41,15 +41,30 @@
         <input type="hidden" asp-for="Form.ContractId" />
 
         <div class="row g-3">
-            <div class="col-12">
-                <label class="form-label">Find service</label>
-                <input class="form-control" id="serviceFilter" placeholder="Type to filter services..." />
-                <div class="form-text">Tip: start typing a keyword.</div>
-            </div>
-
             <div class="col-12 col-md-6">
                 <label class="form-label">Service</label>
-                <select class="form-select" asp-for="SelectedServiceId" asp-items="Model.ServiceOptions" id="serviceSelect"></select>
+
+                <div class="dropdown">
+                    <input type="text"
+                           class="form-control dropdown-toggle"
+                           id="serviceCombo"
+                           data-bs-toggle="dropdown"
+                           aria-expanded="false"
+                           autocomplete="off"
+                           placeholder="Search & select service..." />
+
+                    <ul class="dropdown-menu w-100" id="serviceMenu" aria-labelledby="serviceCombo"></ul>
+                </div>
+
+                <!-- hidden select for model binding -->
+                <select asp-for="SelectedServiceId"
+                        asp-items="Model.ServiceOptions"
+                        id="serviceSelect"
+                        class="form-select"
+                        style="position:absolute; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden;">
+                    <option value="">-- choose --</option>
+                </select>
+
                 <span class="text-danger small" asp-validation-for="SelectedServiceId"></span>
             </div>
 
@@ -89,26 +104,67 @@
     <partial name="_ValidationScriptsPartial" />
 
     <script>
+                
         (function () {
-            const filter = document.getElementById('serviceFilter');
+
+            const combo = document.getElementById('serviceCombo');
+            const menu = document.getElementById('serviceMenu');
             const select = document.getElementById('serviceSelect');
-            if (!filter || !select) return;
 
-            const options = Array.from(select.options);
+            if (!combo || !menu || !select) return;
 
-            function apply() {
-                const q = (filter.value || '').trim().toLowerCase();
-                options.forEach(o => {
-                    const t = (o.text || '').toLowerCase();
-                    o.hidden = (!!q && !t.includes(q));
+            const options = Array.from(select.options)
+                .filter(o => o.value);
+
+            function render(filter) {
+                menu.innerHTML = '';
+
+                const q = (filter || '').toLowerCase();
+
+                const filtered = options.filter(o =>
+                    !q || o.text.toLowerCase().includes(q)
+                );
+
+                if (filtered.length === 0) {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span class="dropdown-item text-muted">No results</span>`;
+                    menu.appendChild(li);
+                    return;
+                }
+
+                filtered.forEach(o => {
+                    const li = document.createElement('li');
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'dropdown-item';
+                    btn.textContent = o.text;
+
+                    btn.addEventListener('click', function () {
+                        combo.value = o.text;
+                        select.value = o.value;
+                    });
+
+                    li.appendChild(btn);
+                    menu.appendChild(li);
                 });
-
-                const sel = select.options[select.selectedIndex];
-                if (sel) sel.hidden = false;
             }
 
-            filter.addEventListener('input', apply);
+            combo.addEventListener('input', function () {
+                render(this.value);
+            });
+
+            combo.addEventListener('focus', function () {
+                render(this.value);
+            });
+
+            // preselect first item if exists
+            if (select.value) {
+                const selected = options.find(o => o.value === select.value);
+                if (selected) combo.value = selected.text;
+            }
+
         })();
+    
 
         function formatJson(textareaId) {
             const el = document.getElementById(textareaId);
