@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Common.Pagination;
@@ -705,10 +706,11 @@ namespace WitcherHub.Pages
                         Status = DocumentStatus.Draft,
                         StartDate = details.StartDate,
                         EndDate = details.EndDate,
-                        Terms = doc.FullDocument,
-                        SignedAt = null
+                        Terms = details.Terms,              
+                        TermsStructured = doc.Structured,  
+                        SignedAt = details.SignedAt
                     },
-                    Items = null // IMPORTANT: don't clear items
+                    Items = null
                 };
 
                 await _contracts.UpdateAsync(contractId, update, ct);
@@ -718,14 +720,13 @@ namespace WitcherHub.Pages
                     ok = true,
                     data = new
                     {
-                        contractId,
-                        next = "snapshot"
+                        redirectUrl = $"/Contracts/Override?id={contractId}"
                     },
                     toast = new
                     {
-                        type = "success",
-                        title = "Updated",
-                        message = "Contract terms have been generated/updated successfully."
+                        type = "info",
+                        title = "Next step",
+                        message = "Review and override Positions, then generate the contract."
                     }
                 });
             }
@@ -750,9 +751,16 @@ namespace WitcherHub.Pages
             var customerName = prj.Customer?.Name ?? "";
             var customerEmail = prj.Customer?.Email ?? "";
 
-            var customerBlock =
-                $"Name/Firma: {customerName}\n" +
-                (string.IsNullOrWhiteSpace(customerEmail) ? "" : $"E-Mail: {customerEmail}\n");
+            var customerBlock = new StringBuilder();
+            customerBlock.AppendLine($"Name/Firma: {customerName}");
+
+            customerBlock.AppendLine("Adresse:");
+            customerBlock.AppendLine("PLZ/Ort:");
+
+            if (!string.IsNullOrWhiteSpace(customerEmail))
+                customerBlock.AppendLine($"E-Mail: {customerEmail}");
+
+            var customerBlockText = customerBlock.ToString().TrimEnd();
 
             var lines = (contract.Items ?? new List<ContractViews.ContractItemItemView>())
                 .OrderBy(x => x.Position)
@@ -781,7 +789,7 @@ namespace WitcherHub.Pages
 
                 LeaveCustomerFieldsBlank = false,
                 IncludePricesInServicesSection = true,
-                CustomerBlockOverride = customerBlock,
+                CustomerBlockOverride = customerBlockText,
 
                 Services = lines
             };

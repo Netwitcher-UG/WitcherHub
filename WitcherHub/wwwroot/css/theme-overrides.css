@@ -11,3 +11,16 @@ html[data-bs-theme="blue-theme"] .pagination .page-item.disabled .page-link {
   color: rgba(255,255,255,.35) !important;        
 }
 
+/* Fix position headers text color in blue-theme */
+html[data-bs-theme="blue-theme"] #positionsAccordion .pos-toggle {
+  color: rgba(255,255,255,.92) !important;
+}
+
+html[data-bs-theme="blue-theme"] #positionsAccordion .pos-toggle .pos-title,
+html[data-bs-theme="blue-theme"] #positionsAccordion .pos-toggle .pos-no {
+  color: rgba(255,255,255,.92) !important;
+}
+
+html[data-bs-theme="blue-theme"] #positionsAccordion .pos-toggle .pos-price {
+  color: rgba(255,255,255,.70) !important;
+}

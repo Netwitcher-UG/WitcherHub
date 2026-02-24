@@ -9,6 +9,7 @@ namespace WitcherHub.Application.Models.DTO.Contracts
     {
         public ContractDto Contract { get; set; } = new();
         public List<ContractItemDto> Items { get; set; } = new();
+        
     }
 
     public class ContractDto
@@ -22,7 +23,7 @@ namespace WitcherHub.Application.Models.DTO.Contracts
 
         public DateOnly? StartDate { get; set; }
         public DateOnly? EndDate { get; set; }
-
+        public ContractStructuredTermsDto? TermsStructured { get; set; }
         public string? Terms { get; set; }
 
         public DateTimeOffset? SignedAt { get; set; }

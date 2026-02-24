@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection.Emit;
 using WitcherHub.Infrastructure.Data.Models;
 
 namespace WitcherHub.Infrastructure.Data.Context
@@ -277,7 +278,9 @@ namespace WitcherHub.Infrastructure.Data.Context
             b.Entity<PricingRule>()
                 .HasIndex(x => new { x.ServiceId, x.Priority })
                 .IsUnique();
-
+            b.Entity<Contract>()
+                .Property(x => x.TermsStructured)
+                .HasColumnType("jsonb");
             // =========================
             // Enums -> string (مهم)
             // =========================

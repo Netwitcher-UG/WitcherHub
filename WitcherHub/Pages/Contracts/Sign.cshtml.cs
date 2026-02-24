@@ -426,7 +426,9 @@ namespace WitcherHub.Pages.Contracts
   h3{font-size:14px;margin:12px 0 6px;page-break-after:avoid;}
   p{margin:0 0 8px;}
   hr{margin:14px 0;border:0;border-top:1px solid #ddd;}
-
+  table{width:100%;border-collapse:collapse;margin:10px 0;}
+  th,td{border:1px solid #ddd;padding:6px;vertical-align:top;}
+  th{background:#f3f3f3;font-weight:700;}
   /* ✅ لا تفصل كتلة التوقيع */
   .sigWrap{break-inside:avoid;page-break-inside:avoid;}
   .meta{margin-bottom:10px;font-size:12px;color:#333;}

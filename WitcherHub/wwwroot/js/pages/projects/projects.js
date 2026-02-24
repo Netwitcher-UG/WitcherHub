@@ -709,6 +709,13 @@
             if (json?.toast) showToast(json.toast);
             else showToast({ type: 'success', title: 'Success', message: 'The contract has been updated successfully.' });
 
+            // ✅ NEW: redirect if server provided it
+            if (json?.data?.redirectUrl) {
+                if (json?.toast) saveToastForReload(json.toast);
+                window.location.href = String(json.data.redirectUrl);
+                return;
+            }
+
             await loadProjectContractSnapshot();
 
         } catch (err) {

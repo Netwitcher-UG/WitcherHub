@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Text;
 using System.Text.Json;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Interfaces;
@@ -253,6 +254,7 @@ namespace WitcherHub.Pages.Contracts.Items
                 var prj = await _projects.GetProjectAsync(contract.ProjectId, ct);
                 if (prj is null) throw new NotFoundAppException("Project not found.");
 
+                // ✅ generate structured from GPT (لكن لا تكتب العقد النهائي هنا)
                 var req = BuildGenerateRequest(prj, contract);
                 var doc = await _contractDocumentGenerator.GenerateAsync(req, ct);
 
@@ -265,19 +267,17 @@ namespace WitcherHub.Pages.Contracts.Items
                         Status = DocumentStatus.Draft,
                         StartDate = contract.StartDate,
                         EndDate = contract.EndDate,
-                        Terms = doc.FullDocument,
-                        SignedAt = null
+
+                        Terms = contract.Terms,              
+                        TermsStructured = doc.Structured,    
+                        SignedAt = contract.SignedAt
                     },
-                    Items = null // do not touch items
+                    Items = null
                 };
 
                 await _contracts.UpdateAsync(contract.Id, update, ct);
 
-                TempData["Toast.Type"] = "success";
-                TempData["Toast.Title"] = "Generated";
-                TempData["Toast.Message"] = "Contract was generated successfully.";
-
-                return Redirect($"/Projects?openProjectId={contract.ProjectId}&tab=contracts");
+                return RedirectToPage("/Contracts/Override", new { id = contract.Id });
             }
             catch (Exception ex) when (ex is BadRequestAppException or NotFoundAppException)
             {
@@ -288,7 +288,6 @@ namespace WitcherHub.Pages.Contracts.Items
                 return RedirectToPage("/Contracts/Items/Manage", new { contractId = ContractId });
             }
         }
-
         private async Task LoadServicesAsync(CancellationToken ct)
         {
             var result = await _services.GetServicesAsync(page: 1, pageSize: 500, search: null, ct: ct);
@@ -314,9 +313,16 @@ namespace WitcherHub.Pages.Contracts.Items
             var customerName = prj.Customer?.Name ?? "";
             var customerEmail = prj.Customer?.Email ?? "";
 
-            var customerBlock =
-                $"Name/Firma: {customerName}\n" +
-                (string.IsNullOrWhiteSpace(customerEmail) ? "" : $"E-Mail: {customerEmail}\n");
+            var customerBlock = new StringBuilder();
+            customerBlock.AppendLine($"Name/Firma: {customerName}");
+
+            customerBlock.AppendLine("Adresse:");
+            customerBlock.AppendLine("PLZ/Ort:");
+
+            if (!string.IsNullOrWhiteSpace(customerEmail))
+                customerBlock.AppendLine($"E-Mail: {customerEmail}");
+
+            var customerBlockText = customerBlock.ToString().TrimEnd();
 
             var lines = (contract.Items ?? new List<ContractViews.ContractItemItemView>())
                 .OrderBy(x => x.Position)
@@ -345,7 +351,7 @@ namespace WitcherHub.Pages.Contracts.Items
 
                 LeaveCustomerFieldsBlank = false,
                 IncludePricesInServicesSection = true,
-                CustomerBlockOverride = customerBlock,
+                CustomerBlockOverride = customerBlockText,
 
                 Services = lines
             };

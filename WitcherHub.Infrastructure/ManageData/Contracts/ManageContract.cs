@@ -149,7 +149,7 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                             Currency = x.Currency,
 
                             Terms = x.Terms,
-
+                            TermsStructured = x.TermsStructured,
                             CreatedAt = x.CreatedAt,
                             StartDate = x.StartDate,
                             EndDate = x.EndDate,
@@ -211,38 +211,40 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
             {
                 var contractNo = await GenerateContractNoAsync(contractsRepo, ct);
 
+                JsonDocument? structuredJson = null;
+
+                if (dto.Contract.TermsStructured is ContractStructuredTermsDto structuredDto)
+                {
+                    var json = JsonSerializer.Serialize(structuredDto);
+                    structuredJson = JsonDocument.Parse(json);
+                }
+
                 var contract = new Contract
                 {
                     ProjectId = dto.Contract.ProjectId,
                     ContractNo = contractNo,
-
                     Status = dto.Contract.Status,
                     Currency = (dto.Contract.Currency ?? "EUR").Trim(),
-
                     Terms = string.IsNullOrWhiteSpace(dto.Contract.Terms) ? null : dto.Contract.Terms.Trim(),
-
+                    TermsStructured = structuredJson,
                     StartDate = dto.Contract.StartDate,
                     EndDate = dto.Contract.EndDate,
-
                     SignedAt = dto.Contract.SignedAt
                 };
 
-                // Items (optional)
                 if (dto.Items is not null && dto.Items.Count > 0)
                 {
                     int pos = 1;
                     foreach (var it in dto.Items.OrderBy(x => x.Position <= 0 ? int.MaxValue : x.Position))
                     {
-                        var item = new ContractItem
+                        contract.Items.Add(new ContractItem
                         {
                             Title = (it.Title ?? "").Trim(),
                             ServiceId = it.ServiceId,
                             Config = it.Config ?? JsonDocument.Parse("{}"),
                             AgreedPrice = it.AgreedPrice,
                             Position = it.Position > 0 ? it.Position : pos
-                        };
-
-                        contract.Items.Add(item);
+                        });
                         pos++;
                     }
                 }
@@ -261,7 +263,6 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                 throw;
             }
         }
-
         // =========================
         // UPDATE CONTRACT (header + optional replace items)
         // =========================
@@ -281,10 +282,15 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
             contract.Currency = (dto.Contract.Currency ?? contract.Currency ?? "EUR").Trim();
             contract.Terms = string.IsNullOrWhiteSpace(dto.Contract.Terms) ? null : dto.Contract.Terms.Trim();
 
+            if (dto.Contract.TermsStructured is ContractStructuredTermsDto structuredDto)
+            {
+                var json = JsonSerializer.Serialize(structuredDto);
+                contract.TermsStructured = JsonDocument.Parse(json);
+            }
+
             contract.StartDate = dto.Contract.StartDate;
             contract.EndDate = dto.Contract.EndDate;
             contract.SignedAt = dto.Contract.SignedAt;
-
             contract.Status = dto.Contract.Status;
 
             if (dto.Items is not null)
@@ -312,7 +318,6 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
             await InvalidateAfterContractChangeAsync(id, ct);
             _log.LogInformation("Contract updated. {ContractId}", id);
         }
-
         // =========================
         // DELETE CONTRACT
         // =========================
@@ -577,11 +582,6 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
             await _unitOfWork.SaveChangesAsync(ct);
         }
 
-        private static string EscapeLike(string input)
-            => input
-                .Replace("!", "!!")
-                .Replace("%", "!%")
-                .Replace("_", "!_")
-                .Replace("[", "![");
+        
     }
 }

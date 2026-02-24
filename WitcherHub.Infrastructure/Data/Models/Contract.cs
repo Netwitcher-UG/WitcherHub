@@ -27,7 +27,7 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         public Guid? CreatedById { get; set; }
         public AppUser? CreatedBy { get; set; }
-
+        public JsonDocument? TermsStructured { get; set; }
         public DateTimeOffset? SignedAt { get; set; }
 
         public ICollection<ContractItem> Items { get; set; } = new List<ContractItem>();

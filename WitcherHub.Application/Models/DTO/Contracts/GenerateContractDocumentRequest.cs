@@ -27,6 +27,8 @@
 
         // (اختياري) لو بدك تمرر بلوك عميل جاهز بدل placeholder
         public string? CustomerBlockOverride { get; set; }
+        public Guid ProjectId { get; set; }
+        public ContractStructuredTermsDto? StructuredOverride { get; set; }
     }
 
     public class ContractServiceLineDto
@@ -46,8 +48,13 @@
 
     public class GenerateContractDocumentResponse
     {
-        public string FixedTerms { get; set; } = default!;
-        public string ServicesSection { get; set; } = default!;
+        // ✅ Structured Anlage A (الأساس الجديد)
+        public ContractStructuredTermsDto Structured { get; set; } = new();
+
+        // ✅ Markdown مولد من Structured (للعرض/الطباعة مؤقتاً)
+        public string ServicesSectionMarkdown { get; set; } = default!;
+
+        // ✅ المستند الكامل بعد الدمج مع التمبلت
         public string FullDocument { get; set; } = default!;
     }
 }

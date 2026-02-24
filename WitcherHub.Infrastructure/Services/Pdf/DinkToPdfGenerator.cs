@@ -113,8 +113,8 @@ namespace WitcherHub.Infrastructure.Services.Pdf
             var printedAt = WebUtility.HtmlEncode(DateTime.Now.ToString("dd.MM.yyyy HH:mm"));
 
             var logoHtml = string.IsNullOrWhiteSpace(logoDataUri)
-                ? ""
-                : $@"<img src=""{logoDataUri}"" style=""height:22px;display:block;"" />";
+    ? ""
+    : $@"<img src=""{logoDataUri}"" style=""height:24px;max-width:220px;object-fit:contain;display:block;"" />";
 
             var headerHtml = $@"
 <!doctype html>
@@ -164,12 +164,11 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 
         private string ResolveLogoDataUri()
         {
-            // ✅ هذا هو المسار الحقيقي حسب مشروعك (صورتك)
-            var p = Path.Combine(_env.WebRootPath, "theme", "logo.png");
+            var p = Path.Combine(_env.WebRootPath, "email-assets", "box-watermark.png");
 
             if (!File.Exists(p))
             {
-                _logger.LogWarning("PDF header logo not found at: {Path}", p);
+                _logger.LogWarning("PDF header image not found at: {Path}", p);
                 return "";
             }
 

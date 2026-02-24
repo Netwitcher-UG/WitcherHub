@@ -33,7 +33,7 @@ namespace WitcherHub.Application.Models.View.Contracts
             public string Currency { get; set; } = "EUR";
 
             public string? Terms { get; set; }
-
+            public JsonDocument? TermsStructured { get; set; }
             public DateTimeOffset CreatedAt { get; set; }
             public DateOnly? StartDate { get; set; }
             public DateOnly? EndDate { get; set; }

@@ -1,0 +1,356 @@
+﻿@page
+@model WitcherHub.Pages.Contracts.OverrideModel
+@{
+    ViewData["Title"] = "Contract Override";
+}
+
+@if (Model.Vm == null || Model.Vm.ContractId == Guid.Empty)
+{
+    <div class="alert alert-danger">Invalid contract.</div>
+    return;
+}
+<style>
+    .linePreview {
+        margin: 8px 0 0 18px;
+        padding: 0;
+        list-style: disc;
+        opacity: .95;
+    }
+
+        .linePreview li {
+            margin: 2px 0;
+        }
+
+        .linePreview .empty {
+            list-style: none;
+            margin-left: -18px;
+        }
+
+    .pos-toggle {
+        width: 100%;
+        text-align: left;
+        padding: 10px 12px;
+        border: 0;
+        background: transparent;
+        border-radius: 14px;
+    }
+
+        .pos-toggle:hover {
+            background: rgba(255,255,255,.05);
+        }
+
+    .pos-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .pos-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: nowrap;
+    }
+
+    .pos-toggle {
+        flex: 1 1 auto; 
+        text-align: left;
+        padding: 10px 12px;
+        border: 0;
+        background: transparent;
+        border-radius: 14px;
+        min-width: 0; 
+    }
+
+        .pos-toggle:hover {
+            background: rgba(255,255,255,.05);
+        }
+
+    .pos-head {
+        display: grid;
+        grid-template-columns: 1fr auto; /* left(title) | price */
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
+
+    .pos-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+    }
+
+    .pos-no {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        background: rgba(255,255,255,.10);
+        flex: 0 0 auto;
+    }
+
+    .pos-title {
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+
+    .pos-price {
+        font-size: .9rem;
+        opacity: .85;
+        white-space: nowrap;
+        flex: 0 0 auto;
+    }
+
+    .pos-delbtn {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(220,53,69,.35);
+        background: transparent;
+        color: #dc3545;
+    }
+
+        .pos-delbtn:hover {
+            background: rgba(220,53,69,.10);
+        }
+
+        .pos-delbtn i {
+            font-size: 18px;
+            line-height: 1;
+        }
+</style>
+<form method="post" class="mb-3">
+    @Html.AntiForgeryToken()
+
+    <input type="hidden" asp-for="Vm.ContractId" />
+    <input type="hidden" asp-for="Vm.ProjectId" />
+    <input type="hidden" asp-for="Vm.ContractNo" />
+    <input type="hidden" asp-for="Vm.Currency" />
+    <input type="hidden" asp-for="Vm.ProjectTitle" />
+    <input type="hidden" asp-for="Vm.CustomerName" />
+    <input type="hidden" asp-for="Vm.CustomerEmail" />
+    <input type="hidden" asp-for="Vm.IsLocked" />
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h3 class="mb-1">Contract Override</h3>
+            <div class="text-muted small">
+                Contract: <strong>@Model.Vm.ContractNo</strong> |
+                Project: <strong>@Model.Vm.ProjectTitle</strong> |
+                Currency: <strong>@Model.Vm.Currency</strong>
+            </div>
+            <div class="text-muted small">
+                Customer: <strong>@Model.Vm.CustomerName</strong>
+                @if (!string.IsNullOrWhiteSpace(Model.Vm.CustomerEmail))
+                {
+                    <span>(@Model.Vm.CustomerEmail)</span>
+                }
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap">
+            <a class="btn btn-outline-secondary"
+               href="/Projects?openProjectId=@Model.Vm.ProjectId&tab=contracts">
+                Back
+            </a>
+
+            <button class="btn btn-outline-primary"
+                    type="submit"
+                    formaction="@Url.Page("/Contracts/Override", "AddPosition", new { id = Model.Vm.ContractId })"
+                    disabled="@Model.Vm.IsLocked">
+                + Add Position
+            </button>
+
+            <button class="btn btn-primary"
+                    type="submit"
+                    formaction="@Url.Page("/Contracts/Override", "Save", new { id = Model.Vm.ContractId })"
+                    disabled="@Model.Vm.IsLocked">
+                Save Structured
+            </button>
+
+            <button class="btn btn-success"
+                    type="submit"
+                    formaction="@Url.Page("/Contracts/Override", "Generate", new { id = Model.Vm.ContractId })"
+                    disabled="@Model.Vm.IsLocked">
+                Generate Contract
+            </button>
+        </div>
+    </div>
+
+    @if (Model.Vm.IsLocked)
+    {
+        <div class="alert alert-warning mt-3">
+            This contract is locked (signed). You can view positions but cannot edit.
+        </div>
+    }
+
+    <div class="mt-3" id="positionsAccordion">
+        @for (int i = 0; i < Model.Vm.Positions.Count; i++)
+        {
+            var p = Model.Vm.Positions[i];
+
+            <div class="card border-0 shadow-sm rounded-4 mb-3">
+                <div class="card-body">
+
+                    <!-- Header row (collapsed view) -->
+                    <div class="pos-row">
+                        <button type="button"
+                                class="pos-toggle"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#posCollapse-@i"
+                                aria-controls="posCollapse-@i"
+                                aria-expanded="@(i == 0 ? "true" : "false")">
+                            <div class="pos-head">
+                                <div class="pos-left">
+                                    <span class="pos-no">(@p.PositionNo)</span>
+                                    <span class="pos-title">
+                                        @(string.IsNullOrWhiteSpace(p.Title) ? "—" : p.Title)
+                                    </span>
+                                </div>
+
+                                <span class="pos-price">
+                                    @(p.LineNetPrice.HasValue? p.LineNetPrice.Value.ToString("0.00") : "—") @Model.Vm.Currency
+                                </span>
+                            </div>
+                        </button>
+
+                        <button type="submit"
+                                class="pos-delbtn"
+                                title="Delete"
+                                formaction="@Url.Page("/Contracts/Override", "DeletePosition", new { id = Model.Vm.ContractId, posNo = p.PositionNo })"
+                                disabled="@Model.Vm.IsLocked">
+                            <i class="material-icons-outlined">delete</i>
+                        </button>
+                    </div>
+                    <!-- Collapsible body -->
+                    <div id="posCollapse-@i"
+                         class="collapse @(i == 0 ? "show" : "") mt-3"
+                         data-bs-parent="#positionsAccordion">
+                        <input type="hidden" asp-for="Vm.Positions[i].PositionNo" />
+
+                        <div class="row g-3">
+                            <div class="col-12 col-lg-8">
+                                <label class="form-label">Title</label>
+                                <input class="form-control" asp-for="Vm.Positions[i].Title" disabled="@Model.Vm.IsLocked" />
+                            </div>
+
+                            <div class="col-12 col-lg-4">
+                                <label class="form-label">Line Net Price</label>
+                                <input class="form-control" asp-for="Vm.Positions[i].LineNetPrice" disabled="@Model.Vm.IsLocked" />
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">Scope</label>
+                                <textarea class="form-control" rows="3" asp-for="Vm.Positions[i].Sections.Scope" disabled="@Model.Vm.IsLocked"></textarea>
+                            </div>
+
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label">Deliverables (one per line)</label>
+                                <textarea class="form-control js-lines"
+                                      rows="5"
+                                      name="Vm.Positions[@i].Sections.DeliverablesText"
+                                      data-preview="#pv-deliverables-@i"
+                                      @(Model.Vm.IsLocked ? "disabled" : "")>@string.Join("\n", p.Sections.Deliverables ?? new())</textarea>
+                                <ul class="linePreview" id="pv-deliverables-@i"></ul>
+                            </div>
+
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label">Out Of Scope (one per line)</label>
+                                <textarea class="form-control js-lines"
+                                      rows="5"
+                                      name="Vm.Positions[@i].Sections.OutOfScopeText"
+                                      data-preview="#pv-outscope-@i"
+                                      @(Model.Vm.IsLocked ? "disabled" : "")>@string.Join("\n", p.Sections.OutOfScope ?? new())</textarea>
+                                <ul class="linePreview" id="pv-outscope-@i"></ul>
+                            </div>
+
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label">Customer Responsibilities (one per line)</label>
+                                <textarea class="form-control js-lines"
+                                      rows="5"
+                                      name="Vm.Positions[@i].Sections.CustomerResponsibilitiesText"
+                                      data-preview="#pv-resp-@i"
+                                      @(Model.Vm.IsLocked ? "disabled" : "")>@string.Join("\n", p.Sections.CustomerResponsibilities ?? new())</textarea>
+                                <ul class="linePreview" id="pv-resp-@i"></ul>
+                            </div>
+
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label">Acceptance Criteria (one per line)</label>
+                                <textarea class="form-control js-lines"
+                                      rows="5"
+                                      name="Vm.Positions[@i].Sections.AcceptanceCriteriaText"
+                                      data-preview="#pv-acc-@i"
+                                      @(Model.Vm.IsLocked ? "disabled" : "")>@string.Join("\n", p.Sections.AcceptanceCriteria ?? new())</textarea>
+                                <ul class="linePreview" id="pv-acc-@i"></ul>
+                            </div>
+
+                            <div class="col-12 col-lg-4">
+                                <label class="form-label">Timeline</label>
+                                <textarea class="form-control" rows="3" asp-for="Vm.Positions[i].Sections.Timeline" disabled="@Model.Vm.IsLocked"></textarea>
+                            </div>
+
+                            <div class="col-12 col-lg-4">
+                                <label class="form-label">Assumptions</label>
+                                <textarea class="form-control" rows="3" asp-for="Vm.Positions[i].Sections.Assumptions" disabled="@Model.Vm.IsLocked"></textarea>
+                            </div>
+
+                            <div class="col-12 col-lg-4">
+                                <label class="form-label">Revisions</label>
+                                <textarea class="form-control" rows="3" asp-for="Vm.Positions[i].Sections.Revisions" disabled="@Model.Vm.IsLocked"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        }
+    </div>
+</form>
+@section Scripts {
+    <script>
+        (function () {
+          function esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s ?? '';
+            return d.innerHTML;
+          }
+
+          function renderPreview(textarea) {
+            const sel = textarea.getAttribute('data-preview');
+            if (!sel) return;
+            const ul = document.querySelector(sel);
+            if (!ul) return;
+
+            const lines = (textarea.value || '')
+              .replace(/\r\n/g, '\n')
+              .split('\n')
+              .map(x => x.trim())
+              .filter(x => x.length > 0);
+
+            if (lines.length === 0) {
+              ul.innerHTML = `<li class="text-muted empty">— no items —</li>`;
+              return;
+            }
+
+            ul.innerHTML = lines.map(x => `<li>${esc(x)}</li>`).join('');
+          }
+
+          document.querySelectorAll('textarea[data-preview]').forEach(t => {
+            t.addEventListener('input', () => renderPreview(t));
+            renderPreview(t); // initial
+          });
+        })();
+    </script>
+}
