@@ -130,6 +130,14 @@
             font-size: 18px;
             line-height: 1;
         }
+
+    /* Make section labels more prominent inside positions accordion */
+    #positionsAccordion .form-label {
+        font-weight: 900 !important;
+        color: #212529 !important; /* dark body color */
+        font-size: .95rem;
+        margin-bottom: .25rem;
+    }
 </style>
 <form method="post" class="mb-3">
     @Html.AntiForgeryToken()
@@ -347,9 +355,61 @@
             ul.innerHTML = lines.map(x => `<li>${esc(x)}</li>`).join('');
           }
 
+          // Initialize previews and add Edit/Save controls for each textarea with data-preview
           document.querySelectorAll('textarea[data-preview]').forEach(t => {
+            // initial render
             t.addEventListener('input', () => renderPreview(t));
-            renderPreview(t); // initial
+            renderPreview(t);
+
+            // create controls
+            const wrapper = t.parentElement;
+            if (!wrapper) return;
+
+            const controls = document.createElement('div');
+            controls.className = 'mb-2';
+
+            const editBtn = document.createElement('button');
+            editBtn.type = 'button';
+            editBtn.className = 'btn btn-sm btn-outline-primary edit-section';
+            editBtn.textContent = 'Edit';
+
+            const saveBtn = document.createElement('button');
+            saveBtn.type = 'button';
+            saveBtn.className = 'btn btn-sm btn-primary ms-2 save-section';
+            saveBtn.textContent = 'Save';
+
+            controls.appendChild(editBtn);
+            controls.appendChild(saveBtn);
+
+            // insert controls before the textarea
+            wrapper.insertBefore(controls, t);
+
+            // hide textarea and save initially (editing mode off)
+            // if the textarea is disabled (contract locked) we do not show edit button
+            const isLocked = t.hasAttribute('disabled');
+            if (isLocked) {
+              editBtn.style.display = 'none';
+              saveBtn.style.display = 'none';
+              t.style.display = 'none';
+            } else {
+              t.style.display = 'none';
+              saveBtn.style.display = 'none';
+            }
+
+            editBtn.addEventListener('click', () => {
+              t.style.display = 'block';
+              saveBtn.style.display = 'inline-block';
+              editBtn.style.display = 'none';
+              t.focus();
+            });
+
+            saveBtn.addEventListener('click', () => {
+              // update preview and hide editor
+              renderPreview(t);
+              t.style.display = 'none';
+              saveBtn.style.display = 'none';
+              editBtn.style.display = 'inline-block';
+            });
           });
         })();
     </script>

@@ -24,3 +24,44 @@ html[data-bs-theme="blue-theme"] #positionsAccordion .pos-toggle .pos-no {
 html[data-bs-theme="blue-theme"] #positionsAccordion .pos-toggle .pos-price {
   color: rgba(255,255,255,.70) !important;
 }
+
+/* Ensure form-field labels inside positions accordion are visible in blue/night theme */
+html[data-bs-theme="blue-theme"] #positionsAccordion .form-label {
+  color: rgba(255,255,255,0.92) !important;
+  font-weight: 900 !important;
+  font-size: .95rem !important;
+}
+
+/* Dark theme overrides */
+html[data-bs-theme="dark"] {
+  --bs-secondary-color: rgba(255, 255, 255, 0.70) !important;
+  --bs-secondary-color-rgb: 255, 255, 255 !important;
+  --bs-tertiary-color: rgba(255, 255, 255, 0.55) !important;
+  --bs-tertiary-color-rgb: 255, 255, 255 !important;
+}
+
+/* pagination disabled link */
+html[data-bs-theme="dark"] .pagination .page-item.disabled .page-link {
+  background-color: rgb(20, 25, 51) !important;
+  border-color: rgba(255,255,255,.08) !important;
+  color: rgba(255,255,255,.35) !important;
+}
+/* Also apply the same visibility/styling for the dark (night) theme */
+html[data-bs-theme="dark"] #positionsAccordion .pos-toggle {
+  color: rgba(255,255,255,.92) !important;
+}
+
+html[data-bs-theme="dark"] #positionsAccordion .pos-toggle .pos-title,
+html[data-bs-theme="dark"] #positionsAccordion .pos-toggle .pos-no {
+  color: rgba(255,255,255,.92) !important;
+}
+
+html[data-bs-theme="dark"] #positionsAccordion .pos-toggle .pos-price {
+  color: rgba(255,255,255,.70) !important;
+}
+
+html[data-bs-theme="dark"] #positionsAccordion .form-label {
+  color: rgba(255,255,255,0.92) !important;
+  font-weight: 900 !important;
+  font-size: .95rem !important;
+}
