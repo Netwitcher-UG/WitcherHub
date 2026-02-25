@@ -92,7 +92,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 return;
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var nowUtc = DateTimeOffset.UtcNow; // ✅ ALWAYS UTC
             var currency = string.IsNullOrWhiteSpace(contract.Currency) ? "EUR" : contract.Currency;
 
             var contractItems = (contract.Items ?? new List<ContractItem>())
@@ -127,7 +127,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             var req = new LexwareInvoiceCreateRequest
             {
                 Archived = false,
-                VoucherDate = now,
+                VoucherDate = nowUtc, // ✅ UTC
                 Address = new LexwareInvoiceAddress
                 {
                     Name = customer.Name,
@@ -147,7 +147,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 ShippingConditions = new LexwareShippingConditions
                 {
                     ShippingType = "service",
-                    ShippingDate = now
+                    ShippingDate = nowUtc // ✅ UTC
                 },
                 Title = "Rechnung",
                 Introduction = $"Invoice for contract {contract.ContractNo}",
@@ -177,15 +177,23 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 localInvoice,
                 invDoc,
                 fallbackCurrency: currency,
-                fallbackIssueAt: now,
+                fallbackIssueAt: nowUtc,
                 defaultPaymentTermDays: _opt.DefaultPaymentTermDays,
                 contractItemsForServiceMapping: contractItems);
+
+            // ✅ InvoiceNo is NOT NULL in DB, ensure fallback
+            if (string.IsNullOrWhiteSpace(localInvoice.InvoiceNo))
+            {
+                localInvoice.InvoiceNo =
+                    localInvoice.LexwareVoucherNumber ??
+                    localInvoice.LexwareInvoiceId ??
+                    $"TEMP-{Guid.NewGuid():N}".Substring(0, 20);
+            }
 
             _db.Invoices.Add(localInvoice);
             await _db.SaveChangesAsync(ct);
 
             await EnsurePdfAsync(localInvoice, ct);
-
             await InvalidateInvoiceCacheAsync(localInvoice.Id, ct);
 
             _logger.LogInformation("Lexware invoice created & stored locally. ContractId={ContractId} LocalId={LocalId} LexId={LexId} No={No}",
@@ -200,20 +208,28 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             if (string.IsNullOrWhiteSpace(invoice.LexwareInvoiceId))
                 return;
 
-            var now = DateTimeOffset.UtcNow;
+            var nowUtc = DateTimeOffset.UtcNow;
 
             var invDoc = await _lex.GetInvoiceAsync(invoice.LexwareInvoiceId!, ct);
 
-            // we don't have contract items here necessarily; use Lexware lineItems primarily
             ApplyLexwareSnapshotToLocalInvoice(
                 invoice,
                 invDoc,
                 fallbackCurrency: invoice.Currency ?? "EUR",
-                fallbackIssueAt: invoice.IssuedAt ?? now,
+                fallbackIssueAt: invoice.IssuedAt ?? nowUtc,
                 defaultPaymentTermDays: _opt.DefaultPaymentTermDays,
                 contractItemsForServiceMapping: null);
 
-            invoice.LexwareSyncedAt = now;
+            invoice.LexwareSyncedAt = nowUtc; // ✅ UTC
+
+            // ✅ InvoiceNo NOT NULL safety
+            if (string.IsNullOrWhiteSpace(invoice.InvoiceNo))
+            {
+                invoice.InvoiceNo =
+                    invoice.LexwareVoucherNumber ??
+                    invoice.LexwareInvoiceId ??
+                    $"TEMP-{Guid.NewGuid():N}".Substring(0, 20);
+            }
 
             await _db.SaveChangesAsync(ct);
 
@@ -239,11 +255,13 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             var voucherNumber = TryGetString(root, "voucherNumber");
             var voucherStatus = TryGetString(root, "voucherStatus");
-            var voucherDate = TryGetDateTimeOffset(root, "voucherDate") ?? fallbackIssueAt;
 
-            // update basic meta
-            invoice.LexwareSnapshot = invDoc;
-            invoice.LexwareSyncedAt = DateTimeOffset.UtcNow;
+            // ✅ ALWAYS normalize to UTC before saving to DB
+            var voucherDateUtc = ToUtc(TryGetDateTimeOffset(root, "voucherDate") ?? fallbackIssueAt);
+
+            // update basic meta (store a safe clone)
+            invoice.LexwareSnapshot = CloneJson(invDoc);
+            invoice.LexwareSyncedAt = DateTimeOffset.UtcNow; // ✅ UTC
 
             invoice.LexwareVoucherNumber = voucherNumber;
             invoice.LexwareVoucherStatus = voucherStatus;
@@ -253,8 +271,9 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             invoice.Currency = string.IsNullOrWhiteSpace(invoice.Currency) ? fallbackCurrency : invoice.Currency;
 
-            invoice.IssuedAt = voucherDate;
-            invoice.IssueDate = DateOnly.FromDateTime(voucherDate.UtcDateTime);
+            // ✅ IssuedAt must be UTC for PostgreSQL timestamptz
+            invoice.IssuedAt = voucherDateUtc;
+            invoice.IssueDate = DateOnly.FromDateTime(voucherDateUtc.UtcDateTime);
 
             // DueDate: try from Lexware, else compute from payment term
             var dueDate = TryGetDateOnly(root, "dueDate");
@@ -270,8 +289,8 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             if (invoice.Status == DocumentStatus.Paid && invoice.PaidAt is null)
             {
-                // best-effort (إذا ما عندنا paidAt من Lexware)
-                invoice.PaidAt = DateTimeOffset.UtcNow;
+                // best-effort
+                invoice.PaidAt = DateTimeOffset.UtcNow; // ✅ UTC
             }
 
             // ---------- Items: remove then rebuild ----------
@@ -280,12 +299,24 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 _db.InvoiceItems.RemoveRange(invoice.Items);
                 invoice.Items.Clear();
             }
+            else if (invoice.Items == null)
+            {
+                invoice.Items = new List<InvoiceItem>();
+            }
 
-            var items = BuildInvoiceItemsFromLexware(root, contractItemsForServiceMapping);
-            invoice.Items = items;
+            var newItems = BuildInvoiceItemsFromLexware(root, contractItemsForServiceMapping);
+
+            foreach (var it in newItems)
+            {
+                it.Invoice = invoice; // navigation only
+                invoice.Items.Add(it);
+            }
 
             // ---------- Totals ----------
             var totals = BuildTotalsFromLexware(root, invoice.Items, voucherStatus, _opt.DefaultTaxRatePercentage);
+
+            // ✅ one-to-one: set navigation only (cleaner)
+            totals.Invoice = invoice;
 
             if (invoice.Totals == null)
             {
@@ -392,7 +423,6 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             decimal total = TryGetDecimal(root, "totalPrice", "totalGrossAmount")
                            ?? (subtotal + tax);
 
-            // balance due
             decimal balance =
                 (voucherStatus ?? "").Equals("paid", StringComparison.OrdinalIgnoreCase)
                     ? 0m
@@ -410,7 +440,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 Total = total,
                 PaidTotal = paid,
                 BalanceDue = balance,
-                UpdatedAt = DateTimeOffset.UtcNow
+                UpdatedAt = DateTimeOffset.UtcNow // ✅ UTC
             };
         }
 
@@ -436,7 +466,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 await File.WriteAllBytesAsync(filePath, pdf, ct);
 
                 invoice.LexwarePdfPath = filePath;
-                invoice.LexwareSyncedAt = DateTimeOffset.UtcNow;
+                invoice.LexwareSyncedAt = DateTimeOffset.UtcNow; // ✅ UTC
 
                 await _db.SaveChangesAsync(ct);
 
@@ -452,14 +482,20 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
         private async Task InvalidateInvoiceCacheAsync(Guid invoiceId, CancellationToken ct)
         {
-            // نفس المنطق الموجود في ManageInvoice.InvalidateAfterInvoiceChangeAsync
             await _cache.RemoveAsync(InvoiceCacheKeys.Details(invoiceId), ct);
             await _cache.BumpVersionAsync(InvoiceCacheKeys.ListVersionKey, ct);
         }
 
         // =========================
-        // Helpers (JSON + mapping)
+        // Helpers (JSON + mapping + UTC)
         // =========================
+
+        private static DateTimeOffset ToUtc(DateTimeOffset value)
+            => value.Offset == TimeSpan.Zero ? value : value.ToUniversalTime();
+
+        private static JsonDocument CloneJson(JsonDocument doc)
+            => JsonDocument.Parse(doc.RootElement.GetRawText());
+
         private static DocumentStatus MapVoucherStatusToDocumentStatus(string? s)
         {
             var v = (s ?? "").Trim().ToLowerInvariant();
@@ -498,12 +534,15 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             return null;
         }
 
+        // ✅ ALWAYS returns UTC (offset 0) if parsed successfully
         private static DateTimeOffset? TryGetDateTimeOffset(JsonElement root, params string[] path)
         {
             if (!TryGetElement(root, out var el, path)) return null;
             if (el.ValueKind != JsonValueKind.String) return null;
+
             if (DateTimeOffset.TryParse(el.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dto))
-                return dto;
+                return ToUtc(dto);
+
             return null;
         }
 
@@ -518,7 +557,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                     return d;
 
                 if (DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dto))
-                    return DateOnly.FromDateTime(dto.UtcDateTime);
+                    return DateOnly.FromDateTime(ToUtc(dto).UtcDateTime);
             }
 
             return null;
