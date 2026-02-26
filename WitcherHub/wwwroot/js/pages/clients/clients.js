@@ -181,32 +181,103 @@
     let editingLocationIndex = null;
     let editingContactIndex = null;
     let editingBasic = false;
-
+    function escapeHtml(str) {
+        return (str ?? "").toString()
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
     // ---------- Render Projects ----------
-    function renderProjects(list) {
-        const body = $('vc-projects');
-        const countEl = $('vc-projectCount');
-        if (countEl) countEl.textContent = (list?.length ?? 0);
-        if (!body) return;
+    function renderProjects(projects) {
+        const tbody = document.getElementById("vc-projects");
+        const countEl = document.getElementById("vc-projectCount");
 
-        if (!list || !list.length) {
-            body.innerHTML = `<tr><td colspan="3" class="text-muted">No projects.</td></tr>`;
+        const list = Array.isArray(projects) ? projects : [];
+        if (countEl) countEl.textContent = list.length;
+
+        if (!tbody) return;
+
+        if (list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-muted">No projects.</td></tr>`;
             return;
         }
 
-        body.innerHTML = list.map(p => `
-                <tr>
-                    <td class="fw-semibold">${esc(p.name)}</td>
-                    <td><span class="badge bg-secondary bg-opacity-10 text-secondary">${esc(p.status)}</span></td>
-                    <td class="text-end">
-                        <button type="button" class="btn p-0 border-0 bg-transparent text-secondary" title="View">
-                            <i class="material-icons-outlined">visibility</i>
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-    }
+        const normStatusText = (v) => {
+            if (v === null || v === undefined) return "";
+            if (typeof v === "number") {
+                // لو الـ enum عندك يطلع أرقام (بدون JsonStringEnumConverter)
+                // عدّل الماب حسب ترتيب ProjectStatus عندك إذا اختلف
+                const map = {
+                    0: "Draft",
+                    1: "Active",
+                    2: "Closed",
+                    3: "Canceled"
+                };
+                return map[v] ?? String(v);
+            }
+            return String(v);
+        };
 
+        const statusBadge = (status) => {
+            const txt = normStatusText(status);
+            const s = txt.toLowerCase();
+
+            if (s.includes("draft")) return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
+            if (s.includes("active")) return `<span class="badge bg-success bg-opacity-10 text-success">Active</span>`;
+            if (s.includes("closed") || s.includes("done") || s.includes("complete")) return `<span class="badge bg-secondary bg-opacity-10 text-secondary">Closed</span>`;
+            if (s.includes("cancel")) return `<span class="badge bg-danger bg-opacity-10 text-danger">Canceled</span>`;
+
+            return `<span class="badge bg-light text-dark">${esc(txt || "-")}</span>`;
+        };
+
+        const fmtDateOnly = (d) => {
+            if (!d) return "—";
+            const s = String(d);
+            // لو جاي DateTime "2026-02-25T00:00:00" خذ الجزء الأول
+            return s.includes("T") ? s.split("T")[0] : s;
+        };
+
+        const fmtRange = (start, end) => {
+            const a = fmtDateOnly(start);
+            const b = fmtDateOnly(end);
+
+            if (a === "—" && b === "—") return "—";
+            if (a !== "—" && b !== "—") return (a === b) ? a : `${a} → ${b}`;
+            return a !== "—" ? a : b;
+        };
+
+        tbody.innerHTML = list.map(p => {
+            const id = p.id ?? p.Id ?? p.projectId ?? p.ProjectId ?? "";
+            const title = p.title ?? p.Title ?? p.name ?? p.Name ?? "(No title)";
+            const status = p.status ?? p.Status ?? p.projectStatus ?? p.ProjectStatus ?? "";
+            const startDate = p.startDate ?? p.StartDate ?? p.start ?? p.Start ?? null;
+            const endDate = p.endDate ?? p.EndDate ?? p.end ?? p.End ?? null;
+
+            const datesText = fmtRange(startDate, endDate);
+            const openUrl = id ? `/Projects?openProjectId=${encodeURIComponent(id)}` : "javascript:;";
+
+            return `
+            <tr class="vc-project-row" data-open="${openUrl}" style="cursor:pointer;">
+                <td class="fw-semibold">${esc(title)}</td>
+                <td>${statusBadge(status)}</td>
+                <td class="text-muted">${esc(datesText)}</td>
+                <td class="text-end">
+                    ${id ? `<a class="btn btn-sm btn-outline-primary" href="${openUrl}">Open</a>` : `<span class="text-muted">—</span>`}
+                </td>
+            </tr>
+        `;
+        }).join("");
+
+        tbody.querySelectorAll("tr.vc-project-row").forEach(tr => {
+            tr.addEventListener("click", (e) => {
+                if (e.target.closest("a")) return;
+                const url = tr.getAttribute("data-open");
+                if (url && url !== "javascript:;") window.location.href = url;
+            });
+        });
+    }
     // ---------- Render Locations (inline edit) ----------
     function renderAddresses(list) {
         const wrap = $('vc-addressList');
@@ -1499,6 +1570,19 @@
             root.contacts ?? root.Contacts ??
             (root.contact ? [root.contact] : []) ??
             (root.Contact ? [root.Contact] : []);
+        const rawProjects =
+            root.projects ?? root.Projects ??
+            data.projects ?? data.Projects ??
+            data.customer?.projects ?? data.Customer?.Projects ??
+            [];
+
+        const normProjects = (rawProjects || []).map(p => ({
+            id: p.id ?? p.Id ?? p.projectId ?? p.ProjectId ?? null,
+            title: p.title ?? p.Title ?? p.name ?? p.Name ?? '',
+            status: p.status ?? p.Status ?? p.projectStatus ?? p.ProjectStatus ?? '',
+            startDate: p.startDate ?? p.StartDate ?? p.start ?? p.Start ?? null,
+            endDate: p.endDate ?? p.EndDate ?? p.end ?? p.End ?? null
+        }));
         const normalizeLexware = (v) => {
             if (v === null || v === undefined) return null; // لا تفرض NotExported
             if (typeof v === 'number') return v === 0 ? 'Imported' : v === 1 ? 'Exported' : 'NotExported';
@@ -1565,10 +1649,10 @@
                 email: c.email ?? c.Email ?? '',
                 phone: c.phone ?? c.Phone ?? ''
             })),
+            
 
 
-
-            projects: root.projects ?? root.Projects ?? []
+            projects: normProjects
         };
     }
     function fmtBool(v) {

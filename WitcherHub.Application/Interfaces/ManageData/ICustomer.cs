@@ -23,5 +23,6 @@ namespace WitcherHub.Application.Interfaces.ManageData
         Task UpdateContactAsync(UpdateCustomerContactDto dto, CancellationToken ct = default);
         Task DeleteContactAsync(DeleteCustomerContactDto dto, CancellationToken ct = default);
         Task SetPrimaryContactAsync(SetPrimaryCustomerContactDto dto, CancellationToken ct = default);
+        Task<List<CustomerProjectItemView>> GetCustomerProjectsAsync(Guid customerId, CancellationToken ct = default);
     }
 }

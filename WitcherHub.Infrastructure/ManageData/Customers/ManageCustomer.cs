@@ -910,6 +910,26 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                 .Select(g => g.OrderByDescending(x => KindRank(x.Kind)).First()) // اختار الأفضل
                 .ToList();
         }
+        public async Task<List<CustomerProjectItemView>> GetCustomerProjectsAsync(Guid customerId, CancellationToken ct = default)
+        {
+            if (customerId == Guid.Empty) throw new BadRequestAppException("Invalid customer id.");
 
+            var projectsRepo = _unitOfWork.Repo<Project>(); // غيّر ProjectEntity حسب اسم الـ Entity عندك
+
+            var items = await projectsRepo.Query(asNoTracking: true)
+                .Where(p => p.CustomerId == customerId)
+                .OrderByDescending(p => p.CreatedAt) // أو StartDate
+                .Select(p => new CustomerProjectItemView
+                {
+                    Id = p.Id,
+                    Title = p.Title,
+                    Status = p.Status,
+                    StartDate = p.StartDate,
+                    EndDate = p.EndDate
+                })
+                .ToListAsync(ct);
+
+            return items;
+        }
     }
 }

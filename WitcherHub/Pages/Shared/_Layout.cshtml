@@ -17,12 +17,25 @@
 <html lang="en" data-bs-theme="blue-theme">
 <head>
     <meta charset="utf-8">
+    <script>
+        (function () {
+          const KEY = "wh_theme";
+          const DEFAULT_THEME = "blue-theme";
+
+          try {
+            const saved = localStorage.getItem(KEY);
+            const theme = saved || DEFAULT_THEME;
+            document.documentElement.setAttribute("data-bs-theme", theme);
+          } catch (e) {
+            document.documentElement.setAttribute("data-bs-theme", DEFAULT_THEME);
+          }
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Maxton | Bootstrap 5 Admin Dashboard Template</title>
+    <title>@ViewData["Title"] - WitcherHub</title>
 
     <!--favicon-->
-    <link rel="icon" href="~/theme/assets/images/favicon-32x32.png" type="image/png">
-
+    <link rel="icon" href="~/theme/assets/images/netwitcher-logo.png" type="image/png">
     <script>
         window.paceOptions = {
             ajax: {
@@ -75,111 +88,20 @@
 
     <!--start header-->
     <header class="top-header">
-        <nav class="navbar navbar-expand align-items-center gap-4">
+        <nav class="navbar navbar-expand align-items-center gap-4 justify-content-between">
 
             <div class="btn-toggle">
                 <a href="javascript:;"><i class="material-icons-outlined">menu</i></a>
             </div>
 
-            <div class="search-bar flex-grow-1">
-                <div class="position-relative">
-                    <input class="form-control rounded-5 px-5 search-control d-lg-block d-none" type="text" placeholder="Search">
-                    <span class="material-icons-outlined position-absolute d-lg-block d-none ms-3 translate-middle-y start-0 top-50">search</span>
-                    <span class="material-icons-outlined position-absolute me-3 translate-middle-y end-0 top-50 search-close">close</span>
+            
+            <ul class="navbar-nav gap-1 nav-right-links align-items-center ms-auto">
 
-                    <div class="search-popup p-3">
-                        <div class="card rounded-4 overflow-hidden">
-                            <div class="card-header d-lg-none">
-                                <div class="position-relative">
-                                    <input class="form-control rounded-5 px-5 mobile-search-control" type="text" placeholder="Search">
-                                    <span class="material-icons-outlined position-absolute ms-3 translate-middle-y start-0 top-50">search</span>
-                                    <span class="material-icons-outlined position-absolute me-3 translate-middle-y end-0 top-50 mobile-search-close">close</span>
-                                </div>
-                            </div>
-                            <div class="card-body search-content">
-                                <p class="search-title">Recent Searches</p>
-                                <div class="d-flex align-items-start flex-wrap gap-2 kewords-wrapper">
-                                    <a href="javascript:;" class="kewords"><span>Angular Template</span><i class="material-icons-outlined fs-6">search</i></a>
-                                    <a href="javascript:;" class="kewords"><span>Dashboard</span><i class="material-icons-outlined fs-6">search</i></a>
-                                    <a href="javascript:;" class="kewords"><span>Admin Template</span><i class="material-icons-outlined fs-6">search</i></a>
-                                    <a href="javascript:;" class="kewords"><span>Bootstrap 5 Admin</span><i class="material-icons-outlined fs-6">search</i></a>
-                                    <a href="javascript:;" class="kewords"><span>Html eCommerce</span><i class="material-icons-outlined fs-6">search</i></a>
-                                    <a href="javascript:;" class="kewords"><span>Sass</span><i class="material-icons-outlined fs-6">search</i></a>
-                                    <a href="javascript:;" class="kewords"><span>laravel 9</span><i class="material-icons-outlined fs-6">search</i></a>
-                                </div>
-
-                                <hr>
-
-                                <p class="search-title">Tutorials</p>
-                                <div class="search-list d-flex flex-column gap-2">
-                                    <div class="search-list-item d-flex align-items-center gap-3">
-                                        <div class="list-icon">
-                                            <i class="material-icons-outlined fs-5">play_circle</i>
-                                        </div>
-                                        <div>
-                                            <h5 class="mb-0 search-list-title">Wordpress Tutorials</h5>
-                                        </div>
-                                    </div>
-                                    <div class="search-list-item d-flex align-items-center gap-3">
-                                        <div class="list-icon">
-                                            <i class="material-icons-outlined fs-5">shopping_basket</i>
-                                        </div>
-                                        <div>
-                                            <h5 class="mb-0 search-list-title">eCommerce Website Tutorials</h5>
-                                        </div>
-                                    </div>
-                                    <div class="search-list-item d-flex align-items-center gap-3">
-                                        <div class="list-icon">
-                                            <i class="material-icons-outlined fs-5">laptop</i>
-                                        </div>
-                                        <div>
-                                            <h5 class="mb-0 search-list-title">Responsive Design</h5>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <hr>
-
-                                <p class="search-title">Members</p>
-                                <div class="search-list d-flex flex-column gap-2">
-                                    <div class="search-list-item d-flex align-items-center gap-3">
-                                        <div class="memmber-img">
-                                            <img src="~/theme/assets/images/avatars/01.png" width="32" height="32" class="rounded-circle" alt="">
-                                        </div>
-                                        <div><h5 class="mb-0 search-list-title">Andrew Stark</h5></div>
-                                    </div>
-
-                                    <div class="search-list-item d-flex align-items-center gap-3">
-                                        <div class="memmber-img">
-                                            <img src="~/theme/assets/images/avatars/02.png" width="32" height="32" class="rounded-circle" alt="">
-                                        </div>
-                                        <div><h5 class="mb-0 search-list-title">Snetro Jhonia</h5></div>
-                                    </div>
-
-                                    <div class="search-list-item d-flex align-items-center gap-3">
-                                        <div class="memmber-img">
-                                            <img src="~/theme/assets/images/avatars/03.png" width="32" height="32" class="rounded-circle" alt="">
-                                        </div>
-                                        <div><h5 class="mb-0 search-list-title">Michle Clark</h5></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="card-footer text-center bg-transparent">
-                                <a href="javascript:;" class="btn w-100">See All Search Results</a>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-            <ul class="navbar-nav gap-1 nav-right-links align-items-center">
-
-                <li class="nav-item d-lg-none mobile-search-btn">
+                @* <li class="nav-item d-lg-none mobile-search-btn">
                     <a class="nav-link" href="javascript:;"><i class="material-icons-outlined">search</i></a>
-                </li>
+                </li> *@
 
-                <li class="nav-item dropdown">
+                @* <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle dropdown-toggle-nocaret" href="javascript:;" data-bs-toggle="dropdown">
                         <img src="~/theme/assets/images/county/02.png" width="22" alt="">
                     </a>
@@ -193,7 +115,7 @@
                         <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img src="~/theme/assets/images/county/07.png" width="20" alt=""><span class="ms-2">Georgian</span></a></li>
                         <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img src="~/theme/assets/images/county/08.png" width="20" alt=""><span class="ms-2">Hindi</span></a></li>
                     </ul>
-                </li>
+                </li> *@
 
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle dropdown-toggle-nocaret position-relative" data-bs-auto-close="outside"
@@ -234,30 +156,38 @@
                     </div>
                 </li>
 
-                <li class="nav-item d-md-flex d-none">
+                @* <li class="nav-item d-md-flex d-none">
                     <a class="nav-link position-relative" data-bs-toggle="offcanvas" href="#offcanvasCart">
                         <i class="material-icons-outlined">shopping_cart</i>
                         <span class="badge-notify">8</span>
                     </a>
-                </li>
+                </li> *@
 
                 <li class="nav-item dropdown">
-                    <a href="javascript:;" class="dropdown-toggle dropdown-toggle-nocaret" data-bs-toggle="dropdown">
-                        <img src="~/theme/assets/images/avatars/01.png" class="rounded-circle p-1 border" width="45" height="45" alt="">
+                    <a href="javascript:;" class="dropdown-toggle dropdown-toggle-nocaret" data-bs-toggle="dropdown" aria-expanded="false">
+                        <img src="~/theme/assets/images/netwitcher-logo.png" class="rounded-circle p-1 border" width="45" height="45" alt="">
                     </a>
+
                     <div class="dropdown-menu dropdown-user dropdown-menu-end shadow">
-                        <a class="dropdown-item gap-2 py-2" href="javascript:;">
-                            <div class="text-center">
-                                <img src="~/theme/assets/images/avatars/01.png" class="rounded-circle p-1 shadow mb-3" width="90" height="90" alt="">
-                                <h5 class="user-name mb-0 fw-bold">Hello, Jhon</h5>
-                            </div>
-                        </a>
-                        <hr class="dropdown-divider">
-                        <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined">person_outline</i>Profile</a>
-                        <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined">local_bar</i>Setting</a>
-                        <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined">dashboard</i>Dashboard</a>
-                        <hr class="dropdown-divider">
-                        <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined">power_settings_new</i>Logout</a>
+                        @* <a class="dropdown-item gap-2 py-2" href="javascript:;">
+            <div class="text-center">
+                <img src="~/theme/assets/images/avatars/01.png" class="rounded-circle p-1 shadow mb-3" width="90" height="90" alt="">
+                <h5 class="user-name mb-0 fw-bold">Hello, Jhon</h5>
+            </div>
+        </a>
+        <hr class="dropdown-divider">
+        <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined">person_outline</i>Profile</a>
+        <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined">local_bar</i>Setting</a>
+        <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined">dashboard</i>Dashboard</a>
+        <hr class="dropdown-divider"> *@
+
+                        <form method="post" asp-page="/Auth/Logout" class="m-0">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="dropdown-item d-flex align-items-center gap-2 py-2">
+                                <i class="material-icons-outlined">power_settings_new</i>
+                                Logout
+                            </button>
+                        </form>
                     </div>
                 </li>
 
@@ -270,10 +200,10 @@
     <aside class="sidebar-wrapper" data-simplebar="true">
         <div class="sidebar-header">
             <div class="logo-icon">
-                <img src="~/theme/assets/images/logo-icon.png" class="logo-img" alt="">
+                <img src="~/theme/assets/images/netwitcher-logo.png" class="logo-img" alt="">
             </div>
             <div class="logo-name flex-grow-1">
-                <h5 class="mb-0">Maxton</h5>
+                <h5 class="mb-0">WitcherHub</h5>
             </div>
             <div class="sidebar-close">
                 <span class="material-icons-outlined">close</span>
@@ -308,7 +238,7 @@
                             <div class="menu-title">Services</div>
                         </a>
                     </li>
-                    <li>
+                    @* <li>
                         <a href="/contracts/sign" target="_blank">
                             <div class="parent-icon"><i class="material-icons-outlined">api</i></div>
                             <div class="menu-title">Contract Page</div>
@@ -321,7 +251,7 @@
                             <div class="parent-icon"><i class="material-icons-outlined">api</i></div>
                             <div class="menu-title">Swagger</div>
                         </a>
-                    </li>
+                    </li> *@
                 }
 
 

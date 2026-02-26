@@ -65,3 +65,44 @@ html[data-bs-theme="dark"] #positionsAccordion .form-label {
   font-weight: 900 !important;
   font-size: .95rem !important;
 }
+/* Gradient primary button text should stay white in light & semi-dark */
+html[data-bs-theme="light"] .btn.btn-grd-primary,
+html[data-bs-theme="light"] .btn.btn-grd-primary:hover,
+html[data-bs-theme="light"] .btn.btn-grd-primary:focus,
+html[data-bs-theme="light"] .btn.btn-grd-primary:active,
+html[data-bs-theme="semi-dark"] .btn.btn-grd-primary,
+html[data-bs-theme="semi-dark"] .btn.btn-grd-primary:hover,
+html[data-bs-theme="semi-dark"] .btn.btn-grd-primary:focus,
+html[data-bs-theme="semi-dark"] .btn.btn-grd-primary:active {
+  color: #fff !important;
+}
+
+html[data-bs-theme="light"] .btn.btn-grd-primary *,
+html[data-bs-theme="semi-dark"] .btn.btn-grd-primary * {
+  color: #fff !important;
+}
+/* Make .text-light readable in light & semi-dark themes */
+html[data-bs-theme="light"] .text-light,
+html[data-bs-theme="semi-dark"] .text-light {
+    color: var(--bs-body-color) !important;
+}
+/* 1) Fix .text-light in light & semi-dark (عام) */
+html[data-bs-theme="light"] .text-light,
+html[data-bs-theme="semi-dark"] .text-light {
+    color: var(--bs-body-color) !important;
+}
+
+/* 2) BUT: داخل هيدر مودال ملوّن/متدرّج خلّيه أبيض */
+html[data-bs-theme="light"] .modal-header[class*="bg-grd"] .modal-title,
+html[data-bs-theme="semi-dark"] .modal-header[class*="bg-grd"] .modal-title,
+html[data-bs-theme="light"] .modal-header[class*="bg-grd"] .text-light,
+html[data-bs-theme="semi-dark"] .modal-header[class*="bg-grd"] .text-light {
+    color: #fff !important;
+}
+
+/* اختياري: زر الإغلاق الأبيض داخل الهيدر الملوّن */
+html[data-bs-theme="light"] .modal-header[class*="bg-grd"] .btn-close,
+html[data-bs-theme="semi-dark"] .modal-header[class*="bg-grd"] .btn-close {
+    filter: invert(1) grayscale(100%);
+    opacity: .9;
+}

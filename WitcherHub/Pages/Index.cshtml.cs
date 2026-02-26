@@ -207,7 +207,14 @@ namespace WitcherHub.Pages
             if (client is null)
                 throw new NotFoundAppException("Customer not found.");
 
-            return new JsonResult(client);
+            // ✅ المشاريع: (الطريقة الأفضل) تجيبها من السيرفس/ManageCustomer
+            var projects = await _customers.GetCustomerProjectsAsync(id, ct); // سنضيفها بالخطوة القادمة
+
+            return new JsonResult(new
+            {
+                customer = client,
+                projects
+            });
         }
 
         // =========================

@@ -21,7 +21,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
             _logger = logger;
             _env = env;
 
-            EnsureWkhtmltoxLoaded(); // ✅ هذا هو المهم
+            EnsureWkhtmltoxLoaded(); 
         }
 
         public byte[] FromHtml(string html, string documentTitle)
@@ -164,7 +164,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 
         private string ResolveLogoDataUri()
         {
-            var p = Path.Combine(_env.WebRootPath, "email-assets", "box-watermark.png");
+            var p = Path.Combine(_env.WebRootPath, "theme", "assets", "images", "netwitcher-logo.png");
 
             if (!File.Exists(p))
             {
