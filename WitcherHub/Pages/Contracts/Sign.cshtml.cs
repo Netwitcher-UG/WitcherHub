@@ -283,9 +283,15 @@ namespace WitcherHub.Pages.Contracts
                     _logger.LogInformation("Lexware job START ContractId={Id}", contractId);
 
                     var lex = scope.ServiceProvider.GetRequiredService<LexwareInvoiceSyncService>();
-                    await lex.CreateFromContractAsync(contractId, token);
+                    //await lex.CreateFromContractAsync(contractId, token);
+                    await lex.CreateFromContractAsync(contractId, CancellationToken.None);
 
                     _logger.LogInformation("Lexware job DONE ContractId={Id}", contractId);
+                }
+                catch (OperationCanceledException oce)
+                {
+                    _logger.LogWarning(oce, "Lexware job CANCELED ContractId={Id}", contractId);
+                    // لا تعمل throw إذا ما بدك توقف الـ worker
                 }
                 catch (Exception ex)
                 {
