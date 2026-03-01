@@ -116,6 +116,10 @@ namespace WitcherHub.Pages
         {
             Project.Title ??= "";
             if (Project.CustomerId == Guid.Empty) { /* leave empty until user fills */ }
+            // ✅ تواريخ افتراضية من السيرفر
+            // (بس إذا المستخدم ما كان حاطط قيمة)
+            var today = DateTime.UtcNow.Date;
+            Project.StartDate ??= DateOnly.FromDateTime(today);
 
             OpenTab ??= "overview";
             if (OpenTab != "overview" && OpenTab != "quotes" && OpenTab != "invoices" && OpenTab != "contracts")

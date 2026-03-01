@@ -79,9 +79,9 @@ namespace WitcherHub.Pages.Quotes
 
             // fill header form from details
             Header.Quote.ProjectId = Quote.ProjectId;
-            Header.Quote.Currency = Quote.Currency;
+            Header.Quote.Currency = "EUR";
             Header.Quote.Notes = Quote.Notes;
-            Header.Quote.IssuedAt = Quote.IssuedAt;
+            Header.Quote.IssuedAt = Quote.IssuedAt ?? DateTimeOffset.Now;
             Header.Quote.ExpiresAt = Quote.ExpiresAt;
             Header.Quote.Status = Quote.Status;
 
@@ -113,7 +113,8 @@ namespace WitcherHub.Pages.Quotes
                 if (Id == Guid.Empty) throw new BadRequestAppException("Invalid quote id.");
 
                 Header.Items = null; // ✅ do not replace items
-
+                                     // Enforce fixed currency regardless of what's posted
+                Header.Quote.Currency = "EUR";
                 var vr = await _updateValidator.ValidateAsync(Header, ct);
                 if (!vr.IsValid)
                 {

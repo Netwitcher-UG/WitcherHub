@@ -27,24 +27,29 @@ namespace WitcherHub.Pages.Quotes
         [BindProperty]
         public QuoteDTOs Form { get; set; } = new();
 
-        public void OnGet()
-        {
-            if (ProjectId != Guid.Empty)
-                Form.Quote.ProjectId = ProjectId;
-
-            Form.Quote.Currency ??= "EUR";
-            Form.Quote.Status = DocumentStatus.Draft;
-        }
-
-        public async Task<IActionResult> OnPostAsync(CancellationToken ct)
+        // NOTE:
+        // We no longer show a standalone "Create" UI.
+        // Hitting /Quotes/Create?projectId=... will immediately create a Draft quote
+        // with fixed Currency=EUR and IssuedAt=today (server), then redirect to Edit.
+        public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             try
             {
-                if (Form is null) throw new BadRequestAppException("Invalid payload.");
-                if (Form.Quote.ProjectId == Guid.Empty) throw new BadRequestAppException("ProjectId is required.");
+                if (ProjectId == Guid.Empty)
+                    throw new BadRequestAppException("ProjectId is required.");
 
-                // Create page = header only
-                Form.Items = new List<QuoteItemDto>();
+                Form = new QuoteDTOs
+                {
+                    Quote = new QuoteDto
+                    {
+                        ProjectId = ProjectId,
+                        Currency = "EUR",
+                        Status = DocumentStatus.Draft,
+                        // server default
+                        IssuedAt = DateTimeOffset.Now
+                    },
+                    Items = new List<QuoteItemDto>() // header only
+                };
 
                 var vr = await _validator.ValidateAsync(Form, ct);
                 if (!vr.IsValid)
@@ -60,7 +65,7 @@ namespace WitcherHub.Pages.Quotes
                     TempData["Toast.Type"] = "error";
                     TempData["Toast.Title"] = "Validation";
                     TempData["Toast.Message"] = "Please fix the highlighted fields.";
-                    return Page();
+                    return RedirectToPage("/Projects/Details", new { id = ProjectId });
                 }
 
                 var id = await _quotes.CreateAsync(Form, ct);
@@ -76,15 +81,18 @@ namespace WitcherHub.Pages.Quotes
                 TempData["Toast.Type"] = "error";
                 TempData["Toast.Title"] = "Not allowed";
                 TempData["Toast.Message"] = ex.Message;
-                return Page();
+                return RedirectToPage("/Projects");
             }
             catch (NotFoundAppException ex)
             {
                 TempData["Toast.Type"] = "error";
                 TempData["Toast.Title"] = "Not found";
                 TempData["Toast.Message"] = ex.Message;
-                return Page();
+                return RedirectToPage("/Projects");
             }
         }
+
+        // Backward compatibility (if something still posts to this page).
+        public Task<IActionResult> OnPostAsync(CancellationToken ct) => OnGetAsync(ct);
     }
 }
