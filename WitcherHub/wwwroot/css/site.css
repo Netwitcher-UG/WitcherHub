@@ -209,3 +209,165 @@ body {
     border-color: var(--bs-nav-tabs-link-active-border-color);
 }
 
+/* ===== Global: TableCard horizontal scroll ===== */
+.wh-tablecard-scroll .table-responsive{
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.wh-tablecard-scroll .table-responsive > table{
+  min-width: var(--wh-table-min-width, 1100px);
+  table-layout: auto !important;
+}
+
+.wh-tablecard-scroll .table-responsive th,
+.wh-tablecard-scroll .table-responsive td{
+  white-space: nowrap;
+}
+
+/* ===== Loading Overlay (Theme-aware) ===== */
+body.ui-loading {
+    overflow: hidden;
+}
+
+#appLoading.app-loading {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--wh-loading-backdrop);
+    backdrop-filter: blur(2px);
+}
+
+    #appLoading.app-loading.d-none {
+        display: none !important;
+    }
+
+#appLoading .app-loading__panel {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: var(--wh-loading-panel-bg);
+    color: var(--wh-loading-text);
+    border: 1px solid var(--wh-loading-border);
+    box-shadow: 0 18px 45px rgba(0,0,0,.25);
+}
+
+#appLoading .app-loading__spinner {
+    width: 22px;
+    height: 22px;
+    color: var(--wh-loading-spinner);
+}
+
+#appLoading .app-loading__text {
+    font-weight: 700;
+    letter-spacing: .1px;
+    color: var(--wh-loading-text);
+}
+
+/* ===== Light / Semi-dark ===== */
+html[data-bs-theme="light"],
+html[data-bs-theme="semi-dark"] {
+    --wh-loading-backdrop: rgba(255,255,255,.70);
+    --wh-loading-panel-bg: rgba(255,255,255,.95);
+    --wh-loading-text: rgba(17,17,17,.92);
+    --wh-loading-border: rgba(0,0,0,.10);
+    --wh-loading-spinner: rgba(17,17,17,.85);
+}
+
+/* ===== Dark ===== */
+html[data-bs-theme="dark"] {
+    --wh-loading-backdrop: rgba(0,0,0,.55);
+    --wh-loading-panel-bg: rgba(18,22,32,.92);
+    --wh-loading-text: rgba(255,255,255,.92);
+    --wh-loading-border: rgba(255,255,255,.10);
+    --wh-loading-spinner: rgba(255,255,255,.90);
+}
+
+/* ===== Blue-theme ===== */
+html[data-bs-theme="blue-theme"] {
+    --wh-loading-backdrop: rgba(8,10,20,.60);
+    --wh-loading-panel-bg: rgba(20,25,51,.92);
+    --wh-loading-text: rgba(255,255,255,.92);
+    --wh-loading-border: rgba(255,255,255,.10);
+    --wh-loading-spinner: rgba(255,255,255,.90);
+}
+
+/* btn-grd-primary => solid color (no gradient) */
+.btn-grd-primary,
+.btn-grd-primary:hover,
+.btn-grd-primary:focus,
+.btn-grd-primary:active,
+.btn-grd-primary.active {
+  background: rgb(107 76 230) !important;
+  background-image: none !important;
+  border-color: rgb(107 76 230) !important;
+  color: #fff !important;
+}
+
+.btn-grd-primary * {
+  color: #fff !important;
+}
+
+
+/* ===== TableCard: Row-cards layout for LIGHT + SEMI-DARK ===== */
+html[data-bs-theme="light"] .wh-tablecard-scroll .table-responsive > table,
+html[data-bs-theme="semi-dark"] .wh-tablecard-scroll .table-responsive > table{
+  border-collapse: separate !important;
+  border-spacing: 0 10px !important; /* space between rows (card look) */
+}
+
+/* header */
+html[data-bs-theme="light"] .wh-tablecard-scroll thead th,
+html[data-bs-theme="semi-dark"] .wh-tablecard-scroll thead th{
+  border: 0 !important;
+  background: transparent !important;
+  color: rgba(0,0,0,.55) !important;
+  font-weight: 800 !important;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  font-size: .78rem;
+  white-space: nowrap;
+}
+
+/* row cells as a "card" */
+html[data-bs-theme="light"] .wh-tablecard-scroll tbody td,
+html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody td{
+  background: rgba(255,255,255,.92) !important;
+  border-top: 1px solid rgba(0,0,0,.08) !important;
+  border-bottom: 1px solid rgba(0,0,0,.08) !important;
+  white-space: nowrap;
+}
+
+/* left / right borders + radius */
+html[data-bs-theme="light"] .wh-tablecard-scroll tbody td:first-child,
+html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody td:first-child{
+  border-left: 1px solid rgba(0,0,0,.08) !important;
+  border-top-left-radius: 14px;
+  border-bottom-left-radius: 14px;
+}
+
+html[data-bs-theme="light"] .wh-tablecard-scroll tbody td:last-child,
+html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody td:last-child{
+  border-right: 1px solid rgba(0,0,0,.08) !important;
+  border-top-right-radius: 14px;
+  border-bottom-right-radius: 14px;
+}
+
+/* vertical separators between columns */
+html[data-bs-theme="light"] .wh-tablecard-scroll tbody td + td,
+html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody td + td{
+  border-left: 1px solid rgba(0,0,0,.06) !important;
+}
+
+/* hover */
+html[data-bs-theme="light"] .wh-tablecard-scroll tbody tr:hover td,
+html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody tr:hover td{
+  background: rgba(255,255,255,1) !important;
+}

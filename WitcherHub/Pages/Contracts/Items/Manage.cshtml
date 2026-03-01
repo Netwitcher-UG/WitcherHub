@@ -36,7 +36,8 @@
             + Add Item
         </button>
 
-        <form method="post" asp-page-handler="GenerateContract" class="d-inline">
+        <form method="post" asp-page-handler="GenerateContract" class="d-inline"
+              onsubmit="window.UI?.loading?.show?.('Generating contract...');">
             @Html.AntiForgeryToken()
             <input type="hidden" name="ContractId" value="@Model.ContractId" />
             <button class="btn btn-primary"

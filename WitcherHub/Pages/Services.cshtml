@@ -9,8 +9,9 @@
     ViewData["Title"] = "Services";
 }
 
-<partial name="_TableCard" model="Model.ServicesTable" />
-
+<div class="wh-tablecard-scroll">
+    <partial name="_TableCard" model="Model.ServicesTable" />
+</div>
 <partial name="~/Pages/Shared/Modals/_ModalShell.cshtml" model="Model.CreateServiceModal" />
 <partial name="~/Pages/Shared/Modals/_ViewServiceModal.cshtml" />
 

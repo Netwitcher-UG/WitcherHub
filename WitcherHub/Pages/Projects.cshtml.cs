@@ -510,17 +510,7 @@ namespace WitcherHub.Pages
         private static Microsoft.AspNetCore.Html.IHtmlContent ActionsButtons(string projectId)
         {
             return new Microsoft.AspNetCore.Html.HtmlString($$"""
-<div class="vc-actions-wrap">
-  <button type="button"
-          class="btn vc-icon-btn text-secondary"
-          title="View"
-          data-bs-toggle="modal"
-          data-bs-target="#ViewProjectModal"
-          data-project-id="{{Enc(projectId)}}"
-          data-open-tab="overview">
-      <i class="material-icons-outlined">visibility</i>
-  </button>
-
+<div class="vc-actions-wrap d-flex justify-content-end gap-1 flex-nowrap">
   <button type="button"
           class="btn vc-icon-btn text-primary"
           title="Quotes"

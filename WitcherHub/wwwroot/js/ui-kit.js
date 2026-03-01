@@ -208,10 +208,11 @@
             const textEl = el.querySelector('.app-loading__text');
             if (textEl) textEl.textContent = text;
 
+            document.body.classList.add('ui-loading');
+
             el.classList.remove('d-none');
             el.setAttribute('aria-hidden', 'false');
 
-            // ✅ auto hide after ms
             if (loadingTimer) {
                 clearTimeout(loadingTimer);
                 loadingTimer = null;
@@ -231,9 +232,10 @@
 
             el.classList.add('d-none');
             el.setAttribute('aria-hidden', 'true');
+
+            document.body.classList.remove('ui-loading');
         }
     };
-
     // ---------- 4) Modal manager (open/close + pass data) ----------
     UI.modal = {
         open({ title, bodyHtml, footerHtml, size }) {

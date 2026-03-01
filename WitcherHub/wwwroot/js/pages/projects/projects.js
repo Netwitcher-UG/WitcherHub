@@ -924,7 +924,27 @@
     });
 
    
+    // ---- row click => open overview modal ----
+    document.addEventListener('click', function (e) {
+        // لا تفتح إذا الضغط داخل أزرار الأكشن أو أي زر/رابط
+        if (e.target.closest('.vc-actions-wrap')) return;
+        if (e.target.closest('button, a, input, textarea, select, label')) return;
 
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+
+        // خذ projectId من أي زر داخل نفس السطر
+        const pidEl = tr.querySelector('[data-project-id]');
+        const pid = pidEl?.getAttribute('data-project-id') || '';
+        if (!pid) return;
+
+        const autoBtn = document.getElementById('vcAutoOpenBtn');
+        if (!autoBtn) return;
+
+        autoBtn.dataset.projectId = pid;
+        autoBtn.dataset.openTab = 'overview';
+        autoBtn.click();
+    });
     // ---- table delete ----
     document.addEventListener('click', async function (e) {
         const btn = e.target.closest('[data-vc-action="table-delete-project"]');

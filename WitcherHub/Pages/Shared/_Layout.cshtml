@@ -349,9 +349,9 @@
 
     <!-- UI Kit: Loading Overlay -->
     <div id="appLoading" class="app-loading d-none" aria-hidden="true">
-        <div class="app-loading__box">
-            <div class="spinner-border" role="status" aria-label="Loading"></div>
-            <div class="app-loading__text mt-3">Loading...</div>
+        <div class="app-loading__panel" role="status" aria-live="polite" aria-atomic="true">
+            <div class="spinner-border app-loading__spinner" aria-hidden="true"></div>
+            <div class="app-loading__text">Loading...</div>
         </div>
     </div>
 

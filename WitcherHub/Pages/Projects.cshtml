@@ -60,10 +60,12 @@
             opacity: .15;
         }
 
-    
+  
 
 </style>
-<partial name="_TableCard" model="Model.ProjectsTable" />
+<div id="projectsTableCard" class="wh-tablecard-scroll">
+    <partial name="_TableCard" model="Model.ProjectsTable" />
+</div>
 
 <partial name="~/Pages/Shared/Modals/_ModalShell.cshtml" model="Model.CreateProjectModal" />
 <partial name="~/Pages/Shared/Modals/_ViewProjectModal.cshtml" />
