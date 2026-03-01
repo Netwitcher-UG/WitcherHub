@@ -745,22 +745,19 @@ namespace WitcherHub.Pages
         }
 
         private GenerateContractDocumentRequest BuildGenerateRequest(
-            WitcherHub.Application.Models.View.Project.ProjectViews.ProjectDetailsView prj,
-            ContractViews.ContractDetailsView contract)
+    WitcherHub.Application.Models.View.Project.ProjectViews.ProjectDetailsView prj,
+    ContractViews.ContractDetailsView contract)
         {
             var customerName = prj.Customer?.Name ?? "";
             var customerEmail = prj.Customer?.Email ?? "";
 
-            var customerBlock = new StringBuilder();
-            customerBlock.AppendLine($"Name/Firma: {customerName}");
-
-            customerBlock.AppendLine("Adresse:");
-            customerBlock.AppendLine("PLZ/Ort:");
-
+            var customerBlockSb = new StringBuilder();
+            if (!string.IsNullOrWhiteSpace(customerName))
+                customerBlockSb.AppendLine(customerName);
             if (!string.IsNullOrWhiteSpace(customerEmail))
-                customerBlock.AppendLine($"E-Mail: {customerEmail}");
+                customerBlockSb.AppendLine(customerEmail);
 
-            var customerBlockText = customerBlock.ToString().TrimEnd();
+            var customerBlockText = customerBlockSb.ToString().TrimEnd();
 
             var lines = (contract.Items ?? new List<ContractViews.ContractItemItemView>())
                 .OrderBy(x => x.Position)

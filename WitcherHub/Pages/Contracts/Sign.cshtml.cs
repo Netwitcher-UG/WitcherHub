@@ -195,6 +195,9 @@ namespace WitcherHub.Pages.Contracts
             return Page();
         }
 
+        // SignModel.cs
+        // استبدل الدالة بالكامل: OnPostSignAsync
+
         public async Task<IActionResult> OnPostSignAsync([FromQuery(Name = "t")] string? t, CancellationToken ct)
         {
             if (Id == Guid.Empty)
@@ -264,14 +267,7 @@ namespace WitcherHub.Pages.Contracts
 
             await _db.SaveChangesAsync(ct);
 
-            // ✅ بعد حفظ التوقيع: ابعث العقد لـ Lexware (بالخلفية)
-            //await _bg.QueueAsync(async token =>
-            //{
-            //    // مهم: استخدم scope جديد لأن DbContext scoped
-            //    using var scope = HttpContext.RequestServices.CreateScope();
-            //    var svc = scope.ServiceProvider.GetRequiredService<LexwareInvoiceSyncService>();
-            //    await svc.CreateFromContractAsync(Id, token);
-            //});
+            // ========= BACKGROUND: Lexware =========
             var contractId = Id;
             _logger.LogInformation("Queued lexware job for ContractId={Id}", contractId);
 
@@ -283,7 +279,6 @@ namespace WitcherHub.Pages.Contracts
                     _logger.LogInformation("Lexware job START ContractId={Id}", contractId);
 
                     var lex = scope.ServiceProvider.GetRequiredService<LexwareInvoiceSyncService>();
-                    //await lex.CreateFromContractAsync(contractId, token);
                     await lex.CreateFromContractAsync(contractId, CancellationToken.None);
 
                     _logger.LogInformation("Lexware job DONE ContractId={Id}", contractId);
@@ -291,7 +286,6 @@ namespace WitcherHub.Pages.Contracts
                 catch (OperationCanceledException oce)
                 {
                     _logger.LogWarning(oce, "Lexware job CANCELED ContractId={Id}", contractId);
-                    // لا تعمل throw إذا ما بدك توقف الـ worker
                 }
                 catch (Exception ex)
                 {
@@ -300,110 +294,121 @@ namespace WitcherHub.Pages.Contracts
                 }
             });
 
-            // ✅ إشعار: الإيميل لازم ينرسل حتى لو الـ PDF فشل
-            try
+            // ========= BACKGROUND: Email + PDF =========
+            var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : "";
+            var baseUrl = $"{Request.Scheme}://{Request.Host.ToUriComponent()}{pathBase}";
+            var rawToken = Token; // same token from query
+            var recipientEmail = link.RecipientEmail;
+
+            await _bg.QueueAsync(async token =>
             {
-                var info = await _db.Contracts
-                    .AsNoTracking()
-                    .Include(c => c.Project)
-                    .FirstOrDefaultAsync(c => c.Id == Id, ct);
+                using var scope = _scopeFactory.CreateScope();
 
-                var contractNo = info?.ContractNo ?? Id.ToString();
-                var projectTitle = info?.Project?.Title ?? "Project";
-                var termsMarkdown = info?.Terms ?? "";
-
-                var actionUrl = Url.Page(
-                    pageName: "/Contracts/Sign",
-                    pageHandler: null,
-                    values: new { id = Id, t = Token },
-                    protocol: Request.Scheme,
-                    host: Request.Host.ToUriComponent()
-                );
-
-                var subject = $"Vertrag {contractNo} – erfolgreich unterschrieben";
-
-                var html = await _templates.RenderAsync("ContractSigned.de", new
-                {
-                    Subject = subject,
-                    UserName = signerName,
-                    ContractNo = contractNo,
-                    ProjectTitle = projectTitle,
-                    SignedAt = now.ToLocalTime().ToString("dd.MM.yyyy HH:mm"),
-                    ActionUrl = actionUrl
-                }, ct);
-
-                byte[]? pdfBytes = null;
-                string? pdfError = null;
-
-                // ✅ PDF لوحده (لو فشل ما يمنع الإيميل)
                 try
                 {
-                    var pdfHtml = BuildSignedPdfHtml(
-                        contractNo: contractNo,
-                        projectTitle: projectTitle,
-                        termsMarkdown: termsMarkdown,
-                        signerName: signerName,
-                        signerEmail: signerEmail,
-                        signedAt: now,
-                        signatureDataUrl: signatureDataUrl
-                    );
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    var templates = scope.ServiceProvider.GetRequiredService<IEmailTemplateRenderer>();
+                    var emailSender = scope.ServiceProvider.GetRequiredService<IEmailSender>();
+                    var pdf = scope.ServiceProvider.GetRequiredService<IPdfGenerator>();
 
-                    _logger.LogInformation("PDF HTML length={Len}. ContractId={ContractId}", pdfHtml.Length, Id);
+                    var info = await db.Contracts
+                        .AsNoTracking()
+                        .Include(c => c.Project)
+                        .FirstOrDefaultAsync(c => c.Id == contractId, token);
 
-                    pdfBytes = _pdf.FromHtml(pdfHtml, $"Vertrag {contractNo}");
+                    if (info is null)
+                    {
+                        _logger.LogWarning("ContractSigned email skipped: Contract not found. ContractId={ContractId}", contractId);
+                        return;
+                    }
 
-                    _logger.LogInformation("PDF generated bytes={Bytes}. ContractId={ContractId}",
-                        pdfBytes?.Length ?? 0, Id);
+                    var contractNo = info.ContractNo ?? contractId.ToString();
+                    var projectTitle = info.Project?.Title ?? "Project";
+                    var termsMarkdown = info.Terms ?? "";
 
-                    if (pdfBytes is { Length: 0 }) pdfBytes = null;
-                }
-                catch (Exception exPdf)
-                {
-                    pdfError = exPdf.ToString();
-                    _logger.LogError(exPdf, "PDF generation failed. ContractId={ContractId}", Id);
-                    pdfBytes = null;
-                }
+                    var actionUrl = $"{baseUrl}/contracts/sign/{contractId}?t={Uri.EscapeDataString(rawToken)}";
+                    var subject = $"Vertrag {contractNo} – erfolgreich unterschrieben";
 
-                var msg = new EmailMessage
-                {
-                    From = new EmailAddress("placeholder@local", "placeholder"),
-                    Subject = subject,
-                    HtmlBody = html,
-                    TextBody = $"Vertrag unterschrieben. Link: {actionUrl}",
-                    Bcc = new List<EmailAddress> { new EmailAddress(link.RecipientEmail, signerName) },
-                    Attachments = pdfBytes is null
-                        ? new List<EmailAttachment>()
-                        : new List<EmailAttachment>
-                        {
-                    new EmailAttachment($"Vertrag-{contractNo}.pdf", "application/pdf", pdfBytes)
-                        }
-                };
+                    var html = await templates.RenderAsync("ContractSigned.de", new
+                    {
+                        Subject = subject,
+                        UserName = signerName,
+                        ContractNo = contractNo,
+                        ProjectTitle = projectTitle,
+                        SignedAt = now.ToLocalTime().ToString("dd.MM.yyyy HH:mm"),
+                        ActionUrl = actionUrl
+                    }, token);
+
+                    byte[]? pdfBytes = null;
+                    string? pdfError = null;
+
+                    try
+                    {
+                        var pdfHtml = BuildSignedPdfHtml(
+                            contractNo: contractNo,
+                            projectTitle: projectTitle,
+                            termsMarkdown: termsMarkdown,
+                            signerName: signerName,
+                            signerEmail: signerEmail,
+                            signedAt: now,
+                            signatureDataUrl: signatureDataUrl
+                        );
+
+                        _logger.LogInformation("PDF HTML length={Len}. ContractId={ContractId}", pdfHtml.Length, contractId);
+
+                        pdfBytes = pdf.FromHtml(pdfHtml, $"Vertrag {contractNo}");
+
+                        _logger.LogInformation("PDF generated bytes={Bytes}. ContractId={ContractId}",
+                            pdfBytes?.Length ?? 0, contractId);
+
+                        if (pdfBytes is { Length: 0 }) pdfBytes = null;
+                    }
+                    catch (Exception exPdf)
+                    {
+                        pdfError = exPdf.ToString();
+                        _logger.LogError(exPdf, "PDF generation failed. ContractId={ContractId}", contractId);
+                        pdfBytes = null;
+                    }
+
+                    var msg = new EmailMessage
+                    {
+                        From = new EmailAddress("placeholder@local", "placeholder"),
+                        Subject = subject,
+                        HtmlBody = html,
+                        TextBody = $"Vertrag unterschrieben. Link: {actionUrl}",
+                        Bcc = new List<EmailAddress> { new EmailAddress(recipientEmail, signerName) },
+                        Attachments = pdfBytes is null
+                            ? new List<EmailAttachment>()
+                            : new List<EmailAttachment>
+                            {
+                        new EmailAttachment($"Vertrag-{contractNo}.pdf", "application/pdf", pdfBytes)
+                            }
+                    };
 
 #if DEBUG
-                // ✅ لإثبات هل المشكلة من PDF أو من الإرسال: إذا فشل الـ PDF أرفق ملف نصي بالخطأ
-                if (pdfBytes is null && !string.IsNullOrWhiteSpace(pdfError))
-                {
-                    msg.Attachments.Add(new EmailAttachment(
-                        "pdf-error.txt",
-                        "text/plain; charset=utf-8",
-                        System.Text.Encoding.UTF8.GetBytes(pdfError)
-                    ));
-                }
+                    if (pdfBytes is null && !string.IsNullOrWhiteSpace(pdfError))
+                    {
+                        msg.Attachments.Add(new EmailAttachment(
+                            "pdf-error.txt",
+                            "text/plain; charset=utf-8",
+                            System.Text.Encoding.UTF8.GetBytes(pdfError)
+                        ));
+                    }
 #endif
 
-                _logger.LogInformation("Sending ContractSigned email. Attachments={Count}. ContractId={ContractId}",
-                    msg.Attachments?.Count ?? 0, Id);
+                    _logger.LogInformation("Sending ContractSigned email. Attachments={Count}. ContractId={ContractId}",
+                        msg.Attachments?.Count ?? 0, contractId);
 
-                await _emailSender.SendAsync(msg, ct);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send ContractSigned email. ContractId={ContractId}", Id);
-            }
+                    await emailSender.SendAsync(msg, token);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "ContractSigned background job failed. ContractId={ContractId}", contractId);
+                }
+            });
 
             return new JsonResult(new { ok = true, signedAtIso = now.UtcDateTime.ToString("o") });
         }
-
         private static string BuildSignedPdfHtml(
             string contractNo,
             string projectTitle,

@@ -9,9 +9,10 @@
         public string BaseDePath { get; set; } = "OpenAI/Contracts/Agenturvertrag.de.md";
         public string AgbDePath { get; set; } = "OpenAI/Contracts/AGB.de.md";
         public string ProviderBlock { get; set; } =
-           "WitcherHub / netwitcher\n" +
-           "Berlin, Deutschland\n" +
-           "Address line\n";
-        
+           "Netwitcher UG (haftungsbeschränkt)\n" +
+           "Kochhannstraße 6\n" +
+           "10249 Berlin\n" +
+           "Deutschland\n";
+
     }
 }

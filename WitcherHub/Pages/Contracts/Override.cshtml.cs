@@ -1,10 +1,13 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Caching.Distributed;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
@@ -21,12 +24,18 @@ namespace WitcherHub.Pages.Contracts
         private readonly IContract _contracts;
         private readonly IProject _projects;
         private readonly IContractDocumentGenerator _contractDocumentGenerator;
-
-        public OverrideModel(IContract contracts, IProject projects, IContractDocumentGenerator contractDocumentGenerator)
+        private readonly IDistributedCache _cache;
+        private static readonly JsonSerializerOptions _jsonOpts = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+        public OverrideModel(IContract contracts, IProject projects, IContractDocumentGenerator contractDocumentGenerator,
+            IDistributedCache cache)
         {
             _contracts = contracts;
             _projects = projects;
             _contractDocumentGenerator = contractDocumentGenerator;
+            _cache = cache;
         }
 
         [BindProperty(SupportsGet = true, Name = "id")]
@@ -44,6 +53,8 @@ namespace WitcherHub.Pages.Contracts
 
             var prj = await _projects.GetProjectAsync(contract.ProjectId, ct);
             if (prj is null) return NotFound();
+
+            await EnsureAiSnapshotFromDbIfMissingAsync(contract, ct);
 
             Vm = BuildVm(contract, prj, IsContractLocked(contract));
             return Page();
@@ -147,9 +158,11 @@ namespace WitcherHub.Pages.Contracts
             var structured = MapVmToStructured(Vm);
 
             var req = BuildGenerateRequest(prj, contract);
-            req.StructuredOverride = structured; // ✅ بدون GPT
+            req.StructuredOverride = structured; 
 
             var doc = await _contractDocumentGenerator.GenerateAsync(req, ct);
+
+            await SaveAiSnapshotAsync(contract.Id, doc.Structured, ct);
 
             var update = new UpdateContractDto
             {
@@ -325,15 +338,19 @@ namespace WitcherHub.Pages.Contracts
         }
 
         private GenerateContractDocumentRequest BuildGenerateRequest(
-            ProjectViews.ProjectDetailsView prj,
-            ContractViews.ContractDetailsView contract)
+    ProjectViews.ProjectDetailsView prj,
+    ContractViews.ContractDetailsView contract)
         {
             var customerName = prj.Customer?.Name ?? "";
             var customerEmail = prj.Customer?.Email ?? "";
 
-            var customerBlock =
-                $"Name/Firma: {customerName}\n" +
-                (string.IsNullOrWhiteSpace(customerEmail) ? "" : $"E-Mail: {customerEmail}\n");
+            var customerBlockSb = new StringBuilder();
+            if (!string.IsNullOrWhiteSpace(customerName))
+                customerBlockSb.AppendLine(customerName);
+            if (!string.IsNullOrWhiteSpace(customerEmail))
+                customerBlockSb.AppendLine(customerEmail);
+
+            var customerBlock = customerBlockSb.ToString().TrimEnd();
 
             var lines = (contract.Items ?? new List<ContractViews.ContractItemItemView>())
                 .OrderBy(x => x.Position)
@@ -399,6 +416,138 @@ namespace WitcherHub.Pages.Contracts
                           .Where(x => !string.IsNullOrWhiteSpace(x))
                           .ToList();
             }
+        }
+        private string AiSnapshotKey(Guid contractId)
+        {
+            var uid = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anon";
+            return $"contract:ai-snap:{uid}:{contractId}";
+        }
+
+        private async Task SaveAiSnapshotAsync(Guid contractId, ContractStructuredTermsDto structured, CancellationToken ct)
+        {
+            var json = JsonSerializer.Serialize(structured, _jsonOpts);
+
+            await _cache.SetStringAsync(
+                AiSnapshotKey(contractId),
+                json,
+                new DistributedCacheEntryOptions
+                {
+                    SlidingExpiration = TimeSpan.FromHours(12) // عدّلها حسب رغبتك
+                },
+                ct);
+        }
+
+        private async Task<ContractStructuredTermsDto?> GetAiSnapshotAsync(Guid contractId, CancellationToken ct)
+        {
+            var json = await _cache.GetStringAsync(AiSnapshotKey(contractId), ct);
+            if (string.IsNullOrWhiteSpace(json)) return null;
+
+            try
+            {
+                return JsonSerializer.Deserialize<ContractStructuredTermsDto>(json, _jsonOpts);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static ContractStructuredTermsDto? TryDeserializeStructured(ContractViews.ContractDetailsView contract)
+        {
+            if (contract.TermsStructured is null) return null;
+
+            try
+            {
+                return JsonSerializer.Deserialize<ContractStructuredTermsDto>(
+                    contract.TermsStructured.RootElement.GetRawText(),
+                    _jsonOpts);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private async Task EnsureAiSnapshotFromDbIfMissingAsync(ContractViews.ContractDetailsView contract, CancellationToken ct)
+        {
+            var existing = await _cache.GetStringAsync(AiSnapshotKey(contract.Id), ct);
+            if (!string.IsNullOrWhiteSpace(existing)) return;
+
+            var structured = TryDeserializeStructured(contract);
+            if (structured == null) return;
+
+            if (string.Equals(structured.GeneratedBy, "override", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            await SaveAiSnapshotAsync(contract.Id, structured, ct);
+        }
+
+        private static ContractOverrideViewModel BuildVmFromStructured(
+            ContractViews.ContractDetailsView contract,
+            ProjectViews.ProjectDetailsView prj,
+            bool isLocked,
+            ContractStructuredTermsDto structured)
+        {
+            return new ContractOverrideViewModel
+            {
+                ContractId = contract.Id,
+                ProjectId = contract.ProjectId,
+                ContractNo = contract.ContractNo,
+                Currency = contract.Currency ?? "EUR",
+                ProjectTitle = prj.Title ?? "Project",
+                CustomerName = prj.Customer?.Name ?? "",
+                CustomerEmail = prj.Customer?.Email ?? "",
+                IsLocked = isLocked,
+                Positions = (structured.Positions ?? new List<ContractPositionSpecDto>())
+                    .OrderBy(p => p.PositionNo)
+                    .Select(p => new ContractOverrideViewModel.PositionVm
+                    {
+                        PositionNo = p.PositionNo,
+                        Title = p.Title ?? "",
+                        LineNetPrice = p.LineNetPrice,
+                        Sections = new ContractOverrideViewModel.PositionVm.SectionsVm
+                        {
+                            Scope = p.Sections?.Scope ?? "",
+                            Deliverables = p.Sections?.Deliverables ?? new List<string>(),
+                            OutOfScope = p.Sections?.OutOfScope ?? new List<string>(),
+                            CustomerResponsibilities = p.Sections?.CustomerResponsibilities ?? new List<string>(),
+                            AcceptanceCriteria = p.Sections?.AcceptanceCriteria ?? new List<string>(),
+                            Timeline = p.Sections?.Timeline ?? "",
+                            Assumptions = p.Sections?.Assumptions ?? "",
+                            Revisions = p.Sections?.Revisions ?? ""
+                        }
+                    })
+                    .ToList()
+            };
+        }
+        public async Task<IActionResult> OnPostResetAsync(CancellationToken ct)
+        {
+            if (Vm.ContractId == Guid.Empty) return BadRequest();
+
+            var contract = await _contracts.GetContractAsync(Vm.ContractId, ct);
+            if (contract is null) return NotFound();
+            if (IsContractLocked(contract)) throw new BadRequestAppException("Contract is locked.");
+
+            var prj = await _projects.GetProjectAsync(contract.ProjectId, ct);
+            if (prj is null) return NotFound();
+
+            var snap = await GetAiSnapshotAsync(contract.Id, ct);
+            if (snap is null)
+            {
+                TempData["Toast.Type"] = "warning";
+                TempData["Toast.Title"] = "Reset";
+                TempData["Toast.Message"] = "No GPT snapshot found in cache (maybe expired).";
+                Vm = BuildVm(contract, prj, false);
+                return Page();
+            }
+
+            Vm = BuildVmFromStructured(contract, prj, false, snap);
+
+            TempData["Toast.Type"] = "success";
+            TempData["Toast.Title"] = "Reset";
+            TempData["Toast.Message"] = "Restored GPT version from cache.";
+
+            return Page(); 
         }
     }
 }

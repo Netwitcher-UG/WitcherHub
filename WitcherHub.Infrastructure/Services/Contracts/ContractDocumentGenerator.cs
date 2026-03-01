@@ -395,33 +395,9 @@ Additional instructions:
 
             if (lines.Count == 0) return "";
 
-            // إذا أغلب السطور فيها ":" نعرضها كـ Table (رسمي وواضح)
-            var kv = new List<(string Key, string Val)>();
-            foreach (var line in lines)
-            {
-                var idx = line.IndexOf(':');
-                if (idx > 0)
-                {
-                    var k = line[..idx].Trim();
-                    var v = line[(idx + 1)..].Trim();
-                    kv.Add((k, v));
-                }
-            }
-
-            if (kv.Count >= Math.Max(1, (int)(lines.Count * 0.6)))
-            {
-                var sb = new StringBuilder();
-                sb.AppendLine("| Feld | Wert |");
-                sb.AppendLine("|---|---|");
-                foreach (var (k, v) in kv)
-                    sb.AppendLine($"| {EscapeMd(k)} | {EscapeMd(v)} |");
-                return sb.ToString().Trim();
-            }
-
-            // fallback: hard-break lines
+            // ✅ لا جدول نهائياً — فقط سطور مع hard breaks
             return ToMarkdownHardBreaks(string.Join("\n", lines));
         }
-
         private static string EscapeMd(string s)
         {
             s ??= "";
@@ -516,46 +492,6 @@ Additional instructions:
 
 
 
-        //        private static string BuildServicesPrompt(
-        //            string projectTitle,
-        //            string currency,
-        //            bool includePrices,
-        //            object servicesPayload,
-        //            string? additionalInstructions)
-        //        {
-        //            var servicesJson = JsonSerializer.Serialize(servicesPayload, new JsonSerializerOptions
-        //            {
-        //                WriteIndented = true
-        //            });
-
-        //            return $@"
-        //You are generating ONLY the BODY content that will be inserted under:
-        //""## Anlage A – Leistungsbeschreibung (variabel)"".
-
-        //IMPORTANT:
-        //- Do NOT write the title or any heading like ""Anlage A"".
-        //- Start directly with: ""### Position 1: ..."" (and so on).
-        //- Do NOT output horizontal rules like ""---"" or ""***"".
-        //- Do NOT write any other contract sections, legal clauses, or signatures.
-
-        //Rules:
-        //- Output Markdown only (no code fences).
-        //- Do NOT add horizontal rules (no '---', '***', or '___').
-        //- Do NOT add any section separators; keep a clean list of positions.
-        //- For each service item: include Scope, Deliverables, Out-of-scope, Customer responsibilities, Acceptance criteria.
-        //- Keep it professional and client-friendly.
-        //- Output language: German (DE).
-        //- {(includePrices ? "Include the agreed price per item if present." : "Do NOT include any prices.")}
-
-        //Project: {projectTitle}
-        //Currency: {currency}
-
-        //Services (JSON):
-        //{servicesJson}
-
-        //Additional instructions:
-        //{additionalInstructions ?? "(none)"}
-        //";
-        //        }
+       
     }
 }

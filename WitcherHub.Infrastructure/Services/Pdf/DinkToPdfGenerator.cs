@@ -114,7 +114,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 
             var logoHtml = string.IsNullOrWhiteSpace(logoDataUri)
     ? ""
-    : $@"<img src=""{logoDataUri}"" style=""height:24px;max-width:220px;object-fit:contain;display:block;"" />";
+    : $@"<img src=""{logoDataUri}"" style=""height:40px;max-width:320px;object-fit:contain;display:block;"" />";
 
             var headerHtml = $@"
 <!doctype html>
