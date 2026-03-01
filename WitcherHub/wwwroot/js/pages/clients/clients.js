@@ -706,6 +706,34 @@
 
         return `<span class="${cls}">${esc(s)}</span>`;
     }
+
+
+    // ---- row click => open client modal (overview) ----
+    document.addEventListener('click', function (e) {
+        // لا تفتح إذا الضغط داخل أزرار الأكشن أو أي زر/رابط/حقل
+        if (e.target.closest('.vc-actions-wrap')) return;
+        if (e.target.closest('button, a, input, textarea, select, label')) return;
+
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+
+        // خذ id من أي عنصر في السطر يحمل data-client-id (عادة موجود في زر view/delete)
+        const idEl = tr.querySelector('[data-client-id]');
+        const id = idEl?.getAttribute('data-client-id') || '';
+        if (!id) return;
+
+        // افتح نفس المودال الذي تفتحه أيقونة view
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'd-none';
+        btn.setAttribute('data-bs-toggle', 'modal');
+        btn.setAttribute('data-bs-target', '#ViewClientModal'); // ✅ تأكد هذا نفس ID المودال عندك
+        btn.setAttribute('data-client-id', id);
+
+        document.body.appendChild(btn);
+        btn.click();
+        btn.remove();
+    });
     document.addEventListener('DOMContentLoaded', () => {
         const typeSelect = document.getElementById("type");
         const firstName = document.getElementById("firstName");

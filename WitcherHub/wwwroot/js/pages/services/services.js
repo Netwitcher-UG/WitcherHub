@@ -227,7 +227,31 @@
             }))
         };
     }
+    // ---- row click => open service modal (overview) ----
+    document.addEventListener('click', function (e) {
+        // لا تفتح إذا الضغط داخل الأكشن أو أي زر/رابط/حقل
+        if (e.target.closest('.vc-actions-wrap')) return;
+        if (e.target.closest('button, a, input, textarea, select, label')) return;
 
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+
+        // خذ id من أي عنصر في السطر يحمل data-service-id
+        const idEl = tr.querySelector('[data-service-id]');
+        const id = idEl?.getAttribute('data-service-id') || '';
+        if (!id) return;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'd-none';
+        btn.setAttribute('data-bs-toggle', 'modal');
+        btn.setAttribute('data-bs-target', '#ViewServiceModal'); // ✅ تأكد هذا نفس ID المودال عندك
+        btn.setAttribute('data-service-id', id);
+
+        document.body.appendChild(btn);
+        btn.click();
+        btn.remove();
+    });
     // ---------- Expr Builder (UI helper) ----------
     // VC_RULE_VARS تُبنى ديناميكياً من ConfigSchema تبع الخدمة + مفاتيح أساسية مشتركة
     const VC_BASE_RULE_VARS = [
