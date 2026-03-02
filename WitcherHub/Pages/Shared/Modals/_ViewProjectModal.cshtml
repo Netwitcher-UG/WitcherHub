@@ -313,9 +313,50 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="vpSendContractModal" tabindex="-1" aria-labelledby="vpSendContractModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4">
+            <div class="modal-header">
+                <h5 class="modal-title" id="vpSendContractModalLabel">Send Contract</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="mb-2">
+                    You are about to send the contract to:
+                </div>
+
+                <div class="p-3 rounded-3 border bg-light">
+                    <div class="fw-semibold" id="vpSendContractCustomerName">—</div>
+                    <div class="text-muted small" id="vpSendContractCustomerEmail"></div>
+                </div>
+
+                <div class="small text-muted mt-3">
+                    Project: <strong id="vpSendContractProject">—</strong><br />
+                    Contract: <strong id="vpSendContractContract">—</strong>
+                </div>
+
+                
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="vpSendContractCancelBtn">
+                    Cancel
+                </button>
+
+                <button type="button" class="btn btn-success" id="vpSendContractConfirmBtn">
+                    <span class="spinner-border spinner-border-sm me-2 d-none" id="vpSendContractSpinner" role="status" aria-hidden="true"></span>
+                    <span id="vpSendContractBtnText">Confirm &amp; Send</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <script>
     (function () {
+      // ===== existing code (اتركه كما هو عندك) =====
       const modalEl = document.getElementById('ViewProjectModal');
       if (!modalEl) return;
 
@@ -328,15 +369,11 @@
         if (projectId) modalEl.dataset.projectId = projectId;
         if (openTab) modalEl.dataset.openTab = openTab;
 
-        // Create links from current project
         const q = document.getElementById('vp-newQuoteBtn');
         if (q) q.href = projectId ? `/Quotes/Create?projectId=${encodeURIComponent(projectId)}` : '#';
 
         const c = document.getElementById('vp-newContractBtn');
         if (c) c.href = projectId ? `/Contracts/Create?projectId=${encodeURIComponent(projectId)}` : '#';
-
-        // const i = document.getElementById('vp-newInvoiceBtn');
-        // if (i) i.href = projectId ? `/Invoices/Create?projectId=${encodeURIComponent(projectId)}` : '#';
       });
 
       modalEl.addEventListener('shown.bs.modal', function () {
@@ -348,5 +385,167 @@
 
         bootstrap.Tab.getOrCreateInstance(btn).show();
       });
+
+      // ===== NEW: Confirm modal + button-only loading + AJAX send =====
+
+      const confirmModalEl = document.getElementById('vpSendContractModal');
+      const confirmBtn = document.getElementById('vpSendContractConfirmBtn');
+      const cancelBtn = document.getElementById('vpSendContractCancelBtn');
+      const spinner = document.getElementById('vpSendContractSpinner');
+      const btnText = document.getElementById('vpSendContractBtnText');
+
+      const projectLabel = document.getElementById('vpSendContractProject');
+      const contractLabel = document.getElementById('vpSendContractContract');
+      const custNameLabel = document.getElementById('vpSendContractCustomerName');
+      const custEmailLabel = document.getElementById('vpSendContractCustomerEmail');
+
+      function setSending(isSending) {
+        if (confirmBtn) confirmBtn.disabled = isSending;
+        if (cancelBtn) cancelBtn.disabled = isSending;
+
+        if (spinner) spinner.classList.toggle('d-none', !isSending);
+        if (btnText) btnText.textContent = isSending ? 'Sending...' : 'Confirm & Send';
+      }
+
+      function ensureToastContainer() {
+        let c = document.getElementById('whToastContainer');
+        if (c) return c;
+
+        c = document.createElement('div');
+        c.id = 'whToastContainer';
+        c.className = 'toast-container position-fixed top-0 end-0 p-3';
+        c.style.zIndex = '11000';
+        document.body.appendChild(c);
+        return c;
+      }
+
+      function showToast(t) {
+        const type = (t?.type || 'info').toLowerCase();
+        const title = t?.title || '';
+        const message = t?.message || '';
+
+        const map = {
+          success: 'text-bg-success',
+          error: 'text-bg-danger',
+          warning: 'text-bg-warning',
+          info: 'text-bg-info'
+        };
+        const cls = map[type] || 'text-bg-secondary';
+
+        const container = ensureToastContainer();
+        const el = document.createElement('div');
+        el.className = `toast align-items-center ${cls} border-0`;
+        el.setAttribute('role', 'alert');
+        el.setAttribute('aria-live', 'assertive');
+        el.setAttribute('aria-atomic', 'true');
+
+        el.innerHTML = `
+          <div class="d-flex">
+            <div class="toast-body">
+              ${title ? `<div class="fw-semibold mb-1">${title}</div>` : ''}
+              <div>${message}</div>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+          </div>
+        `;
+
+        container.appendChild(el);
+        const toast = bootstrap.Toast.getOrCreateInstance(el, { delay: 4200 });
+        toast.show();
+        el.addEventListener('hidden.bs.toast', () => el.remove());
+      }
+
+      // ✅ Intercept click on Send button (CAPTURE) -> show confirm modal فقط
+      document.addEventListener('click', function (e) {
+        const btn = e.target?.closest?.('#vpContractSendBtn');
+        if (!btn) return;
+
+        // important: block any other handlers that might send مباشرة
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        if (btn.disabled) return;
+
+        // fill modal labels
+        const pTitle = (document.getElementById('vp-title')?.textContent || '—').trim();
+        const cTitle = (document.getElementById('vpContractTitle')?.textContent || '—').trim();
+
+        const custName = (document.getElementById('vp-customerName')?.textContent || '—').trim();
+        const custEmail = (document.getElementById('vp-customerEmail')?.textContent || '').trim();
+
+        if (projectLabel) projectLabel.textContent = pTitle || '—';
+        if (contractLabel) contractLabel.textContent = cTitle || '—';
+
+        if (custNameLabel) custNameLabel.textContent = custName || '—';
+        if (custEmailLabel) custEmailLabel.textContent = (custEmail && custEmail !== '—') ? custEmail : '';
+
+        setSending(false);
+
+        if (!confirmModalEl) return;
+        bootstrap.Modal.getOrCreateInstance(confirmModalEl).show();
+      }, true);
+
+      // ✅ Confirm send -> AJAX POST
+      if (confirmBtn) {
+        confirmBtn.addEventListener('click', async function () {
+          const projectId = modalEl.dataset.projectId || '';
+          if (!projectId) {
+            showToast({ type: 'error', title: 'Error', message: 'ProjectId is missing.' });
+            return;
+          }
+
+          const url = (document.getElementById('vcProjectContractSendUrl')?.value || '').trim();
+          const token = (document.getElementById('antiForgeryToken')?.value || '').trim();
+
+          if (!url) {
+            showToast({ type: 'error', title: 'Error', message: 'Send URL not found.' });
+            return;
+          }
+          const sendBtn = document.getElementById('vpContractSendBtn');
+          const prevSendDisabled = sendBtn ? sendBtn.disabled : null;
+          if (sendBtn) sendBtn.disabled = true;
+
+          setSending(true);
+
+          try {
+            const body = `projectId=${encodeURIComponent(projectId)}`;
+
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'RequestVerificationToken': token
+              },
+              body
+            });
+
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok || !data?.ok) {
+              showToast(data?.toast || { type: 'error', title: 'Error', message: 'Failed to send contract.' });
+              setSending(false);
+              if (sendBtn && prevSendDisabled !== null) sendBtn.disabled = prevSendDisabled;
+              return;
+            }
+
+            const custName = (document.getElementById('vp-customerName')?.textContent || '—').trim();
+            const custEmail = (document.getElementById('vp-customerEmail')?.textContent || '').trim();
+            const who = custEmail && custEmail !== '—' ? `${custName} (${custEmail})` : custName;
+
+            showToast(data.toast || { type: 'success', title: 'Sent', message: `Contract email sent to ${who}.` });
+
+            if (confirmModalEl) {
+              bootstrap.Modal.getOrCreateInstance(confirmModalEl).hide();
+            }
+            if (sendBtn && prevSendDisabled !== null) sendBtn.disabled = prevSendDisabled;
+
+          } catch (err) {
+            showToast({ type: 'error', title: 'Server error', message: 'An unexpected error occurred.' });
+            setSending(false);
+            if (sendBtn && prevSendDisabled !== null) sendBtn.disabled = prevSendDisabled;
+          }
+        });
+      }
+
     })();
 </script>
