@@ -39,7 +39,7 @@ namespace WitcherHub.Application.Models.DTO.Invoices
         public DiscountType? InvoiceDiscountType { get; set; }
         public decimal? InvoiceDiscountValue { get; set; }
 
-        public Guid? TaxRateId { get; set; }
+        public bool ApplyTax { get; set; }
     }
 
     public class InvoiceItemDto
@@ -54,10 +54,10 @@ namespace WitcherHub.Application.Models.DTO.Invoices
         public JsonDocument Config { get; set; } = JsonDocument.Parse("{}");
         public JsonDocument? PriceBreakdown { get; set; }
 
-        public Guid? TaxRateId { get; set; }
+        public bool ApplyTax { get; set; }
         public DiscountType? DiscountType { get; set; }
         public decimal? DiscountValue { get; set; }
-
+        public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
         public int Position { get; set; } = 1;
     }
 

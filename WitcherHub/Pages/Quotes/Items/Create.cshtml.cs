@@ -201,11 +201,11 @@ namespace WitcherHub.Pages.Quotes.Items
                 .Select(s => new SelectListItem(s.Name, s.Id.ToString()))
                 .ToList();
 
-            TaxRateOptions = await _db.TaxRates
-                .Where(t => t.IsActive)
-                .OrderBy(t => t.Name)
-                .Select(t => new SelectListItem($"{t.Name} ({t.RatePercent}%)", t.Id.ToString()))
-                .ToListAsync(ct);
+            //TaxRateOptions = await _db.TaxRates
+            //    .Where(t => t.IsActive)
+            //    .OrderBy(t => t.Name)
+            //    .Select(t => new SelectListItem($"{t.Name} ({t.RatePercent}%)", t.Id.ToString()))
+            //    .ToListAsync(ct);
         }
 
         public async Task<IActionResult> OnGetPricingRulesAsync(Guid serviceId, CancellationToken ct)

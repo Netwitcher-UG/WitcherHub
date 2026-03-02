@@ -55,8 +55,8 @@ namespace WitcherHub.Application.Models.View.Quotes
             public JsonDocument Config { get; set; } = JsonDocument.Parse("{}");
             public JsonDocument? PriceBreakdown { get; set; }
 
-            public Guid? TaxRateId { get; set; }
-            public string? TaxName { get; set; }
+
+            public bool Tax { get; set; } 
 
             public DiscountType? DiscountType { get; set; }
             public decimal? DiscountValue { get; set; }

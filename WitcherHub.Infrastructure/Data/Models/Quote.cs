@@ -54,9 +54,9 @@ namespace WitcherHub.Infrastructure.Data.Models
         [Column(TypeName = "jsonb")]
         public JsonDocument? PriceBreakdown { get; set; }
 
-        public Guid? TaxRateId { get; set; }
-        public TaxRate? TaxRate { get; set; }
+        public bool Tax { get; set; } = false;
 
+        public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
         public DiscountType? DiscountType { get; set; }
 
         [Column(TypeName = "numeric(12,2)")]

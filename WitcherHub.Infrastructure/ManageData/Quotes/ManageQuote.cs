@@ -171,10 +171,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
 
                                     Config = i.Config,
                                     PriceBreakdown = i.PriceBreakdown,
-
-                                    TaxRateId = i.TaxRateId,
-                                    TaxName = i.TaxRate != null ? i.TaxRate.Name : null,
-
+                                  
                                     DiscountType = i.DiscountType,
                                     DiscountValue = i.DiscountValue,
 
@@ -237,10 +234,13 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                             UnitPrice = it.UnitPrice,
                             Config = it.Config ?? JsonDocument.Parse("{}"),
                             PriceBreakdown = it.PriceBreakdown,
-                            TaxRateId = it.TaxRateId,
+                            BillingCycle = it.BillingCycle,
                             DiscountType = it.DiscountType,
                             DiscountValue = it.DiscountValue,
                             Position = it.Position > 0 ? it.Position : pos
+
+                            // إذا بدك تخزّن اختيار الضريبة بالـ DB:
+                            // ApplyTax = it.ApplyTax
                         };
                         quote.Items.Add(item);
                         pos++;
@@ -283,7 +283,6 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
             quote.IssuedAt = dto.Quote.IssuedAt?.ToUniversalTime();
             quote.ExpiresAt = dto.Quote.ExpiresAt?.ToUniversalTime();
 
-
             EnsureValidQuoteStatus(dto.Quote.Status);
             quote.Status = dto.Quote.Status;
 
@@ -303,10 +302,13 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                         UnitPrice = it.UnitPrice,
                         Config = it.Config ?? JsonDocument.Parse("{}"),
                         PriceBreakdown = it.PriceBreakdown,
-                        TaxRateId = it.TaxRateId,
+                        BillingCycle = it.BillingCycle,
                         DiscountType = it.DiscountType,
                         DiscountValue = it.DiscountValue,
                         Position = it.Position > 0 ? it.Position : pos
+
+                        // إذا بدك تخزّن اختيار الضريبة بالـ DB:
+                        // ApplyTax = it.ApplyTax
                     });
                     pos++;
                 }
@@ -363,7 +365,6 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                     .Select(x => (int?)x.Position)
                     .MaxAsync(ct) ?? 0;
 
-                //var breakdown = await BuildBreakdownAsync(dto.Item, ct);
                 var (breakdown, effectiveUnit) = await BuildBreakdownAsync(dto.Item, ct);
 
                 var item = new QuoteItem
@@ -372,14 +373,17 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                     Title = (dto.Item.Title ?? "").Trim(),
                     ServiceId = dto.Item.ServiceId,
                     Quantity = dto.Item.Quantity,
-                    //UnitPrice = dto.Item.UnitPrice,
                     Config = dto.Item.Config ?? JsonDocument.Parse("{}"),
+
                     UnitPrice = effectiveUnit,
                     PriceBreakdown = breakdown,
-                    TaxRateId = dto.Item.TaxRateId,
+
                     DiscountType = dto.Item.DiscountType,
                     DiscountValue = dto.Item.DiscountValue,
                     Position = dto.Item.Position > 0 ? dto.Item.Position : (maxPos + 1)
+
+                    // إذا بدك تخزّن اختيار الضريبة بالـ DB:
+                    // ApplyTax = dto.Item.ApplyTax
                 };
 
                 await itemsRepo.AddAsync(item, ct);
@@ -422,11 +426,10 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 item.ServiceId = dto.Item.ServiceId;
                 item.Quantity = dto.Item.Quantity;
                 item.UnitPrice = dto.Item.UnitPrice;
-                item.TaxRateId = dto.Item.TaxRateId;
+           
                 item.DiscountType = dto.Item.DiscountType;
                 item.DiscountValue = dto.Item.DiscountValue;
 
-                // Recalculate breakdown every update
                 // Recalculate breakdown (this will normalize dto.Item.Config if schema exists)
                 var (breakdown, effectiveUnit) = await BuildBreakdownAsync(dto.Item, ct);
 
@@ -435,6 +438,8 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 item.UnitPrice = effectiveUnit;
                 item.PriceBreakdown = breakdown;
 
+                // إذا بدك تخزّن اختيار الضريبة بالـ DB:
+                // item.ApplyTax = dto.Item.ApplyTax;
 
                 if (dto.Item.Position > 0)
                     item.Position = dto.Item.Position;
@@ -602,8 +607,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
             decimal rulesDiscountAmount = 0m;
             var appliedRules = new List<object>();
 
-            // ✅ IMPORTANT (as you requested):
-            // Apply rules ONLY when PricingRuleIds is not empty (selected rules only)
+            // ✅ Apply rules ONLY when PricingRuleIds is not empty (selected rules only)
             if (itemDto.ServiceId.HasValue && itemDto.PricingRuleIds is not null && itemDto.PricingRuleIds.Count > 0)
             {
                 var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -694,9 +698,6 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                             break;
 
                         case RuleAction.Discount:
-                            // Key point:
-                            // - If ValueExpr is numeric literal => interpret (0.10 or 10) as percent, big numbers as amount
-                            // - If ValueExpr is NOT literal (computed) => treat as amount
                             {
                                 var discountBase = Math.Max(0m, baseTotal - rulesDiscountAmount); // sequential discount base
 
@@ -762,23 +763,17 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
             var totalDiscount = Math.Min(baseTotal, Math.Max(0m, fieldDiscountAmount + rulesDiscountAmount));
             var subTotal = Math.Max(0m, baseTotal - totalDiscount);
 
-            // tax
+            // =========================
+            // TAX (FIXED 19% IF SELECTED)
+            // =========================
             decimal taxRatePercent = 0m;
             decimal taxAmount = 0m;
 
-            if (itemDto.TaxRateId.HasValue)
+            // ✅ VAT 19% فقط إذا المستخدم اختار ApplyTax
+            if (itemDto.ApplyTax)
             {
-                var taxRepo = _unitOfWork.Repo<TaxRate>();
-                var tax = await taxRepo.Query(asNoTracking: true)
-                    .Where(t => t.Id == itemDto.TaxRateId.Value && t.IsActive)
-                    .Select(t => new { t.Id, t.Name, t.RatePercent })
-                    .FirstOrDefaultAsync(ct);
-
-                if (tax is not null)
-                {
-                    taxRatePercent = tax.RatePercent;
-                    taxAmount = Math.Max(0m, subTotal * (taxRatePercent / 100m));
-                }
+                taxRatePercent = 19m;
+                taxAmount = Math.Max(0m, subTotal * (taxRatePercent / 100m));
             }
 
             var total = subTotal + taxAmount;
@@ -802,7 +797,9 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 },
                 tax = new
                 {
-                    taxRateId = itemDto.TaxRateId,
+                    applyTax = itemDto.ApplyTax,
+                    // taxRateId موجود لليغاسي فقط (ما عاد نستخدمه بالحساب)
+                   
                     ratePercent = taxRatePercent,
                     amount = taxAmount
                 },
@@ -996,8 +993,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
 
         private static bool EvalBool(string expr, Dictionary<string, object?> vars)
         {
-            var e = new Expression(expr, EvaluateOptions.IgnoreCase);
-
+            var e = new Expression(expr);
             // default missing vars to 0 instead of throwing
             e.EvaluateParameter += (_, args) => { args.Result = 0d; };
 
@@ -1009,7 +1005,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
 
         private static decimal EvalDecimal(string expr, Dictionary<string, object?> vars)
         {
-            var e = new Expression(expr, EvaluateOptions.IgnoreCase);
+            var e = new Expression(expr);
 
             e.EvaluateParameter += (_, args) => { args.Result = 0d; };
 
@@ -1027,7 +1023,6 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 _ => Convert.ToDecimal(r, CultureInfo.InvariantCulture)
             };
         }
-
 
         // =========================
         // Helpers

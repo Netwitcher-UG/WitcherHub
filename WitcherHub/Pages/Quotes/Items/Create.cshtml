@@ -101,16 +101,23 @@
             <!-- Qty / Tax / Discount -->
             <div class="col-12 col-md-3">
                 <label class="form-label">Quantity</label>
-                <input class="form-control" asp-for="Form.Item.Quantity" />
+               
+                <input asp-for="Form.Item.Quantity"
+                       asp-format="{0:0.##}"
+                       type="number"
+                       step="1"
+                       min="0"
+                       class="form-control" />
                 <span class="text-danger small" asp-validation-for="Form.Item.Quantity"></span>
             </div>
-
             <div class="col-12 col-md-3">
-                <label class="form-label">Tax Rate</label>
-                <select class="form-select" asp-for="Form.Item.TaxRateId" asp-items="Model.TaxRateOptions">
-                    <option value="">-- none --</option>
+                <label class="form-label">BillingCycle</label>
+                <select asp-for="Form.Item.BillingCycle"
+                        class="form-select"
+                        asp-items="Html.GetEnumSelectList<BillingCycle>()">
                 </select>
             </div>
+
 
             <div class="col-12 col-md-3">
                 <label class="form-label">Discount Type</label>
@@ -125,6 +132,15 @@
             <div class="col-12 col-md-3">
                 <label class="form-label">Discount Value</label>
                 <input class="form-control" asp-for="Form.Item.DiscountValue" />
+            </div>
+
+            <div class="col-12 col-md-3">
+                <label class="form-label">Tax Rate</label>
+
+                <label class="form-check">
+                    <input asp-for="Form.Item.ApplyTax" class="form-check-input" type="checkbox" />
+                    <span class="form-check-label">Apply VAT (19%)</span>
+                </label>
             </div>
 
             <!-- ✅ Config dynamic UI -->

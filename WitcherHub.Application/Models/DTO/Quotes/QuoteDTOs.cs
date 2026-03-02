@@ -37,11 +37,12 @@ namespace WitcherHub.Application.Models.DTO.Quotes
         public JsonDocument Config { get; set; } = JsonDocument.Parse("{}");
         public JsonDocument? PriceBreakdown { get; set; }
 
-        public Guid? TaxRateId { get; set; }
+        //public Guid? TaxRateId { get; set; }
+        public bool ApplyTax { get; set; }  // true => 19%, false => 0
         public DiscountType? DiscountType { get; set; }
         public decimal? DiscountValue { get; set; }
         public List<Guid> PricingRuleIds { get; set; } = new();
-
+        public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
         public int Position { get; set; } = 1;
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Text;
 
 namespace WitcherHub.Infrastructure.Data.Models
@@ -31,6 +32,6 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         public enum AttachmentOwnerType { Quote, Contract, Invoice, Project, Customer }
         public enum LexwareType { Imported, Exported ,  NotExported }
-
+        public enum BillingCycle { OneTime = 0,Monthly = 1, Quarterly = 2,SemiAnnual = 3,Annual = 4}
     }
 }

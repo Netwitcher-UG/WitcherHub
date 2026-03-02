@@ -25,8 +25,8 @@ namespace WitcherHub.Infrastructure.Data.Context
         public DbSet<PricingRule> PricingRules => Set<PricingRule>();
 
         // -------- Taxes & Discounts --------
-        public DbSet<TaxRate> TaxRates => Set<TaxRate>();
-        public DbSet<DiscountCode> DiscountCodes => Set<DiscountCode>();
+   
+     
 
         // -------- Quotes --------
         public DbSet<Quote> Quotes => Set<Quote>();

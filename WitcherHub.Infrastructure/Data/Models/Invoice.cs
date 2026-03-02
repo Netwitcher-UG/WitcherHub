@@ -30,10 +30,7 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         [Column(TypeName = "numeric(12,2)")]
         public decimal? InvoiceDiscountValue { get; set; }
-
-        public Guid? TaxRateId { get; set; }
-        public TaxRate? TaxRate { get; set; }
-
+        public bool Tax { get; set; } = false;
         public string? Notes { get; set; }
 
         public Guid? CreatedById { get; set; }
@@ -96,8 +93,9 @@ namespace WitcherHub.Infrastructure.Data.Models
         [Column(TypeName = "jsonb")]
         public JsonDocument? PriceBreakdown { get; set; }
 
-        public Guid? TaxRateId { get; set; }
-        public TaxRate? TaxRate { get; set; }
+        public bool Tax { get; set; } = false;
+
+        public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
 
         public DiscountType? DiscountType { get; set; }
 

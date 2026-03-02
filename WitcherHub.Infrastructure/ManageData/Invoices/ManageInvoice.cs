@@ -165,8 +165,8 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                             IssuedAt = x.IssuedAt,
                             PaidAt = x.PaidAt,
 
-                            TaxRateId = x.TaxRateId,
-                            TaxName = x.TaxRate != null ? x.TaxRate.Name : null,
+                            //TaxRateId = x.TaxRateId,
+                            //TaxName = x.TaxRate != null ? x.TaxRate.Name : null,
 
                             InvoiceDiscountType = x.InvoiceDiscountType,
                             InvoiceDiscountValue = x.InvoiceDiscountValue,
@@ -206,8 +206,8 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                                     Config = i.Config,
                                     PriceBreakdown = i.PriceBreakdown,
 
-                                    TaxRateId = i.TaxRateId,
-                                    TaxName = i.TaxRate != null ? i.TaxRate.Name : null,
+                                    //TaxRateId = i.TaxRateId,
+                                    //TaxName = i.TaxRate != null ? i.TaxRate.Name : null,
 
                                     DiscountType = i.DiscountType,
                                     DiscountValue = i.DiscountValue,
@@ -269,7 +269,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                     InvoiceDiscountType = dto.Invoice.InvoiceDiscountType,
                     InvoiceDiscountValue = dto.Invoice.InvoiceDiscountValue,
 
-                    TaxRateId = dto.Invoice.TaxRateId
+                    //TaxRateId = dto.Invoice.TaxRateId
                 };
 
                 // Items (optional)
@@ -285,7 +285,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                             Quantity = it.Quantity,
                             UnitPrice = it.UnitPrice,
                             Config = it.Config,
-                            TaxRateId = it.TaxRateId,
+                            ///*TaxRateId*/ = it.TaxRateId,
                             DiscountType = it.DiscountType,
                             DiscountValue = it.DiscountValue,
                             Position = it.Position > 0 ? it.Position : pos
@@ -298,13 +298,13 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                             Quantity = it.Quantity,
                             UnitPrice = it.UnitPrice,
                             Config = it.Config ?? JsonDocument.Parse("{}"),
-                            TaxRateId = it.TaxRateId,
+                            //TaxRateId = it.TaxRateId,
                             DiscountType = it.DiscountType,
                             DiscountValue = it.DiscountValue,
                             Position = it.Position > 0 ? it.Position : pos
                         };
 
-                        item.PriceBreakdown = await BuildBreakdownAsync(itemDto, invoice.TaxRateId, ct);
+                        item.PriceBreakdown = await BuildBreakdownAsync(itemDto, /*invoice.TaxRateId*/ ct);
 
                         invoice.Items.Add(item);
                         pos++;
@@ -359,7 +359,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
 
             invoice.InvoiceDiscountType = dto.Invoice.InvoiceDiscountType;
             invoice.InvoiceDiscountValue = dto.Invoice.InvoiceDiscountValue;
-            invoice.TaxRateId = dto.Invoice.TaxRateId;
+            //invoice.TaxRateId = dto.Invoice.TaxRateId;
 
             invoice.Status = dto.Invoice.Status;
 
@@ -377,7 +377,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                         Quantity = it.Quantity,
                         UnitPrice = it.UnitPrice,
                         Config = it.Config,
-                        TaxRateId = it.TaxRateId,
+                        //TaxRateId = it.TaxRateId,
                         DiscountType = it.DiscountType,
                         DiscountValue = it.DiscountValue,
                         Position = it.Position > 0 ? it.Position : pos
@@ -391,13 +391,13 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                         Quantity = it.Quantity,
                         UnitPrice = it.UnitPrice,
                         Config = it.Config ?? JsonDocument.Parse("{}"),
-                        TaxRateId = it.TaxRateId,
+                        //TaxRateId = it.TaxRateId,
                         DiscountType = it.DiscountType,
                         DiscountValue = it.DiscountValue,
                         Position = it.Position > 0 ? it.Position : pos
                     };
 
-                    item.PriceBreakdown = await BuildBreakdownAsync(itemDto, invoice.TaxRateId, ct);
+                    item.PriceBreakdown = await BuildBreakdownAsync(itemDto,/* invoice.TaxRateId*/ ct);
 
                     invoice.Items.Add(item);
                     pos++;
@@ -450,7 +450,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
 
             var header = await invoicesRepo.Query(asNoTracking: true)
                 .Where(x => x.Id == dto.InvoiceId)
-                .Select(x => new { x.Id, x.TaxRateId })
+                //.Select(x => new { x.Id, x.TaxRateId })
                 .FirstOrDefaultAsync(ct);
 
             if (header is null) throw new NotFoundAppException("Invoice not found.");
@@ -463,7 +463,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                     .Select(x => (int?)x.Position)
                     .MaxAsync(ct) ?? 0;
 
-                var breakdown = await BuildBreakdownAsync(dto.Item, header.TaxRateId, ct);
+                var breakdown = await BuildBreakdownAsync(dto.Item,/* header.TaxRateId*/ ct);
 
                 var item = new InvoiceItem
                 {
@@ -474,7 +474,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                     UnitPrice = dto.Item.UnitPrice,
                     Config = dto.Item.Config ?? JsonDocument.Parse("{}"),
                     PriceBreakdown = breakdown,
-                    TaxRateId = dto.Item.TaxRateId,
+                    //TaxRateId = dto.Item.TaxRateId,
                     DiscountType = dto.Item.DiscountType,
                     DiscountValue = dto.Item.DiscountValue,
                     Position = dto.Item.Position > 0 ? dto.Item.Position : (maxPos + 1)
@@ -512,12 +512,12 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
             var invoicesRepo = _unitOfWork.Repo<Invoice>();
             var itemsRepo = _unitOfWork.Repo<InvoiceItem>();
 
-            var header = await invoicesRepo.Query(asNoTracking: true)
-                .Where(x => x.Id == dto.InvoiceId)
-                .Select(x => new { x.Id, x.TaxRateId })
-                .FirstOrDefaultAsync(ct);
+            //var header = await invoicesRepo.Query(asNoTracking: true)
+            //    .Where(x => x.Id == dto.InvoiceId)
+            //    .Select(x => new { x.Id, x.TaxRateId })
+            //    .FirstOrDefaultAsync(ct);
 
-            if (header is null) throw new NotFoundAppException("Invoice not found.");
+            //if (header is null) throw new NotFoundAppException("Invoice not found.");
 
             await _unitOfWork.BeginTransactionAsync(ct);
             try
@@ -534,11 +534,11 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                 item.Quantity = dto.Item.Quantity;
                 item.UnitPrice = dto.Item.UnitPrice;
                 item.Config = dto.Item.Config ?? item.Config ?? JsonDocument.Parse("{}");
-                item.TaxRateId = dto.Item.TaxRateId;
+                //item.TaxRateId = dto.Item.TaxRateId;
                 item.DiscountType = dto.Item.DiscountType;
                 item.DiscountValue = dto.Item.DiscountValue;
 
-                item.PriceBreakdown = await BuildBreakdownAsync(dto.Item, header.TaxRateId, ct);
+                item.PriceBreakdown = await BuildBreakdownAsync(dto.Item,/* header.TaxRateId*/ ct);
 
                 if (dto.Item.Position > 0)
                     item.Position = dto.Item.Position;
@@ -665,7 +665,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
         // =========================
         // Price breakdown helper
         // =========================
-        private async Task<JsonDocument> BuildBreakdownAsync(InvoiceItemDto itemDto, Guid? fallbackTaxRateId, CancellationToken ct)
+        private async Task<JsonDocument> BuildBreakdownAsync(InvoiceItemDto itemDto, /*Guid? fallbackTaxRateId,*/ CancellationToken ct)
         {
             var qty = itemDto.Quantity;
             var unit = itemDto.UnitPrice;
@@ -689,27 +689,27 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
             var subTotal = Math.Max(0m, baseTotal - discountAmount);
 
             // tax
-            var effectiveTaxRateId = itemDto.TaxRateId ?? fallbackTaxRateId;
+            //var effectiveTaxRateId = itemDto.TaxRateId ?? fallbackTaxRateId;
 
-            decimal taxRatePercent = 0m;
-            decimal taxAmount = 0m;
+            //decimal taxRatePercent = 0m;
+            //decimal taxAmount = 0m;
 
-            if (effectiveTaxRateId.HasValue)
-            {
-                var taxRepo = _unitOfWork.Repo<TaxRate>();
-                var tax = await taxRepo.Query(asNoTracking: true)
-                    .Where(t => t.Id == effectiveTaxRateId.Value && t.IsActive)
-                    .Select(t => new { t.Id, t.Name, t.RatePercent })
-                    .FirstOrDefaultAsync(ct);
+            //if (effectiveTaxRateId.HasValue)
+            //{
+            //    var taxRepo = _unitOfWork.Repo<TaxRate>();
+            //    var tax = await taxRepo.Query(asNoTracking: true)
+            //        .Where(t => t.Id == effectiveTaxRateId.Value && t.IsActive)
+            //        .Select(t => new { t.Id, t.Name, t.RatePercent })
+            //        .FirstOrDefaultAsync(ct);
 
-                if (tax is not null)
-                {
-                    taxRatePercent = tax.RatePercent;
-                    taxAmount = Math.Max(0m, subTotal * (taxRatePercent / 100m));
-                }
-            }
+            //    if (tax is not null)
+            //    {
+            //        taxRatePercent = tax.RatePercent;
+            //        taxAmount = Math.Max(0m, subTotal * (taxRatePercent / 100m));
+            //    }
+            //}
 
-            var total = subTotal + taxAmount;
+            var total = subTotal /*+ taxAmount*/;
 
             var breakdownObj = new
             {
@@ -722,12 +722,12 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                     value = itemDto.DiscountValue,
                     amount = discountAmount
                 },
-                tax = new
-                {
-                    taxRateId = effectiveTaxRateId,
-                    ratePercent = taxRatePercent,
-                    amount = taxAmount
-                },
+                //tax = new
+                //{
+                //    taxRateId = effectiveTaxRateId,
+                //    ratePercent = taxRatePercent,
+                //    amount = taxAmount
+                //},
                 subTotal,
                 total
             };
@@ -742,7 +742,7 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
 private async Task RecalculateInvoiceTotalsAsync(Guid invoiceId, CancellationToken ct)
 {
     var invoicesRepo = _unitOfWork.Repo<Invoice>();
-    var taxRepo = _unitOfWork.Repo<TaxRate>();
+    //var taxRepo = _unitOfWork.Repo<TaxRate>();
 
     // Load tracked invoice with items/payments/totals so we can upsert InvoiceTotal without needing a separate repository
     var invoice = await invoicesRepo.Query(asNoTracking: false)
@@ -782,19 +782,19 @@ private async Task RecalculateInvoiceTotalsAsync(Guid invoiceId, CancellationTok
     var netSubtotal = Math.Max(0m, subtotal - invoiceDiscountAmount);
 
     // Invoice-level tax only when items tax is zero (avoid double-tax)
-    decimal invoiceTaxAmount = 0m;
-    if (invoice.TaxRateId.HasValue && itemTaxTotal == 0m)
-    {
-        var tax = await taxRepo.Query(asNoTracking: true)
-            .Where(t => t.Id == invoice.TaxRateId.Value && t.IsActive)
-            .Select(t => new { t.RatePercent })
-            .FirstOrDefaultAsync(ct);
+    //decimal invoiceTaxAmount = 0m;
+    //if (invoice.TaxRateId.HasValue && itemTaxTotal == 0m)
+    //{
+    //    var tax = await taxRepo.Query(asNoTracking: true)
+    //        .Where(t => t.Id == invoice.TaxRateId.Value && t.IsActive)
+    //        .Select(t => new { t.RatePercent })
+    //        .FirstOrDefaultAsync(ct);
 
-        if (tax is not null)
-            invoiceTaxAmount = Math.Max(0m, netSubtotal * (tax.RatePercent / 100m));
-    }
+    //    if (tax is not null)
+    //        invoiceTaxAmount = Math.Max(0m, netSubtotal * (tax.RatePercent / 100m));
+    //}
 
-    var taxTotal = itemTaxTotal + invoiceTaxAmount;
+    var taxTotal = itemTaxTotal /*+ invoiceTaxAmount*/;
     var discountTotal = itemDiscountTotal + invoiceDiscountAmount;
     var total = netSubtotal + taxTotal;
 

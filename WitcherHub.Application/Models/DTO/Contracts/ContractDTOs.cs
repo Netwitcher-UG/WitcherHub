@@ -38,7 +38,8 @@ namespace WitcherHub.Application.Models.DTO.Contracts
         public JsonDocument Config { get; set; } = JsonDocument.Parse("{}");
 
         public decimal? AgreedPrice { get; set; }
-
+        public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
+ 
         public int Position { get; set; } = 1;
     }
 

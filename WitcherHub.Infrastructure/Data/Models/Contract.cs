@@ -52,6 +52,8 @@ namespace WitcherHub.Infrastructure.Data.Models
         [Column(TypeName = "numeric(12,2)")]
         public decimal? AgreedPrice { get; set; }
 
+        public bool Tax { get; set; } = false;
+        public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
         public int Position { get; set; } = 1;
     }
 

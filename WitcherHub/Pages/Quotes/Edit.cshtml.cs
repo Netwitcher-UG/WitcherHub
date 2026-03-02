@@ -91,7 +91,7 @@ namespace WitcherHub.Pages.Quotes
             NewItem.Item.Quantity = 1;
             NewItem.Item.UnitPrice = 0;
             NewItem.Item.Title = "";
-            NewItem.Item.TaxRateId = null;
+            NewItem.Item.ApplyTax = false;
             NewItem.Item.DiscountType = null;
             NewItem.Item.DiscountValue = null;
             NewItemConfigJson = "{}";
@@ -341,11 +341,11 @@ namespace WitcherHub.Pages.Quotes
 
         private async Task LoadLookupsAsync(CancellationToken ct)
         {
-            TaxRateOptions = await _db.TaxRates
-                .Where(t => t.IsActive)
-                .OrderBy(t => t.Name)
-                .Select(t => new SelectListItem($"{t.Name} ({t.RatePercent}%)", t.Id.ToString()))
-                .ToListAsync(ct);
+            //TaxRateOptions = await _db.TaxRates
+            //    .Where(t => t.IsActive)
+            //    .OrderBy(t => t.Name)
+            //    .Select(t => new SelectListItem($"{t.Name} ({t.RatePercent}%)", t.Id.ToString()))
+            //    .ToListAsync(ct);
         }
     }
 }
