@@ -486,7 +486,7 @@ namespace WitcherHub.Pages
         }
 
         // ========= helpers =========
-        private static string FmtDate(DateOnly? d) => d?.ToString("yyyy-MM-dd") ?? "—";
+        private static string FmtDate(DateOnly? d) => d?.ToString("dd-MM-yyyy") ?? "—";
 
         private static Microsoft.AspNetCore.Html.IHtmlContent Html(string? text)
             => new Microsoft.AspNetCore.Html.HtmlString(System.Text.Encodings.Web.HtmlEncoder.Default.Encode(text ?? ""));

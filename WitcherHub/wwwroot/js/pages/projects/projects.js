@@ -1160,5 +1160,31 @@
             btn.disabled = false;
         }
     });
+    // ---- Date inputs: click anywhere opens picker; typing doesn't re-open ----
+    (function bindDatePickers() {
+        function bindOne(el) {
+            if (!el || el.dataset.dpBound === '1') return;
+            el.dataset.dpBound = '1';
 
+            let openOnFocus = false;
+
+            el.addEventListener('pointerdown', () => { openOnFocus = true; });
+
+            el.addEventListener('focus', () => {
+                if (!openOnFocus) return;
+                openOnFocus = false;
+                try { el.showPicker?.(); } catch { }
+            });
+
+            el.addEventListener('click', () => {
+                try { el.showPicker?.(); } catch { }
+            });
+
+            el.addEventListener('keydown', () => { openOnFocus = false; });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('input[type="date"].js-datepicker').forEach(bindOne);
+        });
+    })();
 })();
