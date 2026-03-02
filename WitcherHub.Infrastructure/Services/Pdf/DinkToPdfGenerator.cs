@@ -113,8 +113,8 @@ namespace WitcherHub.Infrastructure.Services.Pdf
             var printedAt = WebUtility.HtmlEncode(DateTime.Now.ToString("dd.MM.yyyy HH:mm"));
 
             var logoHtml = string.IsNullOrWhiteSpace(logoDataUri)
-    ? ""
-    : $@"<img src=""{logoDataUri}"" style=""height:40px;max-width:320px;object-fit:contain;display:block;"" />";
+                ? ""
+                : $@"<img src=""{logoDataUri}"" style=""height:52px;max-width:340px;object-fit:contain;display:block;"" />";
 
             var headerHtml = $@"
 <!doctype html>
@@ -124,7 +124,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
   <style>
     body {{ margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; font-size:10px; color:#111; }}
     .wrap {{ width:100%; padding:0 10px; box-sizing:border-box; }}
-    .row {{ width:100%; border-bottom:1px solid #ddd; padding:6px 0 6px 0; }}
+    .row {{ width:100%; border-bottom:1px solid #ddd; padding:8px 0 8px 0; }}
     table {{ width:100%; border-collapse:collapse; }}
     td {{ vertical-align:middle; }}
     .meta {{ color:#666; font-size:9.5px; text-align:right; white-space:nowrap; }}
@@ -155,7 +155,6 @@ namespace WitcherHub.Infrastructure.Services.Pdf
             File.WriteAllText(path, headerHtml, Encoding.UTF8);
             return path;
         }
-
         private static string ToFileUrl(string path)
         {
             var full = Path.GetFullPath(path).Replace("\\", "/");

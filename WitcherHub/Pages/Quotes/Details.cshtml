@@ -49,8 +49,6 @@
             Back
         </a>
 
-        <!-- رجوع للمشروع (يفتح المودال وتبويب quotes) -->
-     
         <a class="btn btn-outline-secondary"
            asp-page="/Projects"
            asp-route-openProjectId="@Model.Quote.ProjectId"
@@ -58,6 +56,22 @@
            title="Back to Project (open quotes tab)">
             Back to Project Quotes
         </a>
+
+        <a class="btn btn-outline-primary"
+           asp-page="./Details"
+           asp-page-handler="Pdf"
+           asp-route-id="@Model.Quote.Id"
+           title="Download PDF">
+            PDF
+        </a>
+
+        <button type="button"
+                class="btn btn-success"
+                data-bs-toggle="modal"
+                data-bs-target="#SendQuoteModal"
+                title="Send quote to customer">
+            Send
+        </button>
 
         <a class="btn btn-primary"
            asp-page="/Quotes/Edit"
@@ -124,3 +138,50 @@
         }
     </div>
 </div>
+<div class="modal fade" id="SendQuoteModal" tabindex="-1" aria-labelledby="SendQuoteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="SendQuoteModalLabel">Send Quote</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="mb-2">
+                    You are about to send this quote as a PDF attachment to the customer linked to this project.
+                </div>
+
+                <div class="small text-muted">
+                    Quote: <strong>@Model.Quote.QuoteNo</strong><br />
+                    Project: <strong>@Model.Quote.ProjectId</strong>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+
+                <form method="post" asp-page-handler="Send" asp-route-id="@Model.Quote.Id" class="d-inline" id="sendQuoteForm">
+                    <button type="submit" class="btn btn-success" id="sendQuoteConfirmBtn">
+                        Confirm & Send
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts{
+    <script>
+        (function () {
+            const form = document.getElementById('sendQuoteForm');
+            const btn = document.getElementById('sendQuoteConfirmBtn');
+            if (!form || !btn) return;
+
+            form.addEventListener('submit', function () {
+                btn.disabled = true;
+                btn.textContent = 'Sending...';
+            });
+        })();
+    </script>
+}
