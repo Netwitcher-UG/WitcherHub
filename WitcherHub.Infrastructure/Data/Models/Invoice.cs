@@ -30,7 +30,7 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         [Column(TypeName = "numeric(12,2)")]
         public decimal? InvoiceDiscountValue { get; set; }
-        public bool Tax { get; set; } = false;
+        public bool ApplyVat { get; set; } = false;
         public string? Notes { get; set; }
 
         public Guid? CreatedById { get; set; }
@@ -64,7 +64,6 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         public ICollection<InvoiceItem> Items { get; set; } = new List<InvoiceItem>();
         public InvoiceTotal? Totals { get; set; }
-
         public ICollection<Payment> Payments { get; set; } = new List<Payment>();
         public ICollection<MilestoneInvoice> MilestoneLinks { get; set; } = new List<MilestoneInvoice>();
     }
@@ -93,7 +92,7 @@ namespace WitcherHub.Infrastructure.Data.Models
         [Column(TypeName = "jsonb")]
         public JsonDocument? PriceBreakdown { get; set; }
 
-        public bool Tax { get; set; } = false;
+  
 
         public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
 

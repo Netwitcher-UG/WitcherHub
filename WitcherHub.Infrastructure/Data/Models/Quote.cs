@@ -23,7 +23,7 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         public DateTimeOffset? IssuedAt { get; set; }
         public DateTimeOffset? ExpiresAt { get; set; }
-
+        public bool ApplyVat { get; set; } = false;
         public Guid? CreatedById { get; set; }
         public AppUser? CreatedBy { get; set; }
 
@@ -53,8 +53,6 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         [Column(TypeName = "jsonb")]
         public JsonDocument? PriceBreakdown { get; set; }
-
-        public bool Tax { get; set; } = false;
 
         public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
         public DiscountType? DiscountType { get; set; }

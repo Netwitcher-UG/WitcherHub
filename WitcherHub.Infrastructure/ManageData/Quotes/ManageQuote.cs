@@ -155,7 +155,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                             CreatedAt = x.CreatedAt,
                             IssuedAt = x.IssuedAt,
                             ExpiresAt = x.ExpiresAt,
-
+                            ApplyVat = x.ApplyVat,
                             Items = x.Items
                                 .OrderBy(i => i.Position)
                                 .ThenBy(i => i.CreatedAt)
@@ -174,7 +174,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                                   
                                     DiscountType = i.DiscountType,
                                     DiscountValue = i.DiscountValue,
-
+                                    BillingCycle = i.BillingCycle,
                                     Position = i.Position,
 
                                     LineTotal = CalcLineTotal(i.Quantity, i.UnitPrice, i.DiscountType, i.DiscountValue)
@@ -212,7 +212,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 {
                     ProjectId = dto.Quote.ProjectId,
                     QuoteNo = quoteNo,
-
+                    ApplyVat = dto.Quote.ApplyVat,
                     Status = dto.Quote.Status,
                     Currency = (dto.Quote.Currency ?? "EUR").Trim(),
                     Notes = string.IsNullOrWhiteSpace(dto.Quote.Notes) ? null : dto.Quote.Notes.Trim(),
@@ -239,8 +239,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                             DiscountValue = it.DiscountValue,
                             Position = it.Position > 0 ? it.Position : pos
 
-                            // إذا بدك تخزّن اختيار الضريبة بالـ DB:
-                            // ApplyTax = it.ApplyTax
+                           
                         };
                         quote.Items.Add(item);
                         pos++;
@@ -282,7 +281,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
             quote.Notes = string.IsNullOrWhiteSpace(dto.Quote.Notes) ? null : dto.Quote.Notes.Trim();
             quote.IssuedAt = dto.Quote.IssuedAt?.ToUniversalTime();
             quote.ExpiresAt = dto.Quote.ExpiresAt?.ToUniversalTime();
-
+            quote.ApplyVat = dto.Quote.ApplyVat;
             EnsureValidQuoteStatus(dto.Quote.Status);
             quote.Status = dto.Quote.Status;
 
@@ -307,8 +306,6 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                         DiscountValue = it.DiscountValue,
                         Position = it.Position > 0 ? it.Position : pos
 
-                        // إذا بدك تخزّن اختيار الضريبة بالـ DB:
-                        // ApplyTax = it.ApplyTax
                     });
                     pos++;
                 }
@@ -374,7 +371,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                     ServiceId = dto.Item.ServiceId,
                     Quantity = dto.Item.Quantity,
                     Config = dto.Item.Config ?? JsonDocument.Parse("{}"),
-
+                    BillingCycle=dto.Item.BillingCycle,
                     UnitPrice = effectiveUnit,
                     PriceBreakdown = breakdown,
 
@@ -426,7 +423,9 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 item.ServiceId = dto.Item.ServiceId;
                 item.Quantity = dto.Item.Quantity;
                 item.UnitPrice = dto.Item.UnitPrice;
-           
+                item.BillingCycle = dto.Item.BillingCycle;
+
+
                 item.DiscountType = dto.Item.DiscountType;
                 item.DiscountValue = dto.Item.DiscountValue;
 
@@ -764,19 +763,13 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
             var subTotal = Math.Max(0m, baseTotal - totalDiscount);
 
             // =========================
-            // TAX (FIXED 19% IF SELECTED)
+            // TAX (DISABLED PER LINE)
+            // VAT will be applied on the whole quote (header) only
             // =========================
             decimal taxRatePercent = 0m;
             decimal taxAmount = 0m;
 
-            // ✅ VAT 19% فقط إذا المستخدم اختار ApplyTax
-            if (itemDto.ApplyTax)
-            {
-                taxRatePercent = 19m;
-                taxAmount = Math.Max(0m, subTotal * (taxRatePercent / 100m));
-            }
-
-            var total = subTotal + taxAmount;
+            var total = subTotal; // ✅ لا ضريبة على السطر
 
             var breakdownObj = new
             {
@@ -797,11 +790,9 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 },
                 tax = new
                 {
-                    applyTax = itemDto.ApplyTax,
-                    // taxRateId موجود لليغاسي فقط (ما عاد نستخدمه بالحساب)
-                   
-                    ratePercent = taxRatePercent,
-                    amount = taxAmount
+                    applyTax = false,
+                    ratePercent = 0m,
+                    amount = 0m
                 },
                 subTotal,
                 total

@@ -21,7 +21,7 @@ namespace WitcherHub.Application.Models.DTO.Quotes
 
         public DateTimeOffset? IssuedAt { get; set; }
         public DateTimeOffset? ExpiresAt { get; set; }
-
+        public bool ApplyVat { get; set; } = false;
         public DocumentStatus Status { get; set; } = DocumentStatus.Draft;
     }
 
@@ -37,8 +37,7 @@ namespace WitcherHub.Application.Models.DTO.Quotes
         public JsonDocument Config { get; set; } = JsonDocument.Parse("{}");
         public JsonDocument? PriceBreakdown { get; set; }
 
-        //public Guid? TaxRateId { get; set; }
-        public bool ApplyTax { get; set; }  // true => 19%, false => 0
+      
         public DiscountType? DiscountType { get; set; }
         public decimal? DiscountValue { get; set; }
         public List<Guid> PricingRuleIds { get; set; } = new();

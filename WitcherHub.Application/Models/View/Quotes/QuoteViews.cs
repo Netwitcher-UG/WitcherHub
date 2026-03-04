@@ -39,6 +39,7 @@ namespace WitcherHub.Application.Models.View.Quotes
             public DateTimeOffset? IssuedAt { get; set; }
             public DateTimeOffset? ExpiresAt { get; set; }
 
+            public bool ApplyVat { get; set; }
             public List<QuoteItemItemView> Items { get; set; } = new();
         }
 
@@ -56,7 +57,8 @@ namespace WitcherHub.Application.Models.View.Quotes
             public JsonDocument? PriceBreakdown { get; set; }
 
 
-            public bool Tax { get; set; } 
+            public BillingCycle BillingCycle { get; set; } // ✅ جديد
+
 
             public DiscountType? DiscountType { get; set; }
             public decimal? DiscountValue { get; set; }

@@ -62,10 +62,6 @@
         catch { return fallback; }
     }
 
-    // To safely embed JSON in data attribute (unused for config now, we use base64)
-    string EscapeForAttr(string? s)
-        => string.IsNullOrEmpty(s) ? "" : s.Replace("&", "&amp;").Replace("\"", "&quot;").Replace("<", "&lt;").Replace(">", "&gt;");
-
     // ✅ Base64 encode JSON safely for HTML attributes
     string ToB64(string s)
         => Convert.ToBase64String(Encoding.UTF8.GetBytes(s ?? "{}"));
@@ -85,14 +81,15 @@
     {
         var subTotal = ReadDec(it.PriceBreakdown, "subTotal", it.LineTotal);
         var discountAmt = ReadNestedDec(it.PriceBreakdown, "discount", "amount", 0m);
-        var taxAmt = ReadNestedDec(it.PriceBreakdown, "tax", "amount", 0m);
-        var total = ReadDec(it.PriceBreakdown, "total", it.LineTotal);
 
         sumSub += subTotal;
         sumDisc += discountAmt;
-        sumTax += taxAmt;
-        sumTotal += total;
     }
+
+    // ✅ VAT على كامل الفاتورة فقط
+    var net = Math.Max(0m, sumSub - sumDisc);      // ✅ بعد الخصم
+    sumTax = (Model.Quote.ApplyVat ? net * 0.19m : 0m);
+    sumTotal = net + sumTax;
 
     // Re-open canvas if validation fails
     var openAddCanvas = ViewContext.ViewData.ModelState.Keys.Any(k => k.StartsWith("NewItem") || k == "NewItemConfigJson");
@@ -157,12 +154,8 @@
                         <input type="hidden" asp-for="Header.Quote.ProjectId" />
 
                         <div class="row g-3">
-                            @* <div class="col-12 col-md-3">
-                                <label class="form-label">Currency</label>
-                                <input class="form-control" asp-for="Header.Quote.Currency" />
-                                <span class="text-danger small" asp-validation-for="Header.Quote.Currency"></span>
-                            </div> *@
                             <input type="hidden" name="Header.Quote.Currency" value="EUR" />
+
                             <div class="col-12 col-md-3">
                                 <label class="form-label">Status</label>
                                 <select class="form-select" asp-for="Header.Quote.Status">
@@ -188,6 +181,14 @@
                                        value="@FmtDate(Model.Header.Quote.ExpiresAt)" />
                             </div>
 
+                            <div class="col-12 col-md-3">
+                                <label class="form-label d-block">VAT</label>
+                                <label class="form-check">
+                                    <input class="form-check-input" asp-for="Header.Quote.ApplyVat" type="checkbox" />
+                                    <span class="form-check-label">Apply VAT (19%)</span>
+                                </label>
+                            </div>
+
                             <div class="col-12">
                                 <label class="form-label">Notes</label>
                                 <textarea class="form-control" rows="3" asp-for="Header.Quote.Notes"></textarea>
@@ -211,15 +212,15 @@
                 </div>
 
                 <div class="d-flex gap-2 flex-wrap">
-                    <a class="btn btn-outline-primary @(isDraft ? "" : "disabled")"
+                    <a class="btn btn-primary @(isDraft ? "" : "disabled") "
                        asp-page="/Quotes/Items/Create"
                        asp-route-quoteId="@Model.Quote.Id"
                        aria-disabled="@(!isDraft)"
                        tabindex="@(isDraft ? "0" : "-1")">
-                        From Service
+                        From Services
                     </a>
 
-                    <button class="btn btn-primary" type="button"
+                    <button class="btn btn-outline-primary" type="button"
                             data-bs-toggle="offcanvas" data-bs-target="#AddItemCanvas"
                             @(isDraft ? "" : "disabled")>
                         Quick add
@@ -263,7 +264,6 @@
                                 {
                                     var subTotal = ReadDec(it.PriceBreakdown, "subTotal", it.LineTotal);
                                     var discountAmt = ReadNestedDec(it.PriceBreakdown, "discount", "amount", 0m);
-                                    var taxAmt = ReadNestedDec(it.PriceBreakdown, "tax", "amount", 0m);
                                     var total = ReadDec(it.PriceBreakdown, "total", it.LineTotal);
 
                                     var dt = ReadNestedStr(it.PriceBreakdown, "discount", "type", "");
@@ -279,7 +279,6 @@
                                             <div class="text-muted small">
                                                 Sub: <strong>@subTotal.ToString("0.00")</strong>
                                                 &nbsp;•&nbsp; Disc: <strong>@discountAmt.ToString("0.00")</strong>
-                                                &nbsp;•&nbsp; Tax: <strong>@taxAmt.ToString("0.00")</strong>
                                             </div>
                                         </td>
 
@@ -299,9 +298,10 @@
                                                         data-item-qty="@it.Quantity"
                                                         data-item-unit="@it.UnitPrice"
                                                         data-item-pos="@it.Position"
-                                                        @* data-item-tax="@it.TaxRateId" *@
+                                                        data-item-billingcycle="@((int)it.BillingCycle)"
                                                         data-item-disctype="@dt"
                                                         data-item-discval="@discVal"
+
                                                         data-item-config-b64="@cfgB64">
                                                     Edit
                                                 </button>
@@ -386,7 +386,8 @@
             <div class="row g-2">
                 <div class="col-4">
                     <label class="form-label">Qty</label>
-                    <input class="form-control" asp-for="NewItem.Item.Quantity" />
+                    <input class="form-control"  asp-for="NewItem.Item.Quantity" />
+
                 </div>
                 <div class="col-4">
                     <label class="form-label">Unit</label>
@@ -402,19 +403,12 @@
                 <div class="accordion-item">
                     <h2 class="accordion-header" id="addItemAdvancedHeading">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#addItemAdvancedBody">
-                            Advanced (tax / discounts / config)
+                            Advanced ( discounts / config)
                         </button>
                     </h2>
 
                     <div id="addItemAdvancedBody" class="accordion-collapse collapse" data-bs-parent="#addItemAdvanced">
                         <div class="accordion-body">
-                            <div class="mb-3">
-                                <label class="form-check">
-                                    <input asp-for="NewItem.Item.ApplyTax" class="form-check-input" type="checkbox" />
-                                    <span class="form-check-label">Apply VAT (19%)</span>
-                                </label>
-                            </div>
-
                             <div class="row g-2">
                                 <div class="col-6">
                                     <label class="form-label">Discount Type</label>
@@ -473,7 +467,7 @@
             <div class="row g-2">
                 <div class="col-4">
                     <label class="form-label">Qty</label>
-                    <input class="form-control" asp-for="EditItem.Item.Quantity" id="ei-qty" />
+                    <input class="form-control"  asp-for="EditItem.Item.Quantity" id="ei-qty" />
                 </div>
                 <div class="col-4">
                     <label class="form-label">Unit</label>
@@ -483,26 +477,26 @@
                     <label class="form-label">Pos</label>
                     <input class="form-control" asp-for="EditItem.Item.Position" id="ei-pos" />
                 </div>
+                <div class="mt-2">
+                    <label class="form-label">BillingCycle</label>
+                    <select class="form-select"
+                            asp-for="EditItem.Item.BillingCycle"
+                            asp-items="Html.GetEnumSelectList<BillingCycle>()"
+                            id="ei-billing">
+                    </select>
+                </div>
             </div>
 
             <div class="accordion mt-3" id="editItemAdvanced">
                 <div class="accordion-item">
                     <h2 class="accordion-header" id="editItemAdvancedHeading">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#editItemAdvancedBody">
-                            Advanced (tax / discounts / config)
+                            Advanced (discounts / config)
                         </button>
                     </h2>
 
                     <div id="editItemAdvancedBody" class="accordion-collapse collapse" data-bs-parent="#editItemAdvanced">
                         <div class="accordion-body">
-                            <div class="mb-3">
-                                <label class="form-label">Tax Rate</label>
-                                <label class="form-check">
-                                    <input asp-for="NewItem.Item.ApplyTax" class="form-check-input" type="checkbox" />
-                                    <span class="form-check-label">Apply VAT (19%)</span>
-                                </label>
-                            </div>
-
                             <div class="row g-2">
                                 <div class="col-6">
                                     <label class="form-label">Discount Type</label>
@@ -550,10 +544,7 @@
                         <div class="text-muted">Discount</div>
                         <div class="fw-semibold" id="ei-prev-disc">-0.00</div>
                     </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <div class="text-muted">Tax</div>
-                        <div class="fw-semibold" id="ei-prev-tax">0.00</div>
-                    </div>
+                   
 
                     <hr class="my-2" />
 
@@ -596,19 +587,9 @@
             search.addEventListener('input', applyFilter);
         })();
 
-        function eiParseTaxPercentFromSelected() {
-            const sel = document.getElementById('ei-tax');
-            if (!sel) return 0;
-
-            const opt = sel.options[sel.selectedIndex];
-            if (!opt) return 0;
-
-            // Example: "VAT (5%)"
-            const m = (opt.textContent || '').match(/(\d+(\.\d+)?)\s*%/);
-            if (!m) return 0;
-
-            const p = parseFloat(m[1]);
-            return isNaN(p) ? 0 : p;
+        // ✅ Tax is quote-level only (ApplyVat = 19%)
+        function eiTaxPercent() {
+            return @((Model.Quote.ApplyVat ? 19 : 0));
         }
 
         function eiComputePreview() {
@@ -620,35 +601,27 @@
             const discType = (document.getElementById('ei-disctype')?.value || '').trim();
             const discVal = parseFloat(document.getElementById('ei-discval')?.value || '0') || 0;
 
-            let discAmt = 0;
-            if (discType === 'Percent') {
-                discAmt = sub * (discVal / 100.0);
-            } else if (discType === 'Amount') {
-                discAmt = discVal;
-            } else if (discType === 'Fixed') {
-                discAmt = discVal;
-            }
+          let discAmt = 0;
+if (discType === 'Percent') discAmt = sub * (discVal / 100.0);
+else if (discType === 'Amount') discAmt = discVal;
+else if (discType === 'Fixed') discAmt = discVal;
 
-            // clamp
-            if (discAmt > sub) discAmt = sub;
-            if (discAmt < 0) discAmt = 0;
+// clamp
+if (discAmt > sub) discAmt = sub;
+if (discAmt < 0) discAmt = 0;
 
-            const taxableBase = sub - discAmt;
-            const taxPercent = eiParseTaxPercentFromSelected();
-            const taxAmt = taxableBase * (taxPercent / 100.0);
-
-            const total = taxableBase + taxAmt;
-
+// ✅ total بدون tax
+const taxableBase = Math.max(0, sub - discAmt);
+const total = taxableBase;
             const f = (n) => (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
 
             const elSub = document.getElementById('ei-prev-sub');
             const elDisc = document.getElementById('ei-prev-disc');
-            const elTax = document.getElementById('ei-prev-tax');
             const elTotal = document.getElementById('ei-prev-total');
 
             if (elSub) elSub.textContent = f(sub);
             if (elDisc) elDisc.textContent = '-' + f(discAmt);
-            if (elTax) elTax.textContent = f(taxAmt);
+           
             if (elTotal) elTotal.textContent = f(total);
         }
 
@@ -665,17 +638,20 @@
             document.getElementById('ei-qty').value = btn.getAttribute('data-item-qty') || '1';
             document.getElementById('ei-unit').value = btn.getAttribute('data-item-unit') || '0';
             document.getElementById('ei-pos').value = btn.getAttribute('data-item-pos') || '1';
-
-            document.getElementById('ei-tax').value = btn.getAttribute('data-item-tax') || '';
+            document.getElementById('ei-billing').value =btn.getAttribute('data-item-billingcycle') || '0';
             document.getElementById('ei-disctype').value = btn.getAttribute('data-item-disctype') || '';
             document.getElementById('ei-discval').value = btn.getAttribute('data-item-discval') || '';
 
-            // ✅ config: base64 -> textarea (safe)
+            // ✅ config: base64 -> textarea
             const b64 = btn.getAttribute('data-item-config-b64');
             let cfgText = '{}';
             try {
-                cfgText = b64 ? decodeURIComponent(escape(atob(b64))) : '{}';
+                if (b64) {
+                    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+                    cfgText = new TextDecoder('utf-8').decode(bytes);
+                }
             } catch { cfgText = '{}'; }
+
             document.getElementById('ei-config').value = cfgText;
 
             // Compute preview once opened
@@ -684,7 +660,7 @@
 
         // Live preview updates
         (function () {
-            const ids = ['ei-qty', 'ei-unit', 'ei-tax', 'ei-disctype', 'ei-discval'];
+            const ids = ['ei-qty', 'ei-unit', 'ei-disctype', 'ei-discval'];
             ids.forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;

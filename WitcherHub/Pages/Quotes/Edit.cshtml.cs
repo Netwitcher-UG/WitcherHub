@@ -75,15 +75,14 @@ namespace WitcherHub.Pages.Quotes
             Quote = await _quotes.GetQuoteAsync(Id, ct);
             if (Quote is null) return NotFound();
 
-            await LoadLookupsAsync(ct);
-
             // fill header form from details
             Header.Quote.ProjectId = Quote.ProjectId;
-            Header.Quote.Currency = "EUR";
+            Header.Quote.Currency = Quote.Currency;
             Header.Quote.Notes = Quote.Notes;
-            Header.Quote.IssuedAt = Quote.IssuedAt ?? DateTimeOffset.Now;
+            Header.Quote.IssuedAt = Quote.IssuedAt;
             Header.Quote.ExpiresAt = Quote.ExpiresAt;
             Header.Quote.Status = Quote.Status;
+            Header.Quote.ApplyVat = Quote.ApplyVat;
 
             // prepare new item defaults
             NewItem.QuoteId = Quote.Id;
@@ -91,12 +90,11 @@ namespace WitcherHub.Pages.Quotes
             NewItem.Item.Quantity = 1;
             NewItem.Item.UnitPrice = 0;
             NewItem.Item.Title = "";
-            NewItem.Item.ApplyTax = false;
             NewItem.Item.DiscountType = null;
             NewItem.Item.DiscountValue = null;
             NewItemConfigJson = "{}";
 
-            // modal defaults (empty)
+            // modal defaults (empty; UI will fill using JS when clicking Edit)
             EditItem.QuoteId = Quote.Id;
             EditItemConfigJson = "{}";
 
@@ -113,8 +111,7 @@ namespace WitcherHub.Pages.Quotes
                 if (Id == Guid.Empty) throw new BadRequestAppException("Invalid quote id.");
 
                 Header.Items = null; // ✅ do not replace items
-                                     // Enforce fixed currency regardless of what's posted
-                Header.Quote.Currency = "EUR";
+
                 var vr = await _updateValidator.ValidateAsync(Header, ct);
                 if (!vr.IsValid)
                 {
@@ -172,7 +169,6 @@ namespace WitcherHub.Pages.Quotes
                 {
                     ModelState.AddModelError(nameof(NewItemConfigJson), "Invalid JSON.");
                     await OnGetAsync(ct);
-                    await LoadLookupsAsync(ct);
                     return Page();
                 }
 
@@ -236,10 +232,11 @@ namespace WitcherHub.Pages.Quotes
                 {
                     ModelState.AddModelError(nameof(EditItemConfigJson), "Invalid JSON.");
                     await OnGetAsync(ct);
-                    await LoadLookupsAsync(ct);
                     return Page();
                 }
 
+                // ✅ SAFETY
+                EditItem.Item ??= new();
                 EditItem.Item.Config = config;
 
                 var vr = await _updateItemValidator.ValidateAsync(EditItem, ct);
@@ -337,15 +334,6 @@ namespace WitcherHub.Pages.Quotes
                 TempData["Toast.Message"] = ex.Message;
                 return RedirectToPage("./Edit", new { id = Id });
             }
-        }
-
-        private async Task LoadLookupsAsync(CancellationToken ct)
-        {
-            //TaxRateOptions = await _db.TaxRates
-            //    .Where(t => t.IsActive)
-            //    .OrderBy(t => t.Name)
-            //    .Select(t => new SelectListItem($"{t.Name} ({t.RatePercent}%)", t.Id.ToString()))
-            //    .ToListAsync(ct);
         }
     }
 }

@@ -291,8 +291,7 @@ namespace WitcherHub.Pages.Quotes
 
                 var sub = ReadDec(it.PriceBreakdown, "subTotal", baseTotal);
                 var disc = ReadNestedDec(it.PriceBreakdown, "discount", "amount", 0m);
-                var tax = ReadNestedDec(it.PriceBreakdown, "tax", "amount", 0m);
-                var total = ReadDec(it.PriceBreakdown, "total", Math.Max(0m, sub) + Math.Max(0m, tax));
+                var total = sub; // ✅ line total بدون ضريبة
 
                 lines.Add(new QuotePdfHtmlBuilder.QuotePdfLine
                 {
@@ -303,17 +302,17 @@ namespace WitcherHub.Pages.Quotes
                     UnitPrice = it.UnitPrice,
                     SubTotal = sub,
                     Discount = disc,
-                    Tax = tax,
-                    Total = total
+                    Tax = 0m,     // ✅ no per-line tax
+                    Total = total // ✅ no per-line tax
                 });
 
                 sumSub += sub;
                 sumDisc += disc;
-                sumTax += tax;
-                sumTotal += total;
             }
-
-            var vatPercent = sumTax > 0m ? 19m : 0m;
+            var vatPercent = q.ApplyVat ? 19m : 0m;
+            sumTax = q.ApplyVat ? Math.Max(0m, sumSub * 0.19m) : 0m;
+            sumTotal = sumSub + sumTax;
+          
 
             return new QuotePdfHtmlBuilder.QuotePdfDocumentModel
             {
