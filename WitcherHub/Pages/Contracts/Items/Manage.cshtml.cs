@@ -58,16 +58,31 @@ namespace WitcherHub.Pages.Contracts.Items
         [BindProperty] public int CreatePosition { get; set; } = 1;
         [BindProperty] public string CreateConfigJson { get; set; } = "{}";
 
-        // Edit fields
+    
+ 
+        // Edit fields (✅ like Quote)
         [BindProperty] public Guid EditItemId { get; set; }
         [BindProperty] public Guid EditServiceId { get; set; }
         [BindProperty] public string? EditTitle { get; set; }
         [BindProperty] public decimal? EditAgreedPrice { get; set; }
+        [BindProperty] public decimal EditQuantity { get; set; } = 1m;
+        [BindProperty] public decimal EditUnitPrice { get; set; } = 0m;
+        [BindProperty] public BillingCycle EditBillingCycle { get; set; } = BillingCycle.OneTime;
+
+        [BindProperty] public DiscountType? EditDiscountType { get; set; }
+        [BindProperty] public decimal? EditDiscountValue { get; set; }
+
         [BindProperty] public int EditPosition { get; set; } = 1;
         [BindProperty] public string EditConfigJson { get; set; } = "{}";
 
         // Delete field
         [BindProperty] public Guid ItemId { get; set; }
+        // Header
+        [BindProperty] public DocumentStatus HeaderStatus { get; set; }
+        [BindProperty] public DateOnly? HeaderStartDate { get; set; }
+        [BindProperty] public DateOnly? HeaderEndDate { get; set; }
+        [BindProperty] public string? HeaderTerms { get; set; }
+        [BindProperty] public InvoiceSendMode HeaderInvoiceSendMode { get; set; } = InvoiceSendMode.Automatic;
 
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
@@ -75,7 +90,11 @@ namespace WitcherHub.Pages.Contracts.Items
 
             Contract = await _contracts.GetContractAsync(ContractId, ct);
             if (Contract is null) return NotFound();
-
+            HeaderStatus = Contract.Status;
+            HeaderStartDate = Contract.StartDate;
+            HeaderEndDate = Contract.EndDate;
+            HeaderTerms = Contract.Terms;
+            HeaderInvoiceSendMode = Contract.InvoiceSendMode;
             await LoadServicesAsync(ct);
 
             IsLocked = IsContractLocked(Contract);
@@ -86,7 +105,44 @@ namespace WitcherHub.Pages.Contracts.Items
 
             return Page();
         }
+        public async Task<IActionResult> OnPostSaveHeaderAsync(CancellationToken ct)
+        {
+            try
+            {
+                if (ContractId == Guid.Empty)
+                    throw new BadRequestAppException("Invalid contract id.");
 
+                Contract = await _contracts.GetContractAsync(ContractId, ct);
+                if (Contract is null)
+                    throw new NotFoundAppException("Contract not found.");
+
+             
+                if (IsContractLocked(Contract))
+                    throw new BadRequestAppException("Contract is locked.");
+                await _contracts.UpdateHeaderAsync(
+                    ContractId,
+                    HeaderStatus,
+                    HeaderStartDate,
+                    HeaderEndDate,
+                    HeaderTerms,
+                    HeaderInvoiceSendMode,
+                    ct);
+
+                TempData["Toast.Type"] = "success";
+                TempData["Toast.Title"] = "Saved";
+                TempData["Toast.Message"] = "Header updated.";
+
+                return RedirectToPage("/Contracts/Items/Manage", new { contractId = ContractId });
+            }
+            catch (Exception ex) when (ex is BadRequestAppException or NotFoundAppException)
+            {
+                TempData["Toast.Type"] = "error";
+                TempData["Toast.Title"] = "Error";
+                TempData["Toast.Message"] = ex.Message;
+
+                return RedirectToPage("/Contracts/Items/Manage", new { contractId = ContractId });
+            }
+        }
         public async Task<IActionResult> OnPostCreateItemAsync(CancellationToken ct)
         {
             try
@@ -170,15 +226,27 @@ namespace WitcherHub.Pages.Contracts.Items
                     throw new BadRequestAppException("Invalid JSON.");
                 }
 
-                var dto = new UpdateContractItemDto();
-                dto.ContractId = ContractId;
-                dto.ItemId = EditItemId;
+                var dto = new UpdateContractItemDto
+                {
+                    ContractId = ContractId,
+                    ItemId = EditItemId
+                };
 
                 dto.Item.ServiceId = EditServiceId;
                 dto.Item.Title = string.IsNullOrWhiteSpace(EditTitle) ? (service.Name ?? "") : EditTitle!.Trim();
                 dto.Item.Config = cfg;
-                dto.Item.AgreedPrice = EditAgreedPrice ?? service.BasePrice;
+
+                dto.Item.Quantity = EditQuantity <= 0 ? 1 : EditQuantity;
+                dto.Item.UnitPrice = EditUnitPrice;                 // (server may override to effective unit)
+                dto.Item.BillingCycle = EditBillingCycle;
+
+                dto.Item.DiscountType = EditDiscountType;
+                dto.Item.DiscountValue = EditDiscountValue;
+
                 dto.Item.Position = EditPosition > 0 ? EditPosition : 1;
+
+                // ✅ IMPORTANT: like Quote => trigger recalculation
+                dto.Item.AgreedPrice = null;
 
                 await _contracts.UpdateItemAsync(dto, ct);
 

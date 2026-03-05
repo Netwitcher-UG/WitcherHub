@@ -29,7 +29,7 @@ namespace WitcherHub.Infrastructure.Data.Models
         public AppUser? CreatedBy { get; set; }
         public JsonDocument? TermsStructured { get; set; }
         public DateTimeOffset? SignedAt { get; set; }
-
+        public InvoiceSendMode InvoiceSendMode { get; set; } = InvoiceSendMode.Automatic;
         public ICollection<ContractItem> Items { get; set; } = new List<ContractItem>();
         public ICollection<ContractSignature> Signatures { get; set; } = new List<ContractSignature>();
     }
@@ -52,8 +52,12 @@ namespace WitcherHub.Infrastructure.Data.Models
         [Column(TypeName = "numeric(12,2)")]
         public decimal? AgreedPrice { get; set; }
 
-      
+        public decimal Quantity { get; set; } = 1;
+        public decimal UnitPrice { get; set; } = 0m;
         public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
+        public DiscountType? DiscountType { get; set; }
+        public decimal? DiscountValue { get; set; }
+        public JsonDocument? PriceBreakdown { get; set; }
         public int Position { get; set; } = 1;
     }
 

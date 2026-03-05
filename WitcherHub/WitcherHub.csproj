@@ -83,6 +83,9 @@
 		<Content Include="libs\linux\**\*.*" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
 		<Content Include="libs\windows\**\*.*" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
 	</ItemGroup>
+	<ItemGroup>
+	  <None Include="wwwroot\js\pages\contracts\items-create.js" />
+	</ItemGroup>
 	
 
 

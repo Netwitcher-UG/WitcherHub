@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using WitcherHub.Application.Common.Pagination;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Models.View.Contracts;
+using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Application.Interfaces.ManageData
 {
@@ -27,5 +28,12 @@ namespace WitcherHub.Application.Interfaces.ManageData
         Task UpdateItemAsync(UpdateContractItemDto dto, CancellationToken ct = default);
         Task DeleteItemAsync(DeleteContractItemDto dto, CancellationToken ct = default);
         Task ReorderItemsAsync(ReorderContractItemsDto dto, CancellationToken ct = default);
+        Task UpdateHeaderAsync(Guid contractId,
+    DocumentStatus status,
+    DateOnly? startDate,
+    DateOnly? endDate,
+    string? terms,
+    InvoiceSendMode invoiceSendMode,
+    CancellationToken ct = default);
     }
 }
