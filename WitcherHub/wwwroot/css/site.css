@@ -371,3 +371,69 @@ html[data-bs-theme="light"] .wh-tablecard-scroll tbody tr:hover td,
 html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody tr:hover td{
   background: rgba(255,255,255,1) !important;
 }
+
+
+
+/* ===== DatePicker: night / blue / semi-dark ===== */
+html[data-bs-theme="dark"] input[type="date"].js-datepicker,
+html[data-bs-theme="blue-theme"] input[type="date"].js-datepicker,
+html[data-bs-theme="semi-dark"] input[type="date"].js-datepicker {
+    color-scheme: dark;
+    cursor: pointer !important;
+    padding-right: .75rem !important;
+    background-image: none !important;
+}
+
+html[data-bs-theme="dark"] input[type="date"].js-datepicker::-webkit-calendar-picker-indicator,
+html[data-bs-theme="blue-theme"] input[type="date"].js-datepicker::-webkit-calendar-picker-indicator,
+html[data-bs-theme="semi-dark"] input[type="date"].js-datepicker::-webkit-calendar-picker-indicator {
+    cursor: pointer !important;
+}
+
+/* ===== VAT alignment ===== */
+.quote-vat-field {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.quote-vat-field > .form-label {
+    margin-bottom: .5rem;
+}
+
+.quote-vat-field .form-check {
+    flex: 1 1 auto;
+    min-height: calc(2.375rem + 2px);
+    display: flex;
+    align-items: center;
+    margin-bottom: 0;
+}
+
+.quote-vat-field .form-check-input {
+    margin-top: 0;
+    cursor: pointer !important;
+}
+
+.quote-vat-field .form-check-label {
+    cursor: pointer !important;
+}
+
+/* ===== Delete dialog ===== */
+.quote-confirm-modal .modal-content {
+    border-radius: 16px;
+}
+
+.quote-confirm-modal .modal-footer {
+    gap: .5rem;
+}
+
+html[data-bs-theme="dark"] .btn-close,
+html[data-bs-theme="blue-theme"] .btn-close {
+    filter: invert(1) grayscale(100%);
+    opacity: 1 !important;
+}
+
+.quote-card-toggle {
+    cursor: pointer;
+    user-select: none;
+}

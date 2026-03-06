@@ -92,8 +92,17 @@
 </div>
 
 @section Scripts {
+    <script src="~/js/navigation/forced-back.js" asp-append-version="true"></script>
+
     <script>
         (function () {
+            const backUrl = '@Url.Page("/Projects", new { openProjectId = Model.ProjectId, tab = "contracts" })';
+
+            window.forcedBackNavigation.bind(
+                backUrl,
+                "__contractDetailsBackRedirect"
+            );
+
             document.getElementById('btnPrint')?.addEventListener('click', function () {
                 window.print();
             });

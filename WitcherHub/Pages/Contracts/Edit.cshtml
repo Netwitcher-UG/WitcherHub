@@ -197,8 +197,18 @@
 </div>
 
 @section Scripts {
+    <script src="~/js/navigation/forced-back.js" asp-append-version="true"></script>
     <script>
         (function () {
+          const backUrl = '@Url.Page("/Projects", new { openProjectId = Model.Contract!.ProjectId, tab = "contracts" })';
+
+          if (window.forcedBackNavigation) {
+            window.forcedBackNavigation.bind(
+              backUrl,
+              "__contractEditBackRedirect"
+            );
+          }
+
           const view = document.getElementById('contractView');
           const editor = document.getElementById('contractEditor');
           const btnSave = document.getElementById('btnSave');
@@ -207,18 +217,15 @@
           const saveForm = document.getElementById('saveForm');
           const termsHidden = document.getElementById('termsHidden');
 
-          // ----- Print should print formatted HTML -----
           if (btnPrint) {
             btnPrint.addEventListener('click', function () {
               const wasEditing = !!editor && !editor.classList.contains('d-none');
 
-              // Show formatted view for print
               if (editor) editor.classList.add('d-none');
               if (view) view.classList.remove('d-none');
 
               window.print();
 
-              // Restore editing view
               if (wasEditing) {
                 if (view) view.classList.add('d-none');
                 if (editor) editor.classList.remove('d-none');
@@ -228,28 +235,23 @@
             });
           }
 
-          // لو مافي editor => العقد مقفل (مش Draft) => لا تفعل edit
           if (!editor) return;
 
-          // ✅ ادخل Edit mode مباشرة عند الفتح (Draft)
           if (view) view.classList.add('d-none');
           editor.classList.remove('d-none');
           editor.classList.add('is-editing');
 
           const originalText = editor.textContent ?? "";
 
-          // Paste as plain text only
           editor.addEventListener('paste', (e) => {
             e.preventDefault();
             const text = (e.clipboardData || window.clipboardData).getData('text/plain');
             document.execCommand('insertText', false, text);
           });
 
-          // Focus at end
           editor.focus();
           placeCaretAtEnd(editor);
 
-          // ✅ Cancel اختياري
           if (btnCancel) {
             btnCancel.addEventListener('click', () => {
               editor.textContent = originalText;
@@ -258,7 +260,6 @@
             });
           }
 
-          // ✅ Save (يشتغل فقط لو الزر موجود)
           if (btnSave && saveForm && termsHidden) {
             btnSave.addEventListener('click', () => {
               const text = (editor.textContent ?? "").replace(/\r\n/g, "\n");
@@ -277,5 +278,4 @@
           }
         })();
     </script>
-
 }
