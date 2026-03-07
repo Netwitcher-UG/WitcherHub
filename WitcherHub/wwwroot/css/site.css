@@ -31,7 +31,7 @@ body {
 }
 
 .page-content {
-    padding-top: 140px; 
+    padding-top: 70px; 
 }
 
 :root {
@@ -40,7 +40,7 @@ body {
 }
 
 body {
-    padding-top: calc(var(--top-header-h) + var(--primary-menu-h) + 16px);
+    padding-top: 30px;
 }
 
 /* wrapper spacing so table doesn't hug card edges */
@@ -436,4 +436,75 @@ html[data-bs-theme="blue-theme"] .btn-close {
 .quote-card-toggle {
     cursor: pointer;
     user-select: none;
+}
+
+#vpContractPreviewWrap{
+    margin-bottom:0.5rem !important;
+}
+.service-form-modal-body {
+    padding: 4px 10px 0 10px;
+}
+
+    .service-form-modal-body .form-section {
+        margin-top: 18px;
+    }
+
+        .service-form-modal-body .form-section:first-of-type {
+            margin-top: 0;
+        }
+
+    .service-form-modal-body .form-section-divider {
+        margin: 10px 0 18px;
+    }
+
+    .service-form-modal-body .tab-content {
+        padding: 18px !important;
+        border-radius: 0 0 14px 14px;
+    }
+
+    .service-form-modal-body .form-control,
+    .service-form-modal-body .form-select {
+        min-height: 46px;
+    }
+
+    .service-form-modal-body textarea.form-control {
+        min-height: 140px;
+    }
+
+    .service-form-modal-body .nav-tabs {
+        margin-top: 10px !important;
+    }
+
+    .service-form-modal-body .row.g-3 {
+        --bs-gutter-y: 1rem;
+    }
+
+.service-config-tabs {
+    padding: 18px !important;
+}
+
+#FormModal .modal-footer {
+    padding: 16px 24px 20px 24px !important;
+}
+
+    #FormModal .modal-footer .btn {
+        min-width: 86px;
+    }
+
+@media (max-width: 767.98px) {
+    .service-form-modal-body {
+        padding: 8px 16px 0 16px;
+    }
+
+        .service-form-modal-body .tab-content {
+            padding: 14px !important;
+        }
+
+    .service-config-tabs {
+        padding: 14px !important;
+    }
+
+    #FormModal .modal-footer {
+        padding: 14px 16px 16px 16px !important;
+    }
 }
