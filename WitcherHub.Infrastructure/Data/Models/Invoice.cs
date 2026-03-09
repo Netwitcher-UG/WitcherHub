@@ -2,11 +2,10 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
-
 using WitcherHub.Domain.Commen;
+
 namespace WitcherHub.Infrastructure.Data.Models
 {
-
     public class Invoice : BaseEntity
     {
         public Guid ProjectId { get; set; }
@@ -30,6 +29,7 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         [Column(TypeName = "numeric(12,2)")]
         public decimal? InvoiceDiscountValue { get; set; }
+
         public bool ApplyVat { get; set; } = false;
         public string? Notes { get; set; }
 
@@ -39,15 +39,33 @@ namespace WitcherHub.Infrastructure.Data.Models
         public DateTimeOffset? IssuedAt { get; set; }
         public DateTimeOffset? PaidAt { get; set; }
 
-        // Invoice.cs (داخل class Invoice)
-        [MaxLength(80)]
-        public string? LexwareInvoiceId { get; set; } // UUID من Lexware (نخزنه كنص)
+        // =========================
+        // Serienrechnung meta
+        // =========================
+        public InvoiceOriginType OriginType { get; set; } = InvoiceOriginType.Manual;
+
+        public bool IsRecurringInvoice { get; set; } = false;
+
+        public DateOnly? RecurringCycleDate { get; set; }
 
         [MaxLength(50)]
-        public string? LexwareVoucherNumber { get; set; } // رقم الفاتورة الرسمي من Lexware
+        public string? RecurringCycleKey { get; set; }
+
+        public InvoiceDispatchStatus DispatchStatus { get; set; } = InvoiceDispatchStatus.NotRequired;
+
+        public DateTimeOffset? SentAt { get; set; }
+
+        // =========================
+        // Lexware
+        // =========================
+        [MaxLength(80)]
+        public string? LexwareInvoiceId { get; set; }
+
+        [MaxLength(50)]
+        public string? LexwareVoucherNumber { get; set; }
 
         [MaxLength(20)]
-        public string? LexwareVoucherStatus { get; set; } // draft/open/paid/voided
+        public string? LexwareVoucherStatus { get; set; }
 
         [MaxLength(300)]
         public string? LexwareResourceUri { get; set; }
@@ -57,10 +75,10 @@ namespace WitcherHub.Infrastructure.Data.Models
         public DateTimeOffset? LexwareSyncedAt { get; set; }
 
         [MaxLength(400)]
-        public string? LexwarePdfPath { get; set; } // وين خزّنا الـ PDF عندنا
+        public string? LexwarePdfPath { get; set; }
 
         [Column(TypeName = "jsonb")]
-        public JsonDocument? LexwareSnapshot { get; set; } // نسخة JSON من GET invoice للتشخيص/العرض
+        public JsonDocument? LexwareSnapshot { get; set; }
 
         public ICollection<InvoiceItem> Items { get; set; } = new List<InvoiceItem>();
         public InvoiceTotal? Totals { get; set; }
@@ -91,8 +109,6 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         [Column(TypeName = "jsonb")]
         public JsonDocument? PriceBreakdown { get; set; }
-
-  
 
         public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
 

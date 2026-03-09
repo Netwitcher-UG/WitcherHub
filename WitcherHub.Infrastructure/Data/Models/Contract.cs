@@ -6,7 +6,6 @@ using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Infrastructure.Data.Models
 {
-
     public class Contract : BaseEntity
     {
         public Guid ProjectId { get; set; }
@@ -15,13 +14,14 @@ namespace WitcherHub.Infrastructure.Data.Models
         [MaxLength(50)]
         public string ContractNo { get; set; } = default!;
 
-        public DocumentStatus Status { get; set; } = DocumentStatus.Draft; // Signed/Terminated...
+        public DocumentStatus Status { get; set; } = DocumentStatus.Draft;
 
         public DateOnly? StartDate { get; set; }
         public DateOnly? EndDate { get; set; }
 
         [MaxLength(10)]
         public string Currency { get; set; } = "EUR";
+
         public bool ApplyVat { get; set; } = false;
         public string? Terms { get; set; }
 
@@ -29,7 +29,24 @@ namespace WitcherHub.Infrastructure.Data.Models
         public AppUser? CreatedBy { get; set; }
         public JsonDocument? TermsStructured { get; set; }
         public DateTimeOffset? SignedAt { get; set; }
+
         public InvoiceSendMode InvoiceSendMode { get; set; } = InvoiceSendMode.Automatic;
+
+        // =========================
+        // Serienrechnung / Recurring
+        // =========================
+        public bool RecurringEnabled { get; set; } = false;
+
+        public bool RecurringIsActive { get; set; } = false;
+
+        public DateOnly? RecurringStartDate { get; set; }
+
+        public DateOnly? RecurringEndDate { get; set; }
+
+        public DateOnly? NextRecurringInvoiceDate { get; set; }
+
+        public DateTimeOffset? LastRecurringInvoiceRunAt { get; set; }
+
         public ICollection<ContractItem> Items { get; set; } = new List<ContractItem>();
         public ICollection<ContractSignature> Signatures { get; set; } = new List<ContractSignature>();
     }
@@ -54,9 +71,12 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         public decimal Quantity { get; set; } = 1;
         public decimal UnitPrice { get; set; } = 0m;
+
         public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
+
         public DiscountType? DiscountType { get; set; }
         public decimal? DiscountValue { get; set; }
+
         public JsonDocument? PriceBreakdown { get; set; }
         public int Position { get; set; } = 1;
     }

@@ -154,7 +154,10 @@
                     </button>
                     <button class="contractPage__btn" type="button" id="btnCancel">@T["contractPage_Cancel"]</button>
                 </div>
-
+               @*  <form method="post" asp-page-handler="SendInvoice">
+    <input type="hidden" name="invoiceId" value="@Model.InvoiceId" />
+    <button type="submit" class="btn btn-primary">Send Invoice</button>
+</form> *@
                 <div class="contractPage__modalStatus" id="modalStatus"></div>
             </div>
         </div>

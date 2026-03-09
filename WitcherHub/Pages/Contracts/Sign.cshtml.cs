@@ -278,8 +278,52 @@ namespace WitcherHub.Pages.Contracts
                 {
                     _logger.LogInformation("Lexware job START ContractId={Id}", contractId);
 
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                     var lex = scope.ServiceProvider.GetRequiredService<LexwareInvoiceSyncService>();
-                    await lex.CreateFromContractAsync(contractId, CancellationToken.None);
+
+                    var contract = await db.Contracts
+                        .Include(c => c.Items)
+                        .FirstOrDefaultAsync(c => c.Id == contractId, token);
+
+                    if (contract == null)
+                    {
+                        _logger.LogWarning("Contract not found in background job. ContractId={Id}", contractId);
+                        return;
+                    }
+
+                    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+                    var hasRecurringItems = contract.Items.Any(i => i.BillingCycle != BillingCycle.OneTime);
+                    var hasOneTimeItems = contract.Items.Any(i => i.BillingCycle == BillingCycle.OneTime);
+
+                    if (hasRecurringItems)
+                    {
+                        var start = contract.RecurringStartDate ?? contract.StartDate ?? today;
+
+                        contract.RecurringEnabled = true;
+                        contract.RecurringIsActive = true;
+
+                        if (contract.NextRecurringInvoiceDate == null)
+                            contract.NextRecurringInvoiceDate = start;
+
+                        await db.SaveChangesAsync(token);
+                    }
+
+                    if (hasOneTimeItems)
+                    {
+                        await lex.CreateOneTimeInvoiceFromContractAsync(contractId, token);
+                    }
+
+                    if (hasRecurringItems)
+                    {
+                        if (contract.NextRecurringInvoiceDate.HasValue && contract.NextRecurringInvoiceDate.Value <= today)
+                        {
+                            await lex.CreateRecurringInvoiceFromContractAsync(
+                                contractId,
+                                contract.NextRecurringInvoiceDate.Value,
+                                token);
+                        }
+                    }
 
                     _logger.LogInformation("Lexware job DONE ContractId={Id}", contractId);
                 }
@@ -293,7 +337,6 @@ namespace WitcherHub.Pages.Contracts
                     throw;
                 }
             });
-
             // ========= BACKGROUND: Email + PDF =========
             var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : "";
             var baseUrl = $"{Request.Scheme}://{Request.Host.ToUriComponent()}{pathBase}";
@@ -484,5 +527,23 @@ namespace WitcherHub.Pages.Contracts
         // (نفس BuildRequestFromDb + NormalizeNewLines عندك)
         private GenerateContractDocumentRequest BuildRequestFromDb(Contract contract) { /* keep your existing */ throw new NotImplementedException(); }
         private static string NormalizeNewLines(string s) => string.IsNullOrEmpty(s) ? "" : s.Replace("\r\n", "\n");
+        public async Task<IActionResult> OnPostSendInvoiceAsync(Guid invoiceId, CancellationToken ct)
+        {
+            if (invoiceId == Guid.Empty)
+                return new JsonResult(new { ok = false, message = "Invalid invoice id." }) { StatusCode = 400 };
+
+            try
+            {
+                var lex = HttpContext.RequestServices.GetRequiredService<LexwareInvoiceSyncService>();
+                await lex.SendManualInvoiceAsync(invoiceId, ct);
+
+                return new JsonResult(new { ok = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Manual invoice send failed. InvoiceId={InvoiceId}", invoiceId);
+                return new JsonResult(new { ok = false, message = ex.Message }) { StatusCode = 500 };
+            }
+        }
     }
 }

@@ -34,5 +34,20 @@ namespace WitcherHub.Infrastructure.Data.Models
         public enum LexwareType { Imported, Exported ,  NotExported }
         public enum BillingCycle { OneTime = 0,Monthly = 1, Quarterly = 2,SemiAnnual = 3,Annual = 4}
         public enum InvoiceSendMode{Automatic = 0,Manual = 1}
-    }
+        public enum InvoiceOriginType
+        {
+            Manual = 0,
+            ContractOneTime = 1,
+            ContractRecurring = 2
+        }
+
+        public enum InvoiceDispatchStatus
+        {
+            NotRequired = 0,
+            PendingManualSend = 1,
+            SentAutomatically = 2,
+            SentManually = 3,
+            Failed = 4
+        }
+}
 }

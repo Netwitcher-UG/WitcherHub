@@ -89,6 +89,7 @@ namespace WitcherHub.Infrastructure
                     new MediaTypeWithQualityHeaderValue("application/json"));
             });
 
+            services.AddHostedService<RecurringInvoiceHostedService>();
             // وخلي ILexwareClient يرجّع نفس LexwareClient (حتى LexwareSyncService يضل شغال)
             services.AddScoped<ILexwareClient>(sp => sp.GetRequiredService<LexwareClient>());
             services.AddScoped<LexwareInvoiceSyncService>();
@@ -127,7 +128,6 @@ namespace WitcherHub.Infrastructure
             services.AddScoped<IQuote, ManageQuote>();
             services.AddScoped<IInvoice, ManageInvoice>();
             services.AddScoped<IContract, ManageContract>();
-
             // UnitOfWork
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 

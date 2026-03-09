@@ -153,7 +153,28 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             return JsonSerializer.Deserialize<LexwareActionResult>(payload, JsonOpts)
                    ?? throw new InvalidOperationException("Lexware CreateInvoice: empty response");
         }
+        public async Task FinalizeInvoiceAsync(
+      string id,
+      CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                throw new ArgumentException("Invoice id is required.", nameof(id));
 
+            var url = $"/v1/invoices/{id}?finalize=true";
+
+            using var res = await SendWithRetryAsync(() =>
+            {
+                var req = new HttpRequestMessage(HttpMethod.Put, url);
+                req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                req.Content = new StringContent("{}", Encoding.UTF8, "application/json");
+                return req;
+            }, ct);
+
+            var payload = await res.Content.ReadAsStringAsync(ct);
+
+            if (!res.IsSuccessStatusCode)
+                throw new InvalidOperationException($"Lexware FinalizeInvoice failed: {(int)res.StatusCode} {payload}");
+        }
         public async Task<JsonDocument> GetInvoiceAsync(string id, CancellationToken ct = default)
         {
             using var res = await SendWithRetryAsync(() =>
