@@ -58,11 +58,14 @@
         </a>
 
         <a class="btn btn-outline-primary"
+           id="downloadPdfBtn"
            asp-page="./Details"
            asp-page-handler="Pdf"
            asp-route-id="@Model.Quote.Id"
+           data-fallback-name="@($"{Model.Quote.QuoteNo}.pdf")"
            title="Download PDF">
-            PDF
+            <span class="pdf-btn-text">PDF</span>
+            <span class="spinner-border spinner-border-sm ms-2 d-none" id="downloadPdfSpinner" role="status" aria-hidden="true"></span>
         </a>
 
         <button type="button"
@@ -171,7 +174,7 @@
     </div>
 </div>
 
-@section Scripts{
+@section Scripts {
     <script>
         (function () {
             const form = document.getElementById('sendQuoteForm');
@@ -181,6 +184,96 @@
             form.addEventListener('submit', function () {
                 btn.disabled = true;
                 btn.textContent = 'Sending...';
+            });
+        })();
+
+        (function () {
+            const pdfBtn = document.getElementById('downloadPdfBtn');
+            const pdfSpinner = document.getElementById('downloadPdfSpinner');
+            const pdfText = pdfBtn?.querySelector('.pdf-btn-text');
+
+            if (!pdfBtn || !pdfSpinner || !pdfText) return;
+
+            let isLoading = false;
+
+            function setPdfLoading(isBusy) {
+                isLoading = isBusy;
+
+                if (isBusy) {
+                    pdfBtn.classList.add('disabled');
+                    pdfBtn.setAttribute('aria-disabled', 'true');
+                    pdfSpinner.classList.remove('d-none');
+                    pdfText.textContent = 'Generating...';
+                } else {
+                    pdfBtn.classList.remove('disabled');
+                    pdfBtn.removeAttribute('aria-disabled');
+                    pdfSpinner.classList.add('d-none');
+                    pdfText.textContent = 'PDF';
+                }
+            }
+
+            function getFileNameFromDisposition(disposition, fallbackName) {
+                if (!disposition) return fallbackName;
+
+                const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+                if (utf8Match && utf8Match[1]) {
+                    return decodeURIComponent(utf8Match[1]);
+                }
+
+                const asciiMatch = disposition.match(/filename="?([^"]+)"?/i);
+                if (asciiMatch && asciiMatch[1]) {
+                    return asciiMatch[1];
+                }
+
+                return fallbackName;
+            }
+
+            pdfBtn.addEventListener('click', async function (e) {
+                e.preventDefault();
+                if (isLoading) return;
+
+                const url = pdfBtn.getAttribute('href');
+                const fallbackName = pdfBtn.dataset.fallbackName || 'quote.pdf';
+
+                if (!url) return;
+
+                setPdfLoading(true);
+
+                try {
+                    const res = await fetch(url, {
+                        method: 'GET',
+                        credentials: 'same-origin'
+                    });
+
+                    if (!res.ok) {
+                        throw new Error('Failed to generate PDF.');
+                    }
+
+                    const contentType = res.headers.get('Content-Type') || '';
+                    if (!contentType.toLowerCase().includes('application/pdf')) {
+                        throw new Error('Response is not a PDF file.');
+                    }
+
+                    const blob = await res.blob();
+
+                    const disposition = res.headers.get('Content-Disposition') || '';
+                    const fileName = getFileNameFromDisposition(disposition, fallbackName);
+
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    const tempLink = document.createElement('a');
+                    tempLink.href = blobUrl;
+                    tempLink.download = fileName;
+                    document.body.appendChild(tempLink);
+                    tempLink.click();
+                    tempLink.remove();
+
+                    window.URL.revokeObjectURL(blobUrl);
+                } catch (err) {
+                    console.error(err);
+                    alert('Failed to download PDF.');
+                } finally {
+                    setPdfLoading(false);
+                }
             });
         })();
     </script>

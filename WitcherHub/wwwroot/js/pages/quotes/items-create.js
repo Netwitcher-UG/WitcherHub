@@ -530,6 +530,43 @@
       syncJsonTargets(false);
     }
 
-  })();
+    })();
+    (function () {
+        if (window.quoteDateTheme) return;
+
+        function init(root) {
+            const scope = root || document;
+
+            scope.querySelectorAll('input[type="date"].js-themed-date, input[type="date"].js-datepicker')
+                .forEach(function (input) {
+                    if (input.dataset.dateThemeReady === "1") return;
+                    input.dataset.dateThemeReady = "1";
+
+                    input.classList.add("js-datepicker");
+                    input.style.cursor = "pointer";
+
+                    input.addEventListener("mousedown", function () {
+                        if (input.disabled || input.readOnly) return;
+
+                        try { input.focus({ preventScroll: true }); }
+                        catch { input.focus(); }
+
+                        if (typeof input.showPicker === "function") {
+                            try { input.showPicker(); } catch (_) { }
+                        }
+                    });
+                });
+        }
+
+        window.quoteDateTheme = { init: init };
+
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", function () {
+                init(document);
+            });
+        } else {
+            init(document);
+        }
+    })();
 
 })();

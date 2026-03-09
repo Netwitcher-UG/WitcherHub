@@ -87,72 +87,210 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 <head>
   <meta charset=""utf-8"" />
   <style>
-    * { box-sizing:border-box; }
-    body { font-family: Arial, Helvetica, sans-serif; color:#111827; font-size:12px; margin:0; padding:0; }
-    .page { padding: 18px 22px; }
+  @page {
+    size: A4;
+    margin: 18mm 16mm 18mm 16mm;
+  }
 
-    .muted { color:#6b7280; }
-    .small { font-size:11px; }
-    .h { font-size:15px; font-weight:800; margin:0 0 10px 0; }
+  * {
+    box-sizing: border-box;
+  }
 
-    .pillRow { margin-top:14px; }
-    .pill {
-      display:inline-block;
-      background:#f3f4f6;
-      border-radius:999px;
-      padding:9px 13px;
-      font-size:11px;
-      margin:8px 14px 0 0;
-    }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+  }
 
-    .card {
-      border:1px solid #e5e7eb;
-      border-radius:14px;
-      padding:18px 20px;
-      background:#fff;
-      min-height: 150px;
-    }
-    .cardTitle { font-weight:800; margin:2px 0 0 0; }
-    .cardLabel { color:#6b7280; font-size:11px; margin-bottom:10px; }
-    .line { margin-top:7px; line-height:1.65; }
+  body {
+    font-family: system-ui, -apple-system, ""Segoe UI"", Roboto, ""Helvetica Neue"", Arial, sans-serif;
+    color: #111827;
+    font-size: 13px;
+    line-height: 1.55;
+    font-weight: 400;
+    text-rendering: geometricPrecision;
+    -webkit-font-smoothing: antialiased;
+    font-kerning: normal;
+  }
 
-    /* ✅ Fix cutting numbers: give numeric cols more room + slightly smaller font + no clipping */
-    .table { width:100%; border-collapse:collapse; margin-top:36px; table-layout:auto; }
-    .table th { text-align:left; font-size:11px; letter-spacing:.4px; color:#6b7280; border-bottom:1px solid #e5e7eb; padding:12px 8px; }
-    .table td { border-bottom:1px solid #f1f5f9; padding:12px 8px; vertical-align:top; overflow:visible; }
-    .table th.num, .table td.num {
-      text-align:right;
-      white-space:nowrap;
-      overflow:visible;
-      font-size:11px;
-      font-variant-numeric: tabular-nums;
-      -webkit-font-feature-settings: 'tnum';
-      font-feature-settings: 'tnum';
-      padding-left:6px;
-      padding-right:6px;
-    }
-    .table th.num { padding-right:6px; }
-    .table td.num strong { white-space:nowrap; }
+  .page {
+    padding: 6px 4px;
+  }
 
-    .title { font-weight:700; }
-    .subline { color:#6b7280; font-size:11px; margin-top:5px; line-height:1.55; }
+  .muted {
+    color: #4b5563;
+  }
 
-    /* ✅ Move invoice summary further down from table */
-    .sumWrap { width:100%; margin-top:30px; }
-    .sumBox {
-      float:right;
-      width:340px;
-      border:1px solid #e5e7eb;
-      border-radius:12px;
-      padding:14px 16px;
-    }
-    .sumTbl { width:100%; border-collapse:collapse; }
-    .sumTbl td { padding:8px 0; vertical-align:top; }
-    .sumTbl .r { text-align:right; white-space:nowrap; font-variant-numeric: tabular-nums; }
-    .sumSep td { border-top:1px solid #e5e7eb; padding-top:12px; }
-    .sumTotal { font-size:16px; font-weight:900; }
-    .clear { clear:both; }
-  </style>
+  .small {
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+
+  .h {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    margin: 0 0 12px 0;
+    color: #0f172a;
+  }
+
+  .pillRow {
+    margin-top: 14px;
+  }
+
+  .pill {
+    display: inline-block;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 11.5px;
+    color: #334155;
+    margin: 8px 12px 0 0;
+    line-height: 1.2;
+  }
+
+  .card {
+    border: 1px solid #dbe3ee;
+    border-radius: 14px;
+    padding: 18px 20px;
+    background: #ffffff;
+    min-height: 150px;
+  }
+
+  .cardTitle {
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: -.01em;
+    margin: 2px 0 0 0;
+    color: #0f172a;
+  }
+
+  .cardLabel {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 10px;
+  }
+
+  .line {
+    margin-top: 7px;
+    line-height: 1.65;
+  }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 34px;
+    table-layout: auto;
+  }
+
+  .table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #64748b;
+    border-bottom: 1px solid #dbe3ee;
+    padding: 12px 8px;
+    vertical-align: bottom;
+  }
+
+  .table td {
+    border-bottom: 1px solid #edf2f7;
+    padding: 14px 8px;
+    vertical-align: top;
+    overflow: visible;
+  }
+
+  .table th.num,
+  .table td.num {
+    text-align: right;
+    white-space: nowrap;
+    overflow: visible;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-feature-settings: ""tnum"";
+    font-feature-settings: ""tnum"";
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .table td.num strong {
+    white-space: nowrap;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .title {
+    font-weight: 800;
+    font-size: 13.5px;
+    line-height: 1.45;
+    color: #0f172a;
+  }
+
+  .subline {
+    color: #475569;
+    font-size: 11.5px;
+    margin-top: 5px;
+    line-height: 1.6;
+  }
+
+  .sumWrap {
+    width: 100%;
+    margin-top: 32px;
+  }
+
+  .sumBox {
+    float: right;
+    width: 360px;
+    border: 1px solid #dbe3ee;
+    border-radius: 14px;
+    padding: 14px 16px;
+    background: #ffffff;
+  }
+
+  .sumTbl {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .sumTbl td {
+    padding: 9px 0;
+    vertical-align: top;
+    font-size: 12.5px;
+  }
+
+  .sumTbl .r {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-feature-settings: ""tnum"";
+    font-feature-settings: ""tnum"";
+  }
+
+  .sumSep td {
+    border-top: 1px solid #dbe3ee;
+    padding-top: 13px;
+  }
+
+  .sumTotal {
+    font-size: 17px;
+    font-weight: 900;
+    color: #0f172a;
+  }
+
+  .clear {
+    clear: both;
+  }
+
+  strong {
+    font-weight: 800;
+  }
+</style>
 </head>
 <body>
   <div class=""page"">
@@ -160,7 +298,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     <table width=""100%"" cellspacing=""0"" cellpadding=""0"">
       <tr>
         <td style=""vertical-align:top;"">
-          <div class=""h"">Angebotsdetails</div>
+          <div class=""h"">Angebot</div>
 
           <div class=""pillRow"">
             <span class=""pill"">Status: <strong>");
@@ -242,7 +380,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
             if (!string.IsNullOrWhiteSpace(m.Notes))
             {
                 sb.Append(@"
-    <div class=""card"" style=""margin-top:20px;"">
+   <div class=""card"" style=""margin-top:18px;"">
       <div class=""cardLabel"">Hinweise</div>
       <div style=""margin-top:10px; white-space:pre-wrap; line-height:1.7;"">");
                 sb.Append(E(m.Notes));
@@ -275,8 +413,8 @@ namespace WitcherHub.Infrastructure.Services.Pdf
                 if (!string.IsNullOrWhiteSpace(l.ServiceName))
                     sb.Append($@"<div class=""subline"">{E(l.ServiceName)}</div>");
 
-                sb.Append($@"<div class=""subline"">Sub: <strong>{E(Money(l.SubTotal))}</strong>
- &nbsp;•&nbsp; Disc: <strong>-{E(Money(l.Discount))}</strong>
+                sb.Append($@"<div class=""subline"">Zwischensumme: <strong>{E(Money(l.SubTotal))}</strong>
+ &nbsp;•&nbsp; Rabatt: <strong>-{E(Money(l.Discount))}</strong>
  &nbsp;•&nbsp; MwSt.: <strong>{E(Money(l.Tax))}</strong></div>");
                 sb.Append("</td>");
 

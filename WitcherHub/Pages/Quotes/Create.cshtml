@@ -14,7 +14,7 @@
     <div class="card-body">
         <input type="hidden" asp-for="Form.Quote.ProjectId" />
 
-        <div class="row g-3">
+        <div class="row g-3 js-pointer">
             <div class="col-12 col-md-4">
                 <label class="form-label">Currency</label>
                 <input class="form-control" asp-for="Form.Quote.Currency" />
@@ -22,14 +22,14 @@
             </div>
 
             <div class="col-12 col-md-4">
-                <label class="form-label">Issued At</label>
-                <input type="date" class="form-control" asp-for="Form.Quote.IssuedAt" />
+                <label class="form-label js-pointer-label">Issued At</label>
+                <input type="date" class="form-control js-themed-date js-datepicker js-pointer-date" asp-for="Form.Quote.IssuedAt" />
                 <span class="text-danger small" asp-validation-for="Form.Quote.IssuedAt"></span>
             </div>
 
             <div class="col-12 col-md-4">
-                <label class="form-label">Expires At</label>
-                <input type="date" class="form-control" asp-for="Form.Quote.ExpiresAt" />
+                <label class="form-label js-pointer-label">Expires At</label>
+                <input type="date" class="form-control js-themed-date js-datepicker js-pointer-date" asp-for="Form.Quote.ExpiresAt" />
                 <span class="text-danger small" asp-validation-for="Form.Quote.ExpiresAt"></span>
             </div>
 
@@ -49,4 +49,12 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/pages/quotes/date-input-theme.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            if (window.quoteDateTheme) {
+                window.quoteDateTheme.init(document);
+            }
+        })();
+    </script>
 }

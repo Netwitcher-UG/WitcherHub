@@ -1,7 +1,7 @@
 @using static WitcherHub.Infrastructure.Data.Models.Enums
 @model WitcherHub.Pages.ServicesModel
-
-<div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+<div class="service-form-modal-body">
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
 <!-- Service Information -->
 <div class="form-section">
@@ -90,8 +90,8 @@
                       placeholder='{"example": true}'></textarea>
             <span class="text-danger" asp-validation-for="Service.ConfigSchemaJson"></span>
         </div>
-    </div> *@
-</div>
+    </div>
+</div> *@
 <div class="form-section">
     <div class="form-section-header">
         <i class="material-icons-outlined">tune</i>
@@ -134,7 +134,7 @@
                 </li>
             </ul>
 
-            <div class="tab-content border border-top-0 rounded-bottom p-3 bg-dark bg-opacity-10">
+            <div class="tab-content border border-top-0 rounded-bottom bg-dark bg-opacity-10 service-config-tabs">
                 <!-- Builder -->
                 <div class="tab-pane fade show active" id="cs-create-builder" role="tabpanel" aria-labelledby="cs-create-builder-tab">
                     <div id="csb-create"
@@ -160,3 +160,4 @@
     </div>
 </div>
 
+</div>
