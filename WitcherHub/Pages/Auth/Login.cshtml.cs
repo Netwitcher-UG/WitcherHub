@@ -29,10 +29,9 @@ namespace WitcherHub.Pages.Auth
                 Response.Cookies.Append("access_token", result.AccessToken, new CookieOptions
                 {
                     HttpOnly = true,
-                    Secure = Request.IsHttps,
-                    SameSite = SameSiteMode.Lax,
-                    Expires = result.ExpiresAtUtc,
-                    Path = "/"
+                    Secure = Request.IsHttps,          
+                    SameSite = SameSiteMode.Strict,
+                    Expires = result.ExpiresAtUtc
                 });
 
                 var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "/Index" : ReturnUrl;

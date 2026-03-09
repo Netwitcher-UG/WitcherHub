@@ -9,7 +9,7 @@ using WitcherHub.Application.Models.View.Invoices;
 
 namespace WitcherHub.Pages.Invoices
 {
-    [Authorize]
+
     public class DetailsModel : PageModel
     {
         private readonly IInvoice _invoices;
