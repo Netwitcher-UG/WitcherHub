@@ -1,9 +1,11 @@
 @page
+@using Microsoft.AspNetCore.Authorization
 @model WitcherHub.Pages.Invoices.DetailsModel
 @{
     ViewData["Title"] = "Invoice";
-}
 
+}
+@attribute [AllowAnonymous]
 <div class="alert alert-warning">
     PDF not available yet for this invoice.
 </div>

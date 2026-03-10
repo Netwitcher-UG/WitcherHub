@@ -98,7 +98,8 @@
 <input type="hidden" id="antiForgeryToken" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />
 <input type="hidden" id="vcProjectContractSendUrl" value="@Url.Page("./Projects", "SendProjectContract")" />
 
-
+<input type="hidden" id="vcInvoiceDetailsPdfUrl" value="@Url.Page("/Invoices/Details", "Pdf")" />
+<input type="hidden" id="vcInvoicePdfViewerUrl" value="@Url.Page("/Invoices/PdfViewer")" />
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/pages/projects/projects.js" asp-append-version="true"></script>

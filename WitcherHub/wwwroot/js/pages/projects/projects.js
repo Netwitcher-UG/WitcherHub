@@ -429,7 +429,9 @@
                 const totalText = Number.isFinite(totalNum) ? totalNum.toFixed(2) : '0.00';
 
                 // ✅ يفتح PDF مباشرة (بدون Layout) بتبويب جديد
-                const pdfUrl = `/Invoices/Details?id=${encodeURIComponent(id)}&handler=Pdf`;
+                const pdfBaseUrl = $('vcInvoicePdfViewerUrl')?.value || '';
+                const joinerPdf = pdfBaseUrl.includes('?') ? '&' : '?';
+                const pdfUrl = `${pdfBaseUrl}${joinerPdf}id=${encodeURIComponent(id)}`;
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `

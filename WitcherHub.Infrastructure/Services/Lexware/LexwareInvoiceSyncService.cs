@@ -627,29 +627,34 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             if (string.IsNullOrWhiteSpace(invoice.LexwareInvoiceId))
                 return;
 
-            var path = invoice.LexwarePdfPath;
-            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            var dir = Path.Combine(_env.ContentRootPath, "App_Data", "LexwareInvoices");
+            Directory.CreateDirectory(dir);
+
+            var existingFullPath = ResolveStoredPdfPath(invoice.LexwarePdfPath);
+            if (!string.IsNullOrWhiteSpace(existingFullPath) && File.Exists(existingFullPath))
                 return;
 
             try
             {
                 var pdf = await _lex.DownloadInvoiceFileAsync(invoice.LexwareInvoiceId!, "application/pdf", ct);
 
-                var dir = Path.Combine(_env.ContentRootPath, "App_Data", "LexwareInvoices");
-                Directory.CreateDirectory(dir);
+                var safeName = (invoice.InvoiceNo ?? invoice.LexwareInvoiceId!)
+                    .Replace("/", "_")
+                    .Replace("\\", "_")
+                    .Trim();
 
-                var safeName = (invoice.InvoiceNo ?? invoice.LexwareInvoiceId!).Replace("/", "_");
-                var filePath = Path.Combine(dir, $"{safeName}.pdf");
+                var fileName = $"{safeName}.pdf";
+                var filePath = Path.Combine(dir, fileName);
 
                 await File.WriteAllBytesAsync(filePath, pdf, ct);
 
-                invoice.LexwarePdfPath = filePath;
+                invoice.LexwarePdfPath = fileName;
                 invoice.LexwareSyncedAt = DateTimeOffset.UtcNow;
 
                 await _db.SaveChangesAsync(ct);
 
-                _logger.LogInformation("Lexware PDF saved. LocalId={LocalId} LexId={LexId} Path={Path}",
-                    invoice.Id, invoice.LexwareInvoiceId, filePath);
+                _logger.LogInformation("Lexware PDF saved. LocalId={LocalId} LexId={LexId} FileName={FileName} FullPath={FullPath}",
+                    invoice.Id, invoice.LexwareInvoiceId, fileName, filePath);
             }
             catch (Exception ex)
             {
@@ -658,6 +663,20 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             }
         }
 
+        private string? ResolveStoredPdfPath(string? storedPath)
+        {
+            if (string.IsNullOrWhiteSpace(storedPath))
+                return null;
+
+            var baseDir = Path.Combine(_env.ContentRootPath, "App_Data", "LexwareInvoices");
+
+            // إذا كانت القيمة القديمة مسارًا كاملاً
+            if (Path.IsPathRooted(storedPath))
+                return Path.GetFullPath(storedPath);
+
+            // إذا كانت القيمة الجديدة مجرد اسم ملف أو مسار نسبي
+            return Path.GetFullPath(Path.Combine(baseDir, storedPath));
+        }
         private async Task InvalidateInvoiceCacheAsync(Guid invoiceId, CancellationToken ct)
         {
             await _cache.RemoveAsync(InvoiceCacheKeys.Details(invoiceId), ct);
