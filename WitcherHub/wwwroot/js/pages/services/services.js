@@ -108,10 +108,45 @@
     function toastInfo(msg, title) { UI?.toast?.info ? UI.toast.info(msg, title) : alert((title ? title + ": " : "") + msg); }
     function toastError(msg, title) { UI?.toast?.error ? UI.toast.error(msg, title) : alert((title ? title + ": " : "") + msg); }
 
-    async function confirmBox(message, title) {
-        if (UI?.confirm?.basic) return await UI.confirm.basic(message, { title: title ?? 'Confirm', okText: 'Yes', cancelText: 'No' });
-        return window.confirm(message);
+    function createDeleteModalHelper() {
+        const modalEl = document.getElementById('DeleteServiceConfirmModal');
+        const titleEl = document.getElementById('DeleteServiceConfirmModalLabel');
+        const messageEl = document.getElementById('DeleteServiceConfirmModalMessage');
+        const confirmBtn = document.getElementById('DeleteServiceConfirmModalSubmit');
+
+        if (!modalEl || !titleEl || !messageEl || !confirmBtn || !window.bootstrap) {
+            return null;
+        }
+
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        let onConfirm = null;
+
+        confirmBtn.addEventListener('click', async function () {
+            if (!onConfirm) return;
+
+            const fn = onConfirm;
+            onConfirm = null;
+            modal.hide();
+
+            await fn();
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            onConfirm = null;
+        });
+
+        return {
+            open: function (title, message, confirmText, callback) {
+                titleEl.textContent = title || 'Confirm';
+                messageEl.textContent = message || 'Are you sure?';
+                confirmBtn.textContent = confirmText || 'Delete';
+                onConfirm = callback;
+                modal.show();
+            }
+        };
     }
+
+    const deleteModalHelper = createDeleteModalHelper();
 
     function clearErrors(prefix) {
         document.querySelectorAll(`[id^="err-${prefix}"]`).forEach(el => el.textContent = '');
@@ -934,22 +969,33 @@
     }
 
     // ---------- Table delete ----------
-    document.addEventListener('click', async function (e) {
+    document.addEventListener('click', function (e) {
         const btn = e.target.closest('[data-vc-action="table-delete-service"]');
         if (!btn) return;
 
         e.preventDefault();
 
         const id = btn.getAttribute('data-service-id');
-        const ok = await confirmBox('Are you sure you want to delete this service?', 'Confirm');
-        if (!ok) return;
-
         const hid = document.getElementById('tblDeleteServiceId');
         const form = document.getElementById('tblDeleteForm');
-        if (!hid || !form) return;
 
-        hid.value = id;
-        form.submit();
+        if (!id || !hid || !form) return;
+
+        if (!deleteModalHelper) {
+            hid.value = id;
+            form.submit();
+            return;
+        }
+
+        deleteModalHelper.open(
+            'Delete service',
+            'Are you sure you want to delete this service?',
+            'Delete',
+            async function () {
+                hid.value = id;
+                form.submit();
+            }
+        );
     });
 
     // ---------- Delegated actions (basic + rules) ----------
@@ -1065,24 +1111,35 @@
         }
 
         if (action === 'delete-rule') {
-            const ok = await confirmBox('Delete this rule?', 'Confirm');
-            if (!ok) return;
-
             const url = document.getElementById('vcDeleteRuleUrl')?.value;
             if (!url) return toastError('vcDeleteRuleUrl not found', 'Error');
 
             const rule = currentService.pricingRules?.[idx];
             if (!rule?.id) return toastError('RuleId missing.', 'Error');
 
-            try {
-                const updatedRaw = await postJson(url, { serviceId: currentService.id, ruleId: rule.id });
-                editingRuleIndex = null;
-                renderService(normalizeService(updatedRaw));
-                toastSuccess('Rule deleted.', 'Success');
-            } catch (err) {
-                console.error(err);
-                toastError(err?.payload?.message || 'Failed to delete rule.', 'Error');
+            const doDelete = async function () {
+                try {
+                    const updatedRaw = await postJson(url, { serviceId: currentService.id, ruleId: rule.id });
+                    editingRuleIndex = null;
+                    renderService(normalizeService(updatedRaw));
+                    toastSuccess('Rule deleted.', 'Success');
+                } catch (err) {
+                    console.error(err);
+                    toastError(err?.payload?.message || 'Failed to delete rule.', 'Error');
+                }
+            };
+
+            if (!deleteModalHelper) {
+                await doDelete();
+                return;
             }
+
+            deleteModalHelper.open(
+                'Delete rule',
+                'Are you sure you want to delete this rule?',
+                'Delete',
+                doDelete
+            );
             return;
         }
     });

@@ -126,14 +126,19 @@
                 </div>
 
                 <div class="col-12 col-md-3">
-                    <label class="form-label">Start Date</label>
-                    <input class="form-control" type="date" asp-for="HeaderStartDate" disabled="@disabledAttr" />
-
+                    <label class="form-label js-pointer-label">Start Date</label>
+                    <input class="form-control js-themed-date js-datepicker js-pointer-date"
+                           type="date"
+                           asp-for="HeaderStartDate"
+                           disabled="@disabledAttr" />
                 </div>
 
                 <div class="col-12 col-md-3">
-                    <label class="form-label">End Date</label>
-                    <input class="form-control" type="date" asp-for="HeaderEndDate" disabled="@disabledAttr" />
+                    <label class="form-label js-pointer-label">End Date</label>
+                    <input class="form-control js-themed-date js-datepicker js-pointer-date"
+                           type="date"
+                           asp-for="HeaderEndDate"
+                           disabled="@disabledAttr" />
                 </div>
 
                 <div class="col-12 col-md-3">
@@ -244,12 +249,16 @@
                                             Edit
                                         </button>
 
-                                        <form method="post" asp-page-handler="DeleteItem" class="d-inline"
-                                              onsubmit="return confirm('Delete this item?');">
+                                        <form method="post" asp-page-handler="DeleteItem" class="d-inline js-delete-form">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="ContractId" value="@Model.ContractId" />
                                             <input type="hidden" name="ItemId" value="@it.Id" />
-                                            <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                                            <button class="btn btn-sm btn-outline-danger js-delete-open"
+                                                    type="button"
+                                                    data-delete-title="Delete item"
+                                                    data-delete-message="Are you sure you want to delete this item?">
+                                                Delete
+                                            </button>
                                         </form>
                                     }
                                     else
@@ -390,11 +399,31 @@
         </form>
     </div>
 </div>
+<div class="modal fade quote-confirm-modal" id="DeleteConfirmModal" tabindex="-1" aria-labelledby="DeleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="DeleteConfirmModalLabel">Delete item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
 
+            <div class="modal-body">
+                <div id="DeleteConfirmModalMessage">Are you sure?</div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="DeleteConfirmModalSubmit">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
 
     <script>
+        
+
         // Filter items table
         (function () {
             const search = document.getElementById('itemSearch');
@@ -454,7 +483,6 @@
             document.getElementById('ci-disctype').value = btn.getAttribute('data-item-disctype') || '';
             document.getElementById('ci-discval').value = btn.getAttribute('data-item-discval') || '';
 
-            // config: base64 -> textarea
             const b64 = btn.getAttribute('data-item-config-b64');
             let cfgText = '{}';
             try {
@@ -468,7 +496,6 @@
             ciComputePreview();
         });
 
-        // Live preview updates
         (function () {
             const ids = ['ci-qty', 'ci-unit', 'ci-disctype', 'ci-discval'];
             ids.forEach(id => {
@@ -479,7 +506,6 @@
             });
         })();
 
-        // JSON formatter
         function formatJson(textareaId) {
             const el = document.getElementById(textareaId);
             if (!el) return;
@@ -492,5 +518,48 @@
             }
         }
         window.formatJson = formatJson;
+
+             (function () {
+            const modalEl = document.getElementById('DeleteConfirmModal');
+            const titleEl = document.getElementById('DeleteConfirmModalLabel');
+            const messageEl = document.getElementById('DeleteConfirmModalMessage');
+            const confirmBtn = document.getElementById('DeleteConfirmModalSubmit');
+
+            if (!modalEl || !titleEl || !messageEl || !confirmBtn || !window.bootstrap) return;
+
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            let pendingForm = null;
+
+            document.addEventListener('click', function (e) {
+                const btn = e.target.closest('.js-delete-open');
+                if (!btn) return;
+
+                pendingForm = btn.closest('form');
+                if (!pendingForm) return;
+
+                titleEl.textContent = btn.getAttribute('data-delete-title') || 'Confirm delete';
+                messageEl.textContent = btn.getAttribute('data-delete-message') || 'Are you sure?';
+
+                modal.show();
+            });
+
+            confirmBtn.addEventListener('click', function () {
+                if (!pendingForm) return;
+
+                const form = pendingForm;
+                pendingForm = null;
+                modal.hide();
+
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            });
+
+            modalEl.addEventListener('hidden.bs.modal', function () {
+                pendingForm = null;
+            });
+        })();
     </script>
 }

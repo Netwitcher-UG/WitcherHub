@@ -566,11 +566,15 @@ namespace WitcherHub.Pages
                 if (prj is null)
                     return NotFound(new { toast = new { type = "error", title = "Not found", message = "Project not found." } });
 
-                // Latest contract only (single per project)
-                var list = await _contracts.GetContractsByProjectAsync(projectId, page: 1, pageSize: 1, search: null, ct);
-                var latest = list.Items?.FirstOrDefault();
+                // ✅ اقرأ مباشرة من DB لتفادي أي cache قديم
+                var contract = await _db.Contracts
+                    .AsNoTracking()
+                    .Include(c => c.Items)
+                    .Where(c => c.ProjectId == projectId)
+                    .OrderByDescending(c => c.CreatedAt)
+                    .FirstOrDefaultAsync(ct);
 
-                if (latest is null)
+                if (contract is null)
                 {
                     return new JsonResult(new
                     {
@@ -579,22 +583,11 @@ namespace WitcherHub.Pages
                     });
                 }
 
-                var details = await _contracts.GetContractAsync(latest.Id, ct);
-                if (details is null)
-                {
-                    return new JsonResult(new
-                    {
-                        ok = true,
-                        data = new { exists = false }
-                    });
-                }
+                var previewHtml = MarkdownToSafeHtml(contract.Terms ?? "");
 
-                var previewHtml = MarkdownToSafeHtml(details.Terms ?? "");
-
-                var isSigned = details.SignedAt is not null || details.Status == DocumentStatus.Signed;
+                var isSigned = contract.SignedAt is not null || contract.Status == DocumentStatus.Signed;
                 var canUpdate = !isSigned;
-
-                var itemsCount = details.Items?.Count ?? 0;
+                var itemsCount = contract.Items?.Count ?? 0;
 
                 return new JsonResult(new
                 {
@@ -602,15 +595,15 @@ namespace WitcherHub.Pages
                     data = new
                     {
                         exists = true,
-                        contractId = details.Id,
-                        contractNo = details.ContractNo,
-                        status = details.Status.ToString(),
-                        signedAt = details.SignedAt,
+                        contractId = contract.Id,
+                        contractNo = contract.ContractNo,
+                        status = contract.Status.ToString(),
+                        signedAt = contract.SignedAt,
                         canUpdate,
                         itemsCount,
                         previewHtml,
-                        editUrl = $"/Contracts/Edit?id={details.Id}",
-                        detailsUrl = $"/Contracts/Details?id={details.Id}"
+                        editUrl = $"/Contracts/Edit?id={contract.Id}",
+                        detailsUrl = $"/Contracts/Details?id={contract.Id}"
                     }
                 });
             }

@@ -58,10 +58,7 @@
         return true;
     }
 
-    async function confirmBox(message, title) {
-        if (UI?.confirm?.basic) return await UI.confirm.basic(message, { title: title ?? 'Confirm', okText: 'Yes', cancelText: 'No' });
-        return window.confirm(message);
-    }
+    
 
     function clearErrors(prefix) {
         document.querySelectorAll(`[id^="err-${prefix}"]`).forEach(el => el.textContent = '');
@@ -896,7 +893,7 @@
             if (a && contractOneState.projectId)
                 a.href = `/Contracts/Create?projectId=${encodeURIComponent(contractOneState.projectId)}`;
 
-            if (!contractOneState.loadedOnce) loadProjectContractSnapshot();
+            loadProjectContractSnapshot();
         }
 
     });
@@ -948,23 +945,48 @@
         autoBtn.click();
     });
     // ---- table delete ----
-    document.addEventListener('click', async function (e) {
-        const btn = e.target.closest('[data-vc-action="table-delete-project"]');
-        if (!btn) return;
-
-        e.preventDefault();
-
-        const id = btn.getAttribute('data-project-id');
-        const ok = await confirmBox('Are you sure you want to delete this project?', 'Confirm');
-        if (!ok) return;
-
+    (function bindProjectDeleteModal() {
+        const modalEl = $('DeleteProjectConfirmModal');
+        const titleEl = $('DeleteProjectConfirmModalLabel');
+        const messageEl = $('DeleteProjectConfirmModalMessage');
+        const confirmBtn = $('DeleteProjectConfirmModalSubmit');
         const hid = $('tblDeleteProjectId');
         const form = $('tblDeleteForm');
-        if (!hid || !form) return;
 
-        hid.value = id;
-        form.submit();
-    });
+        if (!modalEl || !titleEl || !messageEl || !confirmBtn || !hid || !form || !window.bootstrap) return;
+
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        let pendingProjectId = null;
+
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-vc-action="table-delete-project"]');
+            if (!btn) return;
+
+            e.preventDefault();
+
+            pendingProjectId = btn.getAttribute('data-project-id');
+            if (!pendingProjectId) return;
+
+            titleEl.textContent = 'Delete project';
+            messageEl.textContent = 'Are you sure you want to delete this project?';
+
+            modal.show();
+        });
+
+        confirmBtn.addEventListener('click', function () {
+            if (!pendingProjectId) return;
+
+            hid.value = pendingProjectId;
+            pendingProjectId = null;
+
+            modal.hide();
+            form.submit();
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            pendingProjectId = null;
+        });
+    })();
 
     // ---- delegated actions ----
     document.addEventListener('click', async function (e) {

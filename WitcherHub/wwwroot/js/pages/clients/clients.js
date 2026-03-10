@@ -98,10 +98,45 @@
     function toastInfo(msg, title) { UI?.toast?.info ? UI.toast.info(msg, title) : alert((title ? title + ": " : "") + msg); }
     function toastError(msg, title) { UI?.toast?.error ? UI.toast.error(msg, title) : alert((title ? title + ": " : "") + msg); }
 
-    async function confirmBox(message, title) {
-        if (UI?.confirm?.basic) return await UI.confirm.basic(message, { title: title ?? 'Confirm', okText: 'Yes', cancelText: 'No' });
-        return window.confirm(message);
+    function createDeleteModalHelper() {
+        const modalEl = document.getElementById('DeleteClientConfirmModal');
+        const titleEl = document.getElementById('DeleteClientConfirmModalLabel');
+        const messageEl = document.getElementById('DeleteClientConfirmModalMessage');
+        const confirmBtn = document.getElementById('DeleteClientConfirmModalSubmit');
+
+        if (!modalEl || !titleEl || !messageEl || !confirmBtn || !window.bootstrap) {
+            return null;
+        }
+
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        let onConfirm = null;
+
+        confirmBtn.addEventListener('click', async function () {
+            if (!onConfirm) return;
+
+            const fn = onConfirm;
+            onConfirm = null;
+            modal.hide();
+
+            await fn();
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            onConfirm = null;
+        });
+
+        return {
+            open: function (title, message, confirmText, callback) {
+                titleEl.textContent = title || 'Confirm';
+                messageEl.textContent = message || 'Are you sure?';
+                confirmBtn.textContent = confirmText || 'Delete';
+                onConfirm = callback;
+                modal.show();
+            }
+        };
     }
+
+    const deleteModalHelper = createDeleteModalHelper();
 
     function typeBadgeHtml(type) {
         const isCompany = type === 'Company';
@@ -1239,24 +1274,35 @@
 
 
         if (action === 'delete-location') {
-            const ok = await confirmBox('Delete this location?', 'Confirm');
-            if (!ok) return;
-
             const url = document.getElementById('vcDeleteAddressUrl')?.value;
             if (!url) return toastError('vcDeleteAddressUrl not found', 'Error');
 
             const addressId = client.addresses?.[idx]?.id;
             if (!addressId) return toastError('AddressId missing.', 'Error');
 
-            try {
-                const updatedRaw = await postJson(url, { customerId: client.id, addressId });
-                currentClient = normalizeClient(updatedRaw);
-                renderClient(currentClient);
-                toastSuccess('Location deleted (DB).', 'Success');
-            } catch (err) {
-                console.error(err);
-                toastError('Failed to delete location.', 'Error');
+            const doDelete = async function () {
+                try {
+                    const updatedRaw = await postJson(url, { customerId: client.id, addressId });
+                    currentClient = normalizeClient(updatedRaw);
+                    renderClient(currentClient);
+                    toastSuccess('Location deleted (DB).', 'Success');
+                } catch (err) {
+                    console.error(err);
+                    toastError('Failed to delete location.', 'Error');
+                }
+            };
+
+            if (!deleteModalHelper) {
+                await doDelete();
+                return;
             }
+
+            deleteModalHelper.open(
+                'Delete location',
+                'Are you sure you want to delete this location?',
+                'Delete',
+                doDelete
+            );
             return;
         }
 
@@ -1347,27 +1393,37 @@
 
 
         if (action === 'delete-contact') {
-            const ok = await confirmBox('Delete this contact?', 'Confirm');
-            if (!ok) return;
-
             const url = document.getElementById('vcDeleteContactUrl')?.value;
             if (!url) return toastError('vcDeleteContactUrl not found', 'Error');
 
             const contactId = client.contacts?.[idx]?.id;
             if (!contactId) return toastError('ContactId missing.', 'Error');
 
-            try {
-                const updatedRaw = await postJson(url, { customerId: client.id, contactId });
-                currentClient = normalizeClient(updatedRaw);
-                renderClient(currentClient);
-                toastSuccess('Contact deleted (DB).', 'Success');
-            } catch (err) {
-                console.error(err);
-                toastError('Failed to delete contact.', 'Error');
+            const doDelete = async function () {
+                try {
+                    const updatedRaw = await postJson(url, { customerId: client.id, contactId });
+                    currentClient = normalizeClient(updatedRaw);
+                    renderClient(currentClient);
+                    toastSuccess('Contact deleted (DB).', 'Success');
+                } catch (err) {
+                    console.error(err);
+                    toastError('Failed to delete contact.', 'Error');
+                }
+            };
+
+            if (!deleteModalHelper) {
+                await doDelete();
+                return;
             }
+
+            deleteModalHelper.open(
+                'Delete contact',
+                'Are you sure you want to delete this contact?',
+                'Delete',
+                doDelete
+            );
             return;
         }
-
     });
 
     // ---------- Add Location (mock) ----------
@@ -1475,41 +1531,35 @@
     }
 
 
-    // ---------- Confirm for server forms (data-vc-confirm) ----------
-    document.addEventListener('click', async function (e) {
-        const btn = e.target.closest('[data-vc-confirm]');
-        if (!btn) return;
-
-        const type = btn.getAttribute('data-vc-confirm');
-        let msg = 'Are you sure?';
-
-        if (type === 'delete-client') msg = 'Are you sure you want to delete this client?';
-
-        e.preventDefault();
-        const ok = await confirmBox(msg, 'Confirm');
-        if (!ok) return;
-
-        btn.closest('form')?.submit();
-    });
+    
 
     // ---------- Table Delete (server) ----------
-    document.addEventListener('click', async function (e) {
+    document.addEventListener('click', function (e) {
         const btn = e.target.closest('[data-vc-action="table-delete"]');
         if (!btn) return;
 
         e.preventDefault();
 
         const id = btn.getAttribute('data-client-id');
-
-        const ok = await confirmBox('Are you sure you want to delete this client?', 'Confirm');
-        if (!ok) return;
-
         const hid = document.getElementById('tblDeleteClientId');
         const form = document.getElementById('tblDeleteForm');
-        if (!hid || !form) return;
+        if (!id || !hid || !form) return;
 
-        hid.value = id;
-        form.submit();
+        if (!deleteModalHelper) {
+            hid.value = id;
+            form.submit();
+            return;
+        }
+
+        deleteModalHelper.open(
+            'Delete client',
+            'Are you sure you want to delete this client?',
+            'Delete',
+            async function () {
+                hid.value = id;
+                form.submit();
+            }
+        );
     });
 
 

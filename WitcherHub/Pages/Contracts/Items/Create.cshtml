@@ -47,8 +47,8 @@
         <input type="hidden" asp-for="Form.ContractId" />
         <input type="hidden" asp-for="ReturnTo" />
 
+        <!-- Row 1: Service + Pricing Rules -->
         <div class="row g-3">
-
             <!-- Service -->
             <div class="col-12 col-lg-6">
                 <label class="form-label">Service</label>
@@ -79,28 +79,32 @@
             </div>
 
             <!-- Pricing Rules -->
-            <div class="col-12 col-lg-6" id="rulesBlock" style="display:none;">
-                <label class="form-label">Pricing Rules</label>
+            <div class="col-12 col-lg-6">
+                <div id="rulesBlock" style="display:none;">
+                    <label class="form-label">Pricing Rules</label>
 
-                <div class="dropdown">
-                    <input type="text"
-                           class="form-control dropdown-toggle"
-                           id="ruleCombo"
-                           data-bs-toggle="dropdown"
-                           aria-expanded="false"
-                           autocomplete="off"
-                           placeholder="Search & select pricing rule..." />
+                    <div class="dropdown">
+                        <input type="text"
+                               class="form-control dropdown-toggle"
+                               id="ruleCombo"
+                               data-bs-toggle="dropdown"
+                               aria-expanded="false"
+                               autocomplete="off"
+                               placeholder="Search & select pricing rule..." />
 
-                    <ul class="dropdown-menu w-100" id="ruleMenu" aria-labelledby="ruleCombo"></ul>
+                        <ul class="dropdown-menu w-100" id="ruleMenu" aria-labelledby="ruleCombo"></ul>
+                    </div>
+
+                    <div class="form-text">Select one or more rules (they will be applied in order of priority).</div>
+
+                    <div class="mt-2 d-flex flex-wrap gap-2" id="selectedRules"></div>
+                    <div id="ruleHiddenInputs"></div>
                 </div>
-
-                <div class="form-text">Select one or more rules (they will be applied in order of priority).</div>
-
-                <div class="mt-2 d-flex flex-wrap gap-2" id="selectedRules"></div>
-                <div id="ruleHiddenInputs"></div>
             </div>
+        </div>
 
-            <!-- Qty / Billing / Discount -->
+        <!-- Row 2: Quantity + Billing + Discount -->
+        <div class="row g-3 mt-1">
             <div class="col-12 col-md-3">
                 <label class="form-label">Quantity</label>
                 <input asp-for="Form.Item.Quantity"
@@ -134,8 +138,10 @@
                 <label class="form-label">Discount Value</label>
                 <input class="form-control" asp-for="Form.Item.DiscountValue" />
             </div>
+        </div>
 
-            <!-- ✅ Config dynamic UI -->
+        <!-- Row 3: Config -->
+        <div class="row g-3 mt-1">
             <div class="col-12" id="configBlock" style="display:none;">
                 <div class="card border bg-transparent">
                     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -163,7 +169,6 @@
 
                         <div id="cfgFields" class="row g-3"></div>
 
-                        <!-- Advanced: raw JSON -->
                         <div class="collapse mt-3" id="cfgRawCollapse">
                             <div class="d-flex justify-content-between align-items-center">
                                 <label class="form-label mb-0">Config (JSON)</label>
@@ -175,14 +180,11 @@
                             <span class="text-danger small" asp-validation-for="ConfigJson"></span>
                         </div>
 
-                        <!-- Important: keep textarea posted even if collapse closed -->
                         <textarea asp-for="ConfigJson" id="cfg-json-hidden" style="display:none;"></textarea>
                     </div>
                 </div>
             </div>
-
         </div>
-
         <div class="d-flex gap-2 mt-3">
             <button class="btn btn-primary" type="submit" id="btnSubmit">Add Item</button>
             <a class="btn btn-outline-secondary"

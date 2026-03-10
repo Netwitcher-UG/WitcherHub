@@ -47,7 +47,7 @@
 
         <div class="row g-3">
 
-            <!-- Service -->
+            <!-- الصف الأول: Service + Pricing Rules -->
             <div class="col-12 col-lg-6">
                 <label class="form-label">Service</label>
 
@@ -76,32 +76,34 @@
                 <div class="form-text">Tip: start typing a keyword (website, design, video...).</div>
             </div>
 
-            <!-- Pricing Rules -->
-            <div class="col-12 col-lg-6" id="rulesBlock" style="display:none;">
-                <label class="form-label">Pricing Rules</label>
+            <div class="col-12 col-lg-6">
+                <div id="rulesBlock" style="display:none;">
+                    <label class="form-label">Pricing Rules</label>
 
-                <div class="dropdown">
-                    <input type="text"
-                           class="form-control dropdown-toggle"
-                           id="ruleCombo"
-                           data-bs-toggle="dropdown"
-                           aria-expanded="false"
-                           autocomplete="off"
-                           placeholder="Search & select pricing rule..." />
+                    <div class="dropdown">
+                        <input type="text"
+                               class="form-control dropdown-toggle"
+                               id="ruleCombo"
+                               data-bs-toggle="dropdown"
+                               aria-expanded="false"
+                               autocomplete="off"
+                               placeholder="Search & select pricing rule..." />
 
-                    <ul class="dropdown-menu w-100" id="ruleMenu" aria-labelledby="ruleCombo"></ul>
+                        <ul class="dropdown-menu w-100" id="ruleMenu" aria-labelledby="ruleCombo"></ul>
+                    </div>
+
+                    <div class="form-text">Select one or more rules (they will be applied in order of priority).</div>
+
+                    <div class="mt-2 d-flex flex-wrap gap-2" id="selectedRules"></div>
+                    <div id="ruleHiddenInputs"></div>
                 </div>
-
-                <div class="form-text">Select one or more rules (they will be applied in order of priority).</div>
-
-                <div class="mt-2 d-flex flex-wrap gap-2" id="selectedRules"></div>
-                <div id="ruleHiddenInputs"></div>
             </div>
 
-            <!-- Qty / Tax / Discount -->
+            <!-- الصف الثاني: الحقول تبقى دائماً تحت الدروب داون -->
+            <div class="col-12"></div>
+
             <div class="col-12 col-md-3">
                 <label class="form-label">Quantity</label>
-               
                 <input asp-for="Form.Item.Quantity"
                        asp-format="{0:0.##}"
                        type="number"
@@ -110,6 +112,7 @@
                        class="form-control" />
                 <span class="text-danger small" asp-validation-for="Form.Item.Quantity"></span>
             </div>
+
             <div class="col-12 col-md-3">
                 <label class="form-label">BillingCycle</label>
                 <select asp-for="Form.Item.BillingCycle"
@@ -117,7 +120,6 @@
                         asp-items="Html.GetEnumSelectList<BillingCycle>()">
                 </select>
             </div>
-
 
             <div class="col-12 col-md-3">
                 <label class="form-label">Discount Type</label>
@@ -133,8 +135,6 @@
                 <label class="form-label">Discount Value</label>
                 <input class="form-control" asp-for="Form.Item.DiscountValue" />
             </div>
-
-            
 
             <!-- ✅ Config dynamic UI -->
             <div class="col-12" id="configBlock" style="display:none;">

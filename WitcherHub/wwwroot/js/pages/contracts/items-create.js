@@ -508,17 +508,29 @@
     });
 
     // Combined service change:
-    serviceSelect.addEventListener('change', async () => {
-      const serviceId = serviceSelect.value;
+      serviceSelect.addEventListener('change', async () => {
+          const serviceId = serviceSelect.value;
 
-      // load rules
-      if (window.__loadRulesForService) {
-        window.__loadRulesForService(serviceId);
-      }
+          const rulesBlock = document.getElementById('rulesBlock');
+          const configBlock = document.getElementById('configBlock');
+          const cfgLoading = document.getElementById('cfgLoading');
 
-      // load schema + render config
-      await loadSchema(serviceId);
-    });
+          if (serviceId) {
+              if (rulesBlock) rulesBlock.style.display = '';
+              if (configBlock) configBlock.style.display = '';
+              if (cfgLoading) cfgLoading.classList.remove('d-none');
+          }
+
+          const tasks = [];
+
+          if (window.__loadRulesForService) {
+              tasks.push(window.__loadRulesForService(serviceId));
+          }
+
+          tasks.push(loadSchema(serviceId));
+
+          await Promise.all(tasks);
+      });
 
     // initial (postback)
     if (serviceSelect.value) {
