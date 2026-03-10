@@ -18,6 +18,7 @@ namespace WitcherHub.Controllers
     [ApiController]
     public class TestController : ControllerBase
     {
+        //for railway
         private readonly ILexwareClient _lexwareClient;
         private readonly IAiTextGenerator _aiTextGenerator;
         private readonly IAuthService _auth;
