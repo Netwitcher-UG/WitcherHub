@@ -289,15 +289,31 @@
         });
 
         let json = null;
-        try { json = await res.json(); } catch { }
+        let rawText = "";
+        try {
+            rawText = await res.text();
+            json = rawText ? JSON.parse(rawText) : null;
+        } catch {
+            json = null;
+        }
 
         if (!res.ok || !json || json.ok !== true) {
+            console.error("Sign request failed", {
+                status: res.status,
+                statusText: res.statusText,
+                body: rawText
+            });
+
             const code = json && json.code ? json.code : "";
+
             const msg =
                 (code === "FIELDS_REQUIRED") ? (i18n.fillFields || "Fill fields") :
                     (code === "INVALID_EMAIL") ? (i18n.invalidEmail || "Invalid email") :
-                        (json && json.message) ? json.message :
-                            ("HTTP " + res.status);
+                        (res.status === 401) ? (i18n.unauthorized || "This signing link is invalid or expired.") :
+                            (res.status === 409) ? (i18n.alreadySigned || "This contract is already signed.") :
+                                (res.status === 404) ? (i18n.notFound || "Contract not found.") :
+                                    (i18n.genericError || "Something went wrong. Please try again.");
+
             throw new Error(msg);
         }
 

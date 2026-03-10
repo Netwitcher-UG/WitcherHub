@@ -1,7 +1,9 @@
 @page "/contracts/sign/{id:guid?}"
+@using Microsoft.AspNetCore.Authorization
 @using Microsoft.Extensions.Localization
 @using System.Text.Json
 @using WitcherHub.Resources
+@attribute [AllowAnonymous]
 @model WitcherHub.Pages.Contracts.SignModel
 @inject IStringLocalizer<SharedResource> T
 

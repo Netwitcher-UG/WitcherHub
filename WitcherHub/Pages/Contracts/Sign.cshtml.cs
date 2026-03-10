@@ -1,5 +1,6 @@
 using Ganss.Xss;
 using Markdig;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +20,7 @@ using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Pages.Contracts
 {
-   
+    [AllowAnonymous]
     public class SignModel : PageModel
     {
         private readonly AppDbContext _db;
@@ -200,6 +201,11 @@ namespace WitcherHub.Pages.Contracts
 
         public async Task<IActionResult> OnPostSignAsync([FromQuery(Name = "t")] string? t, CancellationToken ct)
         {
+            _logger.LogInformation("OnPostSignAsync HIT. Id={Id}, QueryTokenPresent={HasToken}, FormName={SignerName}, FormEmail={SignerEmail}",
+        Id,
+        !string.IsNullOrWhiteSpace(t),
+        Request.Form["SignerName"].ToString(),
+        Request.Form["SignerEmail"].ToString());
             if (Id == Guid.Empty)
                 return new JsonResult(new { ok = false, message = "Invalid contract id." }) { StatusCode = 400 };
 
