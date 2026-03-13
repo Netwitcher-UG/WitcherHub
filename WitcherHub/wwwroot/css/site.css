@@ -300,19 +300,35 @@ html[data-bs-theme="blue-theme"] {
 }
 
 /* btn-grd-primary => solid color (no gradient) */
+/* btn-grd-primary => solid color (no gradient) */
 .btn-grd-primary,
 .btn-grd-primary:hover,
 .btn-grd-primary:focus,
 .btn-grd-primary:active,
 .btn-grd-primary.active {
-  background: rgb(107 76 230) !important;
-  background-image: none !important;
-  border-color: rgb(107 76 230) !important;
-  color: #fff !important;
+    background: rgb(107 76 230) !important;
+    background-image: none !important;
+    border-color: rgb(107 76 230) !important;
+    color: #fff !important;
 }
 
-.btn-grd-primary * {
-  color: #fff !important;
+    .btn-grd-primary * {
+        color: #fff !important;
+    }
+
+/* ===== Project create modal header ===== */
+#FormModal .modal-header {
+    background: rgb(107 76 230) !important;
+    border-bottom-color: rgb(107 76 230) !important;
+}
+
+#FormModal .modal-title {
+    color: #fff !important;
+}
+
+#FormModal .modal-header .btn-close {
+    filter: invert(1) grayscale(100%);
+    opacity: 1 !important;
 }
 
 
@@ -375,6 +391,15 @@ html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody tr:hover td{
 
 
 /* ===== DatePicker: night / blue / semi-dark ===== */
+/* ===== DatePicker ===== */
+input[type="date"].js-datepicker {
+    cursor: pointer !important;
+}
+
+input[type="date"].js-datepicker::-webkit-calendar-picker-indicator {
+    cursor: pointer !important;
+}
+
 html[data-bs-theme="dark"] input[type="date"].js-datepicker,
 html[data-bs-theme="blue-theme"] input[type="date"].js-datepicker,
 html[data-bs-theme="semi-dark"] input[type="date"].js-datepicker {

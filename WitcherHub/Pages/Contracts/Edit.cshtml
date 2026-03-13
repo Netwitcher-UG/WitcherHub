@@ -16,13 +16,12 @@
 @section Styles {
     <link rel="stylesheet" href="~/css/contracts/contract-sign.css" asp-append-version="true" />
     <style>
-        /* ===== Topbar like Details ===== */
         .contractTopbar {
             position: sticky;
             top: 12px;
             z-index: 50;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
             gap: 12px;
             padding: 10px 12px;
@@ -34,11 +33,22 @@
         }
 
         .contractTopbar__left {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            min-width: 240px;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            flex-wrap: wrap;
+            min-width: 0;
         }
+
+            .contractTopbar__left > .btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                white-space: nowrap;
+                flex: 0 0 auto;
+            }
 
         .contractTopbar__title {
             font-weight: 800;
@@ -53,10 +63,11 @@
 
         .contractTopbar__right {
             display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            justify-content: flex-end;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 240px;
+            align-items: flex-end;
+            text-align: end;
         }
 
         .contractTopbar__badge {
@@ -86,7 +97,6 @@
                 color: #dc3545;
             }
 
-        /* ===== Inline editor inside paper ===== */
         .contractInlineEditor {
             white-space: pre-wrap;
             word-break: break-word;
@@ -104,18 +114,30 @@
                 background: rgba(255,255,255,.55);
             }
 
-        /* Hide default bottom action bar if exists in CSS */
         .contractActions {
             display: none !important;
         }
     </style>
 }
-
 <div class="contractPage">
 
     <!-- ✅ Topbar -->
     <div class="contractTopbar">
         <div class="contractTopbar__left">
+            @if (Model.Contract.Status == WitcherHub.Infrastructure.Data.Models.Enums.DocumentStatus.Draft)
+            {
+                <button class="btn btn-primary btn-sm" type="button" id="btnSave" disabled>Save</button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="btnReset" disabled>Reset</button>
+            }
+
+            <a class="btn btn-outline-secondary btn-sm"
+               asp-page="/Contracts/Details"
+               asp-route-id="@Model.Contract.Id">
+                Review
+            </a>
+        </div>
+
+        <div class="contractTopbar__right">
             <div class="contractTopbar__title">@Model.Contract.ContractNo</div>
             <div class="contractTopbar__sub">
                 Status:
@@ -126,38 +148,10 @@
                 Currency: <strong>@Model.Contract.Currency</strong>
             </div>
         </div>
-
-
-        <div class="contractTopbar__right">
-            @* Save/Cancel only when Draft *@
-            @if (Model.Contract.Status == WitcherHub.Infrastructure.Data.Models.Enums.DocumentStatus.Draft)
-            {
-                <button class="btn btn-primary btn-sm" type="button" id="btnSave">Save</button>
-                <button class="btn btn-outline-secondary btn-sm" type="button" id="btnCancel">Cancel</button>
-            }
-            <button class="btn btn-outline-dark btn-sm" type="button" id="btnPrint">Print</button>
-            <a class="btn btn-outline-secondary btn-sm"
-               asp-page="/Contracts/Details"
-               asp-route-id="@Model.Contract.Id">
-                Details
-            </a>
-            <a class="btn btn-outline-secondary btn-sm"
-               asp-page="/Projects"
-               asp-route-openProjectId="@Model.Contract.ProjectId"
-               asp-route-tab="contracts">
-                Back →
-            </a>
-
-            
-
-            
-
-            
-
-            
-        </div>
     </div>
-
+    
+    
+    
     <div class="contractPage__container">
         <div class="contractPage__paper" id="paper">
 
@@ -197,43 +191,14 @@
 </div>
 
 @section Scripts {
-    <script src="~/js/navigation/forced-back.js" asp-append-version="true"></script>
     <script>
         (function () {
-          const backUrl = '@Url.Page("/Projects", new { openProjectId = Model.Contract!.ProjectId, tab = "contracts" })';
-
-          if (window.forcedBackNavigation) {
-            window.forcedBackNavigation.bind(
-              backUrl,
-              "__contractEditBackRedirect"
-            );
-          }
-
           const view = document.getElementById('contractView');
           const editor = document.getElementById('contractEditor');
           const btnSave = document.getElementById('btnSave');
-          const btnCancel = document.getElementById('btnCancel');
-          const btnPrint = document.getElementById('btnPrint');
+          const btnReset = document.getElementById('btnReset');
           const saveForm = document.getElementById('saveForm');
           const termsHidden = document.getElementById('termsHidden');
-
-          if (btnPrint) {
-            btnPrint.addEventListener('click', function () {
-              const wasEditing = !!editor && !editor.classList.contains('d-none');
-
-              if (editor) editor.classList.add('d-none');
-              if (view) view.classList.remove('d-none');
-
-              window.print();
-
-              if (wasEditing) {
-                if (view) view.classList.add('d-none');
-                if (editor) editor.classList.remove('d-none');
-                editor.focus();
-                placeCaretAtEnd(editor);
-              }
-            });
-          }
 
           if (!editor) return;
 
@@ -241,29 +206,56 @@
           editor.classList.remove('d-none');
           editor.classList.add('is-editing');
 
-          const originalText = editor.textContent ?? "";
+          function normalizeText(value) {
+            return (value ?? '').replace(/\r\n/g, '\n').trimEnd();
+          }
 
-          editor.addEventListener('paste', (e) => {
+          function getEditorText() {
+            return normalizeText(editor.textContent ?? '');
+          }
+
+          function refreshActionState() {
+            const isDirty = getEditorText() !== originalText;
+
+            if (btnSave) btnSave.disabled = !isDirty;
+            if (btnReset) btnReset.disabled = !isDirty;
+          }
+
+          const originalText = getEditorText();
+
+          editor.addEventListener('paste', function (e) {
             e.preventDefault();
             const text = (e.clipboardData || window.clipboardData).getData('text/plain');
             document.execCommand('insertText', false, text);
+            refreshActionState();
           });
+
+          editor.addEventListener('input', refreshActionState);
+          editor.addEventListener('keyup', refreshActionState);
 
           editor.focus();
           placeCaretAtEnd(editor);
+          refreshActionState();
 
-          if (btnCancel) {
-            btnCancel.addEventListener('click', () => {
+          if (btnReset) {
+            btnReset.addEventListener('click', function () {
               editor.textContent = originalText;
               editor.focus();
               placeCaretAtEnd(editor);
+              refreshActionState();
             });
           }
 
           if (btnSave && saveForm && termsHidden) {
-            btnSave.addEventListener('click', () => {
-              const text = (editor.textContent ?? "").replace(/\r\n/g, "\n");
+            btnSave.addEventListener('click', function () {
+              const text = getEditorText();
+              if (text === originalText) {
+                refreshActionState();
+                return;
+              }
+
               termsHidden.value = text;
+              btnSave.disabled = true;
               saveForm.submit();
             });
           }
@@ -279,3 +271,4 @@
         })();
     </script>
 }
+

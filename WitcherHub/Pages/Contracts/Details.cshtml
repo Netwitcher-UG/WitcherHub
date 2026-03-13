@@ -12,14 +12,13 @@
 @section Styles {
     <link rel="stylesheet" href="~/css/contracts/contract-sign.css" asp-append-version="true" />
     <style>
-        /* ===== Topbar (Back right, other actions left) ===== */
         .contractTopbar {
             position: sticky;
             top: 12px;
             z-index: 50;
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 12px;
             padding: 10px 12px;
             margin-bottom: 12px;
@@ -29,20 +28,12 @@
             border: 1px solid rgba(0,0,0,.06);
         }
 
-        .contractTopbar__leftActions {
+        .contractTopbar__actions {
             display: flex;
             align-items: center;
             gap: 8px;
             flex-wrap: wrap;
-            justify-content: flex-start; /* أقصى اليسار */
-        }
-
-        .contractTopbar__rightActions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            justify-content: flex-end; /* أقصى اليمين */
+            justify-content: flex-end;
         }
 
         .contractTopbar__badge {
@@ -55,7 +46,6 @@
         }
     </style>
 }
-
 <div class="contractPage">
 
     <div class="contractTopbar">
@@ -71,13 +61,7 @@
             
         </div>
 
-        <!-- ✅ Right side: Back (arrow reversed) -->
-        <div class="contractTopbar__rightActions">
-            <a class="btn btn-outline-secondary btn-sm"
-               href="/Projects?openProjectId=@Model.ProjectId&tab=contracts">
-                Back →
-            </a>
-        </div>
+        
     </div>
 
     <div class="contractPage__container">
@@ -92,17 +76,8 @@
 </div>
 
 @section Scripts {
-    <script src="~/js/navigation/forced-back.js" asp-append-version="true"></script>
-
     <script>
         (function () {
-            const backUrl = '@Url.Page("/Projects", new { openProjectId = Model.ProjectId, tab = "contracts" })';
-
-            window.forcedBackNavigation.bind(
-                backUrl,
-                "__contractDetailsBackRedirect"
-            );
-
             document.getElementById('btnPrint')?.addEventListener('click', function () {
                 window.print();
             });

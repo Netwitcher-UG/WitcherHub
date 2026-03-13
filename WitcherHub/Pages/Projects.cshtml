@@ -3,103 +3,23 @@
 @using WitcherHub.Domain.SeedData
 @attribute [Authorize(Policy = AppPolicyPrefixes.Permission + AppPermissions.ManageNetwitcher)]
 @model WitcherHub.Pages.ProjectsModel
-@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 
 @{
     ViewData["Title"] = "Projects";
 }
-<style>
-    /* Contract preview typography (inside modal only) */
-    #vpContractPreview .contractDoc,
-    #vpContractPreview {
-        font-size: 14px;
-        line-height: 1.55;
-    }
 
-        /* Titles scale like real contracts */
-        #vpContractPreview h1 {
-            font-size: 22px;
-            line-height: 1.25;
-            margin: 0 0 10px;
-            font-weight: 700;
-        }
-
-        #vpContractPreview h2 {
-            font-size: 18px;
-            line-height: 1.3;
-            margin: 18px 0 8px;
-            font-weight: 700;
-        }
-
-        #vpContractPreview h3 {
-            font-size: 16px;
-            line-height: 1.35;
-            margin: 14px 0 6px;
-            font-weight: 700;
-        }
-
-        #vpContractPreview h4,
-        #vpContractPreview h5,
-        #vpContractPreview h6 {
-            font-size: 14px;
-            margin: 12px 0 6px;
-            font-weight: 700;
-        }
-
-        #vpContractPreview p {
-            margin: 0 0 8px;
-        }
-
-        #vpContractPreview ul,
-        #vpContractPreview ol {
-            margin: 0 0 10px 18px;
-        }
-
-        #vpContractPreview hr {
-            margin: 14px 0;
-            opacity: .15;
-        }
-
-  
-
-</style>
 <div id="projectsTableCard" class="wh-tablecard-scroll">
     <partial name="_TableCard" model="Model.ProjectsTable" />
 </div>
 
 <partial name="~/Pages/Shared/Modals/_ModalShell.cshtml" model="Model.CreateProjectModal" />
-<partial name="~/Pages/Shared/Modals/_ViewProjectModal.cshtml" />
 
 <form id="tblDeleteForm" method="post" asp-page-handler="DeleteProject" class="d-none">
     @Html.AntiForgeryToken()
     <input type="hidden" name="projectId" id="tblDeleteProjectId" />
 </form>
 
-<input type="hidden" id="vcProjectUrl" value="@Url.Page("./Projects", "Project")" />
-<input type="hidden" id="vcUpdateProjectUrl" value="@Url.Page("./Projects", "UpdateBasic")" />
-<input type="hidden" id="vcChangeStatusUrl" value="@Url.Page("./Projects", "ChangeStatus")" />
-<button type="button"
-        id="vcAutoOpenBtn"
-        class="d-none"
-        data-bs-toggle="modal"
-        data-bs-target="#ViewProjectModal">
-</button>
-
-<!-- ✅ New: quotes list endpoint -->
-<input type="hidden" id="vcProjectQuotesUrl" value="@Url.Page("./Projects", "ProjectQuotes")" />
-<input type="hidden" id="vcProjectInvoicesUrl" value="@Url.Page("./Projects", "ProjectInvoices")" />
-<input type="hidden" id="vcProjectContractsUrl" value="@Url.Page("./Projects", "ProjectContracts")" />
-<input type="hidden" id="vcProjectContractSnapshotUrl" value="@Url.Page("./Projects", "ProjectContractSnapshot")" />
-<input type="hidden" id="vcProjectContractGenerateUrl" value="@Url.Page("./Projects", "GenerateProjectContract")" />
-
-<input type="hidden" id="vcProjectContractCreateUrl" value="@Url.Page("./Projects", "CreateProjectContract")" />
-
-
-<input type="hidden" id="antiForgeryToken" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />
-<input type="hidden" id="vcProjectContractSendUrl" value="@Url.Page("./Projects", "SendProjectContract")" />
-
-<input type="hidden" id="vcInvoiceDetailsPdfUrl" value="@Url.Page("/Invoices/Details", "Pdf")" />
-<input type="hidden" id="vcInvoicePdfViewerUrl" value="@Url.Page("/Invoices/PdfViewer")" />
+<input type="hidden" id="vcProjectWorkspaceUrl" value="@Url.Page("/Projects/Workspace")" />
 
 <div class="modal fade quote-confirm-modal" id="DeleteProjectConfirmModal" tabindex="-1" aria-labelledby="DeleteProjectConfirmModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -125,32 +45,19 @@
     <script src="~/js/pages/projects/projects.js" asp-append-version="true"></script>
 
     <script>
-        // Deep-link:
-        // /Projects?openProjectId=<GUID>&tab=quotes -> open project modal directly
         document.addEventListener('DOMContentLoaded', function () {
             const params = new URLSearchParams(window.location.search);
             const openProjectId = params.get('openProjectId');
             if (!openProjectId) return;
 
             const tab = params.get('tab') || 'overview';
+            const baseUrl = document.getElementById('vcProjectWorkspaceUrl')?.value || '/Projects/Workspace';
 
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'd-none';
-            btn.setAttribute('data-bs-toggle', 'modal');
-            btn.setAttribute('data-bs-target', '#ViewProjectModal');
-            btn.setAttribute('data-project-id', openProjectId);
-            btn.setAttribute('data-open-tab', tab);
+            const url = new URL(baseUrl, window.location.origin);
+            url.searchParams.set('id', openProjectId);
+            url.searchParams.set('tab', tab);
 
-            document.body.appendChild(btn);
-            btn.click();
-
-            // optional: clean url
-            params.delete('openProjectId');
-            params.delete('tab');
-            const qs = params.toString();
-            const newUrl = window.location.pathname + (qs ? ('?' + qs) : '');
-            window.history.replaceState({}, document.title, newUrl);
+            window.location.href = url.pathname + url.search;
         });
     </script>
 }
@@ -163,29 +70,36 @@
             const el = document.getElementById('FormModal');
             if (!el) return;
 
-            const m = bootstrap.Modal.getOrCreateInstance(el);
-            m.show();
+            function focusFirstError() {
+                const firstErr = el.querySelector('.field-validation-error, .text-danger:not(:empty)');
+                if (!firstErr) return;
 
-            const firstErr = el.querySelector('.field-validation-error, .text-danger:not(:empty)');
-            if (firstErr) {
                 const input = firstErr.closest('.col-md-2,.col-md-4,.col-md-6,.col-md-8,.col-12')
                     ?.querySelector('input,select,textarea');
+
                 if (input) input.focus();
             }
-        });
-    </script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-          const pid = '@Model.OpenProjectId';
-          if (!pid || pid === '00000000-0000-0000-0000-000000000000') return;
 
-          const tab = '@(Model.OpenTab ?? "overview")';
-          const btn = document.getElementById('vcAutoOpenBtn');
-          if (!btn) return;
+            function tryOpenModal(attempt) {
+                const bsModal = window.bootstrap && window.bootstrap.Modal
+                    ? window.bootstrap.Modal
+                    : null;
 
-          btn.dataset.projectId = pid;
-          btn.dataset.openTab = tab;
-          btn.click();
+                if (!bsModal) {
+                    if (attempt >= 20) return;
+                    window.setTimeout(function () { tryOpenModal(attempt + 1); }, 50);
+                    return;
+                }
+
+                const m = bsModal.getOrCreateInstance(el);
+                m.show();
+                focusFirstError();
+            }
+
+            tryOpenModal(0);
         });
     </script>
 }
+
+
+

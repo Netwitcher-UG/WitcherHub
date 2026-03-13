@@ -1,0 +1,427 @@
+﻿@page
+@using Microsoft.AspNetCore.Authorization
+@using WitcherHub.Domain.SeedData
+@attribute [Authorize(Policy = AppPolicyPrefixes.Permission + AppPermissions.ManageNetwitcher)]
+@model WitcherHub.Pages.Projects.WorkspaceModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+
+@{
+    ViewData["Title"] = $"{Model.ProjectTitle} - Workspace";
+}
+
+<style>
+    #vpContractPreview .contractDoc,
+    #vpContractPreview {
+        font-size: 14px;
+        line-height: 1.55;
+    }
+
+        #vpContractPreview h1 {
+            font-size: 22px;
+            line-height: 1.25;
+            margin: 0 0 10px;
+            font-weight: 700;
+        }
+
+        #vpContractPreview h2 {
+            font-size: 18px;
+            line-height: 1.3;
+            margin: 18px 0 8px;
+            font-weight: 700;
+        }
+
+        #vpContractPreview h3 {
+            font-size: 16px;
+            line-height: 1.35;
+            margin: 14px 0 6px;
+            font-weight: 700;
+        }
+
+        #vpContractPreview h4,
+        #vpContractPreview h5,
+        #vpContractPreview h6 {
+            font-size: 14px;
+            margin: 12px 0 6px;
+            font-weight: 700;
+        }
+
+        #vpContractPreview p {
+            margin: 0 0 8px;
+        }
+
+        #vpContractPreview ul,
+        #vpContractPreview ol {
+            margin: 0 0 10px 18px;
+        }
+
+        #vpContractPreview hr {
+            margin: 14px 0;
+            opacity: .15;
+        }
+</style>
+
+<input type="hidden" id="wsProjectId" value="@Model.ProjectId" />
+<input type="hidden" id="wsOpenTab" value="@Model.Tab" />
+
+<input type="hidden" id="vcProjectUrl" value="@Url.Page("/Projects", "Project")" />
+<input type="hidden" id="vcUpdateProjectUrl" value="@Url.Page("/Projects", "UpdateBasic")" />
+<input type="hidden" id="vcChangeStatusUrl" value="@Url.Page("/Projects", "ChangeStatus")" />
+
+<input type="hidden" id="vcProjectQuotesUrl" value="@Url.Page("/Projects", "ProjectQuotes")" />
+<input type="hidden" id="vcProjectInvoicesUrl" value="@Url.Page("/Projects", "ProjectInvoices")" />
+<input type="hidden" id="vcProjectContractsUrl" value="@Url.Page("/Projects", "ProjectContracts")" />
+<input type="hidden" id="vcProjectContractSnapshotUrl" value="@Url.Page("/Projects", "ProjectContractSnapshot")" />
+<input type="hidden" id="vcProjectContractCreateUrl" value="@Url.Page("/Projects", "CreateProjectContract")" />
+<input type="hidden" id="vcProjectContractSendUrl" value="@Url.Page("/Projects", "SendProjectContract")" />
+
+<input type="hidden" id="vcInvoiceDetailsPdfUrl" value="@Url.Page("/Invoices/Details", "Pdf")" />
+<input type="hidden" id="vcInvoicePdfViewerUrl" value="@Url.Page("/Invoices/PdfViewer")" />
+
+<input type="hidden" id="antiForgeryToken" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />
+
+<div class="container-fluid px-0">
+    <div class="d-flex align-items-center justify-content-between mb-4 gap-3 flex-wrap">
+        <div>
+            <div class="text-muted small">Project Workspace</div>
+
+            <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                <h2 class="mb-0" id="vp-title">@Model.ProjectTitle</h2>
+                <span id="vp-statusBadge"></span>
+            </div>
+
+            <div class="text-muted small" id="vp-meta"></div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a class="btn btn-outline-secondary" href="@Url.Page("/Projects")">Back to Projects</a>
+        </div>
+    </div>
+
+    <div id="vpLoading" class="card border-0 shadow-sm rounded-4">
+        <div class="card-body">Loading...</div>
+    </div>
+
+    <div id="vpBody" class="d-none">
+
+        <div class="mb-3">
+            <div class="text-muted small">Customer</div>
+            <div class="fw-semibold" id="vp-customerName">—</div>
+            <div class="text-muted small" id="vp-customerEmail">—</div>
+        </div>
+
+        <ul class="nav nav-tabs" id="vpTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active"
+                        id="vp-tab-overview"
+                        data-bs-toggle="tab"
+                        data-bs-target="#vp-pane-overview"
+                        type="button"
+                        role="tab">
+                    Overview
+                </button>
+            </li>
+
+            <li class="nav-item" role="presentation">
+                <button class="nav-link"
+                        id="vp-tab-quotes"
+                        data-bs-toggle="tab"
+                        data-bs-target="#vp-pane-quotes"
+                        type="button"
+                        role="tab">
+                    Quotes
+                </button>
+            </li>
+
+            <li class="nav-item" role="presentation">
+                <button class="nav-link"
+                        id="vp-tab-invoices"
+                        data-bs-toggle="tab"
+                        data-bs-target="#vp-pane-invoices"
+                        type="button"
+                        role="tab">
+                    Invoices
+                </button>
+            </li>
+
+            <li class="nav-item" role="presentation">
+                <button class="nav-link"
+                        id="vp-tab-contracts"
+                        data-bs-toggle="tab"
+                        data-bs-target="#vp-pane-contracts"
+                        type="button"
+                        role="tab">
+                    Contracts
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content pt-3">
+
+            <div class="tab-pane fade show active" id="vp-pane-overview" role="tabpanel">
+                <div class="row g-3">
+                    <div class="col-12 col-lg-6">
+                        <div class="card border-0 shadow-sm rounded-4">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <h6 class="mb-0">Basic</h6>
+                                </div>
+
+                                <div id="vp-basicView" class="mt-3">
+                                    <div class="mb-2">
+                                        <div class="text-muted small">Title</div>
+                                        <div class="fw-semibold" id="vp-v-title">—</div>
+                                    </div>
+
+                                    <div class="mb-2">
+                                        <div class="text-muted small">Description</div>
+                                        <div id="vp-v-desc">—</div>
+                                    </div>
+
+                                    <div class="mb-2">
+                                        <div class="text-muted small">Dates</div>
+                                        <div id="vp-v-dates">—</div>
+                                    </div>
+
+                                    <div class="d-flex gap-2 mt-3">
+                                        <button class="btn btn-outline-primary btn-sm" type="button" id="vpEditBasicBtn">Edit</button>
+                                    </div>
+
+                                    <div class="alert alert-info mt-3 mb-0">
+                                        Tip: You can start directly with a <strong>Contract</strong> or <strong>Invoice</strong>.
+                                    </div>
+                                </div>
+
+                                <div id="vp-basicEdit" class="d-none mt-3">
+                                    <div class="mb-2">
+                                        <label class="form-label">Title</label>
+                                        <input class="form-control" id="vp-e-title" />
+                                        <div class="text-danger small" id="err-vp-e-title"></div>
+                                    </div>
+
+                                    <div class="mb-2">
+                                        <label class="form-label">Description</label>
+                                        <textarea class="form-control" rows="3" id="vp-e-desc"></textarea>
+                                        <div class="text-danger small" id="err-vp-e-desc"></div>
+                                    </div>
+
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <label class="form-label">Start</label>
+                                            <input type="date" class="form-control js-datepicker" id="vp-e-start" />
+                                            <div class="text-danger small" id="err-vp-e-start"></div>
+                                        </div>
+
+                                        <div class="col-6">
+                                            <label class="form-label">End</label>
+                                            <input type="date" class="form-control js-datepicker" id="vp-e-end" />
+                                            <div class="text-danger small" id="err-vp-e-end"></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex gap-2 mt-3">
+                                        <button class="btn btn-primary btn-sm" type="button" id="vpSaveBasicBtn">Save</button>
+                                        <button class="btn btn-outline-secondary btn-sm" type="button" id="vpCancelBasicBtn">Cancel</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-lg-6">
+                        <div class="card border-0 shadow-sm rounded-4">
+                            <div class="card-body">
+                                <h6 class="mb-3">Notes</h6>
+                                <div id="vpNotes" class="text-muted">
+                                    Use this page to manage the project, quotes, invoices, and contract in one place.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="vp-pane-quotes" role="tabpanel">
+                <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
+                    <div class="input-group" style="max-width: 520px;">
+                        <input class="form-control" id="vp-quotes-q" placeholder="Search quotes..." />
+                        <button class="btn btn-outline-secondary" type="button" id="vp-quotes-searchBtn">Search</button>
+                    </div>
+
+                    <a class="btn btn-primary" href="#" id="vp-newQuoteBtn">
+                        + New Quote
+                    </a>
+                </div>
+
+                <div id="vpQuotesLoading" class="text-muted small d-none">Loading quotes...</div>
+
+                <div id="vpQuotesEmpty" class="alert alert-light border d-none">
+                    No quotes yet.
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2 d-none" id="vpQuotesTable">
+                        <thead>
+                            <tr>
+                                <th>Quote No</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th class="text-end">Total</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vpQuotesTbody"></tbody>
+                    </table>
+                </div>
+
+                <nav class="d-none" id="vpQuotesPagerWrap">
+                    <ul class="pagination pagination-sm mb-0" id="vpQuotesPager"></ul>
+                </nav>
+            </div>
+
+            <div class="tab-pane fade" id="vp-pane-invoices" role="tabpanel">
+                <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
+                    <div class="input-group" style="max-width: 520px;">
+                        <input class="form-control" id="vp-invoices-q" placeholder="Search invoices..." />
+                        <button class="btn btn-outline-secondary" type="button" id="vp-invoices-searchBtn">Search</button>
+                    </div>
+
+                    <span class="badge bg-secondary">Managed in Lexware</span>
+                </div>
+
+                <div id="vpInvoicesLoading" class="text-muted small d-none">Loading invoices...</div>
+
+                <div id="vpInvoicesEmpty" class="alert alert-light border d-none">
+                    No invoices yet.
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2 d-none" id="vpInvoicesTable">
+                        <thead>
+                            <tr>
+                                <th>Invoice No</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Issue</th>
+                                <th>Due</th>
+                                <th class="text-end">Total</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vpInvoicesTbody"></tbody>
+                    </table>
+                </div>
+
+                <nav class="d-none" id="vpInvoicesPagerWrap">
+                    <ul class="pagination pagination-sm mb-0" id="vpInvoicesPager"></ul>
+                </nav>
+            </div>
+
+            <div class="tab-pane fade" id="vp-pane-contracts" role="tabpanel">
+                <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
+                    <div>
+                        <div class="text-muted small">Contract</div>
+                        <div class="fw-semibold" id="vpContractTitle">—</div>
+                        <div class="text-muted small" id="vpContractMeta">—</div>
+                    </div>
+
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a class="btn btn-outline-primary d-none"
+                           id="vpContractItemsLink"
+                           href="#">
+                            Positions
+                        </a>
+
+                        <button class="btn btn-primary d-none"
+                                type="button"
+                                id="vpContractCreateBtn">
+                            Add Contract
+                        </button>
+
+                        
+
+                        <a class="btn btn-outline-secondary d-none"
+                           id="vpContractEditLink"
+                           href="#">
+                            Edit
+                        </a>
+
+                        <a class="btn btn-outline-primary d-none"
+                           id="vpContractDetailsLink"
+                           href="#">
+                            Review
+                        </a>
+
+                        <button class="btn btn-outline-success d-none"
+                                type="button"
+                                id="vpContractSendBtn"
+                                disabled>
+                            Send
+                        </button>
+                    </div>
+                </div>
+
+                <div id="vpContractLoading" class="text-muted small d-none">Loading contract...</div>
+
+                <div id="vpContractEmpty" class="alert alert-light border d-none">
+                    No contract yet for this project.
+                </div>
+
+                <div id="vpContractPreviewWrap" class="card border-0 shadow-sm rounded-4 d-none">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="mb-0">Preview</h6>
+                            <span id="vpContractStatusBadge"></span>
+                        </div>
+
+                        <div id="vpContractPreview"
+                             style="height:min(38vh,340px); max-height:min(38vh,340px); overflow:auto; border:1px solid rgba(0,0,0,.08); border-radius:12px; padding:14px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="vpSendContractModal" tabindex="-1" aria-labelledby="vpSendContractModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4">
+            <div class="modal-header">
+                <h5 class="modal-title" id="vpSendContractModalLabel">Send Contract</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="mb-2">
+                    You are about to send the contract to:
+                </div>
+
+                <div class="p-3 rounded-3 border bg-light">
+                    <div class="fw-semibold" id="vpSendContractCustomerName">—</div>
+                    <div class="text-muted small" id="vpSendContractCustomerEmail"></div>
+                </div>
+
+                <div class="small text-muted mt-3">
+                    Project: <strong id="vpSendContractProject">—</strong><br />
+                    Contract: <strong id="vpSendContractContract">—</strong>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="vpSendContractCancelBtn">
+                    Cancel
+                </button>
+
+                <button type="button" class="btn btn-success" id="vpSendContractConfirmBtn">
+                    <span class="spinner-border spinner-border-sm me-2 d-none" id="vpSendContractSpinner" role="status" aria-hidden="true"></span>
+                    <span id="vpSendContractBtnText">Confirm &amp; Send</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/pages/projects/workspace.js" asp-append-version="true"></script>
+}

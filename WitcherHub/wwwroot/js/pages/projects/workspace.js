@@ -1,0 +1,1016 @@
+﻿(function () {
+    'use strict';
+
+    window.UI = window.UI || {};
+    const UI = window.UI;
+
+    function $(id) { return document.getElementById(id); }
+
+    function toastSuccess(msg, title) { UI?.toast?.success ? UI.toast.success(msg, title) : alert((title ? title + ': ' : '') + msg); }
+    function toastError(msg, title) { UI?.toast?.error ? UI.toast.error(msg, title) : alert((title ? title + ': ' : '') + msg); }
+    function toastInfo(msg, title) { UI?.toast?.info ? UI.toast.info(msg, title) : alert((title ? title + ': ' : '') + msg); }
+    function toastWarn(msg, title) { UI?.toast?.warning ? UI.toast.warning(msg, title) : alert((title ? title + ': ' : '') + msg); }
+
+    const RELOAD_TOAST_KEY = 'vc.toast.afterReload';
+
+    function saveToastForReload(toastObj) {
+        try {
+            if (!toastObj) return;
+            sessionStorage.setItem(RELOAD_TOAST_KEY, JSON.stringify(toastObj));
+        } catch { }
+    }
+
+    function showToast(t) {
+        if (!t) return;
+        const type = (t.type || '').toString().toLowerCase();
+        const title = t.title || '';
+        const msg = t.message || '';
+
+        if (type === 'success') return toastSuccess(msg, title);
+        if (type === 'warning' || type === 'warn') return toastWarn(msg, title);
+        if (type === 'info') return toastInfo(msg, title);
+        return toastError(msg, title);
+    }
+
+    function clearErrors(prefix) {
+        document.querySelectorAll(`[id^="err-${prefix}"]`).forEach(el => el.textContent = '');
+    }
+
+    function esc(s) {
+        const div = document.createElement('div');
+        div.textContent = s ?? '';
+        return div.innerHTML;
+    }
+
+    function fmtDate(v) {
+        return v ? String(v) : '—';
+    }
+
+    function fmtDateTime(v) {
+        if (!v) return '—';
+        try {
+            const d = new Date(v);
+            return d.toLocaleString();
+        } catch {
+            return String(v);
+        }
+    }
+
+    function statusBadgeHtml(st) {
+        const s = (st ?? '').toString().toLowerCase();
+        if (s === 'active') return `<span class="badge bg-success bg-opacity-10 text-success">Active</span>`;
+        if (s === 'closed') return `<span class="badge bg-secondary bg-opacity-10 text-secondary">Closed</span>`;
+        return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
+    }
+
+    function quoteStatusBadge(st) {
+        const s = (st ?? '').toString().toLowerCase();
+        if (s === 'accepted') return `<span class="badge bg-success bg-opacity-10 text-success">Accepted</span>`;
+        if (s === 'rejected') return `<span class="badge bg-danger bg-opacity-10 text-danger">Rejected</span>`;
+        if (s === 'sent') return `<span class="badge bg-info bg-opacity-10 text-info">Sent</span>`;
+        return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
+    }
+
+    function invoiceStatusBadge(st) {
+        const s = (st ?? '').toString().toLowerCase();
+        if (s === 'paid') return `<span class="badge bg-success bg-opacity-10 text-success">Paid</span>`;
+        if (s === 'void') return `<span class="badge bg-secondary bg-opacity-10 text-secondary">Void</span>`;
+        if (s === 'issued') return `<span class="badge bg-info bg-opacity-10 text-info">Issued</span>`;
+        return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
+    }
+
+    function badgeHtml(status) {
+        const s = (status || '').toString().toLowerCase();
+        if (s === 'signed') return `<span class="badge bg-success bg-opacity-10 text-success">Signed</span>`;
+        if (s === 'sent') return `<span class="badge bg-primary bg-opacity-10 text-primary">Sent</span>`;
+        if (s === 'draft') return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
+        return `<span class="badge bg-secondary bg-opacity-10 text-secondary">${esc(status || '—')}</span>`;
+    }
+
+    function toastFromPayload(payload, fallbackTitle, fallbackMsg) {
+        if (payload?.toast) { showToast(payload.toast); return; }
+        if (payload?.message) { toastError(payload.message, fallbackTitle || 'Error'); return; }
+        toastError(fallbackMsg || 'Request failed.', fallbackTitle || 'Error');
+    }
+
+    async function postJson(url, body) {
+        const token = $('antiForgeryToken')?.value || '';
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                ...(token ? { 'RequestVerificationToken': token } : {})
+            },
+            body: JSON.stringify(body)
+        });
+
+        const contentType = res.headers.get('content-type') || '';
+        const isJson = contentType.includes('application/json');
+
+        if (!res.ok) {
+            let payload = null;
+            try { payload = isJson ? await res.json() : { message: await res.text() }; }
+            catch { payload = { message: 'Request failed.' }; }
+
+            throw { status: res.status, payload };
+        }
+
+        return isJson ? await res.json() : null;
+    }
+
+    async function fetchProjectById(id) {
+        const baseUrl = $('vcProjectUrl')?.value;
+        if (!baseUrl) throw new Error('vcProjectUrl not found');
+
+        const joiner = baseUrl.includes('?') ? '&' : '?';
+        const url = `${baseUrl}${joiner}id=${encodeURIComponent(id)}`;
+
+        const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+
+        const contentType = res.headers.get('content-type') || '';
+        const isJson = contentType.includes('application/json');
+
+        if (!res.ok) {
+            let payload = null;
+            try { payload = isJson ? await res.json() : { message: await res.text() }; }
+            catch { payload = { message: 'Request failed.' }; }
+
+            if (payload?.toast) showToast(payload.toast);
+            else toastError(payload?.message || `HTTP ${res.status}`, 'Error');
+
+            throw new Error(`HTTP ${res.status}`);
+        }
+
+        return res.json();
+    }
+
+    function normalizeProject(raw) {
+        const r = raw || {};
+        const customer = r.customer ?? r.Customer ?? {};
+
+        return {
+            id: r.id ?? r.Id,
+            title: r.title ?? r.Title,
+            description: r.description ?? r.Description,
+            status: r.status ?? r.Status,
+            startDate: r.startDate ?? r.StartDate,
+            endDate: r.endDate ?? r.EndDate,
+            customer: {
+                id: customer.id ?? customer.Id,
+                name: customer.name ?? customer.Name,
+                email: customer.email ?? customer.Email
+            }
+        };
+    }
+
+    let currentProject = null;
+    let editingBasic = false;
+
+    const projectId = ($('wsProjectId')?.value || '').trim();
+    function isValidWorkspaceTab(tab) {
+        return tab === 'overview' || tab === 'quotes' || tab === 'invoices' || tab === 'contracts';
+    }
+
+    function getWorkspaceTabStorageKey() {
+        return `wh.project.workspace.tab:${projectId}`;
+    }
+
+    function getTabNameFromButton(btn) {
+        const target = btn?.getAttribute('data-bs-target') || '';
+        const match = target.match(/^#vp-pane-(overview|quotes|invoices|contracts)$/);
+        return match ? match[1] : 'overview';
+    }
+
+    function updateWorkspaceTabState(tab) {
+        if (!projectId || !isValidWorkspaceTab(tab)) return;
+
+        try {
+            sessionStorage.setItem(getWorkspaceTabStorageKey(), tab);
+        } catch { }
+
+        const url = new URL(window.location.href);
+        url.searchParams.set('id', projectId);
+        url.searchParams.set('tab', tab);
+        window.history.replaceState({}, document.title, url.pathname + url.search);
+    }
+
+    function getInitialWorkspaceTab() {
+        const queryTab = (new URLSearchParams(window.location.search).get('tab') || '').trim().toLowerCase();
+        if (isValidWorkspaceTab(queryTab)) return queryTab;
+
+        try {
+            const savedTab = (sessionStorage.getItem(getWorkspaceTabStorageKey()) || '').trim().toLowerCase();
+            if (isValidWorkspaceTab(savedTab)) return savedTab;
+        } catch { }
+
+        const hiddenTab = (($('wsOpenTab')?.value || '').trim().toLowerCase());
+        if (isValidWorkspaceTab(hiddenTab)) return hiddenTab;
+
+        return 'overview';
+    }
+    const quotesState = {
+        projectId,
+        page: 1,
+        pageSize: 10,
+        q: null,
+        loadedOnce: false
+    };
+
+    const invoicesState = {
+        projectId,
+        page: 1,
+        pageSize: 10,
+        q: null,
+        loadedOnce: false
+    };
+
+    const contractState = {
+        projectId,
+        loadedOnce: false
+    };
+
+    function setBasicMode(isEdit) {
+        editingBasic = !!isEdit;
+        clearErrors('vp-e');
+
+        $('vp-basicView')?.classList.toggle('d-none', editingBasic);
+        $('vp-basicEdit')?.classList.toggle('d-none', !editingBasic);
+    }
+
+    function renderProject(p) {
+        currentProject = p;
+
+        $('vp-title').textContent = p.title ?? 'Project';
+        $('vp-statusBadge').innerHTML = statusBadgeHtml(p.status);
+        $('vp-meta').textContent = p.id ? `ID: ${p.id}` : '';
+
+        $('vp-customerName').textContent = p.customer?.name ?? '—';
+        $('vp-customerEmail').textContent = p.customer?.email ?? '—';
+
+        $('vp-v-title').textContent = p.title ?? '—';
+        $('vp-v-desc').textContent = p.description ?? '—';
+        $('vp-v-dates').textContent = `${fmtDate(p.startDate)} → ${fmtDate(p.endDate)}`;
+
+        $('vp-e-title').value = p.title ?? '';
+        $('vp-e-desc').value = p.description ?? '';
+        $('vp-e-start').value = p.startDate ?? '';
+        $('vp-e-end').value = p.endDate ?? '';
+
+        const q = $('vp-newQuoteBtn');
+        if (q && p.id) q.href = `/Quotes/Create?projectId=${encodeURIComponent(p.id)}`;
+
+        setBasicMode(false);
+    }
+
+    function activateInitialTab() {
+        const tab = getInitialWorkspaceTab();
+        const btn =
+            document.querySelector(`#vpTabs button[data-bs-target="#vp-pane-${tab}"]`) ||
+            $('vp-tab-overview');
+
+        if (!btn) return;
+
+        bootstrap.Tab.getOrCreateInstance(btn).show();
+        updateWorkspaceTabState(tab);
+    }
+
+    async function loadProject() {
+        if (!projectId) {
+            $('vpLoading').textContent = 'Project id is missing.';
+            return;
+        }
+
+        $('vpLoading')?.classList.remove('d-none');
+        $('vpBody')?.classList.add('d-none');
+
+        try {
+            const data = await fetchProjectById(projectId);
+            renderProject(normalizeProject(data));
+
+            $('vpLoading')?.classList.add('d-none');
+            $('vpBody')?.classList.remove('d-none');
+
+            activateInitialTab();
+        } catch (err) {
+            console.error(err);
+            $('vpLoading').textContent = 'Failed to load project.';
+        }
+    }
+
+    function setQuotesLoading(on) {
+        $('vpQuotesLoading')?.classList.toggle('d-none', !on);
+    }
+
+    function setQuotesEmpty(on) {
+        $('vpQuotesEmpty')?.classList.toggle('d-none', !on);
+    }
+
+    function setQuotesTableVisible(on) {
+        $('vpQuotesTable')?.classList.toggle('d-none', !on);
+    }
+
+    function buildQuotesPager(res) {
+        const ul = $('vpQuotesPager');
+        const wrap = $('vpQuotesPagerWrap');
+        if (!ul || !wrap) return;
+
+        ul.innerHTML = '';
+
+        const page = Number(res.page ?? res.Page ?? 1);
+        const totalPages =
+            Number(res.totalPages ?? res.TotalPages ?? 0) ||
+            Math.max(1, Math.ceil(Number(res.totalItems ?? res.TotalItems ?? 0) / Number(res.pageSize ?? res.PageSize ?? 10)));
+
+        wrap.classList.toggle('d-none', totalPages <= 1);
+
+        function addItem(label, targetPage, disabled, active) {
+            const li = document.createElement('li');
+            li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`;
+
+            const a = document.createElement('a');
+            a.className = 'page-link';
+            a.href = '#';
+            a.textContent = label;
+
+            if (!disabled && !active) {
+                a.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    loadQuotes({ page: targetPage });
+                });
+            }
+
+            li.appendChild(a);
+            ul.appendChild(li);
+        }
+
+        addItem('Prev', page - 1, page <= 1, false);
+
+        const start = Math.max(1, page - 2);
+        const end = Math.min(totalPages, page + 2);
+
+        for (let p = start; p <= end; p++) addItem(String(p), p, false, p === page);
+
+        addItem('Next', page + 1, page >= totalPages, false);
+    }
+
+    async function loadQuotes(opts) {
+        if (!quotesState.projectId) return;
+
+        const urlBase = $('vcProjectQuotesUrl')?.value;
+        if (!urlBase) return toastError('vcProjectQuotesUrl not found', 'Error');
+
+        if (opts?.page) quotesState.page = opts.page;
+        if (opts?.q !== undefined) quotesState.q = opts.q;
+
+        setQuotesLoading(true);
+        setQuotesEmpty(false);
+        setQuotesTableVisible(false);
+        $('vpQuotesPagerWrap')?.classList.add('d-none');
+
+        const joiner = urlBase.includes('?') ? '&' : '?';
+        const url =
+            `${urlBase}${joiner}` +
+            `projectId=${encodeURIComponent(quotesState.projectId)}` +
+            `&p=${encodeURIComponent(quotesState.page)}` +
+            `&pageSize=${encodeURIComponent(quotesState.pageSize)}` +
+            `&q=${encodeURIComponent(quotesState.q || '')}`;
+
+        try {
+            const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+            const json = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                toastFromPayload(json, 'Error', 'Failed to load quotes.');
+                return;
+            }
+
+            const data = json.data ?? json;
+            const items = data.items ?? data.Items ?? [];
+
+            const tbody = $('vpQuotesTbody');
+            if (!tbody) return;
+
+            tbody.innerHTML = '';
+
+            if (!items.length) {
+                setQuotesLoading(false);
+                setQuotesEmpty(true);
+                setQuotesTableVisible(false);
+                quotesState.loadedOnce = true;
+                return;
+            }
+
+            for (const q of items) {
+                const id = q.id ?? q.Id;
+                const quoteNo = q.quoteNo ?? q.QuoteNo ?? '—';
+                const status = q.status ?? q.Status;
+                const createdAt = q.createdAt ?? q.CreatedAt;
+                const total = q.itemsTotal ?? q.ItemsTotal ?? 0;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${esc(quoteNo)}</td>
+                    <td>${quoteStatusBadge(status)}</td>
+                    <td>${esc(fmtDate(createdAt))}</td>
+                    <td class="text-end">${Number(total || 0).toFixed(2)}</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" href="/Quotes/Details?id=${encodeURIComponent(id)}">Details</a>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            setQuotesLoading(false);
+            setQuotesEmpty(false);
+            setQuotesTableVisible(true);
+            buildQuotesPager(data);
+            quotesState.loadedOnce = true;
+        } catch (err) {
+            console.error(err);
+            setQuotesLoading(false);
+            toastError('Failed to load quotes.', 'Error');
+        }
+    }
+
+    function setInvoicesLoading(on) {
+        $('vpInvoicesLoading')?.classList.toggle('d-none', !on);
+    }
+
+    function setInvoicesEmpty(on) {
+        $('vpInvoicesEmpty')?.classList.toggle('d-none', !on);
+    }
+
+    function setInvoicesVisible(on) {
+        $('vpInvoicesTable')?.classList.toggle('d-none', !on);
+    }
+
+    function buildInvoicesPager(res) {
+        const ul = $('vpInvoicesPager');
+        const wrap = $('vpInvoicesPagerWrap');
+        if (!ul || !wrap) return;
+
+        ul.innerHTML = '';
+
+        const page = Number(res.page ?? res.Page ?? 1);
+        const totalPages =
+            Number(res.totalPages ?? res.TotalPages ?? 0) ||
+            Math.max(1, Math.ceil(Number(res.totalItems ?? res.TotalItems ?? 0) / Number(res.pageSize ?? res.PageSize ?? 10)));
+
+        wrap.classList.toggle('d-none', totalPages <= 1);
+
+        function addItem(label, targetPage, disabled, active) {
+            const li = document.createElement('li');
+            li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`;
+
+            const a = document.createElement('a');
+            a.className = 'page-link';
+            a.href = '#';
+            a.textContent = label;
+
+            if (!disabled && !active) {
+                a.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    loadInvoices({ page: targetPage });
+                });
+            }
+
+            li.appendChild(a);
+            ul.appendChild(li);
+        }
+
+        addItem('Prev', page - 1, page <= 1, false);
+
+        const start = Math.max(1, page - 2);
+        const end = Math.min(totalPages, page + 2);
+
+        for (let p = start; p <= end; p++) addItem(String(p), p, false, p === page);
+
+        addItem('Next', page + 1, page >= totalPages, false);
+    }
+
+    async function loadInvoices(opts) {
+        if (!invoicesState.projectId) return;
+
+        const urlBase = $('vcProjectInvoicesUrl')?.value;
+        if (!urlBase) return toastError('vcProjectInvoicesUrl not found', 'Error');
+
+        if (opts?.page) invoicesState.page = opts.page;
+        if (opts?.q !== undefined) invoicesState.q = opts.q;
+
+        setInvoicesLoading(true);
+        setInvoicesEmpty(false);
+        setInvoicesVisible(false);
+        $('vpInvoicesPagerWrap')?.classList.add('d-none');
+
+        const joiner = urlBase.includes('?') ? '&' : '?';
+        const url =
+            `${urlBase}${joiner}` +
+            `projectId=${encodeURIComponent(invoicesState.projectId)}` +
+            `&p=${encodeURIComponent(invoicesState.page)}` +
+            `&pageSize=${encodeURIComponent(invoicesState.pageSize)}` +
+            `&q=${encodeURIComponent(invoicesState.q || '')}`;
+
+        try {
+            const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+            const json = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                toastFromPayload(json, 'Error', 'Failed to load invoices.');
+                return;
+            }
+
+            const root = json ?? {};
+            const data = root.data ?? root;
+            const list =
+                (data && (data.items || data.Items)) ? data :
+                    (data.data ?? data.Data ?? data.result ?? data.Result ?? data);
+
+            const itemsRaw = list.items ?? list.Items ?? [];
+            const items = Array.isArray(itemsRaw) ? itemsRaw : [];
+
+            const tbody = $('vpInvoicesTbody');
+            if (!tbody) {
+                setInvoicesLoading(false);
+                toastError('Invoices table not found.', 'Error');
+                return;
+            }
+
+            tbody.innerHTML = '';
+
+            if (!items.length) {
+                setInvoicesLoading(false);
+                setInvoicesEmpty(true);
+                setInvoicesVisible(false);
+                invoicesState.loadedOnce = true;
+                return;
+            }
+
+            for (const inv of items) {
+                const id = inv.id ?? inv.Id;
+                const invoiceNo = inv.invoiceNo ?? inv.InvoiceNo ?? '—';
+                const status = inv.status ?? inv.Status;
+                const createdAt = inv.createdAt ?? inv.CreatedAt;
+                const issueDate = inv.issueDate ?? inv.IssueDate;
+                const dueDate = inv.dueDate ?? inv.DueDate;
+                const total = inv.total ?? inv.Total ?? inv.itemsTotal ?? inv.ItemsTotal ?? 0;
+
+                const totalNum = Number(total);
+                const totalText = Number.isFinite(totalNum) ? totalNum.toFixed(2) : '0.00';
+
+                const pdfBaseUrl = $('vcInvoicePdfViewerUrl')?.value || '';
+                const joinerPdf = pdfBaseUrl.includes('?') ? '&' : '?';
+                const pdfUrl = `${pdfBaseUrl}${joinerPdf}id=${encodeURIComponent(id)}`;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${esc(invoiceNo)}</td>
+                    <td>${invoiceStatusBadge(status)}</td>
+                    <td>${esc(fmtDate(createdAt))}</td>
+                    <td>${esc(fmtDate(issueDate))}</td>
+                    <td>${esc(fmtDate(dueDate))}</td>
+                    <td class="text-end">${totalText}</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" href="${pdfUrl}" target="_blank" rel="noopener">Details</a>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            setInvoicesLoading(false);
+            setInvoicesEmpty(false);
+            setInvoicesVisible(true);
+            buildInvoicesPager(list);
+            invoicesState.loadedOnce = true;
+        } catch (err) {
+            console.error(err);
+            setInvoicesLoading(false);
+            toastError('Failed to load invoices.', 'Error');
+        }
+    }
+
+    function setContractLoading(on) {
+        $('vpContractLoading')?.classList.toggle('d-none', !on);
+    }
+
+    function showContractEmpty(on) {
+        $('vpContractEmpty')?.classList.toggle('d-none', !on);
+    }
+
+    function showContractPreview(on) {
+        $('vpContractPreviewWrap')?.classList.toggle('d-none', !on);
+    }
+
+    async function loadProjectContractSnapshot() {
+        if (!contractState.projectId) return;
+
+        const urlBase = $('vcProjectContractSnapshotUrl')?.value;
+        if (!urlBase) return toastError('vcProjectContractSnapshotUrl not found', 'Error');
+
+        const btnCreate = $('vpContractCreateBtn');
+        
+        const editLink = $('vpContractEditLink');
+        const detailsLink = $('vpContractDetailsLink');
+        const sendBtn = $('vpContractSendBtn');
+        const itemsLink = $('vpContractItemsLink');
+
+        setContractLoading(true);
+        showContractEmpty(false);
+        showContractPreview(false);
+
+        const joiner = urlBase.includes('?') ? '&' : '?';
+        const url = `${urlBase}${joiner}projectId=${encodeURIComponent(contractState.projectId)}`;
+
+        try {
+            const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+            const json = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                toastFromPayload(json, 'Error', 'Failed to load contract.');
+                return;
+            }
+
+            const data = json.data ?? json;
+
+            if (!data.exists) {
+                $('vpContractTitle').textContent = 'No contract';
+                $('vpContractMeta').textContent = '—';
+                $('vpContractStatusBadge').innerHTML = '';
+                $('vpContractPreview').innerHTML = '';
+
+                btnCreate?.classList.remove('d-none');
+                btnCreate.textContent = 'Add Contract';
+
+                editLink?.classList.add('d-none');
+                detailsLink?.classList.add('d-none');
+                sendBtn?.classList.add('d-none');
+                itemsLink?.classList.add('d-none');
+
+                showContractEmpty(true);
+                showContractPreview(false);
+
+                contractState.loadedOnce = true;
+                return;
+            }
+
+            const status = (data.status || '').toString().toLowerCase();
+            const isSigned = status === 'signed' || !!data.signedAt;
+            const canUpdate = !!data.canUpdate && !isSigned;
+
+            $('vpContractTitle').textContent = data.contractNo || 'Contract';
+            $('vpContractMeta').textContent = data.signedAt ? `Signed at: ${fmtDateTime(data.signedAt)}` : 'Not signed yet';
+            $('vpContractStatusBadge').innerHTML = badgeHtml(data.status);
+
+            const cid = data.contractId || data.id || null;
+            const itemsCount = Number(data.itemsCount || 0);
+            const hasItems = itemsCount > 0;
+
+            if (itemsLink && cid && canUpdate) {
+                itemsLink.href = `/Contracts/Items/Manage?contractId=${encodeURIComponent(cid)}&returnTo=items`;
+                itemsLink.textContent = 'Positions';
+                itemsLink.classList.remove('d-none');
+            } else {
+                itemsLink?.classList.add('d-none');
+            }
+
+            $('vpContractPreview').innerHTML = data.previewHtml || '<div class="text-muted">No contract terms yet.</div>';
+
+            if (!hasItems) {
+                if (itemsLink && cid && canUpdate) {
+                    itemsLink.href = `/Contracts/Items/Manage?contractId=${encodeURIComponent(cid)}&returnTo=items&toast=noItems`;
+                    itemsLink.textContent = 'Add Positions';
+                    itemsLink.classList.remove('d-none');
+                } else {
+                    itemsLink?.classList.add('d-none');
+                }
+
+                btnCreate?.classList.add('d-none');
+                editLink?.classList.add('d-none');
+                detailsLink?.classList.add('d-none');
+                sendBtn?.classList.add('d-none');
+
+                $('vpContractPreview').innerHTML =
+                    '<div class="alert alert-warning mb-0">This contract has no Positions. Please add at least one line item to continue.</div>';
+
+                showContractEmpty(false);
+                showContractPreview(true);
+                contractState.loadedOnce = true;
+                return;
+            }
+
+            btnCreate?.classList.add('d-none');
+
+            
+
+            if (editLink) {
+                editLink.href = data.editUrl || '#';
+                editLink.classList.toggle('d-none', !canUpdate);
+            }
+
+            if (detailsLink) {
+                let href = data.detailsUrl || '';
+                if (!href && cid) href = `/Contracts/Details?id=${encodeURIComponent(cid)}`;
+                detailsLink.href = href || '#';
+                detailsLink.classList.toggle('d-none', isSigned);
+            }
+
+            if (sendBtn) {
+                if (isSigned) {
+                    sendBtn.classList.add('d-none');
+                    sendBtn.disabled = true;
+                } else {
+                    sendBtn.classList.remove('d-none');
+                    sendBtn.disabled = !hasItems;
+                }
+            }
+
+            showContractEmpty(false);
+            showContractPreview(true);
+            contractState.loadedOnce = true;
+        } catch (err) {
+            console.error(err);
+            toastError('Failed to load contract.', 'Error');
+        } finally {
+            setContractLoading(false);
+        }
+    }
+
+    async function createProjectContract() {
+        if (!contractState.projectId) return;
+
+        const urlBase = $('vcProjectContractCreateUrl')?.value;
+        if (!urlBase) return toastError('Create endpoint is missing.', 'Error');
+
+        const btn = $('vpContractCreateBtn');
+
+        try {
+            btn.disabled = true;
+            UI?.loading?.show?.('Preparing Positions...');
+
+            const token = $('antiForgeryToken')?.value || '';
+            const joiner = urlBase.includes('?') ? '&' : '?';
+            const url = `${urlBase}${joiner}projectId=${encodeURIComponent(contractState.projectId)}`;
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    ...(token ? { 'RequestVerificationToken': token } : {}),
+                    'Accept': 'application/json'
+                }
+            });
+
+            const json = await res.json().catch(() => ({}));
+            const data = json?.data || {};
+
+            if (data.redirectUrl) {
+                const u = new URL(data.redirectUrl, window.location.origin);
+                u.searchParams.set('toast', 'noItems');
+
+                try { sessionStorage.removeItem(RELOAD_TOAST_KEY); } catch { }
+
+                window.location.href = u.pathname + u.search;
+                return;
+            }
+
+            if (!res.ok) {
+                if (json?.toast) showToast(json.toast);
+                else toastError('Failed to create contract.', 'Error');
+                return;
+            }
+
+            if (json?.ok !== true) {
+                if (json?.toast) showToast(json.toast);
+                else showToast({ type: 'warning', title: 'Warning', message: 'Action not allowed.' });
+                return;
+            }
+
+            if (json?.toast) showToast(json.toast);
+
+            if (data.detailsUrl) {
+                window.location.href = data.detailsUrl;
+                return;
+            }
+
+            await loadProjectContractSnapshot();
+        } catch (err) {
+            console.error(err);
+            toastError('Failed to create contract.', 'Error');
+        } finally {
+            UI?.loading?.hide?.();
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    
+    const confirmModalEl = $('vpSendContractModal');
+    const confirmBtn = $('vpSendContractConfirmBtn');
+    const cancelBtn = $('vpSendContractCancelBtn');
+    const spinner = $('vpSendContractSpinner');
+    const btnText = $('vpSendContractBtnText');
+
+    function setSending(isSending) {
+        if (confirmBtn) confirmBtn.disabled = isSending;
+        if (cancelBtn) cancelBtn.disabled = isSending;
+        if (spinner) spinner.classList.toggle('d-none', !isSending);
+        if (btnText) btnText.textContent = isSending ? 'Sending...' : 'Confirm & Send';
+    }
+
+    function openSendConfirm() {
+        const sendBtn = $('vpContractSendBtn');
+        if (!sendBtn || sendBtn.disabled) return;
+
+        $('vpSendContractProject').textContent = ($('vp-title')?.textContent || '—').trim();
+        $('vpSendContractContract').textContent = ($('vpContractTitle')?.textContent || '—').trim();
+        $('vpSendContractCustomerName').textContent = ($('vp-customerName')?.textContent || '—').trim();
+
+        const email = ($('vp-customerEmail')?.textContent || '').trim();
+        $('vpSendContractCustomerEmail').textContent = (email && email !== '—') ? email : '';
+
+        setSending(false);
+        bootstrap.Modal.getOrCreateInstance(confirmModalEl).show();
+    }
+
+    async function sendProjectContract() {
+        if (!contractState.projectId) {
+            showToast({ type: 'error', title: 'Error', message: 'ProjectId is missing.' });
+            return;
+        }
+
+        const url = ($('vcProjectContractSendUrl')?.value || '').trim();
+        const token = ($('antiForgeryToken')?.value || '').trim();
+
+        if (!url) {
+            showToast({ type: 'error', title: 'Error', message: 'Send URL not found.' });
+            return;
+        }
+
+        const sendBtn = $('vpContractSendBtn');
+        const prevSendDisabled = sendBtn ? sendBtn.disabled : null;
+
+        if (sendBtn) sendBtn.disabled = true;
+        setSending(true);
+
+        try {
+            const body = `projectId=${encodeURIComponent(contractState.projectId)}`;
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    ...(token ? { 'RequestVerificationToken': token } : {})
+                },
+                body
+            });
+
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok || !data?.ok) {
+                showToast(data?.toast || { type: 'error', title: 'Error', message: 'Failed to send contract.' });
+                setSending(false);
+                if (sendBtn && prevSendDisabled !== null) sendBtn.disabled = prevSendDisabled;
+                return;
+            }
+
+            showToast(data.toast || { type: 'success', title: 'Sent', message: 'Contract email sent successfully.' });
+
+            bootstrap.Modal.getOrCreateInstance(confirmModalEl).hide();
+            if (sendBtn && prevSendDisabled !== null) sendBtn.disabled = prevSendDisabled;
+
+            await loadProjectContractSnapshot();
+        } catch (err) {
+            console.error(err);
+            showToast({ type: 'error', title: 'Server error', message: 'An unexpected error occurred.' });
+            setSending(false);
+            if (sendBtn && prevSendDisabled !== null) sendBtn.disabled = prevSendDisabled;
+        }
+    }
+
+    async function saveBasic() {
+        if (!currentProject?.id) return;
+
+        const url = $('vcUpdateProjectUrl')?.value;
+        if (!url) return toastError('vcUpdateProjectUrl not found', 'Error');
+
+        clearErrors('vp-e');
+
+        const payload = {
+            projectId: currentProject.id,
+            project: {
+                title: $('vp-e-title')?.value?.trim() ?? '',
+                description: $('vp-e-desc')?.value ?? null,
+                startDate: $('vp-e-start')?.value || null,
+                endDate: $('vp-e-end')?.value || null
+            }
+        };
+
+        try {
+            const raw = await postJson(url, payload);
+            const data = raw?.data ?? raw;
+
+            renderProject(normalizeProject(data));
+
+            if (raw?.toast) showToast(raw.toast);
+            else showToast({ type: 'success', title: 'Success', message: 'Saved successfully.' });
+        } catch (err) {
+            console.error(err);
+
+            if (err?.status === 400 && err?.payload?.errors) {
+                (err.payload.errors || []).forEach(x => {
+                    const f = (x.field || '').toLowerCase();
+                    if (f.includes('title')) $('err-vp-e-title').textContent = x.error;
+                    if (f.includes('description')) $('err-vp-e-desc').textContent = x.error;
+                    if (f.includes('start')) $('err-vp-e-start').textContent = x.error;
+                    if (f.includes('end')) $('err-vp-e-end').textContent = x.error;
+                });
+
+                toastError('Please fix the highlighted fields.', 'Validation');
+                return;
+            }
+
+            toastFromPayload(err?.payload, 'Error', 'Failed to save.');
+        }
+    }
+
+    document.addEventListener('shown.bs.tab', function (e) {
+        const target = e.target;
+        const tabName = getTabNameFromButton(target);
+
+        updateWorkspaceTabState(tabName);
+
+        if (target?.id === 'vp-tab-quotes' && !quotesState.loadedOnce) {
+            loadQuotes({ page: 1, q: $('vp-quotes-q')?.value?.trim() || '' });
+        }
+
+        if (target?.id === 'vp-tab-invoices' && !invoicesState.loadedOnce) {
+            loadInvoices({ page: 1, q: $('vp-invoices-q')?.value?.trim() || '' });
+        }
+
+        if (target?.id === 'vp-tab-contracts') {
+            loadProjectContractSnapshot();
+        }
+    });
+
+    $('vp-quotes-searchBtn')?.addEventListener('click', function () {
+        loadQuotes({ page: 1, q: $('vp-quotes-q')?.value?.trim() || '' });
+    });
+
+    $('vp-quotes-q')?.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            loadQuotes({ page: 1, q: $('vp-quotes-q')?.value?.trim() || '' });
+        }
+    });
+
+    $('vp-invoices-searchBtn')?.addEventListener('click', function () {
+        loadInvoices({ page: 1, q: $('vp-invoices-q')?.value?.trim() || '' });
+    });
+
+    $('vp-invoices-q')?.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            loadInvoices({ page: 1, q: $('vp-invoices-q')?.value?.trim() || '' });
+        }
+    });
+
+    $('vpEditBasicBtn')?.addEventListener('click', function () {
+        setBasicMode(true);
+    });
+
+    $('vpCancelBasicBtn')?.addEventListener('click', function () {
+        if (currentProject) renderProject(currentProject);
+        setBasicMode(false);
+    });
+
+    $('vpSaveBasicBtn')?.addEventListener('click', saveBasic);
+    $('vpContractCreateBtn')?.addEventListener('click', createProjectContract);
+    $('vpContractSendBtn')?.addEventListener('click', openSendConfirm);
+    $('vpSendContractConfirmBtn')?.addEventListener('click', sendProjectContract);
+
+    (function bindDatePickers() {
+        function bindOne(el) {
+            if (!el || el.dataset.dpBound === '1') return;
+            el.dataset.dpBound = '1';
+
+            let openOnFocus = false;
+
+            el.addEventListener('pointerdown', () => { openOnFocus = true; });
+
+            el.addEventListener('focus', () => {
+                if (!openOnFocus) return;
+                openOnFocus = false;
+                try { el.showPicker?.(); } catch { }
+            });
+
+            el.addEventListener('click', () => {
+                try { el.showPicker?.(); } catch { }
+            });
+
+            el.addEventListener('keydown', () => { openOnFocus = false; });
+        }
+
+        document.querySelectorAll('input[type="date"].js-datepicker').forEach(bindOne);
+    })();
+
+    document.addEventListener('DOMContentLoaded', loadProject);
+})();

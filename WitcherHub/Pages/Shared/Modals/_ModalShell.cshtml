@@ -49,6 +49,26 @@
 @if (Model.AutoOpen)
 {
     <script>
-        new bootstrap.Modal(document.getElementById('@Model.Id')).show();
+        document.addEventListener('DOMContentLoaded', function () {
+            const el = document.getElementById('@Model.Id');
+            if (!el) return;
+
+            function tryOpenModal(attempt) {
+                const bsModal = window.bootstrap && window.bootstrap.Modal
+                    ? window.bootstrap.Modal
+                    : null;
+
+                if (!bsModal) {
+                    if (attempt >= 20) return;
+                    window.setTimeout(function () { tryOpenModal(attempt + 1); }, 50);
+                    return;
+                }
+
+                const m = bsModal.getOrCreateInstance(el);
+                m.show();
+            }
+
+            tryOpenModal(0);
+        });
     </script>
 }

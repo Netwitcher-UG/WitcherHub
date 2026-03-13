@@ -107,3 +107,42 @@ html[data-bs-theme="semi-dark"] .modal-header[class*="bg-grd"] .btn-close {
     opacity: .9;
 }
 
+/* hover */
+html[data-bs-theme="light"] .wh-tablecard-scroll tbody tr:hover td,
+html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody tr:hover td{
+  background: rgba(255,255,255,1) !important;
+}
+
+/* ===== Projects table only: row hover + pointer by theme ===== */
+html[data-bs-theme="light"] #projectsTableCard {
+    --wh-project-row-hover-bg: rgba(45, 148, 249, .07);
+    --wh-project-row-hover-stroke: rgba(45, 148, 249, .18);
+}
+
+html[data-bs-theme="semi-dark"] #projectsTableCard {
+    --wh-project-row-hover-bg: rgba(45, 148, 249, .10);
+    --wh-project-row-hover-stroke: rgba(45, 148, 249, .22);
+}
+
+html[data-bs-theme="dark"] #projectsTableCard {
+    --wh-project-row-hover-bg: rgba(255, 255, 255, .06);
+    --wh-project-row-hover-stroke: rgba(255, 255, 255, .10);
+}
+
+html[data-bs-theme="blue-theme"] #projectsTableCard {
+    --wh-project-row-hover-bg: rgba(120, 170, 255, .12);
+    --wh-project-row-hover-stroke: rgba(120, 170, 255, .18);
+}
+
+#projectsTableCard tbody tr {
+    cursor: pointer;
+}
+
+#projectsTableCard tbody tr > td {
+    transition: background-color .16s ease, box-shadow .16s ease;
+}
+
+#projectsTableCard tbody tr:hover > td {
+    background: var(--wh-project-row-hover-bg, rgba(255,255,255,.05)) !important;
+    box-shadow: inset 0 0 0 1px var(--wh-project-row-hover-stroke, rgba(255,255,255,.08));
+}

@@ -72,9 +72,7 @@ namespace WitcherHub.Pages
         [BindProperty(SupportsGet = true)] public int PageSize { get; set; } = 10;
         [BindProperty(SupportsGet = true, Name = "q")] public string? Search { get; set; }
 
-        [BindProperty(SupportsGet = true)] public Guid OpenProjectId { get; set; }
 
-        [BindProperty(SupportsGet = true)] public string? OpenTab { get; set; }
 
         // extra filters
         [BindProperty(SupportsGet = true)] public string? CustomerName { get; set; }
@@ -115,16 +113,9 @@ namespace WitcherHub.Pages
         private void EnsureDefaults()
         {
             Project.Title ??= "";
-            if (Project.CustomerId == Guid.Empty) { /* leave empty until user fills */ }
-            // ✅ تواريخ افتراضية من السيرفر
-            // (بس إذا المستخدم ما كان حاطط قيمة)
+
             var today = DateTime.UtcNow.Date;
             Project.StartDate ??= DateOnly.FromDateTime(today);
-
-            OpenTab ??= "overview";
-            if (OpenTab != "overview" && OpenTab != "quotes" && OpenTab != "invoices" && OpenTab != "contracts")
-                OpenTab = "overview";
-
         }
 
         // =========================
@@ -136,6 +127,9 @@ namespace WitcherHub.Pages
             await LoadCustomersAsync(ct);
             await LoadTableAsync(ct);
 
+            if (Project.CustomerId == Guid.Empty)
+                ModelState.AddModelError("Project.CustomerId", "Customer is required.");
+
             var vr = await _createValidator.ValidateAsync(Project, ct);
             if (!vr.IsValid)
             {
@@ -143,13 +137,15 @@ namespace WitcherHub.Pages
                 {
                     var key = err.PropertyName;
 
-                    // لأن الفورم مربوط على Project.X
                     if (!string.IsNullOrWhiteSpace(key) && !key.StartsWith("Project."))
                         key = "Project." + key;
 
                     ModelState.AddModelError(key, err.ErrorMessage);
                 }
+            }
 
+            if (!ModelState.IsValid)
+            {
                 BuildCreateProjectModal(autoOpen: true);
 
                 TempData["Toast.Type"] = "error";
@@ -513,17 +509,15 @@ namespace WitcherHub.Pages
 
         private static Microsoft.AspNetCore.Html.IHtmlContent ActionsButtons(string projectId)
         {
+            var quotesUrl = $"/Projects/Workspace?id={projectId}&tab=quotes";
+
             return new Microsoft.AspNetCore.Html.HtmlString($$"""
 <div class="vc-actions-wrap d-flex justify-content-end gap-1 flex-nowrap">
-  <button type="button"
-          class="btn vc-icon-btn text-primary"
-          title="Quotes"
-          data-bs-toggle="modal"
-          data-bs-target="#ViewProjectModal"
-          data-project-id="{{Enc(projectId)}}"
-          data-open-tab="quotes">
+  <a class="btn vc-icon-btn text-primary"
+     title="Quotes"
+     href="{{Enc(quotesUrl)}}">
       <i class="material-icons-outlined">request_quote</i>
-  </button>
+  </a>
 
   <button type="button"
           class="btn vc-icon-btn text-danger"
@@ -535,7 +529,6 @@ namespace WitcherHub.Pages
 </div>
 """);
         }
-
         private async Task LoadCustomersAsync(CancellationToken ct)
         {
             var res = await _customers.GetCustomersAsync(page: 1, pageSize: 200, search: null, ct: ct);
