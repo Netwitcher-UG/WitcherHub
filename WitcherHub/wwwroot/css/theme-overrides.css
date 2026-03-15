@@ -106,7 +106,47 @@ html[data-bs-theme="semi-dark"] .modal-header[class*="bg-grd"] .btn-close {
     filter: invert(1) grayscale(100%);
     opacity: .9;
 }
+/* ===== View Client modal header ===== */
+/* ===== View Client modal header ===== */
+#ViewClientModal .vc-purple-modal-header {
+    background: rgb(107 76 230) !important;
+    background-image: none !important;
+    border-bottom-color: rgb(107 76 230) !important;
+}
 
+#ViewClientModal .vc-purple-modal-header .modal-title,
+#ViewClientModal .vc-purple-modal-header small,
+#ViewClientModal .vc-purple-modal-header .text-white {
+    color: #fff !important;
+}
+
+#ViewClientModal .vc-purple-modal-header .primaery-menu-close,
+#ViewClientModal .vc-purple-modal-header .primaery-menu-close:hover,
+#ViewClientModal .vc-purple-modal-header .primaery-menu-close:focus,
+#ViewClientModal .vc-purple-modal-header .primaery-menu-close:focus-visible,
+#ViewClientModal .vc-purple-modal-header .primaery-menu-close:active {
+    background: transparent !important;
+    background-image: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    color: #fff !important;
+    opacity: 1 !important;
+    text-decoration: none !important;
+}
+
+#ViewClientModal .vc-purple-modal-header .primaery-menu-close i,
+#ViewClientModal .vc-purple-modal-header .primaery-menu-close:hover i,
+#ViewClientModal .vc-purple-modal-header .primaery-menu-close:focus i,
+#ViewClientModal .vc-purple-modal-header .primaery-menu-close:focus-visible i,
+#ViewClientModal .vc-purple-modal-header .primaery-menu-close:active i {
+    color: #fff !important;
+}
+
+#ViewClientModal .vc-purple-modal-header .btn-close {
+    filter: invert(1) grayscale(100%);
+    opacity: 1 !important;
+}
 /* hover */
 html[data-bs-theme="light"] .wh-tablecard-scroll tbody tr:hover td,
 html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody tr:hover td{
@@ -145,4 +185,135 @@ html[data-bs-theme="blue-theme"] #projectsTableCard {
 #projectsTableCard tbody tr:hover > td {
     background: var(--wh-project-row-hover-bg, rgba(255,255,255,.05)) !important;
     box-shadow: inset 0 0 0 1px var(--wh-project-row-hover-stroke, rgba(255,255,255,.08));
+}
+
+
+/* ===== Schema Builder switch visibility in night themes (dark + blue-theme) ===== */
+html[data-bs-theme="dark"] [data-schema-builder] .form-switch .form-check-input,
+html[data-bs-theme="blue-theme"] [data-schema-builder] .form-switch .form-check-input {
+    background-color: rgba(255,255,255,.10) !important;
+    border-color: rgba(255,255,255,.32) !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba(255,255,255,.96)'/%3e%3c/svg%3e") !important;
+    box-shadow: none !important;
+}
+
+html[data-bs-theme="dark"] [data-schema-builder] .form-switch .form-check-input:checked,
+html[data-bs-theme="blue-theme"] [data-schema-builder] .form-switch .form-check-input:checked {
+    background-color: rgb(107 76 230) !important;
+    border-color: rgb(107 76 230) !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba(255,255,255,.98)'/%3e%3c/svg%3e") !important;
+}
+
+html[data-bs-theme="dark"] [data-schema-builder] .form-switch .form-check-input:focus,
+html[data-bs-theme="blue-theme"] [data-schema-builder] .form-switch .form-check-input:focus {
+    box-shadow: 0 0 0 .2rem rgba(107, 76, 230, .22) !important;
+}
+
+html[data-bs-theme="dark"] [data-schema-builder] .form-check-label,
+html[data-bs-theme="blue-theme"] [data-schema-builder] .form-check-label {
+    color: rgba(255,255,255,.92) !important;
+}
+
+/* ===== View Service modal: Add Rule builder spacing + Advanced button ===== */
+#ViewServiceModal #vsAddRuleForm {
+    overflow: hidden;
+}
+
+#ViewServiceModal #vsAddRuleForm > #vs-add-rule-builderWrap,
+#ViewServiceModal #vsAddRuleForm > #vs-add-rule-advWrap {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+}
+
+#ViewServiceModal #vsAddRuleForm > #vs-add-rule-builderWrap {
+    padding-top: 1.25rem;
+}
+
+#ViewServiceModal #vsAddRuleForm > #vs-add-rule-advWrap {
+    padding-top: .75rem;
+}
+
+#ViewServiceModal #vsAddRuleForm > .card-body {
+    padding: 1rem 1.25rem 1.15rem 1.25rem !important;
+}
+
+#ViewServiceModal #vs-add-rule-builderWrap > .mt-2 {
+    margin-top: 0 !important;
+    padding: 1rem 1rem .9rem 1rem;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.02);
+}
+
+html[data-bs-theme="light"] #ViewServiceModal #vs-add-rule-builderWrap > .mt-2,
+html[data-bs-theme="semi-dark"] #ViewServiceModal #vs-add-rule-builderWrap > .mt-2 {
+    border-color: rgba(0,0,0,.08);
+    background: rgba(0,0,0,.02);
+}
+
+/* Advanced button inside Add Rule builder */
+/* Advanced button inside Rule builders (Add + Edit) */
+#ViewServiceModal button[data-vc-action="toggle-advanced"] {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 112px !important;
+    min-height: 38px !important;
+    padding: .5rem 1rem !important;
+    border-radius: 10px !important;
+    font-size: .88rem !important;
+    font-weight: 700 !important;
+    line-height: 1.1 !important;
+    cursor: pointer !important;
+    text-decoration: none !important;
+    vertical-align: middle !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+
+    background: rgb(107 76 230) !important;
+    background-image: none !important;
+    border: 1px solid rgb(107 76 230) !important;
+    color: #fff !important;
+    box-shadow: 0 8px 18px rgba(107, 76, 230, .26) !important;
+    outline: none !important;
+}
+
+#ViewServiceModal button[data-vc-action="toggle-advanced"]:hover,
+#ViewServiceModal button[data-vc-action="toggle-advanced"]:focus,
+#ViewServiceModal button[data-vc-action="toggle-advanced"]:focus-visible,
+#ViewServiceModal button[data-vc-action="toggle-advanced"]:active,
+#ViewServiceModal button[data-vc-action="toggle-advanced"].active {
+    background: rgb(95 66 214) !important;
+    background-image: none !important;
+    border-color: rgb(95 66 214) !important;
+    color: #fff !important;
+    box-shadow: 0 10px 22px rgba(107, 76, 230, .32) !important;
+    outline: none !important;
+}
+
+#ViewServiceModal button[data-vc-action="toggle-advanced"],
+#ViewServiceModal button[data-vc-action="toggle-advanced"] span,
+#ViewServiceModal button[data-vc-action="toggle-advanced"] i {
+    color: #fff !important;
+}
+
+html[data-bs-theme="dark"] #ViewServiceModal button[data-vc-action="toggle-advanced"],
+html[data-bs-theme="blue-theme"] #ViewServiceModal button[data-vc-action="toggle-advanced"] {
+    background: rgb(107 76 230) !important;
+    border-color: rgb(107 76 230) !important;
+    color: #fff !important;
+    box-shadow: 0 10px 22px rgba(107, 76, 230, .30) !important;
+}
+
+html[data-bs-theme="dark"] #ViewServiceModal button[data-vc-action="toggle-advanced"]:hover,
+html[data-bs-theme="dark"] #ViewServiceModal button[data-vc-action="toggle-advanced"]:focus,
+html[data-bs-theme="dark"] #ViewServiceModal button[data-vc-action="toggle-advanced"]:focus-visible,
+html[data-bs-theme="dark"] #ViewServiceModal button[data-vc-action="toggle-advanced"]:active,
+html[data-bs-theme="blue-theme"] #ViewServiceModal button[data-vc-action="toggle-advanced"]:hover,
+html[data-bs-theme="blue-theme"] #ViewServiceModal button[data-vc-action="toggle-advanced"]:focus,
+html[data-bs-theme="blue-theme"] #ViewServiceModal button[data-vc-action="toggle-advanced"]:focus-visible,
+html[data-bs-theme="blue-theme"] #ViewServiceModal button[data-vc-action="toggle-advanced"]:active {
+    background: rgb(95 66 214) !important;
+    border-color: rgb(95 66 214) !important;
+    color: #fff !important;
 }

@@ -242,8 +242,6 @@
         const normStatusText = (v) => {
             if (v === null || v === undefined) return "";
             if (typeof v === "number") {
-                // لو الـ enum عندك يطلع أرقام (بدون JsonStringEnumConverter)
-                // عدّل الماب حسب ترتيب ProjectStatus عندك إذا اختلف
                 const map = {
                     0: "Draft",
                     1: "Active",
@@ -270,7 +268,6 @@
         const fmtDateOnly = (d) => {
             if (!d) return "—";
             const s = String(d);
-            // لو جاي DateTime "2026-02-25T00:00:00" خذ الجزء الأول
             return s.includes("T") ? s.split("T")[0] : s;
         };
 
@@ -299,7 +296,14 @@
                 <td>${statusBadge(status)}</td>
                 <td class="text-muted">${esc(datesText)}</td>
                 <td class="text-end">
-                    ${id ? `<a class="btn btn-sm btn-outline-primary" href="${openUrl}">Open</a>` : `<span class="text-muted">—</span>`}
+                    ${id
+                    ? `
+                        <a class="btn vc-icon-btn text-primary"
+                           href="${openUrl}"
+                           title="Open project">
+                            <i class="material-icons-outlined">visibility</i>
+                        </a>`
+                    : `<span class="text-muted">—</span>`}
                 </td>
             </tr>
         `;
@@ -313,6 +317,8 @@
             });
         });
     }
+
+
     // ---------- Render Locations (inline edit) ----------
     function renderAddresses(list) {
         const wrap = $('vc-addressList');

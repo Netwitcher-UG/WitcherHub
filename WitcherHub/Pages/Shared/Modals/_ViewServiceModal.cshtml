@@ -9,15 +9,15 @@
 </template>
 
 <div class="modal fade" id="ViewServiceModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
+    <div class="modal-dialog modal-dialog-centered modal-xl vs-view-modal-dialog">
+        <div class="modal-content vs-view-modal-content">
 
-            <div class="modal-header">
+            <div class="modal-header vs-purple-modal-header border-bottom-0">
                 <h5 class="modal-title">Service</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close vs-header-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <div class="modal-body">
+            <div class="modal-body vs-view-modal-body">
 
                 <!-- Loading -->
                 <div id="vsLoading" class="text-muted">Loading...</div>
@@ -344,9 +344,7 @@
                 </div>
             </div>
 
-            <div class="modal-footer">
-                <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Close</button>
-            </div>
+            
 
         </div>
     </div>
