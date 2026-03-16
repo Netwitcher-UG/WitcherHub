@@ -33,24 +33,49 @@ namespace WitcherHub.Infrastructure.Services.BackgroundTasks
 
                     var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
+                    _logger.LogInformation("Recurring job running. Today={Today}", today);
+
                     var dueContracts = await db.Contracts
                         .Include(c => c.Items)
                         .Where(c =>
                             c.Status == WitcherHub.Infrastructure.Data.Models.Enums.DocumentStatus.Signed &&
+                            c.InvoiceSendMode == WitcherHub.Infrastructure.Data.Models.Enums.InvoiceSendMode.Automatic &&
                             c.RecurringEnabled &&
                             c.RecurringIsActive &&
                             c.NextRecurringInvoiceDate != null &&
                             c.NextRecurringInvoiceDate <= today)
                         .ToListAsync(stoppingToken);
 
+                    _logger.LogInformation("Due contracts count = {Count}", dueContracts.Count);
+
                     foreach (var contract in dueContracts)
                     {
+                        _logger.LogInformation(
+                            "Processing ContractId={ContractId}, NextRecurringInvoiceDate={NextRecurringInvoiceDate}",
+                            contract.Id,
+                            contract.NextRecurringInvoiceDate);
+
                         try
                         {
-                            await lex.CreateRecurringInvoiceFromContractAsync(
+                            var result = await lex.CreateRecurringInvoiceFromContractAsync(
                                 contract.Id,
                                 contract.NextRecurringInvoiceDate!.Value,
                                 stoppingToken);
+
+                            if (result.Created)
+                            {
+                                _logger.LogInformation(
+                                    "Recurring invoice created. ContractId={ContractId}. Message={Message}",
+                                    contract.Id,
+                                    result.Message);
+                            }
+                            else
+                            {
+                                _logger.LogWarning(
+                                    "Recurring invoice not created. ContractId={ContractId}. Message={Message}",
+                                    contract.Id,
+                                    result.Message);
+                            }
                         }
                         catch (Exception ex)
                         {

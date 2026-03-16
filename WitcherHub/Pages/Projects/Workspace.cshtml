@@ -1,4 +1,4 @@
-﻿@page
+@page
 @using Microsoft.AspNetCore.Authorization
 @using WitcherHub.Domain.SeedData
 @attribute [Authorize(Policy = AppPolicyPrefixes.Permission + AppPermissions.ManageNetwitcher)]
@@ -323,7 +323,20 @@
                         <div class="fw-semibold" id="vpContractTitle">—</div>
                         <div class="text-muted small" id="vpContractMeta">—</div>
                     </div>
-
+                    @if (Model.CurrentContractId.HasValue)
+                    {
+                        <form method="post"
+                              asp-page="/Projects/Workspace"
+                              asp-page-handler="GenerateInvoice"
+                              asp-route-id="@Model.ProjectId"
+                              asp-route-tab="contracts"
+                              class="d-inline @(Model.ShowManualInvoiceButton ? "" : "d-none")">
+                            <input type="hidden" name="contractId" value="@Model.CurrentContractId.Value" />
+                            <button type="submit" class="btn btn-success" id="vpContractGenerateInvoiceBtn">
+                                Create Invoice
+                            </button>
+                        </form>
+                    }
                     <div class="d-flex gap-2 flex-wrap">
                         <a class="btn btn-outline-primary d-none"
                            id="vpContractItemsLink"

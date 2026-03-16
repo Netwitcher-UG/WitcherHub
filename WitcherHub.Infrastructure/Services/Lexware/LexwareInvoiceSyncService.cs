@@ -18,6 +18,18 @@ using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Infrastructure.Services.Lexware
 {
+    public sealed class InvoiceGenerationResult
+    {
+        public bool Created { get; init; }
+        public string Message { get; init; } = "";
+
+        public static InvoiceGenerationResult Success(string message) =>
+            new() { Created = true, Message = message };
+
+        public static InvoiceGenerationResult Warning(string message) =>
+            new() { Created = false, Message = message };
+    }
+
     public class LexwareInvoiceSyncService
     {
         private readonly AppDbContext _db;
@@ -47,7 +59,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
         // PUBLIC API
         // =========================================
 
-        public async Task CreateOneTimeInvoiceFromContractAsync(Guid contractId, CancellationToken ct)
+        public async Task<InvoiceGenerationResult> CreateOneTimeInvoiceFromContractAsync(Guid contractId, CancellationToken ct)
         {
             var contract = await LoadContractAsync(contractId, ct);
             var items = contract.Items
@@ -58,7 +70,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             if (items.Count == 0)
             {
                 _logger.LogInformation("No one-time items found. ContractId={ContractId}", contractId);
-                return;
+                return InvoiceGenerationResult.Warning("No one-time items found for this contract.");
             }
 
             var existing = await _db.Invoices.AnyAsync(x =>
@@ -68,10 +80,10 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             if (existing)
             {
                 _logger.LogInformation("One-time invoice already exists. ContractId={ContractId}", contractId);
-                return;
+                return InvoiceGenerationResult.Warning("A one-time invoice already exists for this contract.");
             }
 
-            await CreateInvoiceInternalAsync(
+            return await CreateInvoiceInternalAsync(
                 contract,
                 items,
                 invoiceDate: DateOnly.FromDateTime(DateTime.UtcNow),
@@ -85,7 +97,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 ct: ct);
         }
 
-        public async Task CreateRecurringInvoiceFromContractAsync(
+        public async Task<InvoiceGenerationResult> CreateRecurringInvoiceFromContractAsync(
             Guid contractId,
             DateOnly cycleDate,
             CancellationToken ct)
@@ -95,31 +107,40 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             if (!contract.RecurringEnabled || !contract.RecurringIsActive)
             {
                 _logger.LogInformation("Recurring disabled/inactive. ContractId={ContractId}", contractId);
-                return;
+                return InvoiceGenerationResult.Warning("Recurring billing is disabled or inactive for this contract.");
             }
 
             if (contract.RecurringEndDate.HasValue && cycleDate > contract.RecurringEndDate.Value)
             {
-                _logger.LogInformation("Recurring cycle skipped because beyond end date. ContractId={ContractId} CycleDate={CycleDate}",
+                _logger.LogInformation(
+                    "Recurring cycle skipped because beyond end date. ContractId={ContractId} CycleDate={CycleDate}",
                     contractId, cycleDate);
-                return;
+
+                return InvoiceGenerationResult.Warning(
+                    $"Recurring billing already ended before cycle {cycleDate:yyyy-MM-dd}.");
             }
 
             var items = contract.Items
                 .Where(x => x.BillingCycle != BillingCycle.OneTime)
-                .Where(x => IsItemDueForCycle(x.BillingCycle, contract.RecurringStartDate ?? contract.StartDate ?? cycleDate, cycleDate))
+                .Where(x => IsItemDueForCycle(
+                    x.BillingCycle,
+                    contract.RecurringStartDate ?? contract.StartDate ?? cycleDate,
+                    cycleDate))
                 .OrderBy(x => x.Position)
                 .ToList();
 
             if (items.Count == 0)
             {
-                _logger.LogInformation("No recurring items due for cycle. ContractId={ContractId} CycleDate={CycleDate}",
+                _logger.LogInformation(
+                    "No recurring items due for cycle. ContractId={ContractId} CycleDate={CycleDate}",
                     contractId, cycleDate);
 
                 contract.NextRecurringInvoiceDate = CalculateNextRecurringDate(cycleDate);
                 contract.LastRecurringInvoiceRunAt = DateTimeOffset.UtcNow;
                 await _db.SaveChangesAsync(ct);
-                return;
+
+                return InvoiceGenerationResult.Warning(
+                    $"No recurring items are due for cycle {cycleDate:yyyy-MM-dd}.");
             }
 
             var cycleKey = $"{contract.Id:N}:{cycleDate:yyyy-MM-dd}";
@@ -129,12 +150,15 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             if (exists)
             {
-                _logger.LogInformation("Recurring invoice already exists. ContractId={ContractId} CycleKey={CycleKey}",
+                _logger.LogInformation(
+                    "Recurring invoice already exists. ContractId={ContractId} CycleKey={CycleKey}",
                     contractId, cycleKey);
-                return;
+
+                return InvoiceGenerationResult.Warning(
+                    $"A recurring invoice already exists for cycle {cycleDate:yyyy-MM-dd}.");
             }
 
-            await CreateInvoiceInternalAsync(
+            var result = await CreateInvoiceInternalAsync(
                 contract,
                 items,
                 invoiceDate: cycleDate,
@@ -147,6 +171,9 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                     : InvoiceDispatchStatus.PendingManualSend,
                 ct: ct);
 
+            if (!result.Created)
+                return result;
+
             contract.NextRecurringInvoiceDate = CalculateNextRecurringDate(cycleDate);
             contract.LastRecurringInvoiceRunAt = DateTimeOffset.UtcNow;
 
@@ -156,6 +183,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             }
 
             await _db.SaveChangesAsync(ct);
+            return result;
         }
 
         public async Task SendManualInvoiceAsync(Guid localInvoiceId, CancellationToken ct)
@@ -172,9 +200,6 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             if (string.IsNullOrWhiteSpace(invoice.LexwareInvoiceId))
                 throw new InvalidOperationException("Invoice has no Lexware reference.");
 
-            // IMPORTANT:
-            // بدّل هذا السطر حسب اسم الميثود الموجودة داخل LexwareClient عندك
-            // الهدف هنا: finalize / send draft invoice on Lexware
             await _lex.FinalizeInvoiceAsync(invoice.LexwareInvoiceId!, ct);
 
             await RefreshFromLexwareAsync(invoice, ct);
@@ -191,7 +216,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
         // INTERNAL CREATE
         // =========================================
 
-        private async Task CreateInvoiceInternalAsync(
+        private async Task<InvoiceGenerationResult> CreateInvoiceInternalAsync(
             Contract contract,
             List<ContractItem> sourceItems,
             DateOnly invoiceDate,
@@ -203,7 +228,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             CancellationToken ct)
         {
             if (contract.Status != DocumentStatus.Signed)
-                throw new InvalidOperationException("Contract is not signed yet.");
+                return InvoiceGenerationResult.Warning("Contract is not signed yet.");
 
             var customer = contract.Project.Customer;
 
@@ -217,9 +242,12 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             if (string.IsNullOrWhiteSpace(customer.Name) || string.IsNullOrWhiteSpace(city))
             {
-                _logger.LogWarning("Lexware skipped: missing customer name/city. ContractId={ContractId}, CustomerId={CustomerId}",
+                _logger.LogWarning(
+                    "Lexware skipped: missing customer name/city. ContractId={ContractId}, CustomerId={CustomerId}",
                     contract.Id, customer.Id);
-                return;
+
+                return InvoiceGenerationResult.Warning(
+                    "Invoice was not created because customer name or city is missing.");
             }
 
             var currency = string.IsNullOrWhiteSpace(contract.Currency) ? "EUR" : contract.Currency;
@@ -274,7 +302,8 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                     : $"ContractId={contract.Id};OneTime=true"
             };
 
-            _logger.LogInformation("Lexware create START. ContractId={ContractId} Recurring={Recurring} Finalize={Finalize}",
+            _logger.LogInformation(
+                "Lexware create START. ContractId={ContractId} Recurring={Recurring} Finalize={Finalize}",
                 contract.Id, isRecurringInvoice, finalizeOnLexware);
 
             var created = await _lex.CreateInvoiceAsync(req, finalize: finalizeOnLexware, ct);
@@ -322,8 +351,14 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             await EnsurePdfAsync(localInvoice, ct);
             await InvalidateInvoiceCacheAsync(localInvoice.Id, ct);
 
-            _logger.LogInformation("Lexware invoice created. ContractId={ContractId} LocalId={LocalId} LexId={LexId}",
+            _logger.LogInformation(
+                "Lexware invoice created. ContractId={ContractId} LocalId={LocalId} LexId={LexId}",
                 contract.Id, localInvoice.Id, localInvoice.LexwareInvoiceId);
+
+            return InvoiceGenerationResult.Success(
+                isRecurringInvoice
+                    ? $"Recurring invoice created for cycle {invoiceDate:yyyy-MM-dd}."
+                    : "One-time invoice created successfully.");
         }
 
         private async Task<Contract> LoadContractAsync(Guid contractId, CancellationToken ct)
@@ -670,13 +705,12 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             var baseDir = Path.Combine(_env.ContentRootPath, "App_Data", "LexwareInvoices");
 
-            // إذا كانت القيمة القديمة مسارًا كاملاً
             if (Path.IsPathRooted(storedPath))
                 return Path.GetFullPath(storedPath);
 
-            // إذا كانت القيمة الجديدة مجرد اسم ملف أو مسار نسبي
             return Path.GetFullPath(Path.Combine(baseDir, storedPath));
         }
+
         private async Task InvalidateInvoiceCacheAsync(Guid invoiceId, CancellationToken ct)
         {
             await _cache.RemoveAsync(InvoiceCacheKeys.Details(invoiceId), ct);

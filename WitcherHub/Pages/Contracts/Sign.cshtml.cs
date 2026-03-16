@@ -315,20 +315,29 @@ namespace WitcherHub.Pages.Contracts
                         await db.SaveChangesAsync(token);
                     }
 
-                    if (hasOneTimeItems)
+                    if (contract.InvoiceSendMode == InvoiceSendMode.Automatic)
                     {
-                        await lex.CreateOneTimeInvoiceFromContractAsync(contractId, token);
-                    }
-
-                    if (hasRecurringItems)
-                    {
-                        if (contract.NextRecurringInvoiceDate.HasValue && contract.NextRecurringInvoiceDate.Value <= today)
+                        if (hasOneTimeItems)
                         {
-                            await lex.CreateRecurringInvoiceFromContractAsync(
-                                contractId,
-                                contract.NextRecurringInvoiceDate.Value,
-                                token);
+                            await lex.CreateOneTimeInvoiceFromContractAsync(contractId, token);
                         }
+
+                        if (hasRecurringItems)
+                        {
+                            if (contract.NextRecurringInvoiceDate.HasValue && contract.NextRecurringInvoiceDate.Value <= today)
+                            {
+                                await lex.CreateRecurringInvoiceFromContractAsync(
+                                    contractId,
+                                    contract.NextRecurringInvoiceDate.Value,
+                                    token);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogInformation(
+                            "Invoice generation skipped because contract uses manual mode. ContractId={Id}",
+                            contractId);
                     }
 
                     _logger.LogInformation("Lexware job DONE ContractId={Id}", contractId);
