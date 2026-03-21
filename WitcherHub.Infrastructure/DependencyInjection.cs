@@ -163,6 +163,7 @@ namespace WitcherHub.Infrastructure
             services.AddSingleton<IConverter>(new SynchronizedConverter(new PdfTools()));
             services.AddSingleton<IPdfGenerator, DinkToPdfGenerator>();
             services.AddScoped<ContractCreationService>();
+            services.AddScoped<IInvoiceNotificationService, InvoiceNotificationService>();
             return services;
         }
     }
