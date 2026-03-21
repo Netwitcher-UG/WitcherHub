@@ -1,55 +1,76 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using WitcherHub.Application.Interfaces.ManageData;
+using WitcherHub.Infrastructure.Services.Lexware;
+using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Pages.Invoices
 {
+    [AllowAnonymous]
     public class PdfViewerModel : PageModel
     {
         private readonly IInvoice _invoices;
-        private readonly IWebHostEnvironment _env;
+        private readonly LexwareClient _lex;
 
-        public PdfViewerModel(IInvoice invoices, IWebHostEnvironment env)
+        public PdfViewerModel(IInvoice invoices, LexwareClient lex)
         {
             _invoices = invoices;
-            _env = env;
+            _lex = lex;
         }
 
         [BindProperty(SupportsGet = true)]
         public Guid Id { get; set; }
 
-        public async Task<IActionResult> OnGetAsync(CancellationToken ct)
+        public async Task<IActionResult> OnGetAsync(bool download = false, CancellationToken ct = default)
         {
             if (Id == Guid.Empty)
                 return Content("Invalid invoice id.", "text/plain");
 
             var inv = await _invoices.GetInvoiceAsync(Id, ct);
             if (inv is null)
-                return Content("Invoice not found.", "text/plain");
+                return NotFound("Invoice not found.");
 
-            var storedPath = inv.LexwarePdfPath;
-            if (string.IsNullOrWhiteSpace(storedPath))
-                return Content("PDF not available yet.", "text/plain");
+            if (string.IsNullOrWhiteSpace(inv.LexwareInvoiceId))
+                return Content("Invoice is not linked to Lexware.", "text/plain");
 
-            var baseDir = Path.GetFullPath(Path.Combine(_env.ContentRootPath, "App_Data", "LexwareInvoices"));
+            if (inv.Status == DocumentStatus.Draft ||
+                string.Equals(inv.LexwareVoucherStatus, "draft", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(409, "PDF is not available yet because the invoice is still draft.");
+            }
 
-            var fileNameOnly = Path.GetFileName(storedPath);
+            try
+            {
+                var pdfBytes = await _lex.DownloadInvoiceFileAsync(
+                    inv.LexwareInvoiceId!,
+                    "application/pdf",
+                    ct);
 
-            if (string.IsNullOrWhiteSpace(fileNameOnly))
-                return Content("PDF file name is invalid.", "text/plain");
+                var downloadName = $"Invoice-{(string.IsNullOrWhiteSpace(inv.InvoiceNo) ? inv.Id.ToString() : inv.InvoiceNo)}.pdf";
 
-            var full = Path.GetFullPath(Path.Combine(baseDir, fileNameOnly));
+                FileContentResult result;
 
-            if (!full.StartsWith(baseDir, StringComparison.OrdinalIgnoreCase))
-                return Content("PDF path rejected by security check.", "text/plain");
+                if (download)
+                    result = File(pdfBytes, "application/pdf", downloadName);
+                else
+                    result = File(pdfBytes, "application/pdf");
 
-            if (!System.IO.File.Exists(full))
-                return Content($"PDF file not found: {fileNameOnly}", "text/plain");
+                result.EnableRangeProcessing = true;
 
-            var result = PhysicalFile(full, "application/pdf");
-            result.EnableRangeProcessing = true;
-            return result;
+                Response.Headers["Cache-Control"] = "no-store, no-cache, max-age=0";
+                Response.Headers["Pragma"] = "no-cache";
+
+                return result;
+            }
+            catch (InvalidOperationException ex)
+            {
+                return StatusCode(409, $"PDF is not available from Lexware yet. {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(502, $"Failed to fetch invoice PDF from Lexware. {ex.GetBaseException().Message}");
+            }
         }
-       
     }
 }

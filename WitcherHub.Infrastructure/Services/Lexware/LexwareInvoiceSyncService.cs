@@ -234,58 +234,81 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             var billing = customer.Addresses?
                 .OrderByDescending(a => a.IsDefault)
+                .ThenByDescending(a => a.IsLexware)
                 .FirstOrDefault();
 
-            var street = (billing?.StreetRaw ?? "").Trim();
-            var zip = (billing?.PostalCode ?? "").Trim();
-            var city = (billing?.City ?? "").Trim();
+            var recipientName = BuildRecipientName(customer, billing);
+            var recipientSupplement = BuildRecipientSupplement(customer, billing);
 
-            if (string.IsNullOrWhiteSpace(customer.Name) || string.IsNullOrWhiteSpace(city))
+            var street = CleanPrintText(billing?.StreetRaw) ?? string.Empty;
+            var zip = CleanPrintText(billing?.PostalCode) ?? string.Empty;
+            var city = CleanPrintText(billing?.City) ?? string.Empty;
+            var countryCode = NormalizeCountryCode(billing?.CountryCode, fallback: "DE");
+
+            var lexwareContactId = CleanPrintText(customer.LexwareContactId);
+
+            if (string.IsNullOrWhiteSpace(recipientName) ||
+                string.IsNullOrWhiteSpace(street) ||
+                string.IsNullOrWhiteSpace(zip) ||
+                string.IsNullOrWhiteSpace(city))
             {
                 _logger.LogWarning(
-                    "Lexware skipped: missing customer name/city. ContractId={ContractId}, CustomerId={CustomerId}",
+                    "Lexware skipped: missing recipient address data. ContractId={ContractId}, CustomerId={CustomerId}",
                     contract.Id, customer.Id);
 
                 return InvoiceGenerationResult.Warning(
-                    "Invoice was not created because customer name or city is missing.");
+                    "Invoice was not created because recipient address data is incomplete.");
             }
 
             var currency = string.IsNullOrWhiteSpace(contract.Currency) ? "EUR" : contract.Currency;
             var invoiceDateUtc = new DateTimeOffset(invoiceDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
 
-            var lexLineItems = sourceItems.Select(i => new LexwareInvoiceLineItem
-            {
-                Type = "custom",
-                Name = string.IsNullOrWhiteSpace(i.Title) ? $"Position {i.Position}" : i.Title.Trim(),
-                Quantity = i.Quantity <= 0 ? 1 : i.Quantity,
-                UnitName = "Stück",
-                UnitPrice = new LexwareUnitPrice
-                {
-                    Currency = currency,
-                    NetAmount = ResolveNetAmount(i),
-                    TaxRatePercentage = _opt.DefaultTaxRatePercentage
-                },
-                DiscountPercentage = ResolveDiscountPercent(i)
-            }).ToList();
-
+            var lexLineItems = sourceItems
+      .OrderBy(i => i.Position)
+      .Select(i => new LexwareInvoiceLineItem
+      {
+          Type = "custom",
+          Name = BuildLineItemName(i),
+          Quantity = i.Quantity <= 0 ? 1 : i.Quantity,
+          UnitName = "Stück",
+          UnitPrice = new LexwareUnitPrice
+          {
+              Currency = currency,
+              NetAmount = ResolveNetAmount(i),
+              TaxRatePercentage = _opt.DefaultTaxRatePercentage
+          },
+          DiscountPercentage = ResolveDiscountPercent(i)
+      })
+      .ToList();
             var req = new LexwareInvoiceCreateRequest
             {
                 Archived = false,
+                Language = "de",
                 VoucherDate = invoiceDateUtc,
                 Address = new LexwareInvoiceAddress
                 {
-                    Name = customer.Name,
+                    ContactId = lexwareContactId,
+                    Name = recipientName,
+                    Supplement = recipientSupplement,
                     Street = street,
                     Zip = zip,
                     City = city,
-                    CountryCode = _opt.DefaultCountryCode
+                    CountryCode = countryCode
                 },
                 LineItems = lexLineItems,
-                TotalPrice = new LexwareTotalPrice { Currency = currency },
-                TaxConditions = new LexwareTaxConditions { TaxType = "net" },
+                TotalPrice = new LexwareTotalPrice
+                {
+                    Currency = currency
+                },
+                TaxConditions = new LexwareTaxConditions
+                {
+                    TaxType = "net"
+                },
                 PaymentConditions = new LexwarePaymentConditions
                 {
-                    PaymentTermLabel = _opt.DefaultPaymentTermLabel,
+                    PaymentTermLabel = string.IsNullOrWhiteSpace(_opt.DefaultPaymentTermLabel)
+             ? "Zahlbar sofort, rein netto"
+             : _opt.DefaultPaymentTermLabel,
                     PaymentTermDuration = _opt.DefaultPaymentTermDays
                 },
                 ShippingConditions = new LexwareShippingConditions
@@ -294,12 +317,8 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                     ShippingDate = invoiceDateUtc
                 },
                 Title = "Rechnung",
-                Introduction = isRecurringInvoice
-                    ? $"Recurring invoice for contract {contract.ContractNo}"
-                    : $"Invoice for contract {contract.ContractNo}",
-                Remark = isRecurringInvoice
-                    ? $"ContractId={contract.Id};RecurringCycleKey={recurringCycleKey}"
-                    : $"ContractId={contract.Id};OneTime=true"
+                Introduction = BuildGermanInvoiceIntroduction(contract, isRecurringInvoice, invoiceDate),
+                Remark = BuildGermanInvoiceRemark()
             };
 
             _logger.LogInformation(
@@ -370,6 +389,9 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 .Include(c => c.Project)
                     .ThenInclude(p => p.Customer)
                         .ThenInclude(cu => cu.EmailAddresses)
+                .Include(c => c.Project)
+                    .ThenInclude(p => p.Customer)
+                        .ThenInclude(cu => cu.Contacts)
                 .Include(c => c.Items)
                 .FirstOrDefaultAsync(c => c.Id == contractId, ct);
 
@@ -393,7 +415,106 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             return 0m;
         }
+        private static string? CleanPrintText(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
 
+            var s = value.Trim();
+
+            if (s.Equals("N/A", StringComparison.OrdinalIgnoreCase) ||
+                s.Equals("NA", StringComparison.OrdinalIgnoreCase) ||
+                s.Equals("null", StringComparison.OrdinalIgnoreCase) ||
+                s.Equals("-", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            return s;
+        }
+
+        private static string NormalizeCountryCode(string? value, string fallback = "DE")
+        {
+            var s = CleanPrintText(value);
+            if (string.IsNullOrWhiteSpace(s))
+                return fallback;
+
+            s = s.Trim().ToUpperInvariant();
+            return s.Length == 2 ? s : fallback;
+        }
+
+        private static string BuildRecipientName(Customer customer, CustomerAddress? billing)
+        {
+            var billingName = CleanPrintText(billing?.FullNameOrCompany);
+            if (!string.IsNullOrWhiteSpace(billingName))
+                return billingName!;
+
+            var customerName = CleanPrintText(customer.Name);
+            if (!string.IsNullOrWhiteSpace(customerName))
+                return customerName!;
+
+            var personName = string.Join(" ", new[]
+            {
+        CleanPrintText(customer.FirstName),
+        CleanPrintText(customer.LastName)
+    }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+            if (!string.IsNullOrWhiteSpace(personName))
+                return personName;
+
+            return "Kunde";
+        }
+
+        private static string? BuildRecipientSupplement(Customer customer, CustomerAddress? billing)
+        {
+            var addressLine2 = CleanPrintText(billing?.AddressLine2);
+            if (!string.IsNullOrWhiteSpace(addressLine2))
+                return addressLine2;
+
+            var primaryContact = customer.Contacts?
+                .OrderByDescending(x => x.IsPrimary)
+                .ThenBy(x => x.Name)
+                .FirstOrDefault();
+
+            if (primaryContact == null)
+                return null;
+
+            var contactName = string.Join(" ", new[]
+            {
+        CleanPrintText(primaryContact.FirstName),
+        CleanPrintText(primaryContact.LastName)
+    }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+            if (string.IsNullOrWhiteSpace(contactName))
+                contactName = CleanPrintText(primaryContact.Name);
+
+            if (string.IsNullOrWhiteSpace(contactName))
+                return null;
+
+            return $"z. Hd. {contactName}";
+        }
+
+        private static string BuildGermanInvoiceIntroduction(
+            Contract contract,
+            bool isRecurringInvoice,
+            DateOnly invoiceDate)
+        {
+            if (isRecurringInvoice)
+            {
+                return
+                    $"Hiermit berechnen wir Ihnen die vertraglich vereinbarten wiederkehrenden Leistungen " +
+                    $"für den Abrechnungszeitraum {invoiceDate:MM.yyyy} gemäß Vertrag {contract.ContractNo}.";
+            }
+
+            return $"Hiermit berechnen wir Ihnen die vertraglich vereinbarten Leistungen gemäß Vertrag {contract.ContractNo}.";
+        }
+
+        private static string BuildGermanInvoiceRemark()
+            => "Vielen Dank für Ihren Auftrag.";
+
+        private static string BuildLineItemName(ContractItem item)
+        {
+            var title = CleanPrintText(item.Title);
+            return !string.IsNullOrWhiteSpace(title) ? title! : $"Position {item.Position}";
+        }
         private static bool IsItemDueForCycle(BillingCycle itemCycle, DateOnly recurringStartDate, DateOnly currentCycleDate)
         {
             if (itemCycle == BillingCycle.OneTime)
@@ -659,42 +780,13 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
         private async Task EnsurePdfAsync(Invoice invoice, CancellationToken ct)
         {
-            if (string.IsNullOrWhiteSpace(invoice.LexwareInvoiceId))
-                return;
-
-            var dir = Path.Combine(_env.ContentRootPath, "App_Data", "LexwareInvoices");
-            Directory.CreateDirectory(dir);
-
-            var existingFullPath = ResolveStoredPdfPath(invoice.LexwarePdfPath);
-            if (!string.IsNullOrWhiteSpace(existingFullPath) && File.Exists(existingFullPath))
-                return;
-
-            try
+            // لم نعد نخزن PDF محلياً.
+            // نحافظ فقط على تنظيف أي path قديم حتى لا تعتمد بقية الصفحات عليه.
+            if (!string.IsNullOrWhiteSpace(invoice.LexwarePdfPath))
             {
-                var pdf = await _lex.DownloadInvoiceFileAsync(invoice.LexwareInvoiceId!, "application/pdf", ct);
-
-                var safeName = (invoice.InvoiceNo ?? invoice.LexwareInvoiceId!)
-                    .Replace("/", "_")
-                    .Replace("\\", "_")
-                    .Trim();
-
-                var fileName = $"{safeName}.pdf";
-                var filePath = Path.Combine(dir, fileName);
-
-                await File.WriteAllBytesAsync(filePath, pdf, ct);
-
-                invoice.LexwarePdfPath = fileName;
+                invoice.LexwarePdfPath = null;
                 invoice.LexwareSyncedAt = DateTimeOffset.UtcNow;
-
                 await _db.SaveChangesAsync(ct);
-
-                _logger.LogInformation("Lexware PDF saved. LocalId={LocalId} LexId={LexId} FileName={FileName} FullPath={FullPath}",
-                    invoice.Id, invoice.LexwareInvoiceId, fileName, filePath);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lexware PDF download/save failed. LocalId={LocalId} LexId={LexId}",
-                    invoice.Id, invoice.LexwareInvoiceId);
             }
         }
 

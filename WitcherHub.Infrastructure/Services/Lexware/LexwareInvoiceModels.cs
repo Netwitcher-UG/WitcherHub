@@ -28,7 +28,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
         [JsonPropertyName("paymentConditions")] public LexwarePaymentConditions? PaymentConditions { get; set; }
 
         [JsonPropertyName("shippingConditions")] public LexwareShippingConditions ShippingConditions { get; set; } = new();
-
+        [JsonPropertyName("language")] public string? Language { get; set; }
         [JsonPropertyName("title")] public string? Title { get; set; }
         [JsonPropertyName("introduction")] public string? Introduction { get; set; }
         [JsonPropertyName("remark")] public string? Remark { get; set; }
