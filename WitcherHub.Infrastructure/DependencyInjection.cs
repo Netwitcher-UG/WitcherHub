@@ -33,6 +33,7 @@ using WitcherHub.Infrastructure.Services.Email_Sender.EmailTemplates;
 using WitcherHub.Infrastructure.Services.Email_Sender.Options;
 using WitcherHub.Infrastructure.Services.Email_Sender.Sender;
 using WitcherHub.Infrastructure.Services.HostedServices;
+using WitcherHub.Infrastructure.Services.Invoices;
 using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Infrastructure.Services.OpenAI;
 using WitcherHub.Infrastructure.Services.Pdf;
@@ -93,6 +94,7 @@ namespace WitcherHub.Infrastructure
             // وخلي ILexwareClient يرجّع نفس LexwareClient (حتى LexwareSyncService يضل شغال)
             services.AddScoped<ILexwareClient>(sp => sp.GetRequiredService<LexwareClient>());
             services.AddScoped<LexwareInvoiceSyncService>();
+            services.AddScoped<InvoicePublicLinkService>();
             //======= OpenAI =======
             services.Configure<OpenAIOptions>(
                 configuration.GetSection(OpenAIOptions.SectionName));
