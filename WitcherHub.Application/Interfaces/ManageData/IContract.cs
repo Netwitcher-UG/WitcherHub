@@ -35,5 +35,7 @@ namespace WitcherHub.Application.Interfaces.ManageData
     string? terms,
     InvoiceSendMode invoiceSendMode,
     CancellationToken ct = default);
+
+        Task<bool> HasSavedOverrideDraftAsync(Guid contractId, CancellationToken ct = default);
     }
 }

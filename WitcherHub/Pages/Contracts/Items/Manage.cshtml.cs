@@ -48,7 +48,7 @@ namespace WitcherHub.Pages.Contracts.Items
         public List<SelectListItem> ServiceOptions { get; private set; } = new();
 
         public bool IsLocked { get; private set; }
-
+        public bool HasSavedOverrideDraft { get; private set; }
         public int NextPosition { get; private set; } = 1;
 
         // Create fields
@@ -98,13 +98,17 @@ namespace WitcherHub.Pages.Contracts.Items
             await LoadServicesAsync(ct);
 
             IsLocked = IsContractLocked(Contract);
+            HasSavedOverrideDraft = await _contracts.HasSavedOverrideDraftAsync(ContractId, ct);
 
             NextPosition = (Contract.Items?.Count ?? 0) + 1;
 
-            
+
 
             return Page();
         }
+
+        
+        
         public async Task<IActionResult> OnPostSaveHeaderAsync(CancellationToken ct)
         {
             try
@@ -422,6 +426,22 @@ namespace WitcherHub.Pages.Contracts.Items
                 CustomerBlockOverride = customerBlockText,
 
                 Services = lines
+            };
+        }
+
+        public async Task<IActionResult> OnGetServiceSchemaAsync(Guid serviceId, CancellationToken ct)
+        {
+            if (serviceId == Guid.Empty)
+                return new ContentResult { Content = "null", ContentType = "application/json" };
+
+            var service = await _services.GetServiceAsync(serviceId, ct);
+            if (service?.ConfigSchema is null)
+                return new ContentResult { Content = "null", ContentType = "application/json" };
+
+            return new ContentResult
+            {
+                Content = service.ConfigSchema.RootElement.GetRawText(),
+                ContentType = "application/json"
             };
         }
     }

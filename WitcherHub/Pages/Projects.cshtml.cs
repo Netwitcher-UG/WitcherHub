@@ -577,6 +577,8 @@ namespace WitcherHub.Pages
                 }
 
                 var previewHtml = MarkdownToSafeHtml(contract.Terms ?? "");
+                var hasTerms = !string.IsNullOrWhiteSpace(contract.Terms);
+
 
                 var isSigned = contract.SignedAt is not null || contract.Status == DocumentStatus.Signed;
                 var canUpdate = !isSigned;
@@ -594,6 +596,7 @@ namespace WitcherHub.Pages
                         signedAt = contract.SignedAt,
                         canUpdate,
                         itemsCount,
+                        hasTerms,
                         previewHtml,
                         editUrl = $"/Contracts/Edit?id={contract.Id}",
                         detailsUrl = $"/Contracts/Details?id={contract.Id}"
@@ -896,7 +899,18 @@ namespace WitcherHub.Pages
 
             if (contract is null)
                 return new JsonResult(new { ok = false, toast = new { type = "warning", title = "No contract", message = "There is no contract for this project." } }) { StatusCode = 404 };
-
+            if (string.IsNullOrWhiteSpace(contract.Terms))
+                return new JsonResult(new
+                {
+                    ok = false,
+                    toast = new
+                    {
+                        type = "warning",
+                        title = "Contract not generated",
+                        message = "Generate the contract first before sending it."
+                    }
+                })
+                { StatusCode = 409 };
             // شرطك: لازم يوجد عقد + line items
             var hasItems = contract.Items != null && contract.Items.Count > 0;
             if (!hasItems)
@@ -1013,7 +1027,128 @@ namespace WitcherHub.Pages
                 toast = new { type = "success", title = "Sent", message = "Contract email sent successfully." }
             });
         }
+        public async Task<IActionResult> OnPostCreateProjectContractLinkAsync(Guid projectId, CancellationToken ct)
+        {
+            if (projectId == Guid.Empty)
+                return new JsonResult(new
+                {
+                    ok = false,
+                    toast = new { type = "error", title = "Error", message = "Invalid project id." }
+                })
+                { StatusCode = 400 };
 
+            var contract = await _db.Contracts
+                .Include(c => c.Items)
+                .Include(c => c.Project)
+                    .ThenInclude(p => p.Customer)
+                        .ThenInclude(cu => cu.Contacts)
+                .Include(c => c.Project)
+                    .ThenInclude(p => p.Customer)
+                        .ThenInclude(cu => cu.EmailAddresses)
+                .FirstOrDefaultAsync(c => c.ProjectId == projectId, ct);
+
+            if (contract is null)
+                return new JsonResult(new
+                {
+                    ok = false,
+                    toast = new { type = "warning", title = "No contract", message = "There is no contract for this project." }
+                })
+                { StatusCode = 404 };
+
+            var hasItems = contract.Items != null && contract.Items.Count > 0;
+            if (!hasItems)
+                return new JsonResult(new
+                {
+                    ok = false,
+                    toast = new { type = "warning", title = "Missing Positions", message = "Please add at least one line item before creating the link." }
+                })
+                { StatusCode = 409 };
+
+            if (contract.Status == DocumentStatus.Signed || contract.SignedAt != null)
+                return new JsonResult(new
+                {
+                    ok = false,
+                    toast = new { type = "info", title = "Already signed", message = "This contract is already signed." }
+                })
+                { StatusCode = 409 };
+
+            var customer = contract.Project.Customer;
+
+            string? recipientEmail =
+                customer.Contacts?
+                    .OrderByDescending(c => c.IsPrimary)
+                    .Select(c => (c.Email ?? "").Trim())
+                    .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
+
+            if (string.IsNullOrWhiteSpace(recipientEmail))
+            {
+                recipientEmail =
+                    customer.EmailAddresses?
+                        .OrderByDescending(ea => (ea.Kind ?? "").Trim().Equals("business", StringComparison.OrdinalIgnoreCase))
+                        .Select(ea => (ea.Email ?? "").Trim())
+                        .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
+            }
+
+            if (string.IsNullOrWhiteSpace(recipientEmail))
+                return new JsonResult(new
+                {
+                    ok = false,
+                    toast = new { type = "error", title = "No email", message = "Customer email not found." }
+                })
+                { StatusCode = 409 };
+
+            var rawToken = GenerateUrlSafeToken(32);
+            var tokenHash = ContractAccessLink.HashToken(rawToken);
+
+            var link = new ContractAccessLink
+            {
+                ContractId = contract.Id,
+                RecipientEmail = recipientEmail.Trim(),
+                TokenHash = tokenHash,
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(14),
+                RevokedAtUtc = null,
+                LastOpenedAtUtc = null
+            };
+
+            _db.ContractAccessLinks.Add(link);
+
+            //if (contract.Status == DocumentStatus.Draft)
+            //    contract.Status = DocumentStatus.Sent;
+
+            await _db.SaveChangesAsync(ct);
+
+            var actionUrl = Url.Page(
+                pageName: "/Contracts/Sign",
+                pageHandler: null,
+                values: new { id = contract.Id, t = rawToken },
+                protocol: Request.Scheme,
+                host: Request.Host.ToUriComponent()
+            );
+
+            if (string.IsNullOrWhiteSpace(actionUrl))
+                return new JsonResult(new
+                {
+                    ok = false,
+                    toast = new { type = "error", title = "Error", message = "Failed to build contract link." }
+                })
+                { StatusCode = 500 };
+
+            return new JsonResult(new
+            {
+                ok = true,
+                data = new
+                {
+                    url = actionUrl
+                },
+                toast = new
+                {
+                    type = "success",
+                    title = "Done",
+                    message = "Contract link created successfully."
+                }
+            });
+        }
         // helper: safe URL token
         private static string GenerateUrlSafeToken(int bytes)
         {
