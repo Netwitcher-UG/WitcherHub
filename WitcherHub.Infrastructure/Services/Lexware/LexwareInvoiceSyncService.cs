@@ -15,6 +15,7 @@ using WitcherHub.Application.Common.CacheKeys;
 using WitcherHub.Application.Common.Caching;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
+using WitcherHub.Infrastructure.Services.Invoices;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Infrastructure.Services.Lexware
@@ -41,6 +42,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
         private readonly IWebHostEnvironment _env;
         private readonly ILogger<LexwareInvoiceSyncService> _logger;
         private readonly IAppCache _cache;
+        private readonly IInvoiceNotificationService _invoiceNotificationService;
 
         public LexwareInvoiceSyncService(
             AppDbContext db,
@@ -48,7 +50,8 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             IOptions<LexwareOptions> opt,
             IWebHostEnvironment env,
             ILogger<LexwareInvoiceSyncService> logger,
-            IAppCache cache)
+            IAppCache cache,
+            IInvoiceNotificationService invoiceNotificationService)
         {
             _db = db;
             _lex = lex;
@@ -56,6 +59,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             _env = env;
             _logger = logger;
             _cache = cache;
+            _invoiceNotificationService = invoiceNotificationService;
         }
 
         public async Task<InvoiceGenerationResult> CreateOneTimeInvoiceFromContractAsync(
@@ -218,18 +222,31 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             await _db.SaveChangesAsync(ct);
             await InvalidateInvoiceCacheAsync(invoice.Id, ct);
+
+            try
+            {
+                await _invoiceNotificationService.QueueInvoiceReadyEmailAsync(invoice.Id, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Manual invoice sent but notification email failed. LocalInvoiceId={LocalInvoiceId} LexwareInvoiceId={LexwareInvoiceId}",
+                    invoice.Id,
+                    invoice.LexwareInvoiceId);
+            }
         }
 
         private async Task<InvoiceGenerationResult> CreateInvoiceInternalAsync(
-            Contract contract,
-            List<ContractItem> sourceItems,
-            DateOnly invoiceDate,
-            InvoiceOriginType originType,
-            string? recurringCycleKey,
-            bool isRecurringInvoice,
-            bool finalizeOnLexware,
-            InvoiceDispatchStatus dispatchStatus,
-            CancellationToken ct)
+     Contract contract,
+     List<ContractItem> sourceItems,
+     DateOnly invoiceDate,
+     InvoiceOriginType originType,
+     string? recurringCycleKey,
+     bool isRecurringInvoice,
+     bool finalizeOnLexware,
+     InvoiceDispatchStatus dispatchStatus,
+     CancellationToken ct)
         {
             if (contract.Status != DocumentStatus.Signed)
                 return InvoiceGenerationResult.Warning("Contract is not signed yet.");
@@ -378,6 +395,22 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             await EnsurePdfAsync(localInvoice, ct);
             await InvalidateInvoiceCacheAsync(localInvoice.Id, ct);
+
+            if (dispatchStatus == InvoiceDispatchStatus.SentAutomatically)
+            {
+                try
+                {
+                    await _invoiceNotificationService.QueueInvoiceReadyEmailAsync(localInvoice.Id, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Automatic invoice created but notification email failed. LocalInvoiceId={LocalInvoiceId} LexwareInvoiceId={LexwareInvoiceId}",
+                        localInvoice.Id,
+                        localInvoice.LexwareInvoiceId);
+                }
+            }
 
             _logger.LogInformation(
                 "Lexware invoice created. ContractId={ContractId} LocalId={LocalId} LexId={LexId}",

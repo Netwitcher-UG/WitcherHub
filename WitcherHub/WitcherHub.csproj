@@ -26,6 +26,7 @@
 	  <None Remove="EmailTemplates\Messages\ContractReady.de.html" />
 	  <None Remove="EmailTemplates\Messages\ContractReady.en.html" />
 	  <None Remove="EmailTemplates\Messages\ContractSigned.de.html" />
+	  <None Remove="EmailTemplates\Messages\InvoiceReady.html" />
 	  <None Remove="EmailTemplates\Messages\QuoteSent.html" />
 	  <None Remove="EmailTemplates\Messages\Welcome.html" />
 	  <None Remove="EmailTemplates\_Layout.html" />
@@ -39,6 +40,9 @@
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </Content>
 	  <Content Include="EmailTemplates\Messages\ContractSigned.de.html">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
+	  <Content Include="EmailTemplates\Messages\InvoiceReady.html">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </Content>
 	  <Content Include="EmailTemplates\Messages\QuoteSent.html">

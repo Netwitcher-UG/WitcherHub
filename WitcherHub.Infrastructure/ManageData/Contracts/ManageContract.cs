@@ -21,7 +21,6 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using WitcherHub.Application.Common.ConfigSchema;
-using WitcherHub.Infrastructure.Data.Models;
 
 namespace WitcherHub.Infrastructure.ManageData.Contracts
 {
@@ -132,6 +131,74 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
         // =========================
         // DETAILS
         // =========================
+
+        public async Task<bool> HasSavedOverrideDraftAsync(Guid contractId, CancellationToken ct = default)
+        {
+            if (contractId == Guid.Empty)
+                throw new BadRequestAppException("Invalid contract id.");
+
+            var repo = _unitOfWork.Repo<Contract>();
+
+            var termsStructured = await repo.Query(asNoTracking: true)
+                .Where(x => x.Id == contractId)
+                .Select(x => x.TermsStructured)
+                .FirstOrDefaultAsync(ct);
+
+            return IsSavedOverrideDraft(termsStructured);
+        }
+
+        private static bool IsSavedOverrideDraft(JsonDocument? doc)
+        {
+            if (doc is null)
+                return false;
+
+            try
+            {
+                var root = doc.RootElement;
+
+                if (!TryGetJsonProperty(root, "GeneratedBy", out var generatedByEl))
+                    return false;
+
+                var generatedBy = generatedByEl.ValueKind == JsonValueKind.String
+                    ? generatedByEl.GetString()
+                    : null;
+
+                if (!string.Equals(generatedBy, "override", StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                if (!TryGetJsonProperty(root, "Positions", out var positionsEl))
+                    return false;
+
+                return positionsEl.ValueKind == JsonValueKind.Array
+                       && positionsEl.GetArrayLength() > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryGetJsonProperty(JsonElement element, string propertyName, out JsonElement value)
+        {
+            if (element.TryGetProperty(propertyName, out value))
+                return true;
+
+            var camelCaseName = char.ToLowerInvariant(propertyName[0]) + propertyName.Substring(1);
+            if (element.TryGetProperty(camelCaseName, out value))
+                return true;
+
+            foreach (var p in element.EnumerateObject())
+            {
+                if (string.Equals(p.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = p.Value;
+                    return true;
+                }
+            }
+
+            value = default;
+            return false;
+        }
         public async Task<ContractViews.ContractDetailsView?> GetContractAsync(Guid id, CancellationToken ct = default)
         {
             if (id == Guid.Empty) throw new BadRequestAppException("Invalid contract id.");
@@ -252,9 +319,12 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                     int pos = 1;
                     foreach (var it in dto.Items.OrderBy(x => x.Position <= 0 ? int.MaxValue : x.Position))
                     {
+                        var title = (it.Title ?? "").Trim();
+
                         contract.Items.Add(new ContractItem
                         {
-                            Title = (it.Title ?? "").Trim(),
+                            Title = title,
+                            Discription = string.IsNullOrWhiteSpace(title) ? $"Position {pos}" : title,
                             ServiceId = it.ServiceId,
                             Config = it.Config ?? JsonDocument.Parse("{}"),
                             AgreedPrice = it.AgreedPrice,
@@ -315,10 +385,13 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                 int pos = 1;
                 foreach (var it in dto.Items.OrderBy(x => x.Position <= 0 ? int.MaxValue : x.Position))
                 {
+                    var title = (it.Title ?? "").Trim();
+
                     contract.Items.Add(new ContractItem
                     {
                         ContractId = contract.Id,
-                        Title = (it.Title ?? "").Trim(),
+                        Title = title,
+                        Discription = string.IsNullOrWhiteSpace(title) ? $"Position {pos}" : title,
                         ServiceId = it.ServiceId,
                         Config = it.Config ?? JsonDocument.Parse("{}"),
                         AgreedPrice = it.AgreedPrice,
@@ -422,19 +495,22 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                     computedTotal = total;
                 }
 
+                var title = (dto.Item.Title ?? "").Trim();
+                var effectivePosition = dto.Item.Position > 0 ? dto.Item.Position : (maxPos + 1);
+
                 var item = new ContractItem
                 {
                     ContractId = dto.ContractId,
-                    Title = (dto.Item.Title ?? "").Trim(),
+                    Title = title,
+                    Discription = string.IsNullOrWhiteSpace(title) ? $"Position {effectivePosition}" : title,
                     ServiceId = dto.Item.ServiceId,
                     Config = dto.Item.Config ?? JsonDocument.Parse("{}"),
 
                     // ✅ keep manual if provided, otherwise auto
                     AgreedPrice = dto.Item.AgreedPrice ?? computedTotal,
 
-                    Position = dto.Item.Position > 0 ? dto.Item.Position : (maxPos + 1),
+                    Position = effectivePosition,
 
-                    // ✅ optional: إذا ضفت الأعمدة بالداتابيس (مستحسن ليتوافق تماماً مع Quotes)
                     Quantity = dto.Item.Quantity,
                     UnitPrice = dto.Item.UnitPrice,
                     BillingCycle = dto.Item.BillingCycle,
@@ -477,6 +553,7 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                 if (item is null) throw new NotFoundAppException("Contract item not found.");
 
                 item.Title = (dto.Item.Title ?? item.Title ?? "").Trim();
+                item.Discription = string.IsNullOrWhiteSpace(item.Discription) ? item.Title : item.Discription;
                 item.ServiceId = dto.Item.ServiceId;
                 item.Config = dto.Item.Config ?? item.Config ?? JsonDocument.Parse("{}");
 
@@ -1183,6 +1260,8 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                 .Replace("%", "!%")
                 .Replace("_", "!_")
                 .Replace("[", "![");
+
+        
     }
 
 

@@ -73,6 +73,7 @@
 <input type="hidden" id="vcProjectContractSnapshotUrl" value="@Url.Page("/Projects", "ProjectContractSnapshot")" />
 <input type="hidden" id="vcProjectContractCreateUrl" value="@Url.Page("/Projects", "CreateProjectContract")" />
 <input type="hidden" id="vcProjectContractSendUrl" value="@Url.Page("/Projects", "SendProjectContract")" />
+<input type="hidden" id="vcProjectContractCopyLinkUrl" value="@Url.Page("/Projects", "CreateProjectContractLink")" />
 
 <input type="hidden" id="vcInvoiceDetailsPdfUrl" value="@Url.Page("/Invoices/Details", "Pdf")" />
 <input type="hidden" id="vcInvoicePdfViewerUrl" value="@Url.Page("/Invoices/PdfViewer")" />
@@ -369,6 +370,12 @@
                                 id="vpContractSendBtn"
                                 disabled>
                             Send
+                        </button>
+                        <button class="btn btn-outline-info d-none"
+                                type="button"
+                                id="vpContractCopyLinkBtn"
+                                disabled>
+                            Copy Link
                         </button>
                     </div>
                 </div>

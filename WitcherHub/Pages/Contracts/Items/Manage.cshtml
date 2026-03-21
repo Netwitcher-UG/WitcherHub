@@ -64,7 +64,14 @@
            href="/Projects?openProjectId=@Model.Contract.ProjectId&tab=contracts">
             Back to Project
         </a>
-
+        @if (Model.HasSavedOverrideDraft)
+        {
+            <a class="btn btn-outline-info"
+               asp-page="/Contracts/Override"
+               asp-route-id="@Model.ContractId">
+                Open Override
+            </a>
+        }
         <!-- ✅ نفس Quotes: From Services -->
         <a class="btn btn-outline-primary @(Model.IsLocked ? "disabled" : "")"
            asp-page="/Contracts/Items/Create"
@@ -242,6 +249,7 @@
                                                     data-bs-target="#EditItemCanvas"
                                                     data-item-id="@it.Id"
                                                     data-item-serviceid="@(it.ServiceId?.ToString() ?? "")"
+                                                    data-item-servicename="@(it.ServiceName ?? "")"
                                                     data-item-title="@it.Title"
                                                     data-item-qty="@it.Quantity"
                                                     data-item-unit="@it.UnitPrice"
@@ -297,7 +305,10 @@
             <input type="hidden" name="ContractId" value="@Model.ContractId" />
             <input type="hidden" name="EditItemId" id="ci-id" />
             <input type="hidden" name="EditServiceId" id="ci-svc" />
-
+            <div class="mb-3">
+                <label class="form-label">Service</label>
+                <input class="form-control" id="ci-svc-name" readonly />
+            </div>
             <div class="mb-3">
                 <label class="form-label">Title</label>
                 <input class="form-control" name="EditTitle" id="ci-title" />
@@ -358,11 +369,44 @@
                             </div>
 
                             <div class="mt-3">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <label class="form-label mb-0">Config (JSON)</label>
-                                    <button class="btn btn-sm btn-outline-secondary" type="button" onclick="formatJson('ci-config')">Format</button>
+                                <div class="card border bg-transparent">
+                                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                        <div class="fw-semibold">Config</div>
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" id="ci-cfg-reset-btn">
+                                                Reset
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    data-bs-toggle="collapse"
+                                                    data-bs-target="#ciCfgRawCollapse"
+                                                    aria-expanded="false">
+                                                Raw JSON
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="card-body">
+                                        <div id="ci-cfg-loading" class="text-muted small d-none">Loading config schema…</div>
+
+                                        <div id="ci-cfg-empty" class="text-muted small d-none">
+                                            This service has no config schema. You can still use Raw JSON if needed.
+                                        </div>
+
+                                        <div id="ci-cfg-fields" class="row g-3"></div>
+
+                                        <div class="collapse mt-3" id="ciCfgRawCollapse">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <label class="form-label mb-0">Config (JSON)</label>
+                                                <button class="btn btn-sm btn-outline-secondary" type="button" id="ci-cfg-format-btn">Format</button>
+                                            </div>
+
+                                            <textarea class="form-control mt-2 font-monospace" rows="6" name="EditConfigJson" id="ci-config"></textarea>
+                                            <div class="form-text">You normally don’t need to edit this manually.</div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <textarea class="form-control mt-2" rows="6" name="EditConfigJson" id="ci-config"></textarea>
                             </div>
 
                             <div class="alert alert-info mt-3 mb-0">
@@ -474,15 +518,297 @@
         }
 
         // Populate edit offcanvas
-        document.addEventListener('show.bs.offcanvas', function (e) {
+                function ciTryParseJson(raw) {
+            try { return JSON.parse(raw || "{}"); } catch { return {}; }
+        }
+
+        function ciStringifyJson(obj, pretty) {
+            return JSON.stringify(obj ?? {}, null, pretty ? 2 : 0);
+        }
+
+        let ciSchema = null;
+        let ciCfg = {};
+
+        function ciSyncJson(pretty) {
+            const el = document.getElementById('ci-config');
+            if (!el) return;
+            el.value = ciStringifyJson(ciCfg, pretty);
+        }
+
+        function ciNormalizeCfgBySchema() {
+            if (!ciSchema || ciSchema.type !== 'object' || !ciSchema.properties) return;
+
+            if (ciSchema.additionalProperties === false) {
+                const allowed = new Set(Object.keys(ciSchema.properties));
+                Object.keys(ciCfg).forEach(k => {
+                    if (!allowed.has(k)) delete ciCfg[k];
+                });
+            }
+
+            Object.entries(ciSchema.properties).forEach(([key, def]) => {
+                if (ciCfg[key] === undefined && def && typeof def === 'object' && def.default !== undefined) {
+                    ciCfg[key] = def.default;
+                }
+            });
+        }
+
+        function ciIsRequired(key) {
+            return !!(ciSchema && Array.isArray(ciSchema.required) &&
+                ciSchema.required.some(x => (x || '').toLowerCase() === key.toLowerCase()));
+        }
+
+        function ciFieldId(key) {
+            return `ci_cfg_${key}`;
+        }
+
+        function ciSetControlValue(def, control, val) {
+            const hasEnum = Array.isArray(def.enum);
+            const t = (def.type || (hasEnum ? 'string' : 'string'));
+
+            if (t === 'boolean') {
+                control.checked = !!val;
+                return;
+            }
+
+            if (val === undefined || val === null) {
+                control.value = '';
+                return;
+            }
+
+            control.value = String(val);
+        }
+
+        function ciWriteValueFromControl(key, def, control) {
+            const hasEnum = Array.isArray(def.enum);
+            const t = (def.type || (hasEnum ? 'string' : 'string'));
+
+            if (t === 'boolean') {
+                ciCfg[key] = !!control.checked;
+                ciSyncJson(false);
+                return;
+            }
+
+            if (control.value === '' || control.value === null || control.value === undefined) {
+                delete ciCfg[key];
+                ciSyncJson(false);
+                return;
+            }
+
+            if (hasEnum) {
+                ciCfg[key] = control.value;
+                ciSyncJson(false);
+                return;
+            }
+
+            if (t === 'integer') {
+                const n = Number(control.value);
+                if (!Number.isFinite(n)) delete ciCfg[key];
+                else ciCfg[key] = Math.trunc(n);
+
+                ciSyncJson(false);
+                return;
+            }
+
+            if (t === 'number') {
+                const n = Number(control.value);
+                if (!Number.isFinite(n)) delete ciCfg[key];
+                else ciCfg[key] = n;
+
+                ciSyncJson(false);
+                return;
+            }
+
+            ciCfg[key] = control.value;
+            ciSyncJson(false);
+        }
+
+        function ciRenderField(key, def) {
+            const col = document.createElement('div');
+            col.className = 'col-12 col-md-6';
+
+            const title = def.title || def.label || key;
+            const desc = def.description || '';
+            const required = ciIsRequired(key);
+
+            const wrapper = document.createElement('div');
+
+            const label = document.createElement('label');
+            label.className = 'form-label';
+            label.setAttribute('for', ciFieldId(key));
+            label.innerHTML = `${title}${required ? ' <span class="text-danger">*</span>' : ''}`;
+            wrapper.appendChild(label);
+
+            const hasEnum = Array.isArray(def.enum);
+            const t = (def.type || (hasEnum ? 'string' : 'string'));
+
+            let control;
+
+            if (t === 'boolean') {
+                const div = document.createElement('div');
+                div.className = 'form-check form-switch';
+
+                control = document.createElement('input');
+                control.type = 'checkbox';
+                control.className = 'form-check-input';
+                control.id = ciFieldId(key);
+
+                const lab2 = document.createElement('label');
+                lab2.className = 'form-check-label';
+                lab2.setAttribute('for', ciFieldId(key));
+                lab2.textContent = title;
+
+                div.appendChild(control);
+                div.appendChild(lab2);
+                wrapper.appendChild(div);
+            }
+            else if (hasEnum) {
+                control = document.createElement('select');
+                control.className = 'form-select';
+                control.id = ciFieldId(key);
+
+                const empty = document.createElement('option');
+                empty.value = '';
+                empty.textContent = '-- select --';
+                control.appendChild(empty);
+
+                def.enum.forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = String(v);
+                    opt.textContent = String(v);
+                    control.appendChild(opt);
+                });
+
+                wrapper.appendChild(control);
+            }
+            else if (t === 'integer' || t === 'number') {
+                control = document.createElement('input');
+                control.type = 'number';
+                control.className = 'form-control';
+                control.id = ciFieldId(key);
+
+                if (t === 'integer') control.step = '1';
+                if (typeof def.minimum === 'number') control.min = String(def.minimum);
+                if (typeof def.maximum === 'number') control.max = String(def.maximum);
+
+                wrapper.appendChild(control);
+            }
+            else {
+                control = document.createElement('input');
+                control.type = 'text';
+                control.className = 'form-control';
+                control.id = ciFieldId(key);
+                wrapper.appendChild(control);
+            }
+
+            if (desc) {
+                const help = document.createElement('div');
+                help.className = 'form-text';
+                help.textContent = desc;
+                wrapper.appendChild(help);
+            }
+
+            control.addEventListener('input', () => ciWriteValueFromControl(key, def, control));
+            control.addEventListener('change', () => ciWriteValueFromControl(key, def, control));
+
+            ciSetControlValue(def, control, ciCfg[key]);
+            col.appendChild(wrapper);
+            return col;
+        }
+
+        function ciRenderConfigFields() {
+            const fields = document.getElementById('ci-cfg-fields');
+            const empty = document.getElementById('ci-cfg-empty');
+            if (!fields || !empty) return;
+
+            fields.innerHTML = '';
+
+            if (!ciSchema || ciSchema.type !== 'object' || !ciSchema.properties || typeof ciSchema.properties !== 'object') {
+                empty.classList.remove('d-none');
+                ciSyncJson(false);
+                return;
+            }
+
+            empty.classList.add('d-none');
+
+            Object.entries(ciSchema.properties).forEach(([key, def]) => {
+                if (!def || typeof def !== 'object') return;
+                fields.appendChild(ciRenderField(key, def));
+            });
+
+            ciSyncJson(false);
+        }
+
+        async function ciLoadSchemaAndRender(serviceId, rawJson) {
+            const loading = document.getElementById('ci-cfg-loading');
+            const fields = document.getElementById('ci-cfg-fields');
+            const empty = document.getElementById('ci-cfg-empty');
+
+            ciSchema = null;
+            ciCfg = ciTryParseJson(rawJson);
+
+            if (fields) fields.innerHTML = '';
+            if (empty) empty.classList.add('d-none');
+
+            if (!serviceId) {
+                ciSyncJson(false);
+                return;
+            }
+
+            if (loading) loading.classList.remove('d-none');
+
+            try {
+                const url = `?handler=ServiceSchema&serviceId=${encodeURIComponent(serviceId)}`;
+                const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+
+                if (!res.ok) {
+                    ciSchema = null;
+                    ciRenderConfigFields();
+                    return;
+                }
+
+                const txt = (await res.text()).trim();
+                ciSchema = txt ? ciTryParseJson(txt) : null;
+
+                ciNormalizeCfgBySchema();
+                ciRenderConfigFields();
+            } finally {
+                if (loading) loading.classList.add('d-none');
+            }
+        }
+
+        document.getElementById('ci-cfg-reset-btn')?.addEventListener('click', function () {
+            ciCfg = {};
+            ciNormalizeCfgBySchema();
+            ciRenderConfigFields();
+        });
+
+        document.getElementById('ci-cfg-format-btn')?.addEventListener('click', function () {
+            const raw = document.getElementById('ci-config');
+            if (!raw) return;
+
+            try {
+                ciCfg = JSON.parse(raw.value || "{}");
+                ciNormalizeCfgBySchema();
+                ciSyncJson(true);
+                ciRenderConfigFields();
+            } catch {
+                alert("Invalid JSON. Please fix it first.");
+            }
+        });
+
+        document.addEventListener('show.bs.offcanvas', async function (e) {
             const el = e.target;
             if (!el || el.id !== 'EditItemCanvas') return;
 
             const btn = e.relatedTarget;
             if (!btn) return;
 
+            const serviceId = btn.getAttribute('data-item-serviceid') || '';
+            const serviceName = btn.getAttribute('data-item-servicename') || '';
+
             document.getElementById('ci-id').value = btn.getAttribute('data-item-id') || '';
-            document.getElementById('ci-svc').value = btn.getAttribute('data-item-serviceid') || '';
+            document.getElementById('ci-svc').value = serviceId;
+            document.getElementById('ci-svc-name').value = serviceName;
             document.getElementById('ci-title').value = btn.getAttribute('data-item-title') || '';
             document.getElementById('ci-qty').value = btn.getAttribute('data-item-qty') || '1';
             document.getElementById('ci-unit').value = btn.getAttribute('data-item-unit') || '0';
@@ -493,16 +819,22 @@
 
             const b64 = btn.getAttribute('data-item-config-b64');
             let cfgText = '{}';
+
             try {
                 if (b64) {
                     const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
                     cfgText = new TextDecoder('utf-8').decode(bytes);
                 }
-            } catch { cfgText = '{}'; }
+            } catch {
+                cfgText = '{}';
+            }
+
             document.getElementById('ci-config').value = cfgText;
 
+            await ciLoadSchemaAndRender(serviceId, cfgText);
             ciComputePreview();
         });
+
 
         (function () {
             const ids = ['ci-qty', 'ci-unit', 'ci-disctype', 'ci-discval'];
@@ -514,18 +846,7 @@
             });
         })();
 
-        function formatJson(textareaId) {
-            const el = document.getElementById(textareaId);
-            if (!el) return;
-
-            try {
-                const obj = JSON.parse(el.value || "{}");
-                el.value = JSON.stringify(obj, null, 2);
-            } catch {
-                alert("Invalid JSON. Please fix it first.");
-            }
-        }
-        window.formatJson = formatJson;
+        
 
              (function () {
             const modalEl = document.getElementById('DeleteConfirmModal');

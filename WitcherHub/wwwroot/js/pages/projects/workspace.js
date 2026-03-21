@@ -614,6 +614,7 @@
         const detailsLink = $('vpContractDetailsLink');
         const sendBtn = $('vpContractSendBtn');
         const itemsLink = $('vpContractItemsLink');
+        const copyLinkBtn = $('vpContractCopyLinkBtn');
 
         setContractLoading(true);
         showContractEmpty(false);
@@ -645,6 +646,7 @@
                 editLink?.classList.add('d-none');
                 detailsLink?.classList.add('d-none');
                 sendBtn?.classList.add('d-none');
+                copyLinkBtn?.classList.add('d-none');
                 itemsLink?.classList.add('d-none');
 
                 showContractEmpty(true);
@@ -665,6 +667,7 @@
             const cid = data.contractId || data.id || null;
             const itemsCount = Number(data.itemsCount || 0);
             const hasItems = itemsCount > 0;
+            const hasTerms = !!data.hasTerms;
 
             if (itemsLink && cid && canUpdate) {
                 itemsLink.href = `/Contracts/Items/Manage?contractId=${encodeURIComponent(cid)}&returnTo=items`;
@@ -689,6 +692,7 @@
                 editLink?.classList.add('d-none');
                 detailsLink?.classList.add('d-none');
                 sendBtn?.classList.add('d-none');
+                btnCreate?.classList.add('d-none');
 
                 $('vpContractPreview').innerHTML =
                     '<div class="alert alert-warning mb-0">This contract has no Positions. Please add at least one line item to continue.</div>';
@@ -712,16 +716,35 @@
                 let href = data.detailsUrl || '';
                 if (!href && cid) href = `/Contracts/Details?id=${encodeURIComponent(cid)}`;
                 detailsLink.href = href || '#';
-                detailsLink.classList.toggle('d-none', isSigned);
+                detailsLink.classList.toggle('d-none', isSigned || !hasTerms);
             }
 
             if (sendBtn) {
+                sendBtn.classList.remove('d-none');
+
                 if (isSigned) {
-                    sendBtn.classList.add('d-none');
                     sendBtn.disabled = true;
+                    sendBtn.textContent = 'Signed';
+                    sendBtn.classList.remove('btn-outline-success');
+                    sendBtn.classList.add('btn-success');
+                    sendBtn.title = 'This contract is already signed.';
                 } else {
-                    sendBtn.classList.remove('d-none');
                     sendBtn.disabled = !hasItems;
+                    sendBtn.textContent = 'Send';
+                    sendBtn.classList.remove('btn-success');
+                    sendBtn.classList.add('btn-outline-success');
+                    sendBtn.removeAttribute('title');
+                }
+            }
+
+            if (copyLinkBtn) {
+                if (isSigned) {
+                    copyLinkBtn.classList.add('d-none');
+                } else {
+                    copyLinkBtn.classList.remove('d-none');
+                    copyLinkBtn.disabled = !hasItems;
+                    copyLinkBtn.textContent = 'Copy Link';
+                    copyLinkBtn.removeAttribute('title');
                 }
             }
 
@@ -802,7 +825,7 @@
         }
     }
 
-    
+    const copyLinkBtn = $('vpContractCopyLinkBtn');
     const confirmModalEl = $('vpSendContractModal');
     const confirmBtn = $('vpSendContractConfirmBtn');
     const cancelBtn = $('vpSendContractCancelBtn');
@@ -829,6 +852,58 @@
 
         setSending(false);
         bootstrap.Modal.getOrCreateInstance(confirmModalEl).show();
+    }
+    async function copyProjectContractLink() {
+        if (!contractState.projectId) {
+            showToast({ type: 'error', title: 'Error', message: 'ProjectId is missing.' });
+            return;
+        }
+
+        const url = ($('vcProjectContractCopyLinkUrl')?.value || '').trim();
+        const token = ($('antiForgeryToken')?.value || '').trim();
+
+        if (!url) {
+            showToast({ type: 'error', title: 'Error', message: 'Copy link URL not found.' });
+            return;
+        }
+
+        const btn = $('vpContractCopyLinkBtn');
+        if (btn?.dataset.busy === '1') return;
+
+        try {
+            if (btn) btn.dataset.busy = '1';
+
+            const body = `projectId=${encodeURIComponent(contractState.projectId)}`;
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    ...(token ? { 'RequestVerificationToken': token } : {})
+                },
+                body
+            });
+
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok || !data?.ok || !data?.data?.url) {
+                showToast(data?.toast || { type: 'error', title: 'Error', message: 'Failed to create contract link.' });
+                return;
+            }
+
+            await navigator.clipboard.writeText(data.data.url);
+
+            showToast({
+                type: 'success',
+                title: 'Copied',
+                message: 'Contract link copied.'
+            });
+        } catch (err) {
+            console.error(err);
+            showToast({ type: 'error', title: 'Server error', message: 'Failed to copy contract link.' });
+        } finally {
+            if (btn) delete btn.dataset.busy;
+        }
     }
 
     async function sendProjectContract() {
@@ -985,6 +1060,7 @@
     $('vpSaveBasicBtn')?.addEventListener('click', saveBasic);
     $('vpContractCreateBtn')?.addEventListener('click', createProjectContract);
     $('vpContractSendBtn')?.addEventListener('click', openSendConfirm);
+    $('vpContractCopyLinkBtn')?.addEventListener('click', copyProjectContractLink);
     $('vpSendContractConfirmBtn')?.addEventListener('click', sendProjectContract);
 
     (function bindDatePickers() {
