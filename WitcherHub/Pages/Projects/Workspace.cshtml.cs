@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Infrastructure.Data.Context;
+using WitcherHub.Infrastructure.Services.Invoices;
 using WitcherHub.Infrastructure.Services.Lexware;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
@@ -13,15 +14,18 @@ namespace WitcherHub.Pages.Projects
         private readonly IProject _projects;
         private readonly AppDbContext _db;
         private readonly LexwareInvoiceSyncService _lexwareInvoiceSyncService;
+        private readonly InvoicePublicLinkService _invoicePublicLinkService;
 
         public WorkspaceModel(
-            IProject projects,
-            AppDbContext db,
-            LexwareInvoiceSyncService lexwareInvoiceSyncService)
+     IProject projects,
+     AppDbContext db,
+     LexwareInvoiceSyncService lexwareInvoiceSyncService,
+     InvoicePublicLinkService invoicePublicLinkService)
         {
             _projects = projects;
             _db = db;
             _lexwareInvoiceSyncService = lexwareInvoiceSyncService;
+            _invoicePublicLinkService = invoicePublicLinkService;
         }
 
         [BindProperty(SupportsGet = true, Name = "id")]
@@ -212,7 +216,94 @@ namespace WitcherHub.Pages.Projects
                 isSigned &&
                 contract.InvoiceSendMode == InvoiceSendMode.Manual;
         }
+        public async Task<IActionResult> OnPostCreateInvoicePublicLinkAsync(Guid invoiceId, CancellationToken ct)
+        {
+            try
+            {
+                if (ProjectId == Guid.Empty || invoiceId == Guid.Empty)
+                    return new JsonResult(new
+                    {
+                        ok = false,
+                        toast = new { type = "error", title = "Error", message = "Invalid project or invoice id." }
+                    })
+                    { StatusCode = 400 };
 
+                var invoice = await _db.Invoices
+                    .Include(x => x.Project)
+                        .ThenInclude(p => p.Customer)
+                            .ThenInclude(c => c.Contacts)
+                    .Include(x => x.Project)
+                        .ThenInclude(p => p.Customer)
+                            .ThenInclude(c => c.EmailAddresses)
+                    .FirstOrDefaultAsync(x => x.Id == invoiceId && x.ProjectId == ProjectId, ct);
+
+                if (invoice is null)
+                    return new JsonResult(new
+                    {
+                        ok = false,
+                        toast = new { type = "error", title = "Not found", message = "Invoice not found." }
+                    })
+                    { StatusCode = 404 };
+
+                string? recipientEmail =
+                    invoice.Project?.Customer?.Contacts?
+                        .OrderByDescending(c => c.IsPrimary)
+                        .Select(c => (c.Email ?? "").Trim())
+                        .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
+
+                if (string.IsNullOrWhiteSpace(recipientEmail))
+                {
+                    recipientEmail =
+                        invoice.Project?.Customer?.EmailAddresses?
+                            .OrderByDescending(ea => (ea.Kind ?? "").Trim().Equals("business", StringComparison.OrdinalIgnoreCase))
+                            .Select(ea => (ea.Email ?? "").Trim())
+                            .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
+                }
+
+                var rawToken = await _invoicePublicLinkService.CreateAsync(
+                    invoice.Id,
+                    recipientEmail,
+                    expiresInDays: 14,
+                    oneTimeUse: false,
+                    ct: ct);
+
+                var publicUrl = Url.Page(
+                    pageName: "/Public/Invoices/View",
+                    pageHandler: null,
+                    values: new { t = rawToken },
+                    protocol: Request.Scheme,
+                    host: Request.Host.ToUriComponent());
+
+                if (string.IsNullOrWhiteSpace(publicUrl))
+                    return new JsonResult(new
+                    {
+                        ok = false,
+                        toast = new { type = "error", title = "Error", message = "Failed to build public link." }
+                    })
+                    { StatusCode = 500 };
+
+                return new JsonResult(new
+                {
+                    ok = true,
+                    data = new
+                    {
+                        url = publicUrl,
+                        expiresAt = DateTimeOffset.UtcNow.AddDays(14),
+                        recipientEmail
+                    },
+                    toast = new { type = "success", title = "Done", message = "Secure invoice link created successfully." }
+                });
+            }
+            catch (Exception ex)
+            {
+                return new JsonResult(new
+                {
+                    ok = false,
+                    toast = new { type = "error", title = "Server error", message = ex.GetBaseException().Message }
+                })
+                { StatusCode = 500 };
+            }
+        }
         private static string NormalizeTab(string? tab)
         {
             return (tab ?? "").Trim().ToLowerInvariant() switch
