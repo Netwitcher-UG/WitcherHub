@@ -30,7 +30,7 @@ namespace WitcherHub.Infrastructure.Data.Models
         [Column(TypeName = "numeric(12,2)")]
         public decimal? InvoiceDiscountValue { get; set; }
 
-        public bool ApplyVat { get; set; } = false;
+        public bool ApplyVat { get; set; } = true;
         public string? Notes { get; set; }
 
         public Guid? CreatedById { get; set; }
@@ -39,25 +39,16 @@ namespace WitcherHub.Infrastructure.Data.Models
         public DateTimeOffset? IssuedAt { get; set; }
         public DateTimeOffset? PaidAt { get; set; }
 
-        // =========================
-        // Serienrechnung meta
-        // =========================
         public InvoiceOriginType OriginType { get; set; } = InvoiceOriginType.Manual;
-
         public bool IsRecurringInvoice { get; set; } = false;
-
         public DateOnly? RecurringCycleDate { get; set; }
 
         [MaxLength(50)]
         public string? RecurringCycleKey { get; set; }
 
         public InvoiceDispatchStatus DispatchStatus { get; set; } = InvoiceDispatchStatus.NotRequired;
-
         public DateTimeOffset? SentAt { get; set; }
 
-        // =========================
-        // Lexware
-        // =========================
         [MaxLength(80)]
         public string? LexwareInvoiceId { get; set; }
 
@@ -71,7 +62,6 @@ namespace WitcherHub.Infrastructure.Data.Models
         public string? LexwareResourceUri { get; set; }
 
         public int? LexwareVersion { get; set; }
-
         public DateTimeOffset? LexwareSyncedAt { get; set; }
 
         [MaxLength(400)]
@@ -98,8 +88,16 @@ namespace WitcherHub.Infrastructure.Data.Models
         [MaxLength(250)]
         public string Title { get; set; } = default!;
 
+        [MaxLength(500)]
+        public string Discription { get; set; } = string.Empty;
+
+        public ServiceUnitType UnitType { get; set; } = ServiceUnitType.Custom;
+
+        [MaxLength(30)]
+        public string UnitName { get; set; } = string.Empty;
+
         [Column(TypeName = "numeric(12,2)")]
-        public decimal Quantity { get; set; } = 1;
+        public decimal Quantity { get; set; } = 1m;
 
         [Column(TypeName = "numeric(12,2)")]
         public decimal UnitPrice { get; set; }
@@ -109,8 +107,7 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         [Column(TypeName = "jsonb")]
         public JsonDocument? PriceBreakdown { get; set; }
-        [MaxLength(500)]
-        public string Discription { get; set; } = null!;
+
         public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
 
         public DiscountType? DiscountType { get; set; }

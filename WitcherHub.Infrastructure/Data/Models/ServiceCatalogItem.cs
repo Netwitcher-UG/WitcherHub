@@ -16,7 +16,10 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         public ServiceType ServiceType { get; set; } = ServiceType.Other;
         public PricingModel PricingModel { get; set; } = PricingModel.Fixed;
+        public ServiceUnitType UnitType { get; set; } = ServiceUnitType.Custom;
 
+        [MaxLength(30)]
+        public string UnitName { get; set; } = string.Empty;
         [Column(TypeName = "numeric(12,2)")]
         public decimal BasePrice { get; set; }
 

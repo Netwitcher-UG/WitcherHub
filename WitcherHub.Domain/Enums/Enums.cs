@@ -49,5 +49,16 @@ namespace WitcherHub.Infrastructure.Data.Models
             SentManually = 3,
             Failed = 4
         }
-}
+        public enum ServiceUnitType
+        {
+            Custom = 0,
+            Piece = 1,
+            Hour = 2,
+            Day = 3,
+            Month = 4,
+            FlatRate = 5,
+            Package = 6,
+            Project = 7
+        }
+    }
 }
