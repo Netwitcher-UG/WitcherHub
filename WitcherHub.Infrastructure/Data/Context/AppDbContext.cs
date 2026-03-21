@@ -52,6 +52,9 @@ namespace WitcherHub.Infrastructure.Data.Context
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
         public DbSet<ContractAccessLink> ContractAccessLinks => Set<ContractAccessLink>();
 
+
+        public DbSet<InvoiceAccessLink> InvoiceAccessLinks => Set<InvoiceAccessLink>();
+
         protected override void OnModelCreating(ModelBuilder b)
         {
             base.OnModelCreating(b);
@@ -281,6 +284,28 @@ namespace WitcherHub.Infrastructure.Data.Context
             b.Entity<Contract>()
                 .Property(x => x.TermsStructured)
                 .HasColumnType("jsonb");
+
+            b.Entity<InvoiceAccessLink>(e =>
+            {
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.TokenHash)
+                    .IsRequired()
+                    .HasMaxLength(128);
+
+                e.Property(x => x.RecipientEmail)
+                    .HasMaxLength(320);
+
+                e.HasIndex(x => x.TokenHash)
+                    .IsUnique();
+
+                e.HasIndex(x => new { x.InvoiceId, x.ExpiresAt });
+
+                e.HasOne(x => x.Invoice)
+                    .WithMany()
+                    .HasForeignKey(x => x.InvoiceId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
             // =========================
             // Enums -> string (مهم)
             // =========================

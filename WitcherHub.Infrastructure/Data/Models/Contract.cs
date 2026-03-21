@@ -68,7 +68,8 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         [Column(TypeName = "numeric(12,2)")]
         public decimal? AgreedPrice { get; set; }
-
+        [MaxLength(500)]
+        public string Discription { get; set; } = null!;
         public decimal Quantity { get; set; } = 1;
         public decimal UnitPrice { get; set; } = 0m;
 
