@@ -24,6 +24,8 @@ namespace WitcherHub.Infrastructure.Data.Models
         public string DefaultCurrency { get; set; } = "EUR";
 
         public bool IsActive { get; set; } = true;
+        [MaxLength(500)]
+        public string Discription { get; set; } =null!;
 
         [Column(TypeName = "jsonb")]
         public JsonDocument? ConfigSchema { get; set; }
