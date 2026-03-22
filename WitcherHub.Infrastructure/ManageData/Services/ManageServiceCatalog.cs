@@ -181,14 +181,38 @@ namespace WitcherHub.Infrastructure.ManageData.Services
 
             var servicesRepo = _unitOfWork.Repo<ServiceCatalogItem>();
 
+            if (dto is null) throw new BadRequestAppException("Invalid payload.");
+
+            if (string.IsNullOrWhiteSpace(dto.Service.Name))
+                throw new BadRequestAppException("Service name is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.Service.DefaultDescription))
+                throw new BadRequestAppException("Default description is required.");
+
+           
+
             var service = new ServiceCatalogItem
             {
-                Name = (dto.Service.Name ?? "").Trim(),
+                Name = dto.Service.Name.Trim(),
                 ServiceType = dto.Service.ServiceType,
                 PricingModel = dto.Service.PricingModel,
+
                 BasePrice = dto.Service.BasePrice,
-                DefaultCurrency = (dto.Service.DefaultCurrency ?? "EUR").Trim(),
+
+                DefaultCurrency = string.IsNullOrWhiteSpace(dto.Service.DefaultCurrency)
+                    ? "EUR"
+                    : dto.Service.DefaultCurrency.Trim(),
+
                 IsActive = dto.Service.IsActive,
+
+                // Optional
+                UnitName = string.IsNullOrWhiteSpace(dto.Service.DefaultUnitName)
+                    ? string.Empty
+                    : dto.Service.DefaultUnitName.Trim(),
+
+                // Required
+                Description = dto.Service.DefaultDescription.Trim(),
+
                 ConfigSchema = ParseJsonOrNull(dto.Service.ConfigSchemaJson)
             };
 

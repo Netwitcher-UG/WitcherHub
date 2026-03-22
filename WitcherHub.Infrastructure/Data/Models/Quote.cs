@@ -41,8 +41,7 @@ namespace WitcherHub.Infrastructure.Data.Models
         [MaxLength(250)]
         public string Title { get; set; } = default!;
 
-        [MaxLength(500)]
-        public string Description { get; set; } = string.Empty;
+    
 
         public ServiceUnitType UnitType { get; set; } = ServiceUnitType.Custom;
 

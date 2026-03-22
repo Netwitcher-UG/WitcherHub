@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
-using WitcherHub.Infrastructure.Data.Models;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Application.Models.DTO.Services
@@ -9,7 +7,7 @@ namespace WitcherHub.Application.Models.DTO.Services
     public class ServiceCatalogDTOs
     {
         public ServiceCatalogItemDto Service { get; set; } = new();
-        public List<PricingRuleDto> PricingRules { get; set; } = new(); // اختياري (للإنشاء فقط عادةً)
+        public List<PricingRuleDto> PricingRules { get; set; } = new();
     }
 
     public class ServiceCatalogItemDto
@@ -23,7 +21,10 @@ namespace WitcherHub.Application.Models.DTO.Services
         public string DefaultCurrency { get; set; } = "EUR";
         public bool IsActive { get; set; } = true;
 
+        // Optional
         public string DefaultUnitName { get; set; } = "";
+
+        // Required by business rule
         public string DefaultDescription { get; set; } = "";
 
         public string? ConfigSchemaJson { get; set; }
@@ -40,7 +41,7 @@ namespace WitcherHub.Application.Models.DTO.Services
         public string ValueExpr { get; set; } = "0";
 
         public string? Label { get; set; }
-        public string Scope { get; set; } = "LINE_ITEM"; // LINE_ITEM / INVOICE
+        public string Scope { get; set; } = "LINE_ITEM";
         public bool IsActive { get; set; } = true;
 
         public DateOnly? ValidFrom { get; set; }
@@ -52,7 +53,6 @@ namespace WitcherHub.Application.Models.DTO.Services
         public ServiceCatalogItemDto Service { get; set; } = new();
     }
 
-    // ---------- PricingRules ops ----------
     public class CreatePricingRuleDto
     {
         public Guid ServiceId { get; set; }

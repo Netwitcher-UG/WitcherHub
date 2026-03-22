@@ -87,9 +87,8 @@ namespace WitcherHub.Application.Models.View.Invoices
             public string? ServiceName { get; set; }
 
             public string Title { get; set; } = "";
-            public string Description { get; set; } = "";
-            public string UnitName { get; set; } = "";
-
+            public string Description { get; set; } = string.Empty;
+            public string UnitName { get; set; } = string.Empty;
             public decimal Quantity { get; set; }
             public decimal UnitPrice { get; set; }
 

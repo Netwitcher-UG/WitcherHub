@@ -125,12 +125,12 @@ namespace WitcherHub.Pages.Quotes.Items
                 // Load service details (includes ConfigSchema + BasePrice)
                 var service = await _services.GetServiceAsync(SelectedServiceId, ct);
                 if (service is null) throw new NotFoundAppException("Service not found.");
+
                 if (string.IsNullOrWhiteSpace(Form.Item.UnitName) && !string.IsNullOrWhiteSpace(service.DefaultUnitName))
                     Form.Item.UnitName = service.DefaultUnitName;
 
                 if (string.IsNullOrWhiteSpace(Form.Item.Description) && !string.IsNullOrWhiteSpace(service.DefaultDescription))
-                    Form.Item.Description = service.DefaultDescription;
-                // ✅ Apply defaults + Validate config vs schema (if exists)
+                    Form.Item.Description = service.DefaultDescription; // ✅ Apply defaults + Validate config vs schema (if exists)
                 var finalConfig = configDoc;
 
                 if (service.ConfigSchema is not null)
@@ -163,10 +163,17 @@ namespace WitcherHub.Pages.Quotes.Items
                 Form.Item.Config = finalConfig;
 
                 // Snapshot fields (for validator only; backend pricing recalculates anyway)
+                // Snapshot fields
                 Form.Item.Title = service.Name ?? "";
                 Form.Item.UnitPrice = service.BasePrice;
-                Form.Item.UnitName = "";
-                Form.Item.Description = "";
+
+                // keep user-entered values if موجودة، otherwise take defaults from service
+                if (string.IsNullOrWhiteSpace(Form.Item.UnitName))
+                    Form.Item.UnitName = service.DefaultUnitName ?? "";
+
+                if (string.IsNullOrWhiteSpace(Form.Item.Description))
+                    Form.Item.Description = service.DefaultDescription ?? "";
+
                 var vr = await _validator.ValidateAsync(Form, ct);
                 if (!vr.IsValid)
                 {

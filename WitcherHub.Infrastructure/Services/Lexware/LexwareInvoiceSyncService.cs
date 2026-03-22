@@ -500,11 +500,11 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
         private static string? ResolveDescription(ContractItem item)
         {
-            var description = CleanPrintText(item.Discription);
+            var description = CleanPrintText(item.Description);
             if (!string.IsNullOrWhiteSpace(description))
                 return description;
 
-            return CleanPrintText(item.Service?.Discription);
+            return CleanPrintText(item.Service?.Description);
         }
 
         private static ServiceUnitType ResolveUnitType(ContractItem item)
@@ -859,7 +859,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                     var item = new InvoiceItem
                     {
                         Title = ci != null ? ResolveTitle(ci) : lexwareName,
-                        Discription = ci != null ? ResolveDescription(ci) ?? string.Empty : string.Empty,
+                        Description = ci != null ? ResolveDescription(ci) ?? string.Empty : string.Empty,
                         Quantity = qty,
                         UnitPrice = unitNet,
                         Position = pos,
@@ -896,7 +896,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                     list.Add(new InvoiceItem
                     {
                         Title = ResolveTitle(ci),
-                        Discription = ResolveDescription(ci) ?? string.Empty,
+                        Description = ResolveDescription(ci) ?? string.Empty,
                         Quantity = ci.Quantity <= 0 ? 1m : ci.Quantity,
                         UnitPrice = ResolveNetAmount(ci),
                         Position = ci.Position,

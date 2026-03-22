@@ -34,8 +34,8 @@ namespace WitcherHub.Application.Models.DTO.Contracts
         public Guid? ServiceId { get; set; }
         public string Title { get; set; } = "";
 
-        public string Description { get; set; } = "";
-        public string UnitName { get; set; } = "";
+        public string Description { get; set; } = string.Empty;
+        public string UnitName { get; set; } = string.Empty;
 
         public JsonDocument Config { get; set; } = JsonDocument.Parse("{}");
 
