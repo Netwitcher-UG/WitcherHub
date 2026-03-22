@@ -60,7 +60,8 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         [Column(TypeName = "jsonb")]
         public JsonDocument? PriceBreakdown { get; set; }
-
+        [MaxLength(500)]
+        public string Description { get; set; } = null!;
         public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
         public DiscountType? DiscountType { get; set; }
 

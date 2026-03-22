@@ -562,7 +562,6 @@ namespace WitcherHub.Pages
                 // ✅ اقرأ مباشرة من DB لتفادي أي cache قديم
                 var contract = await _db.Contracts
                     .AsNoTracking()
-                    .Include(c => c.Items)
                     .Where(c => c.ProjectId == projectId)
                     .OrderByDescending(c => c.CreatedAt)
                     .FirstOrDefaultAsync(ct);

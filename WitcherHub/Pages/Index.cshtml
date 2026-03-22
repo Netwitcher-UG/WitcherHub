@@ -10,7 +10,7 @@
     ViewData["LexwareImportUrl"] = Url.Page("./Index", "LexwareImportContacts");
 }
 
-<div class="wh-tablecard-scroll">
+<div id="clientsTableCard" class="wh-tablecard-scroll">
     <partial name="_TableCard" model="Model.ClientsTable" />
 </div>
 <partial name="~/Pages/Shared/Modals/_ModalShell.cshtml" model="Model.CreateCustomerModal" />
