@@ -559,9 +559,10 @@ namespace WitcherHub.Pages
                 if (prj is null)
                     return NotFound(new { toast = new { type = "error", title = "Not found", message = "Project not found." } });
 
-                // ✅ اقرأ مباشرة من DB لتفادي أي cache قديم
+                // ✅ لازم نحمّل Items وإلا itemsCount سيبقى 0
                 var contract = await _db.Contracts
                     .AsNoTracking()
+                    .Include(c => c.Items)
                     .Where(c => c.ProjectId == projectId)
                     .OrderByDescending(c => c.CreatedAt)
                     .FirstOrDefaultAsync(ct);
@@ -577,7 +578,6 @@ namespace WitcherHub.Pages
 
                 var previewHtml = MarkdownToSafeHtml(contract.Terms ?? "");
                 var hasTerms = !string.IsNullOrWhiteSpace(contract.Terms);
-
 
                 var isSigned = contract.SignedAt is not null || contract.Status == DocumentStatus.Signed;
                 var canUpdate = !isSigned;
@@ -616,7 +616,6 @@ namespace WitcherHub.Pages
                 return StatusCode(500, new { toast = new { type = "error", title = "Server error", message = "Something went wrong." } });
             }
         }
-
         public async Task<IActionResult> OnPostGenerateProjectContractAsync(Guid projectId, CancellationToken ct = default)
         {
             try
