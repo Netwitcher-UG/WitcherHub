@@ -324,7 +324,7 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                         contract.Items.Add(new ContractItem
                         {
                             Title = title,
-                            Discription = string.IsNullOrWhiteSpace(title) ? $"Position {pos}" : title,
+                            Description = string.IsNullOrWhiteSpace(title) ? $"Position {pos}" : title,
                             ServiceId = it.ServiceId,
                             Config = it.Config ?? JsonDocument.Parse("{}"),
                             AgreedPrice = it.AgreedPrice,
@@ -391,7 +391,7 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                     {
                         ContractId = contract.Id,
                         Title = title,
-                        Discription = string.IsNullOrWhiteSpace(title) ? $"Position {pos}" : title,
+                        Description = string.IsNullOrWhiteSpace(title) ? $"Position {pos}" : title,
                         ServiceId = it.ServiceId,
                         Config = it.Config ?? JsonDocument.Parse("{}"),
                         AgreedPrice = it.AgreedPrice,
@@ -502,7 +502,7 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                 {
                     ContractId = dto.ContractId,
                     Title = title,
-                    Discription = string.IsNullOrWhiteSpace(title) ? $"Position {effectivePosition}" : title,
+                    Description = string.IsNullOrWhiteSpace(title) ? $"Position {effectivePosition}" : title,
                     ServiceId = dto.Item.ServiceId,
                     Config = dto.Item.Config ?? JsonDocument.Parse("{}"),
 
@@ -553,7 +553,7 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                 if (item is null) throw new NotFoundAppException("Contract item not found.");
 
                 item.Title = (dto.Item.Title ?? item.Title ?? "").Trim();
-                item.Discription = string.IsNullOrWhiteSpace(item.Discription) ? item.Title : item.Discription;
+                item.Description = string.IsNullOrWhiteSpace(item.Description) ? item.Title : item.Description;
                 item.ServiceId = dto.Item.ServiceId;
                 item.Config = dto.Item.Config ?? item.Config ?? JsonDocument.Parse("{}");
 

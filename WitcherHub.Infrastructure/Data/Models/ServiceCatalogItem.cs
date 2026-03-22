@@ -25,7 +25,7 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         public bool IsActive { get; set; } = true;
         [MaxLength(500)]
-        public string Discription { get; set; } =null!;
+        public string Description { get; set; } =null!;
 
         [Column(TypeName = "jsonb")]
         public JsonDocument? ConfigSchema { get; set; }
