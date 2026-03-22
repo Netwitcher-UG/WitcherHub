@@ -138,6 +138,24 @@
                 <label class="form-label">Discount Value</label>
                 <input class="form-control" asp-for="Form.Item.DiscountValue" />
             </div>
+            <div class="row g-3 mt-1">
+                <div class="col-12 col-md-4">
+                    <label class="form-label">Unit Name</label>
+                    <input asp-for="Form.Item.UnitName"
+                           class="form-control"
+                           placeholder="e.g. Piece / Hour / Month" />
+                    <span class="text-danger small" asp-validation-for="Form.Item.UnitName"></span>
+                </div>
+
+                <div class="col-12 col-md-8">
+                    <label class="form-label">Description</label>
+                    <textarea asp-for="Form.Item.Description"
+                              class="form-control"
+                              rows="3"
+                              placeholder="This text will appear on the contract / invoice line"></textarea>
+                    <span class="text-danger small" asp-validation-for="Form.Item.Description"></span>
+                </div>
+            </div>
         </div>
 
         <!-- Row 3: Config -->

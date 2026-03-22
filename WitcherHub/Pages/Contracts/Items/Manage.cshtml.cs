@@ -68,7 +68,8 @@ namespace WitcherHub.Pages.Contracts.Items
         [BindProperty] public decimal EditQuantity { get; set; } = 1m;
         [BindProperty] public decimal EditUnitPrice { get; set; } = 0m;
         [BindProperty] public BillingCycle EditBillingCycle { get; set; } = BillingCycle.OneTime;
-
+        [BindProperty] public string? EditDescription { get; set; }
+        [BindProperty] public string? EditUnitName { get; set; }
         [BindProperty] public DiscountType? EditDiscountType { get; set; }
         [BindProperty] public decimal? EditDiscountValue { get; set; }
 
@@ -182,6 +183,8 @@ namespace WitcherHub.Pages.Contracts.Items
                 dto.Item.Config = cfg;
                 dto.Item.AgreedPrice = CreateAgreedPrice ?? service.BasePrice;
                 dto.Item.Position = CreatePosition > 0 ? CreatePosition : (Contract.Items?.Count ?? 0) + 1;
+                dto.Item.Description = EditDescription?.Trim() ?? "";
+                dto.Item.UnitName = EditUnitName?.Trim() ?? "";
 
                 await _contracts.CreateItemAsync(dto, ct);
 

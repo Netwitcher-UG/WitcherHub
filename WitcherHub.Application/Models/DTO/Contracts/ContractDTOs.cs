@@ -34,11 +34,13 @@ namespace WitcherHub.Application.Models.DTO.Contracts
         public Guid? ServiceId { get; set; }
         public string Title { get; set; } = "";
 
-        // jsonb
+        public string Description { get; set; } = "";
+        public string UnitName { get; set; } = "";
+
         public JsonDocument Config { get; set; } = JsonDocument.Parse("{}");
-        // ✅ New (like Quote)
+
         public decimal Quantity { get; set; } = 1;
-        public decimal UnitPrice { get; set; } = 0m; // snapshot from service base price
+        public decimal UnitPrice { get; set; } = 0m;
         public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
 
         public DiscountType? DiscountType { get; set; }
@@ -46,10 +48,7 @@ namespace WitcherHub.Application.Models.DTO.Contracts
 
         public List<Guid> PricingRuleIds { get; set; } = new();
 
-
-
         public decimal? AgreedPrice { get; set; }
- 
         public int Position { get; set; } = 1;
     }
 

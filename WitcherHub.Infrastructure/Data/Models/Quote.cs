@@ -35,15 +35,22 @@ namespace WitcherHub.Infrastructure.Data.Models
         public Guid QuoteId { get; set; }
         public Quote Quote { get; set; } = default!;
 
-        
         public Guid? ServiceId { get; set; }
         public ServiceCatalogItem? Service { get; set; }
 
         [MaxLength(250)]
         public string Title { get; set; } = default!;
 
+        [MaxLength(500)]
+        public string Description { get; set; } = string.Empty;
+
+        public ServiceUnitType UnitType { get; set; } = ServiceUnitType.Custom;
+
+        [MaxLength(30)]
+        public string UnitName { get; set; } = string.Empty;
+
         [Column(TypeName = "numeric(12,2)")]
-        public decimal Quantity { get; set; } = 1;
+        public decimal Quantity { get; set; } = 1m;
 
         [Column(TypeName = "numeric(12,2)")]
         public decimal UnitPrice { get; set; }
@@ -53,8 +60,7 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         [Column(TypeName = "jsonb")]
         public JsonDocument? PriceBreakdown { get; set; }
-        [MaxLength(500)]
-        public string Discription { get; set; } = null!;
+
         public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
         public DiscountType? DiscountType { get; set; }
 

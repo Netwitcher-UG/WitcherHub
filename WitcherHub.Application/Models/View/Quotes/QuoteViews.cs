@@ -50,22 +50,22 @@ namespace WitcherHub.Application.Models.View.Quotes
             public string? ServiceName { get; set; }
 
             public string Title { get; set; } = "";
+            public string Description { get; set; } = "";
+            public string UnitName { get; set; } = "";
+
             public decimal Quantity { get; set; }
             public decimal UnitPrice { get; set; }
 
             public JsonDocument Config { get; set; } = JsonDocument.Parse("{}");
             public JsonDocument? PriceBreakdown { get; set; }
 
-
-            public BillingCycle BillingCycle { get; set; } // ✅ جديد
-
+            public BillingCycle BillingCycle { get; set; }
 
             public DiscountType? DiscountType { get; set; }
             public decimal? DiscountValue { get; set; }
 
             public int Position { get; set; }
-
-            public decimal LineTotal { get; set; } // Quantity * UnitPrice - discount (بدون tax حالياً)
+            public decimal LineTotal { get; set; }
         }
     }
 }

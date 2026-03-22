@@ -23,11 +23,9 @@ namespace WitcherHub.Application.Models.DTO.Services
         public string DefaultCurrency { get; set; } = "EUR";
         public bool IsActive { get; set; } = true;
 
-        // نرسل JSON كسلسلة من الـ API
-        // Update behavior (في Manage): 
-        // - null => لا تغيّر
-        // - ""   => امسح/خلّيه null
-        // - otherwise => parse وتخزين
+        public string DefaultUnitName { get; set; } = "";
+        public string DefaultDescription { get; set; } = "";
+
         public string? ConfigSchemaJson { get; set; }
     }
 

@@ -47,10 +47,12 @@ namespace WitcherHub.Application.Models.DTO.Invoices
         public Guid? ServiceId { get; set; }
         public string Title { get; set; } = "";
 
+        public string Description { get; set; } = "";
+        public string UnitName { get; set; } = "";
+
         public decimal Quantity { get; set; } = 1;
         public decimal UnitPrice { get; set; }
 
-        // jsonb
         public JsonDocument Config { get; set; } = JsonDocument.Parse("{}");
         public JsonDocument? PriceBreakdown { get; set; }
 

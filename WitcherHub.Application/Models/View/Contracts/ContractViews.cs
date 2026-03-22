@@ -49,6 +49,7 @@ namespace WitcherHub.Application.Models.View.Contracts
             public Guid Id { get; set; }
             public Guid? ServiceId { get; set; }
             public string? ServiceName { get; set; }
+
             public decimal Quantity { get; set; } = 1m;
             public decimal UnitPrice { get; set; } = 0m;
             public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
@@ -58,6 +59,9 @@ namespace WitcherHub.Application.Models.View.Contracts
 
             public JsonDocument? PriceBreakdown { get; set; }
             public string Title { get; set; } = "";
+            public string Description { get; set; } = "";
+            public string UnitName { get; set; } = "";
+
             public JsonDocument Config { get; set; } = JsonDocument.Parse("{}");
 
             public decimal? AgreedPrice { get; set; }

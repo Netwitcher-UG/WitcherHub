@@ -30,21 +30,21 @@ namespace WitcherHub.Application.Models.DTO.Quotes
         public Guid? ServiceId { get; set; }
         public string Title { get; set; } = "";
 
+        public string Description { get; set; } = "";
+        public string UnitName { get; set; } = "";
+
         public decimal Quantity { get; set; } = 1;
         public decimal UnitPrice { get; set; }
 
-        // jsonb
         public JsonDocument Config { get; set; } = JsonDocument.Parse("{}");
         public JsonDocument? PriceBreakdown { get; set; }
 
-      
         public DiscountType? DiscountType { get; set; }
         public decimal? DiscountValue { get; set; }
         public List<Guid> PricingRuleIds { get; set; } = new();
         public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
         public int Position { get; set; } = 1;
     }
-
     public sealed class QuoteIdRequest
     {
         public Guid QuoteId { get; set; }

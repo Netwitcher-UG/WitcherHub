@@ -224,12 +224,20 @@
 
                                 <td>
                                     <div class="fw-semibold">@it.Title</div>
+
+                                    @if (!string.IsNullOrWhiteSpace(it.Description))
+                                    {
+                                        <div class="text-muted small">@it.Description</div>
+                                    }
+
                                     <div class="text-muted small">
                                         @(it.ServiceName ?? "—")
-                                        &nbsp;•&nbsp;
-                                        Sub: <strong>@subTotal.ToString("0.00")</strong>
-                                        &nbsp;•&nbsp;
-                                        Disc: <strong>@discountAmt.ToString("0.00")</strong>
+                                        @if (!string.IsNullOrWhiteSpace(it.UnitName))
+                                        {
+                                            <text>&nbsp;•&nbsp; Unit: <strong>@it.UnitName</strong></text>
+                                        }
+                                        &nbsp;•&nbsp; Sub: <strong>@subTotal.ToString("0.00")</strong>
+                                        &nbsp;•&nbsp; Disc: <strong>@discountAmt.ToString("0.00")</strong>
                                     </div>
                                 </td>
 
@@ -254,6 +262,8 @@
                                                     data-item-qty="@it.Quantity"
                                                     data-item-unit="@it.UnitPrice"
                                                     data-item-pos="@it.Position"
+                                                    data-item-description="@it.Description"
+                                                    data-item-unitname="@it.UnitName"
                                                     data-item-billingcycle="@((int)it.BillingCycle)"
                                                     data-item-disctype="@discTypeStr"
                                                     data-item-discval="@discValStr"
@@ -313,7 +323,15 @@
                 <label class="form-label">Title</label>
                 <input class="form-control" name="EditTitle" id="ci-title" />
             </div>
+            <div class="mb-3">
+                <label class="form-label">Unit Name</label>
+                <input class="form-control" name="EditUnitName" id="ci-unitname" />
+            </div>
 
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" name="EditDescription" id="ci-description" rows="3"></textarea>
+            </div>
             <div class="row g-2">
                 <div class="col-4">
                     <label class="form-label">Qty</label>
@@ -816,7 +834,8 @@
             document.getElementById('ci-billing').value = btn.getAttribute('data-item-billingcycle') || '0';
             document.getElementById('ci-disctype').value = btn.getAttribute('data-item-disctype') || '';
             document.getElementById('ci-discval').value = btn.getAttribute('data-item-discval') || '';
-
+                    document.getElementById('ci-unitname').value = btn.getAttribute('data-item-unitname') || '';
+        document.getElementById('ci-description').value = btn.getAttribute('data-item-description') || '';
             const b64 = btn.getAttribute('data-item-config-b64');
             let cfgText = '{}';
 

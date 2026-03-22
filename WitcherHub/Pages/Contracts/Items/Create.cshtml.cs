@@ -68,7 +68,8 @@ namespace WitcherHub.Pages.Contracts.Items
             Form.Item.Quantity = 1;
             Form.Item.Position = (Contract.Items?.Count ?? 0) + 1;
             ConfigJson = "{}";
-
+            Form.Item.UnitName = "";
+            Form.Item.Description = "";
             // ✅ Toast لما يكون في redirect من flow إنشاء عقد بدون Quote
             if (string.Equals(ReturnTo, "items", StringComparison.OrdinalIgnoreCase))
             {
@@ -158,7 +159,11 @@ namespace WitcherHub.Pages.Contracts.Items
                 // Load service details (includes ConfigSchema + BasePrice)
                 var service = await _services.GetServiceAsync(SelectedServiceId, ct);
                 if (service is null) throw new NotFoundAppException("Service not found.");
+                if (string.IsNullOrWhiteSpace(Form.Item.UnitName) && !string.IsNullOrWhiteSpace(service.DefaultUnitName))
+                    Form.Item.UnitName = service.DefaultUnitName;
 
+                if (string.IsNullOrWhiteSpace(Form.Item.Description) && !string.IsNullOrWhiteSpace(service.DefaultDescription))
+                    Form.Item.Description = service.DefaultDescription;
                 // ✅ Apply defaults + Validate config vs schema (if exists)
                 var finalConfig = configDoc;
 

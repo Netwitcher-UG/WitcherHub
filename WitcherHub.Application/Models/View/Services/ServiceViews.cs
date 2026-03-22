@@ -35,6 +35,9 @@ namespace WitcherHub.Application.Models.View.Services
             public string DefaultCurrency { get; set; } = "EUR";
             public bool IsActive { get; set; }
 
+            public string DefaultUnitName { get; set; } = "";
+            public string DefaultDescription { get; set; } = "";
+
             public JsonDocument? ConfigSchema { get; set; }
 
             public List<PricingRuleItemView> PricingRules { get; set; } = new();
