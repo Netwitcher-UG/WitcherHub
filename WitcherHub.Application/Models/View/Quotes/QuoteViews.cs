@@ -51,7 +51,7 @@ namespace WitcherHub.Application.Models.View.Quotes
             public DateTimeOffset? LastRecurringInvoiceRunAt { get; set; }
 
             public DateTimeOffset? SignedAt { get; set; }
-            public List<QuoteSignatureView> Signatures { get; set; } = new();
+            //public List<QuoteSignatureView> Signatures { get; set; } = new();
             public List<QuoteItemItemView> Items { get; set; } = new();
         }
 

@@ -3,6 +3,7 @@ using System;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WitcherHub.Infrastructure.Data.Context;
@@ -12,9 +13,11 @@ using WitcherHub.Infrastructure.Data.Context;
 namespace WitcherHub.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260323064222_AddQuoteInvoiceSupportAndUnifiedRecurringInvoices")]
+    partial class AddQuoteInvoiceSupportAndUnifiedRecurringInvoices
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -877,9 +880,6 @@ namespace WitcherHub.Infrastructure.Migrations
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("QuoteId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateOnly?>("RecurringCycleDate")
                         .HasColumnType("date");
 
@@ -904,8 +904,6 @@ namespace WitcherHub.Infrastructure.Migrations
                     b.HasIndex("CreatedById");
 
                     b.HasIndex("ProjectId");
-
-                    b.HasIndex("QuoteId");
 
                     b.ToTable("Invoices");
                 });
@@ -1294,10 +1292,6 @@ namespace WitcherHub.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("AfterCustomerSignAction")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<bool>("ApplyVat")
                         .HasColumnType("boolean");
 
@@ -1315,18 +1309,8 @@ namespace WitcherHub.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("InvoiceSendMode")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<DateTimeOffset?>("IssuedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("LastRecurringInvoiceRunAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateOnly?>("NextRecurringInvoiceDate")
-                        .HasColumnType("date");
 
                     b.Property<string>("Notes")
                         .HasColumnType("text");
@@ -1338,21 +1322,6 @@ namespace WitcherHub.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
-
-                    b.Property<bool>("RecurringEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateOnly?>("RecurringEndDate")
-                        .HasColumnType("date");
-
-                    b.Property<bool>("RecurringIsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateOnly?>("RecurringStartDate")
-                        .HasColumnType("date");
-
-                    b.Property<DateTimeOffset?>("SignedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1440,44 +1409,6 @@ namespace WitcherHub.Infrastructure.Migrations
                     b.HasIndex("ServiceId");
 
                     b.ToTable("QuoteItems");
-                });
-
-            modelBuilder.Entity("WitcherHub.Infrastructure.Data.Models.QuoteSignature", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("QuoteId")
-                        .HasColumnType("uuid");
-
-                    b.Property<JsonDocument>("SignatureData")
-                        .HasColumnType("jsonb");
-
-                    b.Property<DateTimeOffset?>("SignedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("SignerEmail")
-                        .IsRequired()
-                        .HasMaxLength(320)
-                        .HasColumnType("character varying(320)");
-
-                    b.Property<string>("SignerName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("QuoteId");
-
-                    b.ToTable("QuoteSignature");
                 });
 
             modelBuilder.Entity("WitcherHub.Infrastructure.Data.Models.ServiceCatalogItem", b =>
@@ -1718,17 +1649,11 @@ namespace WitcherHub.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("WitcherHub.Infrastructure.Data.Models.Quote", "Quote")
-                        .WithMany()
-                        .HasForeignKey("QuoteId");
-
                     b.Navigation("Contract");
 
                     b.Navigation("CreatedBy");
 
                     b.Navigation("Project");
-
-                    b.Navigation("Quote");
                 });
 
             modelBuilder.Entity("WitcherHub.Infrastructure.Data.Models.InvoiceAccessLink", b =>
@@ -1882,17 +1807,6 @@ namespace WitcherHub.Infrastructure.Migrations
                     b.Navigation("Service");
                 });
 
-            modelBuilder.Entity("WitcherHub.Infrastructure.Data.Models.QuoteSignature", b =>
-                {
-                    b.HasOne("WitcherHub.Infrastructure.Data.Models.Quote", "Quote")
-                        .WithMany("Signatures")
-                        .HasForeignKey("QuoteId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Quote");
-                });
-
             modelBuilder.Entity("WitcherHub.Infrastructure.Data.Models.Contract", b =>
                 {
                     b.Navigation("Items");
@@ -1941,8 +1855,6 @@ namespace WitcherHub.Infrastructure.Migrations
             modelBuilder.Entity("WitcherHub.Infrastructure.Data.Models.Quote", b =>
                 {
                     b.Navigation("Items");
-
-                    b.Navigation("Signatures");
                 });
 
             modelBuilder.Entity("WitcherHub.Infrastructure.Data.Models.ServiceCatalogItem", b =>
