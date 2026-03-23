@@ -17,7 +17,11 @@ namespace WitcherHub.Infrastructure.Data.Models
             Signed, Terminated,
             Issued, Paid, Void
         }
-
+        public enum QuoteAfterSignAction
+        {
+            Contract = 0,
+            Invoice = 1
+        }
         public enum ServiceType { Website, Design, Video, Editing, Other }
         public enum PricingModel { Fixed, Unit, Tiered, Hourly }
 
@@ -38,7 +42,9 @@ namespace WitcherHub.Infrastructure.Data.Models
         {
             Manual = 0,
             ContractOneTime = 1,
-            ContractRecurring = 2
+            ContractRecurring = 2,
+            QuoteOneTime = 3,
+            QuoteRecurring = 4
         }
 
         public enum InvoiceDispatchStatus

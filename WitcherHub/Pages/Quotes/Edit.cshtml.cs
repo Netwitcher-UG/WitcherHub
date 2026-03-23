@@ -50,7 +50,14 @@ namespace WitcherHub.Pages.Quotes
         [BindProperty]
         public UpdateQuoteDto Header { get; set; } = new()
         {
-            Quote = new QuoteDto { Currency = "EUR", Status = DocumentStatus.Draft },
+         
+            Quote = new QuoteDto
+            {
+                Currency = "EUR",
+                Status = DocumentStatus.Draft,
+                AfterCustomerSignAction = QuoteAfterSignAction.Contract,
+                InvoiceSendMode = InvoiceSendMode.Automatic
+            },
             Items = null // ✅ important
         };
 
@@ -83,7 +90,8 @@ namespace WitcherHub.Pages.Quotes
             Header.Quote.ExpiresAt = Quote.ExpiresAt;
             Header.Quote.Status = Quote.Status;
             Header.Quote.ApplyVat = Quote.ApplyVat;
-
+            Header.Quote.AfterCustomerSignAction = Quote.AfterCustomerSignAction;
+            Header.Quote.InvoiceSendMode = Quote.InvoiceSendMode;
             // prepare new item defaults
             NewItem.QuoteId = Quote.Id;
             NewItem.Item.Position = (Quote.Items?.Count ?? 0) + 1;
@@ -111,7 +119,8 @@ namespace WitcherHub.Pages.Quotes
                 if (Id == Guid.Empty) throw new BadRequestAppException("Invalid quote id.");
 
                 Header.Items = null; // ✅ do not replace items
-
+                if (Header.Quote.AfterCustomerSignAction != QuoteAfterSignAction.Invoice)
+                    Header.Quote.InvoiceSendMode = InvoiceSendMode.Automatic;
                 var vr = await _updateValidator.ValidateAsync(Header, ct);
                 if (!vr.IsValid)
                 {

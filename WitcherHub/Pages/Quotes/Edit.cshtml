@@ -206,6 +206,28 @@
                                 </div>
                             </div>
 
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">After customer signs</label>
+                                <select class="form-select js-pointer-select"
+                                        asp-for="Header.Quote.AfterCustomerSignAction"
+                                        id="quoteAfterSignAction">
+                                    <option value="@((int)QuoteAfterSignAction.Contract)">Create Contract</option>
+                                    <option value="@((int)QuoteAfterSignAction.Invoice)">Send as Invoice</option>
+                                </select>
+                                <span class="text-danger small" asp-validation-for="Header.Quote.AfterCustomerSignAction"></span>
+                            </div>
+
+                            <div class="col-12 col-md-6" id="quoteInvoiceSendModeWrap">
+                                <label class="form-label">Invoice Send Mode</label>
+                                <select class="form-select js-pointer-select"
+                                        asp-for="Header.Quote.InvoiceSendMode"
+                                        id="quoteInvoiceSendMode">
+                                    <option value="@((int)InvoiceSendMode.Automatic)">Automatic</option>
+                                    <option value="@((int)InvoiceSendMode.Manual)">Manual</option>
+                                </select>
+                                <span class="text-danger small" asp-validation-for="Header.Quote.InvoiceSendMode"></span>
+                            </div>
+
                             <div class="col-12">
                                 <label class="form-label">Notes</label>
                                 <textarea class="form-control" rows="3" asp-for="Header.Quote.Notes"></textarea>
@@ -809,6 +831,24 @@
             modalEl.addEventListener('hidden.bs.modal', function () {
                 pendingForm = null;
             });
+        })();
+                (function () {
+            const actionEl = document.getElementById('quoteAfterSignAction');
+            const modeWrapEl = document.getElementById('quoteInvoiceSendModeWrap');
+            const modeEl = document.getElementById('quoteInvoiceSendMode');
+
+            function toggleInvoiceMode() {
+                if (!actionEl) return;
+
+                const isInvoice = actionEl.value === '@((int)QuoteAfterSignAction.Invoice)';
+                if (modeWrapEl) modeWrapEl.classList.toggle('d-none', !isInvoice);
+                if (modeEl) modeEl.disabled = !isInvoice;
+            }
+
+            if (actionEl) {
+                actionEl.addEventListener('change', toggleInvoiceMode);
+                toggleInvoiceMode();
+            }
         })();
     </script>
 }

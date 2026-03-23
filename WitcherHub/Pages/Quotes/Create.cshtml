@@ -1,8 +1,13 @@
 @page
+@using static WitcherHub.Infrastructure.Data.Models.Enums
 @model WitcherHub.Pages.Quotes.CreateModel
 
 @{
     ViewData["Title"] = "Create Quote";
+}
+
+@functions {
+    string FmtDate(DateTimeOffset? d) => d?.ToString("yyyy-MM-dd") ?? "";
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -13,24 +18,62 @@
 <form method="post" class="card">
     <div class="card-body">
         <input type="hidden" asp-for="Form.Quote.ProjectId" />
+        <input type="hidden" asp-for="Form.Quote.Currency" value="EUR" />
 
         <div class="row g-3 js-pointer">
             <div class="col-12 col-md-4">
-                <label class="form-label">Currency</label>
-                <input class="form-control" asp-for="Form.Quote.Currency" />
-                <span class="text-danger small" asp-validation-for="Form.Quote.Currency"></span>
-            </div>
-
-            <div class="col-12 col-md-4">
                 <label class="form-label js-pointer-label">Issued At</label>
-                <input type="date" class="form-control js-themed-date js-datepicker js-pointer-date" asp-for="Form.Quote.IssuedAt" />
+                <input type="date"
+                       class="form-control js-themed-date js-datepicker js-pointer-date"
+                       name="Form.Quote.IssuedAt"
+                       value="@FmtDate(Model.Form.Quote.IssuedAt)" />
                 <span class="text-danger small" asp-validation-for="Form.Quote.IssuedAt"></span>
             </div>
 
             <div class="col-12 col-md-4">
                 <label class="form-label js-pointer-label">Expires At</label>
-                <input type="date" class="form-control js-themed-date js-datepicker js-pointer-date" asp-for="Form.Quote.ExpiresAt" />
+                <input type="date"
+                       class="form-control js-themed-date js-datepicker js-pointer-date"
+                       name="Form.Quote.ExpiresAt"
+                       value="@FmtDate(Model.Form.Quote.ExpiresAt)" />
                 <span class="text-danger small" asp-validation-for="Form.Quote.ExpiresAt"></span>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <div class="quote-vat-field">
+                    <label class="form-label">VAT</label>
+                    <div class="form-check d-flex align-items-center">
+                        <input class="form-check-input js-pointer-checkbox"
+                               asp-for="Form.Quote.ApplyVat"
+                               type="checkbox"
+                               id="CreateQuoteApplyVat" />
+                        <label class="form-check-label js-pointer-label ms-2" for="CreateQuoteApplyVat">
+                            Apply VAT (19%)
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label">After customer signs</label>
+                <select class="form-select js-pointer-select"
+                        asp-for="Form.Quote.AfterCustomerSignAction"
+                        id="createQuoteAfterSignAction">
+                    <option value="@((int)QuoteAfterSignAction.Contract)">Create Contract</option>
+                    <option value="@((int)QuoteAfterSignAction.Invoice)">Send as Invoice</option>
+                </select>
+                <span class="text-danger small" asp-validation-for="Form.Quote.AfterCustomerSignAction"></span>
+            </div>
+
+            <div class="col-12 col-md-6" id="createQuoteInvoiceSendModeWrap">
+                <label class="form-label">Invoice Send Mode</label>
+                <select class="form-select js-pointer-select"
+                        asp-for="Form.Quote.InvoiceSendMode"
+                        id="createQuoteInvoiceSendMode">
+                    <option value="@((int)InvoiceSendMode.Automatic)">Automatic</option>
+                    <option value="@((int)InvoiceSendMode.Manual)">Manual</option>
+                </select>
+                <span class="text-danger small" asp-validation-for="Form.Quote.InvoiceSendMode"></span>
             </div>
 
             <div class="col-12">
@@ -54,6 +97,25 @@
         (function () {
             if (window.quoteDateTheme) {
                 window.quoteDateTheme.init(document);
+            }
+        })();
+
+        (function () {
+            const actionEl = document.getElementById('createQuoteAfterSignAction');
+            const modeWrapEl = document.getElementById('createQuoteInvoiceSendModeWrap');
+            const modeEl = document.getElementById('createQuoteInvoiceSendMode');
+
+            function toggleInvoiceMode() {
+                if (!actionEl) return;
+
+                const isInvoice = actionEl.value === '@((int)QuoteAfterSignAction.Invoice)';
+                if (modeWrapEl) modeWrapEl.classList.toggle('d-none', !isInvoice);
+                if (modeEl) modeEl.disabled = !isInvoice;
+            }
+
+            if (actionEl) {
+                actionEl.addEventListener('change', toggleInvoiceMode);
+                toggleInvoiceMode();
             }
         })();
     </script>

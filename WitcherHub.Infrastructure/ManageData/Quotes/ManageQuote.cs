@@ -156,6 +156,17 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                             IssuedAt = x.IssuedAt,
                             ExpiresAt = x.ExpiresAt,
                             ApplyVat = x.ApplyVat,
+
+                            AfterCustomerSignAction = x.AfterCustomerSignAction,
+                            InvoiceSendMode = x.InvoiceSendMode,
+
+                            RecurringEnabled = x.RecurringEnabled,
+                            RecurringIsActive = x.RecurringIsActive,
+                            RecurringStartDate = x.RecurringStartDate,
+                            RecurringEndDate = x.RecurringEndDate,
+                            NextRecurringInvoiceDate = x.NextRecurringInvoiceDate,
+                            LastRecurringInvoiceRunAt = x.LastRecurringInvoiceRunAt,
+
                             Items = x.Items
                                 .OrderBy(i => i.Position)
                                 .ThenBy(i => i.CreatedAt)
@@ -166,12 +177,15 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                                     ServiceName = i.Service != null ? i.Service.Name : null,
 
                                     Title = i.Title,
+                                    Description = i.Description,
+                                    UnitName = i.UnitName,
+
                                     Quantity = i.Quantity,
                                     UnitPrice = i.UnitPrice,
 
                                     Config = i.Config,
                                     PriceBreakdown = i.PriceBreakdown,
-                                  
+
                                     DiscountType = i.DiscountType,
                                     DiscountValue = i.DiscountValue,
                                     BillingCycle = i.BillingCycle,
@@ -217,18 +231,28 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                     Currency = (dto.Quote.Currency ?? "EUR").Trim(),
                     Notes = string.IsNullOrWhiteSpace(dto.Quote.Notes) ? null : dto.Quote.Notes.Trim(),
                     IssuedAt = dto.Quote.IssuedAt?.ToUniversalTime(),
-                    ExpiresAt = dto.Quote.ExpiresAt?.ToUniversalTime()
+                    ExpiresAt = dto.Quote.ExpiresAt?.ToUniversalTime(),
+
+                    AfterCustomerSignAction = dto.Quote.AfterCustomerSignAction,
+                    InvoiceSendMode = dto.Quote.AfterCustomerSignAction == QuoteAfterSignAction.Invoice
+                        ? dto.Quote.InvoiceSendMode
+                        : InvoiceSendMode.Automatic,
+
+                    RecurringStartDate = dto.Quote.RecurringStartDate,
+                    RecurringEndDate = dto.Quote.RecurringEndDate
                 };
 
-                // Items (optional)
                 if (dto.Items is not null && dto.Items.Count > 0)
                 {
                     int pos = 1;
                     foreach (var it in dto.Items.OrderBy(x => x.Position <= 0 ? int.MaxValue : x.Position))
                     {
-                        var item = new QuoteItem
+                        quote.Items.Add(new QuoteItem
                         {
                             Title = (it.Title ?? "").Trim(),
+                            Description = string.IsNullOrWhiteSpace(it.Description) ? string.Empty : it.Description.Trim(),
+                            UnitName = string.IsNullOrWhiteSpace(it.UnitName) ? string.Empty : it.UnitName.Trim(),
+
                             ServiceId = it.ServiceId,
                             Quantity = it.Quantity,
                             UnitPrice = it.UnitPrice,
@@ -238,13 +262,13 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                             DiscountType = it.DiscountType,
                             DiscountValue = it.DiscountValue,
                             Position = it.Position > 0 ? it.Position : pos
+                        });
 
-                           
-                        };
-                        quote.Items.Add(item);
                         pos++;
                     }
                 }
+
+                ApplyDerivedRecurringState(quote);
 
                 await quotesRepo.AddAsync(quote, ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
@@ -282,8 +306,17 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
             quote.IssuedAt = dto.Quote.IssuedAt?.ToUniversalTime();
             quote.ExpiresAt = dto.Quote.ExpiresAt?.ToUniversalTime();
             quote.ApplyVat = dto.Quote.ApplyVat;
+
             EnsureValidQuoteStatus(dto.Quote.Status);
             quote.Status = dto.Quote.Status;
+
+            quote.AfterCustomerSignAction = dto.Quote.AfterCustomerSignAction;
+            quote.InvoiceSendMode = dto.Quote.AfterCustomerSignAction == QuoteAfterSignAction.Invoice
+                ? dto.Quote.InvoiceSendMode
+                : InvoiceSendMode.Automatic;
+
+            quote.RecurringStartDate = dto.Quote.RecurringStartDate;
+            quote.RecurringEndDate = dto.Quote.RecurringEndDate;
 
             if (dto.Items is not null)
             {
@@ -296,6 +329,9 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                     {
                         QuoteId = quote.Id,
                         Title = (it.Title ?? "").Trim(),
+                        Description = string.IsNullOrWhiteSpace(it.Description) ? string.Empty : it.Description.Trim(),
+                        UnitName = string.IsNullOrWhiteSpace(it.UnitName) ? string.Empty : it.UnitName.Trim(),
+
                         ServiceId = it.ServiceId,
                         Quantity = it.Quantity,
                         UnitPrice = it.UnitPrice,
@@ -305,11 +341,13 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                         DiscountType = it.DiscountType,
                         DiscountValue = it.DiscountValue,
                         Position = it.Position > 0 ? it.Position : pos
-
                     });
+
                     pos++;
                 }
             }
+
+            ApplyDerivedRecurringState(quote);
 
             await _unitOfWork.SaveChangesAsync(ct);
 
@@ -368,24 +406,24 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 {
                     QuoteId = dto.QuoteId,
                     Title = (dto.Item.Title ?? "").Trim(),
+                    Description = string.IsNullOrWhiteSpace(dto.Item.Description) ? string.Empty : dto.Item.Description.Trim(),
+                    UnitName = string.IsNullOrWhiteSpace(dto.Item.UnitName) ? string.Empty : dto.Item.UnitName.Trim(),
+
                     ServiceId = dto.Item.ServiceId,
                     Quantity = dto.Item.Quantity,
                     Config = dto.Item.Config ?? JsonDocument.Parse("{}"),
-                    BillingCycle=dto.Item.BillingCycle,
+                    BillingCycle = dto.Item.BillingCycle,
                     UnitPrice = effectiveUnit,
                     PriceBreakdown = breakdown,
 
                     DiscountType = dto.Item.DiscountType,
                     DiscountValue = dto.Item.DiscountValue,
                     Position = dto.Item.Position > 0 ? dto.Item.Position : (maxPos + 1)
-
-                    // إذا بدك تخزّن اختيار الضريبة بالـ DB:
-                    // ApplyTax = dto.Item.ApplyTax
                 };
 
                 await itemsRepo.AddAsync(item, ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
-
+                await RefreshQuoteRecurringStateAsync(dto.QuoteId, ct);
                 await InvalidateAfterQuoteChangeAsync(dto.QuoteId, ct);
                 _log.LogInformation("Quote item created. {QuoteId} {ItemId}", dto.QuoteId, item.Id);
 
@@ -420,11 +458,13 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 if (item is null) throw new NotFoundAppException("Quote item not found.");
 
                 item.Title = (dto.Item.Title ?? item.Title ?? "").Trim();
+                item.Description = string.IsNullOrWhiteSpace(dto.Item.Description) ? string.Empty : dto.Item.Description.Trim();
+                item.UnitName = string.IsNullOrWhiteSpace(dto.Item.UnitName) ? string.Empty : dto.Item.UnitName.Trim();
+
                 item.ServiceId = dto.Item.ServiceId;
                 item.Quantity = dto.Item.Quantity;
                 item.UnitPrice = dto.Item.UnitPrice;
                 item.BillingCycle = dto.Item.BillingCycle;
-
 
                 item.DiscountType = dto.Item.DiscountType;
                 item.DiscountValue = dto.Item.DiscountValue;
@@ -446,7 +486,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 itemsRepo.Update(item);
 
                 await _unitOfWork.CommitTransactionAsync(ct);
-
+                await RefreshQuoteRecurringStateAsync(dto.QuoteId, ct);
                 await InvalidateAfterQuoteChangeAsync(dto.QuoteId, ct);
                 _log.LogInformation("Quote item updated. {QuoteId} {ItemId}", dto.QuoteId, dto.ItemId);
             }
@@ -484,7 +524,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 await RepackPositionsAsync(dto.QuoteId, ct);
 
                 await _unitOfWork.CommitTransactionAsync(ct);
-
+                await RefreshQuoteRecurringStateAsync(dto.QuoteId, ct);
                 await InvalidateAfterQuoteChangeAsync(dto.QuoteId, ct);
                 _log.LogInformation("Quote item deleted. {QuoteId} {ItemId}", dto.QuoteId, dto.ItemId);
             }
@@ -557,6 +597,52 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
         // =========================
         // Price breakdown helper (strongly typed)
         // =========================
+
+
+        private static void ApplyDerivedRecurringState(Quote quote)
+        {
+            var shouldInvoice = quote.AfterCustomerSignAction == QuoteAfterSignAction.Invoice;
+            var hasRecurringItems = quote.Items.Any(x => x.BillingCycle != BillingCycle.OneTime);
+
+            var recurringEnabled = shouldInvoice && hasRecurringItems;
+
+            quote.RecurringEnabled = recurringEnabled;
+            quote.RecurringIsActive = recurringEnabled;
+
+            if (!recurringEnabled)
+            {
+                quote.RecurringStartDate = null;
+                quote.RecurringEndDate = null;
+                quote.NextRecurringInvoiceDate = null;
+                quote.LastRecurringInvoiceRunAt = null;
+                return;
+            }
+
+            var fallbackStart =
+                quote.RecurringStartDate ??
+                (quote.IssuedAt.HasValue
+                    ? DateOnly.FromDateTime(quote.IssuedAt.Value.UtcDateTime)
+                    : DateOnly.FromDateTime(DateTime.UtcNow));
+
+            quote.RecurringStartDate = fallbackStart;
+            quote.NextRecurringInvoiceDate ??= fallbackStart;
+        }
+
+        private async Task RefreshQuoteRecurringStateAsync(Guid quoteId, CancellationToken ct)
+        {
+            var quotesRepo = _unitOfWork.Repo<Quote>();
+
+            var quote = await quotesRepo.Query(asNoTracking: false)
+                .Include(x => x.Items)
+                .FirstOrDefaultAsync(x => x.Id == quoteId, ct);
+
+            if (quote is null)
+                return;
+
+            ApplyDerivedRecurringState(quote);
+            await _unitOfWork.SaveChangesAsync(ct);
+        }
+
         private async Task<(JsonDocument Breakdown, decimal EffectiveUnitPrice)> BuildBreakdownAsync(QuoteItemDto itemDto, CancellationToken ct)
         {
             var qty = itemDto.Quantity;

@@ -161,9 +161,14 @@ namespace WitcherHub.Pages.Quotes
 
                 await _email.QueueNowAsync(msg, ct);
 
+                var currentQuote = await _quotes.GetQuoteAsync(Id, ct);
+                if (currentQuote is null)
+                    throw new NotFoundAppException("Quote not found.");
+
                 // (اختياري وآمن) حدّث الحالة إلى Sent فقط لو كانت Draft
                 if (model.StatusText?.Equals(DocumentStatus.Draft.ToString(), StringComparison.OrdinalIgnoreCase) == true)
                 {
+                 
                     var dto = new UpdateQuoteDto
                     {
                         Quote = new QuoteDto
@@ -173,11 +178,13 @@ namespace WitcherHub.Pages.Quotes
                             Notes = model.Notes,
                             IssuedAt = model.IssuedAt ?? DateTimeOffset.Now,
                             ExpiresAt = model.ExpiresAt,
-                            Status = DocumentStatus.Sent
+                            Status = DocumentStatus.Sent,
+                            ApplyVat = currentQuote.ApplyVat,
+                            AfterCustomerSignAction = currentQuote.AfterCustomerSignAction,
+                            InvoiceSendMode = currentQuote.InvoiceSendMode
                         },
                         Items = null
                     };
-
                     await _quotes.UpdateAsync(model.QuoteId, dto, ct);
                 }
 

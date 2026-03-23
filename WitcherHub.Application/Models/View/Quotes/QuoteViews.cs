@@ -40,6 +40,18 @@ namespace WitcherHub.Application.Models.View.Quotes
             public DateTimeOffset? ExpiresAt { get; set; }
 
             public bool ApplyVat { get; set; }
+            public QuoteAfterSignAction AfterCustomerSignAction { get; set; } = QuoteAfterSignAction.Contract;
+            public InvoiceSendMode InvoiceSendMode { get; set; } = InvoiceSendMode.Automatic;
+         
+            public bool RecurringEnabled { get; set; }
+            public bool RecurringIsActive { get; set; }
+            public DateOnly? RecurringStartDate { get; set; }
+            public DateOnly? RecurringEndDate { get; set; }
+            public DateOnly? NextRecurringInvoiceDate { get; set; }
+            public DateTimeOffset? LastRecurringInvoiceRunAt { get; set; }
+
+            public DateTimeOffset? SignedAt { get; set; }
+            public List<QuoteSignatureView> Signatures { get; set; } = new();
             public List<QuoteItemItemView> Items { get; set; } = new();
         }
 

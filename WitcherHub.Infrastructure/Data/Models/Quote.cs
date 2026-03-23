@@ -20,13 +20,27 @@ namespace WitcherHub.Infrastructure.Data.Models
         public string Currency { get; set; } = "EUR";
 
         public string? Notes { get; set; }
-
+        public QuoteAfterSignAction AfterCustomerSignAction { get; set; } = QuoteAfterSignAction.Contract;
+        public InvoiceSendMode InvoiceSendMode { get; set; } = InvoiceSendMode.Automatic;
+      
+        // recurring مثل العقد
+        public bool RecurringEnabled { get; set; } = false;
+        public bool RecurringIsActive { get; set; } = false;
+        public DateOnly? RecurringStartDate { get; set; }
+        public DateOnly? RecurringEndDate { get; set; }
+        public DateOnly? NextRecurringInvoiceDate { get; set; }
+        public DateTimeOffset? LastRecurringInvoiceRunAt { get; set; }
         public DateTimeOffset? IssuedAt { get; set; }
         public DateTimeOffset? ExpiresAt { get; set; }
-        public bool ApplyVat { get; set; } = false;
+        public bool ApplyVat { get; set; } = true;
         public Guid? CreatedById { get; set; }
         public AppUser? CreatedBy { get; set; }
+        public DateTimeOffset? SignedAt { get; set; }
 
+       
+
+        // signatures
+        public ICollection<QuoteSignature> Signatures { get; set; } = new List<QuoteSignature>();
         public ICollection<QuoteItem> Items { get; set; } = new List<QuoteItem>();
     }
 
@@ -68,5 +82,44 @@ namespace WitcherHub.Infrastructure.Data.Models
         public decimal? DiscountValue { get; set; }
 
         public int Position { get; set; } = 1;
+    }
+    public class QuoteSignature : BaseEntity
+    {
+        public Guid QuoteId { get; set; }
+        public Quote Quote { get; set; } = default!;
+
+        [MaxLength(200)]
+        public string SignerName { get; set; } = default!;
+
+        [MaxLength(320)]
+        public string SignerEmail { get; set; } = default!;
+
+        public DateTimeOffset? SignedAt { get; set; }
+
+        [Column(TypeName = "jsonb")]
+        public JsonDocument? SignatureData { get; set; }
+    }
+    public class QuoteAccessLink : BaseEntity
+    {
+        public Guid QuoteId { get; set; }
+        public Quote Quote { get; set; } = default!;
+
+        [MaxLength(200)]
+        public string TokenHash { get; set; } = default!;
+
+        [MaxLength(320)]
+        public string RecipientEmail { get; set; } = default!;
+
+        public DateTimeOffset ExpiresAt { get; set; }
+        public DateTimeOffset? RevokedAtUtc { get; set; }
+        public DateTimeOffset? LastOpenedAtUtc { get; set; }
+
+        public static string HashToken(string rawToken)
+        {
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(rawToken);
+            var hash = sha.ComputeHash(bytes);
+            return Convert.ToHexString(hash);
+        }
     }
 }

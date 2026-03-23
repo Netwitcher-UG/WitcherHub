@@ -13,6 +13,8 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         public Guid? ContractId { get; set; }
         public Contract? Contract { get; set; }
+        public Guid? QuoteId { get; set; }
+        public Quote? Quote { get; set; }
 
         [MaxLength(50)]
         public string InvoiceNo { get; set; } = default!;

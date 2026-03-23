@@ -23,6 +23,12 @@ namespace WitcherHub.Application.Models.DTO.Quotes
         public DateTimeOffset? ExpiresAt { get; set; }
         public bool ApplyVat { get; set; } = false;
         public DocumentStatus Status { get; set; } = DocumentStatus.Draft;
+        public QuoteAfterSignAction AfterCustomerSignAction { get; set; } = QuoteAfterSignAction.Contract;
+        public InvoiceSendMode InvoiceSendMode { get; set; } = InvoiceSendMode.Automatic;
+      
+        public DateOnly? RecurringStartDate { get; set; }
+        public DateOnly? RecurringEndDate { get; set; }
+        public DateTimeOffset? SignedAt { get; set; }
     }
 
     public class QuoteItemDto

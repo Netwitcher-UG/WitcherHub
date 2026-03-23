@@ -27,29 +27,45 @@ namespace WitcherHub.Pages.Quotes
         [BindProperty]
         public QuoteDTOs Form { get; set; } = new();
 
-        // NOTE:
-        // We no longer show a standalone "Create" UI.
-        // Hitting /Quotes/Create?projectId=... will immediately create a Draft quote
-        // with fixed Currency=EUR and IssuedAt=today (server), then redirect to Edit.
-        public async Task<IActionResult> OnGetAsync(CancellationToken ct)
+        public IActionResult OnGet()
+        {
+            if (ProjectId == Guid.Empty)
+            {
+                TempData["Toast.Type"] = "error";
+                TempData["Toast.Title"] = "Error";
+                TempData["Toast.Message"] = "ProjectId is required.";
+                return RedirectToPage("/Projects");
+            }
+
+            Form = new QuoteDTOs
+            {
+                Quote = new QuoteDto
+                {
+                    ProjectId = ProjectId,
+                    Currency = "EUR",
+                    Status = DocumentStatus.Draft,
+                    IssuedAt = DateTimeOffset.Now,
+                    AfterCustomerSignAction = QuoteAfterSignAction.Contract,
+                    InvoiceSendMode = InvoiceSendMode.Automatic
+                },
+                Items = new List<QuoteItemDto>()
+            };
+
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostAsync(CancellationToken ct)
         {
             try
             {
-                if (ProjectId == Guid.Empty)
+                if (Form.Quote.ProjectId == Guid.Empty)
                     throw new BadRequestAppException("ProjectId is required.");
 
-                Form = new QuoteDTOs
-                {
-                    Quote = new QuoteDto
-                    {
-                        ProjectId = ProjectId,
-                        Currency = "EUR",
-                        Status = DocumentStatus.Draft,
-                        // server default
-                        IssuedAt = DateTimeOffset.Now
-                    },
-                    Items = new List<QuoteItemDto>() // header only
-                };
+                Form.Quote.Currency = "EUR";
+                Form.Quote.Status = DocumentStatus.Draft;
+
+                if (Form.Quote.AfterCustomerSignAction != QuoteAfterSignAction.Invoice)
+                    Form.Quote.InvoiceSendMode = InvoiceSendMode.Automatic;
 
                 var vr = await _validator.ValidateAsync(Form, ct);
                 if (!vr.IsValid)
@@ -59,13 +75,14 @@ namespace WitcherHub.Pages.Quotes
                         var key = err.PropertyName;
                         if (!string.IsNullOrWhiteSpace(key) && !key.StartsWith("Form."))
                             key = "Form." + key;
+
                         ModelState.AddModelError(key, err.ErrorMessage);
                     }
 
                     TempData["Toast.Type"] = "error";
                     TempData["Toast.Title"] = "Validation";
                     TempData["Toast.Message"] = "Please fix the highlighted fields.";
-                    return RedirectToPage("/Projects/Details", new { id = ProjectId });
+                    return Page();
                 }
 
                 var id = await _quotes.CreateAsync(Form, ct);
@@ -91,8 +108,5 @@ namespace WitcherHub.Pages.Quotes
                 return RedirectToPage("/Projects");
             }
         }
-
-        // Backward compatibility (if something still posts to this page).
-        public Task<IActionResult> OnPostAsync(CancellationToken ct) => OnGetAsync(ct);
     }
 }
