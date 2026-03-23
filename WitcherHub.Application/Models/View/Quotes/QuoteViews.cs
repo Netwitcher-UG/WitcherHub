@@ -29,7 +29,8 @@ namespace WitcherHub.Application.Models.View.Quotes
         {
             public Guid Id { get; set; }
             public Guid ProjectId { get; set; }
-
+            public string? CustomerName { get; set; }
+            public string? CustomerEmail { get; set; }
             public string QuoteNo { get; set; } = "";
             public DocumentStatus Status { get; set; }
             public string Currency { get; set; } = "EUR";

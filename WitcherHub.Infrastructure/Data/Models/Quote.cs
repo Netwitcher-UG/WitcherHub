@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using WitcherHub.Domain.Commen;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
@@ -41,6 +43,7 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         // signatures
         public ICollection<QuoteSignature> Signatures { get; set; } = new List<QuoteSignature>();
+        public ICollection<QuoteAccessLink> AccessLinks { get; set; } = new List<QuoteAccessLink>();
         public ICollection<QuoteItem> Items { get; set; } = new List<QuoteItem>();
     }
 
@@ -104,22 +107,27 @@ namespace WitcherHub.Infrastructure.Data.Models
         public Guid QuoteId { get; set; }
         public Quote Quote { get; set; } = default!;
 
-        [MaxLength(200)]
-        public string TokenHash { get; set; } = default!;
+        [MaxLength(128)]
+        public string TokenHash { get; set; } = default!; // SHA256 hex
 
         [MaxLength(320)]
         public string RecipientEmail { get; set; } = default!;
 
         public DateTimeOffset ExpiresAt { get; set; }
-        public DateTimeOffset? RevokedAtUtc { get; set; }
-        public DateTimeOffset? LastOpenedAtUtc { get; set; }
+        public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 
-        public static string HashToken(string rawToken)
+        public DateTimeOffset? LastOpenedAtUtc { get; set; }
+        public DateTimeOffset? RevokedAtUtc { get; set; }
+
+        public bool IsRevoked => RevokedAtUtc != null;
+
+        public static string HashToken(string token)
         {
-            using var sha = System.Security.Cryptography.SHA256.Create();
-            var bytes = System.Text.Encoding.UTF8.GetBytes(rawToken);
-            var hash = sha.ComputeHash(bytes);
-            return Convert.ToHexString(hash);
+            using var sha = SHA256.Create();
+            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(token));
+            var sb = new StringBuilder(bytes.Length * 2);
+            foreach (var b in bytes) sb.Append(b.ToString("x2"));
+            return sb.ToString();
         }
     }
 }

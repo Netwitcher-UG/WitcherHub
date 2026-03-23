@@ -1,7 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
 using NCalc;
@@ -14,10 +12,9 @@ using WitcherHub.Application.Common.Pagination;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Common.ConfigSchema;
-using WitcherHub.Infrastructure.Data.Models; // ServiceCatalogItem موجود هون
+using WitcherHub.Infrastructure.Data.Models; 
 using WitcherHub.Application.Models.DTO.Quotes;
 using WitcherHub.Application.Models.View.Quotes;
-using WitcherHub.Infrastructure.Data.Models;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Infrastructure.ManageData.Quotes
@@ -148,6 +145,28 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                         {
                             Id = x.Id,
                             ProjectId = x.ProjectId,
+
+                            CustomerName = x.Project.Customer.Type == CustomerType.Individual
+                                ? (
+                                    (((x.Project.Customer.FirstName ?? "") + " " + (x.Project.Customer.LastName ?? "")).Trim()) != ""
+                                        ? (((x.Project.Customer.FirstName ?? "") + " " + (x.Project.Customer.LastName ?? "")).Trim())
+                                        : x.Project.Customer.Name
+                                  )
+                                : x.Project.Customer.Name,
+
+                            CustomerEmail =
+                                x.Project.Customer.Contacts
+                                    .Where(c => c.Email != null && c.Email != "")
+                                    .OrderByDescending(c => c.IsPrimary)
+                                    .Select(c => c.Email)
+                                    .FirstOrDefault()
+                                ??
+                                x.Project.Customer.EmailAddresses
+                                    .Where(e => e.Email != null && e.Email != "")
+                                    .OrderByDescending(e => e.Kind == "business")
+                                    .Select(e => e.Email)
+                                    .FirstOrDefault(),
+
                             QuoteNo = x.QuoteNo,
                             Status = x.Status,
                             Currency = x.Currency,
@@ -202,7 +221,6 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 DetailsCacheOptions,
                 ct);
         }
-
         // =========================
         // CREATE QUOTE (with optional items)
         // =========================

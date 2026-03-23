@@ -4,7 +4,20 @@
 @{
     ViewData["Title"] = "Quote Details";
 }
+@{
+    var showSignedPdfBtn = Model.HasSignedQuotePdf;
+    var showCopyLinkBtn = !Model.HasSignedQuotePdf;
+}
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+<form method="post" id="quoteCopyLinkAfForm">
+    @Html.AntiForgeryToken()
+</form>
 
+<input type="hidden"
+       id="createQuotePublicLinkUrl"
+       value="@Url.Page("./Details", "CreatePublicLink", new { id = Model.Id })" />
+<input type="hidden" id="quoteAntiForgeryToken"
+       value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />
 @if (Model.Quote is null)
 {
     <div class="alert alert-danger">Quote not found.</div>
@@ -43,19 +56,7 @@
     </div>
 
     <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary"
-           asp-page="/Projects"
-           title="Back to Projects">
-            Back
-        </a>
-
-        <a class="btn btn-outline-secondary"
-           asp-page="/Projects"
-           asp-route-openProjectId="@Model.Quote.ProjectId"
-           asp-route-openTab="quotes"
-           title="Back to Project (open quotes tab)">
-            Back to Project Quotes
-        </a>
+        
 
         <a class="btn btn-outline-primary"
            id="downloadPdfBtn"
@@ -68,19 +69,45 @@
             <span class="spinner-border spinner-border-sm ms-2 d-none" id="downloadPdfSpinner" role="status" aria-hidden="true"></span>
         </a>
 
-        <button type="button"
-                class="btn btn-success"
-                data-bs-toggle="modal"
-                data-bs-target="#SendQuoteModal"
-                title="Send quote to customer">
-            Send
-        </button>
+        @if (showCopyLinkBtn)
+        {
+            <button type="button"
+                    class="btn btn-success"
+                    data-bs-toggle="modal"
+                    data-bs-target="#SendQuoteModal"
+                    title="Send quote to customer">
+                Send
+            </button>
+        }
+        @if (showCopyLinkBtn)
+        {
+            <button type="button"
+                    class="btn btn-outline-info"
+                    id="copyQuoteLinkBtn"
+                    title="Copy public signing link">
+                Copy Link
+            </button>
+        }
 
-        <a class="btn btn-primary"
-           asp-page="/Quotes/Edit"
-           asp-route-id="@Model.Quote.Id">
-            Edit
-        </a>
+        @if (showSignedPdfBtn)
+        {
+            <a class="btn btn-outline-success"
+               asp-page="./Details"
+               asp-page-handler="SignedPdf"
+               asp-route-id="@Model.Quote.Id"
+               title="Download signed PDF">
+                Signed PDF
+            </a>
+        }
+        else
+        {
+            <a class="btn btn-primary"
+               asp-page="/Quotes/Edit"
+               asp-route-id="@Model.Quote.Id">
+                Edit
+            </a>
+        }
+        
     </div>
 </div>
 
@@ -151,14 +178,22 @@
 
             <div class="modal-body">
                 <div class="mb-2">
-                    You are about to send this quote as a PDF attachment to the customer linked to this project.
+                    You are about to send this quote to the customer with:
+                </div>
+
+                <ul class="mb-3">
+                    <li>an attached unsigned PDF</li>
+                    <li>a secure signing link in the email body</li>
+                </ul>
+
+                <div class="p-3 rounded-3 border bg-light mb-3">
+                    <div class="fw-semibold">@(Model.Quote.CustomerName ?? "—")</div>
+                    <div class="text-muted small">@(Model.Quote.CustomerEmail ?? "—")</div>
                 </div>
 
                 <div class="small text-muted">
-                    Quote: <strong>@Model.Quote.QuoteNo</strong><br />
-                    Project: <strong>@Model.Quote.ProjectId</strong>
+                    Quote: <strong>@Model.Quote.QuoteNo</strong>
                 </div>
-
             </div>
 
             <div class="modal-footer">
@@ -166,7 +201,7 @@
 
                 <form method="post" asp-page-handler="Send" asp-route-id="@Model.Quote.Id" class="d-inline" id="sendQuoteForm">
                     <button type="submit" class="btn btn-success" id="sendQuoteConfirmBtn">
-                        Confirm & Send
+                        Confirm &amp; Send
                     </button>
                 </form>
             </div>
@@ -176,7 +211,35 @@
 
 @section Scripts {
     <script>
-        (function () {
+        function showQuoteToast(type, title, message) {
+            const t = (type || '').toString().toLowerCase();
+
+            if (window.UI?.toast) {
+                if (t === 'success' && typeof window.UI.toast.success === 'function') {
+                    window.UI.toast.success(message, title);
+                    return;
+                }
+
+                if ((t === 'warning' || t === 'warn') && typeof window.UI.toast.warning === 'function') {
+                    window.UI.toast.warning(message, title);
+                    return;
+                }
+
+                if (t === 'info' && typeof window.UI.toast.info === 'function') {
+                    window.UI.toast.info(message, title);
+                    return;
+                }
+
+                if (typeof window.UI.toast.error === 'function') {
+                    window.UI.toast.error(message, title);
+                    return;
+                }
+            }
+
+            alert((title ? title + ': ' : '') + (message || ''));
+        }
+
+                (function () {
             const form = document.getElementById('sendQuoteForm');
             const btn = document.getElementById('sendQuoteConfirmBtn');
             if (!form || !btn) return;
@@ -184,6 +247,48 @@
             form.addEventListener('submit', function () {
                 btn.disabled = true;
                 btn.textContent = 'Sending...';
+            });
+        })();
+        (function () {
+            const btn = document.getElementById('copyQuoteLinkBtn');
+            const urlEl = document.getElementById('createQuotePublicLinkUrl');
+            const tokenEl = document.getElementById('quoteAntiForgeryToken');
+
+            if (!btn || !urlEl || !tokenEl) return;
+
+            btn.addEventListener('click', async function () {
+                if (btn.dataset.busy === '1') return;
+
+                try {
+                    btn.dataset.busy = '1';
+                    btn.disabled = true;
+                    btn.textContent = 'Creating...';
+
+                    const res = await fetch(urlEl.value, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'RequestVerificationToken': tokenEl.value
+                        }
+                    });
+
+                    const data = await res.json().catch(() => null);
+
+                    if (!res.ok || !data?.ok || !data?.data?.url) {
+                        showQuoteToast('error', 'Error', data?.message || 'Failed to create public link.');
+                        return;
+                    }
+
+                    await navigator.clipboard.writeText(data.data.url);
+                    showQuoteToast('success', 'Copied', 'Public quote link copied.');
+                } catch (err) {
+                    console.error(err);
+                    showQuoteToast('error', 'Server error', 'Failed to copy public link.');
+                } finally {
+                    delete btn.dataset.busy;
+                    btn.disabled = false;
+                    btn.textContent = 'Copy Link';
+                }
             });
         })();
 
@@ -278,3 +383,5 @@
         })();
     </script>
 }
+
+

@@ -37,6 +37,7 @@ using WitcherHub.Infrastructure.Services.Invoices;
 using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Infrastructure.Services.OpenAI;
 using WitcherHub.Infrastructure.Services.Pdf;
+using WitcherHub.Infrastructure.Services.Quotes;
 using QueuedHostedService = WitcherHub.Infrastructure.Services.BackgroundTasks.QueuedHostedService;
 
 namespace WitcherHub.Infrastructure
@@ -164,6 +165,7 @@ namespace WitcherHub.Infrastructure
             services.AddSingleton<IPdfGenerator, DinkToPdfGenerator>();
             services.AddScoped<ContractCreationService>();
             services.AddScoped<IInvoiceNotificationService, InvoiceNotificationService>();
+            services.AddScoped<QuotePublicLinkService>();
             return services;
         }
     }

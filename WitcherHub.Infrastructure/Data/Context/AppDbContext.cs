@@ -25,12 +25,14 @@ namespace WitcherHub.Infrastructure.Data.Context
         public DbSet<PricingRule> PricingRules => Set<PricingRule>();
 
         // -------- Taxes & Discounts --------
-   
-     
+
+
 
         // -------- Quotes --------
         public DbSet<Quote> Quotes => Set<Quote>();
         public DbSet<QuoteItem> QuoteItems => Set<QuoteItem>();
+        public DbSet<QuoteSignature> QuoteSignatures => Set<QuoteSignature>();
+        public DbSet<QuoteAccessLink> QuoteAccessLinks => Set<QuoteAccessLink>();
 
         // -------- Contracts --------
         public DbSet<Contract> Contracts => Set<Contract>();
@@ -121,6 +123,20 @@ namespace WitcherHub.Infrastructure.Data.Context
                 .WithMany()
                 .HasForeignKey(x => x.ServiceId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // QuoteSignature -> Quote
+            b.Entity<QuoteSignature>()
+                .HasOne(x => x.Quote)
+                .WithMany(x => x.Signatures)
+                .HasForeignKey(x => x.QuoteId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // QuoteAccessLink -> Quote
+            b.Entity<QuoteAccessLink>()
+                .HasOne(x => x.Quote)
+                .WithMany(x => x.AccessLinks)
+                .HasForeignKey(x => x.QuoteId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Contract -> Project
             b.Entity<Contract>()
@@ -256,6 +272,13 @@ namespace WitcherHub.Infrastructure.Data.Context
             b.Entity<PricingRule>().HasIndex(x => new { x.ServiceId, x.Priority });
 
             b.Entity<Quote>().HasIndex(x => x.ProjectId);
+            b.Entity<QuoteAccessLink>()
+                .HasIndex(x => x.TokenHash)
+                .IsUnique();
+
+            b.Entity<QuoteAccessLink>()
+                .HasIndex(x => new { x.QuoteId, x.RecipientEmail });
+
             b.Entity<Invoice>().HasIndex(x => x.ProjectId);
             b.Entity<Invoice>().HasIndex(x => x.ContractId);
 

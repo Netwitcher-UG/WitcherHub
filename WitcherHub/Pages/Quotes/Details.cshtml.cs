@@ -2,16 +2,19 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Interfaces;
+using WitcherHub.Application.Interfaces.Email;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Quotes;
 using WitcherHub.Application.Models.Email;
 using WitcherHub.Application.Services.Email;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Services.Pdf;
+using WitcherHub.Infrastructure.Services.Quotes;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Pages.Quotes
@@ -23,16 +26,18 @@ namespace WitcherHub.Pages.Quotes
         private readonly AppDbContext _db;
         private readonly IPdfGenerator _pdf;
         private readonly IEmailService _email;
-        private readonly WitcherHub.Application.Interfaces.Email.IEmailTemplateRenderer _emailRenderer;
+        private readonly IEmailTemplateRenderer _emailRenderer;
         private readonly IConfiguration _cfg;
+        private readonly QuotePublicLinkService _quotePublicLinkService;
 
         public DetailsModel(
-            IQuote quotes,
-            AppDbContext db,
-            IPdfGenerator pdf,
-            IEmailService email,
-            WitcherHub.Application.Interfaces.Email.IEmailTemplateRenderer emailRenderer,
-            IConfiguration cfg)
+                IQuote quotes,
+                AppDbContext db,
+                IPdfGenerator pdf,
+                IEmailService email,
+                IEmailTemplateRenderer emailRenderer,
+                IConfiguration cfg,
+                QuotePublicLinkService quotePublicLinkService)
         {
             _quotes = quotes;
             _db = db;
@@ -40,13 +45,14 @@ namespace WitcherHub.Pages.Quotes
             _email = email;
             _emailRenderer = emailRenderer;
             _cfg = cfg;
+            _quotePublicLinkService = quotePublicLinkService;
         }
 
         [BindProperty(SupportsGet = true)]
         public Guid Id { get; set; }
 
         public WitcherHub.Application.Models.View.Quotes.QuoteViews.QuoteDetailsView? Quote { get; private set; }
-
+        public bool HasSignedQuotePdf { get; private set; }
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             try
@@ -57,6 +63,11 @@ namespace WitcherHub.Pages.Quotes
                 Quote = await _quotes.GetQuoteAsync(Id, ct);
                 if (Quote is null)
                     throw new NotFoundAppException("Quote not found.");
+
+                HasSignedQuotePdf = await _db.QuoteSignatures
+                    .AsNoTracking()
+                    .Where(x => x.QuoteId == Id && x.SignedAt != null && x.SignatureData != null)
+                    .AnyAsync(ct);
 
                 return Page();
             }
@@ -75,6 +86,54 @@ namespace WitcherHub.Pages.Quotes
                 return RedirectToPage("/Projects");
             }
         }
+
+        public async Task<IActionResult> OnGetSignedPdfAsync(CancellationToken ct)
+        {
+            try
+            {
+                var sig = await _db.QuoteSignatures
+                    .AsNoTracking()
+                    .Where(x => x.QuoteId == Id && x.SignedAt != null)
+                    .OrderByDescending(x => x.SignedAt)
+                    .FirstOrDefaultAsync(ct);
+
+                if (sig is null)
+                    throw new BadRequestAppException("Signed quote PDF is not available.");
+
+                string? signatureDataUrl = null;
+
+                if (sig.SignatureData is not null &&
+                    sig.SignatureData.RootElement.TryGetProperty("dataUrl", out var p) &&
+                    p.ValueKind == JsonValueKind.String)
+                {
+                    signatureDataUrl = p.GetString();
+                }
+
+                if (string.IsNullOrWhiteSpace(signatureDataUrl))
+                    throw new BadRequestAppException("Signed quote PDF is not available.");
+
+                var model = await LoadPdfModelAsync(ct);
+
+                var html = BuildSignedQuotePdfHtml(
+                    model,
+                    sig.SignerName,
+                    sig.SignerEmail,
+                    sig.SignedAt ?? DateTimeOffset.UtcNow,
+                    signatureDataUrl);
+
+                var bytes = _pdf.FromHtml(html, $"Angebot {model.QuoteNo} - signed");
+
+                return File(bytes, "application/pdf", $"{model.QuoteNo}-signed.pdf");
+            }
+            catch (Exception ex) when (ex is BadRequestAppException or NotFoundAppException)
+            {
+                TempData["Toast.Type"] = "error";
+                TempData["Toast.Title"] = "Error";
+                TempData["Toast.Message"] = ex.Message;
+                return RedirectToPage("./Details", new { id = Id });
+            }
+        }
+
 
         // =========================
         // GET: PDF
@@ -112,28 +171,33 @@ namespace WitcherHub.Pages.Quotes
                 if (string.IsNullOrWhiteSpace(model.Customer.Email))
                     throw new BadRequestAppException("Customer email not found for this project.");
 
-                // PDF
+                if (string.Equals(model.StatusText, DocumentStatus.Signed.ToString(), StringComparison.OrdinalIgnoreCase))
+                    throw new BadRequestAppException("This quote is already signed.");
+
+                // PDF attachment (unsigned)
                 var pdfHtml = QuotePdfHtmlBuilder.Build(model);
                 var pdfBytes = _pdf.FromHtml(pdfHtml, $"Angebot {model.QuoteNo}");
 
-                // Public base URL (for optional link)
+                // Create public signing link
+                var rawToken = await _quotePublicLinkService.CreateAsync(
+                    model.QuoteId,
+                    model.Customer.Email,
+                    expiresInDays: 14,
+                    ct: ct);
+
                 var publicBaseUrl =
                     _cfg["WITCHERHUB_PUBLIC_BASE_URL"]
                     ?? Environment.GetEnvironmentVariable("WITCHERHUB_PUBLIC_BASE_URL")
-                    ?? "";
+                    ?? $"{Request.Scheme}://{Request.Host}";
+
                 publicBaseUrl = NormalizeBaseUrl(publicBaseUrl);
 
-                var actionUrl = string.IsNullOrWhiteSpace(publicBaseUrl)
-                    ? ""
-                    : $"{publicBaseUrl}/Quotes/Details?id={model.QuoteId}";
+                var actionUrl = $"{publicBaseUrl}/quotes/sign/{model.QuoteId}?t={Uri.EscapeDataString(rawToken)}";
 
-                var actionBlock = "";
-
-                // Email template render
-                var subject = $"Angebot {model.QuoteNo}";
+                var subject = $"Angebot {model.QuoteNo} zur Prüfung und Unterschrift";
 
                 var emailHtml = await _emailRenderer.RenderAsync(
-                    "QuoteSent",
+                    "QuoteSignatureRequest",
                     new
                     {
                         Subject = subject,
@@ -141,7 +205,7 @@ namespace WitcherHub.Pages.Quotes
                         QuoteNo = model.QuoteNo,
                         ProjectTitle = model.ProjectTitle,
                         ExpiresAt = model.ExpiresAt?.ToString("dd.MM.yyyy") ?? "—",
-                        ActionBlock = actionBlock
+                        ActionUrl = actionUrl
                     },
                     ct);
 
@@ -165,10 +229,8 @@ namespace WitcherHub.Pages.Quotes
                 if (currentQuote is null)
                     throw new NotFoundAppException("Quote not found.");
 
-                // (اختياري وآمن) حدّث الحالة إلى Sent فقط لو كانت Draft
                 if (model.StatusText?.Equals(DocumentStatus.Draft.ToString(), StringComparison.OrdinalIgnoreCase) == true)
                 {
-                 
                     var dto = new UpdateQuoteDto
                     {
                         Quote = new QuoteDto
@@ -185,12 +247,13 @@ namespace WitcherHub.Pages.Quotes
                         },
                         Items = null
                     };
+
                     await _quotes.UpdateAsync(model.QuoteId, dto, ct);
                 }
 
                 TempData["Toast.Type"] = "success";
                 TempData["Toast.Title"] = "Sent";
-                TempData["Toast.Message"] = "Quote sent to customer with PDF attached.";
+                TempData["Toast.Message"] = "Quote email with PDF and signing link has been sent.";
 
                 return RedirectToPage("./Details", new { id = Id });
             }
@@ -204,6 +267,67 @@ namespace WitcherHub.Pages.Quotes
             }
         }
 
+        public async Task<IActionResult> OnPostCreatePublicLinkAsync(CancellationToken ct)
+        {
+            try
+            {
+                var model = await LoadPdfModelAsync(ct);
+
+                if (string.Equals(model.StatusText, DocumentStatus.Signed.ToString(), StringComparison.OrdinalIgnoreCase))
+                    throw new BadRequestAppException("This quote is already signed.");
+
+                if (model.Lines is null || model.Lines.Count == 0)
+                    throw new BadRequestAppException("Please add at least one Position before creating a public link.");
+
+                if (string.IsNullOrWhiteSpace(model.Customer.Email))
+                    throw new BadRequestAppException("Customer email not found for this quote.");
+
+                var rawToken = await _quotePublicLinkService.CreateAsync(
+                    model.QuoteId,
+                    model.Customer.Email,
+                    expiresInDays: 14,
+                    ct: ct);
+
+                var publicUrl = Url.Page(
+                    "/Quotes/Sign",
+                    pageHandler: null,
+                    values: new { id = model.QuoteId, t = rawToken },
+                    protocol: Request.Scheme,
+                    host: Request.Host.ToUriComponent());
+
+                if (string.IsNullOrWhiteSpace(publicUrl))
+                    throw new InvalidOperationException("Failed to build public link.");
+
+                return new JsonResult(new
+                {
+                    ok = true,
+                    data = new
+                    {
+                        url = publicUrl,
+                        expiresAt = DateTimeOffset.UtcNow.AddDays(14),
+                        recipientEmail = model.Customer.Email
+                    }
+                });
+            }
+            catch (Exception ex) when (ex is BadRequestAppException or NotFoundAppException)
+            {
+                return new JsonResult(new
+                {
+                    ok = false,
+                    message = ex.Message
+                })
+                { StatusCode = 400 };
+            }
+            catch (Exception ex)
+            {
+                return new JsonResult(new
+                {
+                    ok = false,
+                    message = ex.GetBaseException().Message
+                })
+                { StatusCode = 500 };
+            }
+        }
         // =========================
         // Helpers
         // =========================
@@ -410,6 +534,106 @@ namespace WitcherHub.Pages.Quotes
                 return fallback;
             }
             catch { return fallback; }
+        }
+
+        private static string BuildSignedQuotePdfHtml(
+    QuotePdfHtmlBuilder.QuotePdfDocumentModel model,
+    string signerName,
+    string signerEmail,
+    DateTimeOffset signedAt,
+    string signatureDataUrl)
+        {
+            var html = QuotePdfHtmlBuilder.Build(model);
+
+            var extraStyle = """
+<style>
+  .signedQuoteBlock{
+    margin: 28px 0 0 0;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .signedQuoteCard{
+    border: 1px solid #dbe3ee;
+    border-radius: 14px;
+    padding: 18px 20px;
+    background: #ffffff;
+  }
+
+  .signedQuoteTitle{
+    font-size: 18px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 14px 0;
+  }
+
+  .signedQuoteRow{
+    margin: 6px 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #111827;
+  }
+
+  .signedQuoteRow strong{
+    display: inline-block;
+    min-width: 120px;
+  }
+
+  .signedQuoteImage{
+    margin-top: 14px;
+  }
+
+  .signedQuoteImage img{
+    max-width: 260px;
+    max-height: 120px;
+    display: block;
+  }
+
+  .signedQuoteLine{
+    width: 260px;
+    border-top: 1px solid #111827;
+    margin-top: 8px;
+  }
+</style>
+""";
+
+            var signatureBlock = $"""
+<div class="signedQuoteBlock">
+  <div class="signedQuoteCard">
+    <h2 class="signedQuoteTitle">Kundenunterschrift</h2>
+    <div class="signedQuoteRow"><strong>Angebot:</strong> {WebUtility.HtmlEncode(model.QuoteNo)}</div>
+    <div class="signedQuoteRow"><strong>Projekt:</strong> {WebUtility.HtmlEncode(model.ProjectTitle)}</div>
+    <div class="signedQuoteRow"><strong>Name:</strong> {WebUtility.HtmlEncode(signerName ?? "")}</div>
+    <div class="signedQuoteRow"><strong>E-Mail:</strong> {WebUtility.HtmlEncode(signerEmail ?? "")}</div>
+    <div class="signedQuoteRow"><strong>Signiert am:</strong> {WebUtility.HtmlEncode(signedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))}</div>
+
+    <div class="signedQuoteImage">
+      <img src="{WebUtility.HtmlEncode(signatureDataUrl ?? "")}" alt="Signature" />
+      <div class="signedQuoteLine"></div>
+    </div>
+  </div>
+</div>
+""";
+
+            if (html.Contains("</head>", StringComparison.OrdinalIgnoreCase))
+            {
+                html = html.Replace("</head>", extraStyle + "</head>", StringComparison.OrdinalIgnoreCase);
+            }
+            else
+            {
+                html = extraStyle + html;
+            }
+
+            if (html.Contains("</body>", StringComparison.OrdinalIgnoreCase))
+            {
+                html = html.Replace("</body>", signatureBlock + "</body>", StringComparison.OrdinalIgnoreCase);
+            }
+            else
+            {
+                html += signatureBlock;
+            }
+
+            return html;
         }
     }
 }

@@ -108,12 +108,7 @@
     </div>
 
     <div class="d-flex gap-2 flex-wrap">
-        <a class="btn btn-outline-secondary"
-           asp-page="/Projects"
-           asp-route-openProjectId="@Model.Quote.ProjectId"
-           asp-route-openTab="quotes">
-            Back
-        </a>
+        
         <a class="btn btn-outline-primary" asp-page="/Quotes/Details" asp-route-id="@Model.Quote.Id">Preview</a>
 
         <form method="post" asp-page-handler="DeleteQuote" asp-route-id="@Model.Id" class="d-inline js-delete-form">
@@ -344,6 +339,7 @@
                                                         data-bs-toggle="offcanvas"
                                                         data-bs-target="#EditItemCanvas"
                                                         data-item-id="@it.Id"
+                                                        data-item-service-id="@it.ServiceId"
                                                         data-item-title="@it.Title"
                                                         data-item-qty="@it.Quantity"
                                                         data-item-unit="@it.UnitPrice"
@@ -353,7 +349,6 @@
                                                         data-item-billingcycle="@((int)it.BillingCycle)"
                                                         data-item-disctype="@dt"
                                                         data-item-discval="@discVal"
-
                                                         data-item-config-b64="@cfgB64">
                                                     Edit
                                                 </button>
@@ -522,7 +517,7 @@
         <form method="post" asp-page-handler="UpdateItem" asp-route-id="@Model.Id" id="editItemForm">
             <input type="hidden" asp-for="Id" />
             <input type="hidden" asp-for="EditItem.ItemId" id="ei-id" />
-
+            <input type="hidden" asp-for="EditItem.Item.ServiceId" id="ei-service-id" />
             <div class="mb-3">
                 <label class="form-label">Title</label>
                 <input class="form-control" asp-for="EditItem.Item.Title" id="ei-title" />
@@ -587,16 +582,49 @@
                             </div>
 
                             <div class="mt-3">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <label class="form-label mb-0">Config (JSON)</label>
-                                    <button class="btn btn-sm btn-outline-secondary" type="button" onclick="formatJson('ei-config')">Format</button>
-                                </div>
-                                <textarea class="form-control mt-2" rows="6" asp-for="EditItemConfigJson" id="ei-config"></textarea>
-                                <span class="text-danger small" asp-validation-for="EditItemConfigJson"></span>
-                            </div>
+                                <div class="card border bg-transparent">
+                                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                        <div class="fw-semibold">Config</div>
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" id="eiCfgResetBtn">
+                                                Reset
+                                            </button>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    data-bs-toggle="collapse"
+                                                    data-bs-target="#eiCfgRawCollapse"
+                                                    aria-expanded="false">
+                                                Raw JSON
+                                            </button>
+                                        </div>
+                                    </div>
 
-                            <div class="alert alert-info mt-3 mb-0">
-                                PriceBreakdown will be recalculated automatically when you save.
+                                    <div class="card-body">
+                                        <div id="ei-cfgLoading" class="text-muted small d-none">Loading config schema…</div>
+
+                                        <div id="ei-cfgEmpty" class="text-muted small d-none">
+                                            This item has no config schema. Existing config will be shown as editable fields when possible.
+                                        </div>
+
+                                        <div id="ei-cfgFields" class="row g-3"></div>
+
+                                        <div class="collapse mt-3" id="eiCfgRawCollapse">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <label class="form-label mb-0">Config (JSON)</label>
+                                                <button class="btn btn-sm btn-outline-secondary" type="button" onclick="formatJson('ei-config')">
+                                                    Format
+                                                </button>
+                                            </div>
+
+                                            <textarea class="form-control mt-2 font-monospace" rows="7" asp-for="EditItemConfigJson" id="ei-config"></textarea>
+                                            <span class="text-danger small" asp-validation-for="EditItemConfigJson"></span>
+                                        </div>
+
+                                        <div class="alert alert-info mt-3 mb-0">
+                                            PriceBreakdown will be recalculated automatically when you save.
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -679,10 +707,6 @@
             search.addEventListener('input', applyFilter);
         })();
 
-        function eiTaxPercent() {
-            return @((Model.Quote.ApplyVat ? 19 : 0));
-        }
-
         function eiComputePreview() {
             const qty = parseFloat(document.getElementById('ei-qty')?.value || '0') || 0;
             const unit = parseFloat(document.getElementById('ei-unit')?.value || '0') || 0;
@@ -700,8 +724,7 @@
             if (discAmt > sub) discAmt = sub;
             if (discAmt < 0) discAmt = 0;
 
-            const taxableBase = Math.max(0, sub - discAmt);
-            const total = taxableBase;
+            const total = Math.max(0, sub - discAmt);
 
             const f = (n) => (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
 
@@ -714,35 +737,356 @@
             if (elTotal) elTotal.textContent = f(total);
         }
 
+        const eiServiceSchemaEndpoint = '@Url.Page("/Quotes/Items/Create", "ServiceSchema")';
+        let eiConfigBaseObject = {};
+        let eiLastSchema = null;
+
+        function eiEncodeHtml(value) {
+            return (value ?? '')
+                .toString()
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function eiParseJsonSafe(text) {
+            try {
+                const parsed = JSON.parse(text || '{}');
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    return parsed;
+                }
+                return {};
+            } catch {
+                return {};
+            }
+        }
+
+        function eiDeepClone(obj) {
+            return JSON.parse(JSON.stringify(obj || {}));
+        }
+
+        function eiSetConfigJson(obj) {
+            const raw = document.getElementById('ei-config');
+            if (!raw) return;
+            raw.value = JSON.stringify(obj || {}, null, 2);
+        }
+
+        function eiBuildSchemaUrl(serviceId) {
+            const url = new URL(eiServiceSchemaEndpoint, window.location.origin);
+            url.searchParams.set('serviceId', serviceId);
+            return url.toString();
+        }
+
+        function eiGuessFieldType(value) {
+            if (typeof value === 'boolean') return 'boolean';
+            if (typeof value === 'number') return Number.isInteger(value) ? 'integer' : 'number';
+            return 'string';
+        }
+
+        function eiNormalizeSchemaFields(schema, currentConfig) {
+            let fields = [];
+
+            if (schema && typeof schema === 'object') {
+                if (schema.properties && typeof schema.properties === 'object' && !Array.isArray(schema.properties)) {
+                    const required = Array.isArray(schema.required) ? schema.required : [];
+
+                    fields = Object.entries(schema.properties).map(([name, meta]) => {
+                        const m = meta || {};
+                        const enumValues = Array.isArray(m.enum) ? m.enum : null;
+                        let type = (m.type || '').toString().toLowerCase();
+
+                        if (enumValues) type = 'select';
+                        if (!type) type = eiGuessFieldType(currentConfig?.[name]);
+
+                        return {
+                            name,
+                            title: m.title || m.label || name,
+                            description: m.description || '',
+                            type,
+                            enumValues,
+                            required: required.includes(name),
+                            defaultValue: m.default,
+                            minimum: m.minimum,
+                            maximum: m.maximum
+                        };
+                    });
+                } else if (Array.isArray(schema.fields)) {
+                    fields = schema.fields
+                        .filter(x => x && (x.name || x.key))
+                        .map(x => {
+                            const enumValues = Array.isArray(x.enum) ? x.enum : null;
+                            let type = (x.type || '').toString().toLowerCase();
+
+                            if (enumValues) type = 'select';
+                            if (!type) type = eiGuessFieldType(currentConfig?.[x.name || x.key]);
+
+                            return {
+                                name: x.name || x.key,
+                                title: x.title || x.label || x.name || x.key,
+                                description: x.description || '',
+                                type,
+                                enumValues,
+                                required: !!x.required,
+                                defaultValue: x.default,
+                                minimum: x.minimum,
+                                maximum: x.maximum
+                            };
+                        });
+                }
+            }
+
+            if (!fields.length) {
+                fields = Object.entries(currentConfig || {}).map(([name, value]) => ({
+                    name,
+                    title: name,
+                    description: '',
+                    type: eiGuessFieldType(value),
+                    enumValues: null,
+                    required: false,
+                    defaultValue: value
+                }));
+            }
+
+            return fields.filter(x => !!x.name);
+        }
+
+        function eiResolveFieldValue(field, currentConfig) {
+            if (currentConfig && Object.prototype.hasOwnProperty.call(currentConfig, field.name)) {
+                return currentConfig[field.name];
+            }
+
+            if (field.defaultValue !== undefined) {
+                return field.defaultValue;
+            }
+
+            if (field.type === 'boolean') return false;
+            return '';
+        }
+
+        function eiRenderConfigFields(schema, currentConfig) {
+            const container = document.getElementById('ei-cfgFields');
+            const emptyEl = document.getElementById('ei-cfgEmpty');
+
+            if (!container || !emptyEl) return;
+
+            const fields = eiNormalizeSchemaFields(schema, currentConfig);
+            eiLastSchema = schema;
+
+            if (!fields.length) {
+                container.innerHTML = '';
+                emptyEl.classList.remove('d-none');
+                eiSetConfigJson(currentConfig || {});
+                return;
+            }
+
+            emptyEl.classList.add('d-none');
+
+            const html = fields.map((field, index) => {
+                const id = `ei-cfg-${index}`;
+                const label = eiEncodeHtml(field.title || field.name);
+                const name = eiEncodeHtml(field.name);
+                const desc = field.description ? `<div class="form-text">${eiEncodeHtml(field.description)}</div>` : '';
+                const requiredMark = field.required ? ' <span class="text-danger">*</span>' : '';
+                const value = eiResolveFieldValue(field, currentConfig);
+
+                let type = (field.type || 'string').toString().toLowerCase();
+                if (type === 'bool') type = 'boolean';
+                if (type === 'int') type = 'integer';
+                if (type === 'text') type = 'string';
+
+                if (type === 'boolean') {
+                    return `
+                        <div class="col-12 col-md-6">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       id="${id}"
+                                       data-ei-config-input
+                                       data-config-name="${name}"
+                                       data-config-type="boolean"
+                                       ${value ? 'checked' : ''} />
+                                <label class="form-check-label" for="${id}">
+                                    ${label}${requiredMark}
+                                </label>
+                            </div>
+                            ${desc}
+                        </div>
+                    `;
+                }
+
+                if (type === 'select' && Array.isArray(field.enumValues) && field.enumValues.length > 0) {
+                    const options = field.enumValues.map(opt => {
+                        const optVal = opt?.toString() ?? '';
+                        const selected = (value?.toString() ?? '') === optVal ? 'selected' : '';
+                        return `<option value="${eiEncodeHtml(optVal)}" ${selected}>${eiEncodeHtml(optVal)}</option>`;
+                    }).join('');
+
+                    return `
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="${id}">${label}${requiredMark}</label>
+                            <select class="form-select"
+                                    id="${id}"
+                                    data-ei-config-input
+                                    data-config-name="${name}"
+                                    data-config-type="string">
+                                ${options}
+                            </select>
+                            ${desc}
+                        </div>
+                    `;
+                }
+
+                const isNumber = type === 'number' || type === 'integer';
+                const inputType = isNumber ? 'number' : 'text';
+                const step = type === 'integer' ? '1' : (type === 'number' ? 'any' : null);
+                const minAttr = field.minimum !== undefined && field.minimum !== null ? `min="${field.minimum}"` : '';
+                const maxAttr = field.maximum !== undefined && field.maximum !== null ? `max="${field.maximum}"` : '';
+
+                return `
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="${id}">${label}${requiredMark}</label>
+                        <input class="form-control"
+                               id="${id}"
+                               type="${inputType}"
+                               value="${eiEncodeHtml(value)}"
+                               data-ei-config-input
+                               data-config-name="${name}"
+                               data-config-type="${eiEncodeHtml(type)}"
+                               ${step ? `step="${step}"` : ''}
+                               ${minAttr}
+                               ${maxAttr} />
+                        ${desc}
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = html;
+
+            container.querySelectorAll('[data-ei-config-input]').forEach(el => {
+                el.addEventListener('input', eiSyncConfigFromFields);
+                el.addEventListener('change', eiSyncConfigFromFields);
+            });
+
+            eiSyncConfigFromFields();
+        }
+
+        function eiSyncConfigFromFields() {
+            const container = document.getElementById('ei-cfgFields');
+            if (!container) return;
+
+            const next = eiDeepClone(eiConfigBaseObject);
+
+            container.querySelectorAll('[data-ei-config-input]').forEach(el => {
+                const name = el.getAttribute('data-config-name');
+                const type = (el.getAttribute('data-config-type') || 'string').toLowerCase();
+
+                if (!name) return;
+
+                delete next[name];
+
+                if (type === 'boolean') {
+                    next[name] = !!el.checked;
+                    return;
+                }
+
+                const raw = (el.value || '').trim();
+                if (raw === '') return;
+
+                if (type === 'integer') {
+                    const parsed = parseInt(raw, 10);
+                    if (!Number.isNaN(parsed)) next[name] = parsed;
+                    return;
+                }
+
+                if (type === 'number') {
+                    const parsed = parseFloat(raw);
+                    if (!Number.isNaN(parsed)) next[name] = parsed;
+                    return;
+                }
+
+                next[name] = raw;
+            });
+
+            eiSetConfigJson(next);
+        }
+
+        async function eiLoadConfigEditor(serviceId, configText) {
+            const loadingEl = document.getElementById('ei-cfgLoading');
+            const emptyEl = document.getElementById('ei-cfgEmpty');
+            const currentConfig = eiParseJsonSafe(configText);
+
+            eiConfigBaseObject = eiDeepClone(currentConfig);
+
+            if (loadingEl) loadingEl.classList.remove('d-none');
+            if (emptyEl) emptyEl.classList.add('d-none');
+
+            try {
+                if (!serviceId) {
+                    eiRenderConfigFields(null, currentConfig);
+                    return;
+                }
+
+                const res = await fetch(eiBuildSchemaUrl(serviceId), {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin'
+                });
+
+                const text = await res.text();
+                let schema = null;
+
+                if (res.ok && text && text.trim() && text.trim() !== 'null') {
+                    schema = JSON.parse(text);
+                }
+
+                eiRenderConfigFields(schema, currentConfig);
+            } catch {
+                eiRenderConfigFields(null, currentConfig);
+            } finally {
+                if (loadingEl) loadingEl.classList.add('d-none');
+            }
+        }
+
         document.addEventListener('show.bs.offcanvas', function (e) {
             const el = e.target;
             if (!el || el.id !== 'EditItemCanvas') return;
 
             const btn = e.relatedTarget;
-            if (!btn) return;
 
-            document.getElementById('ei-id').value = btn.getAttribute('data-item-id') || '';
-            document.getElementById('ei-title').value = btn.getAttribute('data-item-title') || '';
-            document.getElementById('ei-qty').value = btn.getAttribute('data-item-qty') || '1';
-            document.getElementById('ei-unit').value = btn.getAttribute('data-item-unit') || '0';
-            document.getElementById('ei-pos').value = btn.getAttribute('data-item-pos') || '1';
-            document.getElementById('ei-billing').value = btn.getAttribute('data-item-billingcycle') || '0';
-            document.getElementById('ei-disctype').value = btn.getAttribute('data-item-disctype') || '';
-            document.getElementById('ei-discval').value = btn.getAttribute('data-item-discval') || '';
-                    document.getElementById('ei-unitname').value = btn.getAttribute('data-item-unitname') || '';
-        document.getElementById('ei-description').value = btn.getAttribute('data-item-description') || '';
+            if (btn) {
+                document.getElementById('ei-id').value = btn.getAttribute('data-item-id') || '';
+                document.getElementById('ei-service-id').value = btn.getAttribute('data-item-service-id') || '';
+                document.getElementById('ei-title').value = btn.getAttribute('data-item-title') || '';
+                document.getElementById('ei-qty').value = btn.getAttribute('data-item-qty') || '1';
+                document.getElementById('ei-unit').value = btn.getAttribute('data-item-unit') || '0';
+                document.getElementById('ei-pos').value = btn.getAttribute('data-item-pos') || '1';
+                document.getElementById('ei-billing').value = btn.getAttribute('data-item-billingcycle') || '0';
+                document.getElementById('ei-disctype').value = btn.getAttribute('data-item-disctype') || '';
+                document.getElementById('ei-discval').value = btn.getAttribute('data-item-discval') || '';
+                document.getElementById('ei-unitname').value = btn.getAttribute('data-item-unitname') || '';
+                document.getElementById('ei-description').value = btn.getAttribute('data-item-description') || '';
 
-            const b64 = btn.getAttribute('data-item-config-b64');
-            let cfgText = '{}';
-            try {
-                if (b64) {
-                    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-                    cfgText = new TextDecoder('utf-8').decode(bytes);
+                const b64 = btn.getAttribute('data-item-config-b64');
+                let cfgText = '{}';
+
+                try {
+                    if (b64) {
+                        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+                        cfgText = new TextDecoder('utf-8').decode(bytes);
+                    }
+                } catch {
+                    cfgText = '{}';
                 }
-            } catch { cfgText = '{}'; }
 
-            document.getElementById('ei-config').value = cfgText;
+                document.getElementById('ei-config').value = cfgText;
+            }
 
+            const serviceId = document.getElementById('ei-service-id')?.value || '';
+            const cfgText = document.getElementById('ei-config')?.value || '{}';
+
+            eiLoadConfigEditor(serviceId, cfgText);
             eiComputePreview();
         });
 
@@ -754,6 +1098,21 @@
                 el.addEventListener('input', eiComputePreview);
                 el.addEventListener('change', eiComputePreview);
             });
+
+            const resetBtn = document.getElementById('eiCfgResetBtn');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', function () {
+                    eiRenderConfigFields(eiLastSchema, eiDeepClone(eiConfigBaseObject));
+                });
+            }
+
+            const rawConfigEl = document.getElementById('ei-config');
+            if (rawConfigEl) {
+                rawConfigEl.addEventListener('change', function () {
+                    const current = eiParseJsonSafe(rawConfigEl.value);
+                    eiRenderConfigFields(eiLastSchema, current);
+                });
+            }
         })();
 
         function formatJson(textareaId) {
@@ -763,6 +1122,10 @@
             try {
                 const obj = JSON.parse(el.value || "{}");
                 el.value = JSON.stringify(obj, null, 2);
+
+                if (textareaId === 'ei-config') {
+                    eiRenderConfigFields(eiLastSchema, eiParseJsonSafe(el.value));
+                }
             } catch {
                 alert("Invalid JSON. Please fix it first.");
             }
@@ -832,7 +1195,8 @@
                 pendingForm = null;
             });
         })();
-                (function () {
+
+        (function () {
             const actionEl = document.getElementById('quoteAfterSignAction');
             const modeWrapEl = document.getElementById('quoteInvoiceSendModeWrap');
             const modeEl = document.getElementById('quoteInvoiceSendMode');
@@ -852,7 +1216,6 @@
         })();
     </script>
 }
-
 
 
 
