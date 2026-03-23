@@ -55,6 +55,15 @@
                                     <div class="text-muted small">Name</div>
                                     <div class="fw-semibold" id="vs-v-name">—</div>
                                 </div>
+                                <div class="col-md-6">
+                                    <div class="text-muted small">Default Unit</div>
+                                    <div class="fw-semibold" id="vs-v-defaultUnitName">—</div>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="text-muted small">Default Description</div>
+                                    <div class="fw-semibold" id="vs-v-defaultDescription">—</div>
+                                </div>
                                 <div class="col-md-3">
                                     <div class="text-muted small">Type</div>
                                     <div class="fw-semibold" id="vs-v-type">—</div>
@@ -131,7 +140,22 @@
                                     <input class="form-control" id="vs-basic-basePrice" />
                                     <div class="text-danger small mt-1" id="err-vs-basic-basePrice"></div>
                                 </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-light">Default Unit</label>
+                                    <input class="form-control"
+                                           id="vs-basic-defaultUnitName"
+                                           placeholder="e.g. Piece / Hour / Month" />
+                                    <div class="text-danger small mt-1" id="err-vs-basic-defaultUnitName"></div>
+                                </div>
 
+                                <div class="col-12">
+                                    <label class="form-label text-light">Default Description</label>
+                                    <textarea class="form-control"
+                                              id="vs-basic-defaultDescription"
+                                              rows="3"
+                                              placeholder="Short default line description used in quote / contract / invoice"></textarea>
+                                    <div class="text-danger small mt-1" id="err-vs-basic-defaultDescription"></div>
+                                </div>
                                 <div class="col-md-6 d-flex align-items-end">
                                     <div class="form-check form-switch">
                                         <input class="form-check-input" type="checkbox" id="vs-basic-active" />

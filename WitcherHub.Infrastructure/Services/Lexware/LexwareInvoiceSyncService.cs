@@ -289,7 +289,8 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 .Select(i => new LexwareInvoiceLineItem
                 {
                     Type = "custom",
-                    Name = BuildLineItemName(i),
+                    Name = ResolveTitle(i),
+                    Description = ResolveDescription(i),
                     Quantity = i.Quantity <= 0 ? 1m : i.Quantity,
                     UnitName = ResolveUnitName(i),
                     UnitPrice = new LexwareUnitPrice
@@ -853,13 +854,15 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                     var discountPct = TryGetDecimal(x, "discountPercentage");
                     var lexwareName = TryGetString(x, "name") ?? $"Position {pos}";
                     var lexwareUnitName = TryGetString(x, "unitName");
-
+                    var lexwareDescription = TryGetString(x, "description");
                     var ci = orderedContractItems?.ElementAtOrDefault(pos - 1);
-
+             
                     var item = new InvoiceItem
                     {
                         Title = ci != null ? ResolveTitle(ci) : lexwareName,
-                        Description = ci != null ? ResolveDescription(ci) ?? string.Empty : string.Empty,
+                        Description = ci != null
+    ? ResolveDescription(ci) ?? string.Empty
+    : (lexwareDescription ?? string.Empty),
                         Quantity = qty,
                         UnitPrice = unitNet,
                         Position = pos,

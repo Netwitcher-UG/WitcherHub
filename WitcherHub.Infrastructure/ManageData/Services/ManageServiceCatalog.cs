@@ -145,6 +145,8 @@ namespace WitcherHub.Infrastructure.ManageData.Services
                         PricingModel = entity.PricingModel,
                         BasePrice = entity.BasePrice,
                         DefaultCurrency = entity.DefaultCurrency,
+                        DefaultUnitName = entity.UnitName,
+                        DefaultDescription = entity.Description,
                         IsActive = entity.IsActive,
                         ConfigSchema = entity.ConfigSchema,
 
@@ -263,6 +265,10 @@ namespace WitcherHub.Infrastructure.ManageData.Services
             service.PricingModel = s.PricingModel;
             service.BasePrice = s.BasePrice;
             service.DefaultCurrency = (s.DefaultCurrency ?? "EUR").Trim();
+            service.UnitName = string.IsNullOrWhiteSpace(s.DefaultUnitName)
+    ? string.Empty
+    : s.DefaultUnitName.Trim();
+            service.Description = (s.DefaultDescription ?? "").Trim();
             service.IsActive = s.IsActive;
 
             // ConfigSchemaJson behavior:

@@ -11,6 +11,12 @@
         "Service.DefaultCurrency": "vs-basic-currency",
         "DefaultCurrency": "vs-basic-currency",
 
+        "Service.DefaultUnitName": "vs-basic-defaultUnitName",
+        "DefaultUnitName": "vs-basic-defaultUnitName",
+
+        "Service.DefaultDescription": "vs-basic-defaultDescription",
+        "DefaultDescription": "vs-basic-defaultDescription",
+
         "Service.ServiceType": "vs-basic-serviceType",
         "ServiceType": "vs-basic-serviceType",
 
@@ -22,9 +28,6 @@
 
         "Service.IsActive": "vs-basic-active",
         "IsActive": "vs-basic-active",
-
-        "Service.ConfigSchemaJson": "vs-basic-config",
-        "ConfigSchemaJson": "vs-basic-config",
     };
 
     const mapAddRule = {
@@ -244,7 +247,9 @@
             serviceType: root.serviceType ?? root.ServiceType,
             pricingModel: root.pricingModel ?? root.PricingModel,
             basePrice: root.basePrice ?? root.BasePrice,
-            defaultCurrency: root.defaultCurrency ?? root.DefaultCurrency,
+            defaultUnitName: root.defaultUnitName ?? root.DefaultUnitName,
+            defaultDescription: root.defaultDescription ?? root.DefaultDescription,
+     defaultCurrency: root.defaultCurrency ?? root.DefaultCurrency,
             isActive: root.isActive ?? root.IsActive,
             configSchema: root.configSchema ?? root.ConfigSchema,
             pricingRules: (rules || []).map(r => ({
@@ -911,9 +916,12 @@
         $('vs-v-basePrice').textContent = `${svc?.basePrice ?? '—'}`;
         $('vs-v-currency').textContent = `${svc?.defaultCurrency ?? '—'}`;
         $('vs-v-active').textContent = svc?.isActive ? 'Yes' : 'No';
-
+        $('vs-v-defaultUnitName').textContent = svc?.defaultUnitName ?? '—';
+        $('vs-v-defaultDescription').textContent = svc?.defaultDescription ?? '—';
         $('vs-basic-name').value = svc?.name ?? '';
         $('vs-basic-currency').value = svc?.defaultCurrency ?? 'EUR';
+        $('vs-basic-defaultUnitName').value = svc?.defaultUnitName ?? '';
+        $('vs-basic-defaultDescription').value = svc?.defaultDescription ?? '';
         $('vs-basic-basePrice').value = (svc?.basePrice ?? 0);
         $('vs-basic-active').checked = !!svc?.isActive;
 
@@ -1042,7 +1050,9 @@
                     pricingModel: $('vs-basic-pricingModel')?.value,
                     basePrice: Number($('vs-basic-basePrice')?.value ?? 0),
                     defaultCurrency: $('vs-basic-currency')?.value?.trim() ?? 'EUR',
-                    isActive: !!$('vs-basic-active')?.checked,
+                    defaultUnitName: $('vs-basic-defaultUnitName')?.value?.trim() ?? '',
+                    defaultDescription: $('vs-basic-defaultDescription')?.value?.trim() ?? '',
+          isActive: !!$('vs-basic-active')?.checked,
                     configSchemaJson: cfgToSend
                 }
             };
