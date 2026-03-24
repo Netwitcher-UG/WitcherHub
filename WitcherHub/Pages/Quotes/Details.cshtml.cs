@@ -30,7 +30,7 @@ namespace WitcherHub.Pages.Quotes
         private readonly IEmailTemplateRenderer _emailRenderer;
         private readonly IConfiguration _cfg;
         private readonly QuotePublicLinkService _quotePublicLinkService;
-        private readonly LexwareInvoiceSyncService _lexwareInvoiceSyncService;
+                private readonly LexwareInvoiceSyncService _lexwareInvoiceSyncService;
 
         public DetailsModel(
                 IQuote quotes,

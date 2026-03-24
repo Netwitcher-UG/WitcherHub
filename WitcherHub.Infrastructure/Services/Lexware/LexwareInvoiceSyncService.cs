@@ -166,6 +166,24 @@ namespace WitcherHub.Infrastructure.Services.Lexware
         {
             var quote = await LoadQuoteAsync(quoteId, ct);
 
+            if (quote.Status != DocumentStatus.Signed)
+            {
+                var latestSignature = await _db.QuoteSignatures
+                    .AsNoTracking()
+                    .Where(x => x.QuoteId == quoteId && x.SignedAt != null)
+                    .OrderByDescending(x => x.SignedAt)
+                    .FirstOrDefaultAsync(ct);
+
+                if (latestSignature != null)
+                {
+                    quote.Status = DocumentStatus.Signed;
+                    if (!quote.SignedAt.HasValue)
+                        quote.SignedAt = latestSignature.SignedAt;
+
+                    await _db.SaveChangesAsync(ct);
+                }
+            }
+
             var items = quote.Items
                 .Where(x => x.BillingCycle == BillingCycle.OneTime)
                 .OrderBy(x => x.Position)
@@ -298,6 +316,25 @@ namespace WitcherHub.Infrastructure.Services.Lexware
         {
             var quote = await LoadQuoteAsync(quoteId, ct);
 
+            if (quote.Status != DocumentStatus.Signed)
+            {
+                var latestSignature = await _db.QuoteSignatures
+                    .AsNoTracking()
+                    .Where(x => x.QuoteId == quoteId && x.SignedAt != null)
+                    .OrderByDescending(x => x.SignedAt)
+                    .FirstOrDefaultAsync(ct);
+
+                if (latestSignature != null)
+                {
+                    quote.Status = DocumentStatus.Signed;
+                    if (!quote.SignedAt.HasValue)
+                        quote.SignedAt = latestSignature.SignedAt;
+
+                    await _db.SaveChangesAsync(ct);
+                }
+            }
+
+
             if (!quote.RecurringEnabled || !quote.RecurringIsActive)
             {
                 _logger.LogInformation("Recurring disabled/inactive. QuoteId={QuoteId}", quoteId);
@@ -406,7 +443,18 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 throw new InvalidOperationException("Invoice has no Lexware reference.");
 
             await _lex.FinalizeInvoiceAsync(invoice.LexwareInvoiceId!, ct);
-            await RefreshFromLexwareAsync(invoice, ct);
+
+            var finalized = await RefreshFromLexwareUntilNotDraftAsync(
+                invoice,
+                maxAttempts: 8,
+                delay: TimeSpan.FromSeconds(1),
+                ct);
+
+            if (!finalized)
+            {
+                throw new InvalidOperationException(
+                    "Lexware accepted the finalize request, but the invoice is still returned as draft. Please retry in a few seconds.");
+            }
 
             invoice.DispatchStatus = InvoiceDispatchStatus.SentManually;
             invoice.SentAt = DateTimeOffset.UtcNow;
@@ -426,6 +474,37 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                     invoice.Id,
                     invoice.LexwareInvoiceId);
             }
+        }
+
+        private async Task<bool> RefreshFromLexwareUntilNotDraftAsync(
+    Invoice invoice,
+    int maxAttempts,
+    TimeSpan delay,
+    CancellationToken ct)
+        {
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                await RefreshFromLexwareAsync(invoice, ct);
+
+                if (!string.Equals(invoice.LexwareVoucherStatus, "draft", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                _logger.LogInformation(
+                    "Lexware invoice still draft after finalize. LocalId={LocalId} LexId={LexId} Attempt={Attempt}/{MaxAttempts}",
+                    invoice.Id,
+                    invoice.LexwareInvoiceId,
+                    attempt,
+                    maxAttempts);
+
+                if (attempt < maxAttempts)
+                {
+                    await Task.Delay(delay, ct);
+                }
+            }
+
+            return false;
         }
 
         private async Task<InvoiceGenerationResult> CreateInvoiceInternalAsync(
@@ -475,10 +554,16 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             var invoiceDateUtc = new DateTimeOffset(invoiceDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
             var taxRate = source.ApplyVat ? FixedTaxRatePercentage : 0m;
 
-            var finalizeOnLexware = source.InvoiceSendMode == InvoiceSendMode.Automatic;
+            //var finalizeOnLexware = source.InvoiceSendMode == InvoiceSendMode.Automatic;
+            //var dispatchStatus = source.InvoiceSendMode == InvoiceSendMode.Automatic
+            //    ? InvoiceDispatchStatus.SentAutomatically
+            //    : InvoiceDispatchStatus.PendingManualSend;
+
+            var finalizeOnLexware = true;
+
             var dispatchStatus = source.InvoiceSendMode == InvoiceSendMode.Automatic
                 ? InvoiceDispatchStatus.SentAutomatically
-                : InvoiceDispatchStatus.PendingManualSend;
+                : InvoiceDispatchStatus.SentManually;
 
             var lexLineItems = sourceItems
                 .OrderBy(i => i.Position)
@@ -547,8 +632,36 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 isRecurringInvoice,
                 finalizeOnLexware);
 
+            //var created = await _lex.CreateInvoiceAsync(req, finalize: finalizeOnLexware, ct);
+            //var invDoc = await _lex.GetInvoiceAsync(created.Id, ct);
+
+            //var localInvoice = new Invoice
+            //{
+            //    ProjectId = source.ProjectId,
+            //    ContractId = source.ContractId,
+            //    QuoteId = source.QuoteId,
+            //    Currency = currency,
+            //    ApplyVat = source.ApplyVat,
+            //    OriginType = originType,
+            //    IsRecurringInvoice = isRecurringInvoice,
+            //    RecurringCycleDate = isRecurringInvoice ? invoiceDate : null,
+            //    RecurringCycleKey = recurringCycleKey,
+            //    DispatchStatus = dispatchStatus,
+            //    SentAt = dispatchStatus == InvoiceDispatchStatus.SentAutomatically
+            //        ? DateTimeOffset.UtcNow
+            //        : null,
+            //    Notes = BuildGeneratedInvoiceNote(source, isRecurringInvoice),
+            //    LexwareInvoiceId = created.Id,
+            //    LexwareResourceUri = created.ResourceUri,
+            //    LexwareVersion = created.Version
+            //};
+
             var created = await _lex.CreateInvoiceAsync(req, finalize: finalizeOnLexware, ct);
-            var invDoc = await _lex.GetInvoiceAsync(created.Id, ct);
+            var invDoc = await GetInvoiceAfterFinalizeAsync(
+                created.Id,
+                maxAttempts: 8,
+                delay: TimeSpan.FromSeconds(1),
+                ct);
 
             var localInvoice = new Invoice
             {
@@ -562,9 +675,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 RecurringCycleDate = isRecurringInvoice ? invoiceDate : null,
                 RecurringCycleKey = recurringCycleKey,
                 DispatchStatus = dispatchStatus,
-                SentAt = dispatchStatus == InvoiceDispatchStatus.SentAutomatically
-                    ? DateTimeOffset.UtcNow
-                    : null,
+                SentAt = DateTimeOffset.UtcNow,
                 Notes = BuildGeneratedInvoiceNote(source, isRecurringInvoice),
                 LexwareInvoiceId = created.Id,
                 LexwareResourceUri = created.ResourceUri,
@@ -622,7 +733,39 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                     ? $"Recurring invoice created for cycle {invoiceDate:yyyy-MM-dd}."
                     : "One-time invoice created successfully.");
         }
+        private async Task<JsonDocument> GetInvoiceAfterFinalizeAsync(
+    string lexwareInvoiceId,
+    int maxAttempts,
+    TimeSpan delay,
+    CancellationToken ct)
+        {
+            JsonDocument? lastDoc = null;
 
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                lastDoc = await _lex.GetInvoiceAsync(lexwareInvoiceId, ct);
+
+                var voucherStatus = TryGetString(lastDoc.RootElement, "voucherStatus");
+
+                if (!string.Equals(voucherStatus, "draft", StringComparison.OrdinalIgnoreCase))
+                {
+                    return lastDoc;
+                }
+
+                _logger.LogInformation(
+                    "Lexware invoice still draft right after create/finalize. LexId={LexId} Attempt={Attempt}/{MaxAttempts}",
+                    lexwareInvoiceId,
+                    attempt,
+                    maxAttempts);
+
+                if (attempt < maxAttempts)
+                {
+                    await Task.Delay(delay, ct);
+                }
+            }
+
+            return lastDoc ?? await _lex.GetInvoiceAsync(lexwareInvoiceId, ct);
+        }
         private async Task<Contract> LoadContractAsync(Guid contractId, CancellationToken ct)
         {
             var contract = await _db.Contracts
