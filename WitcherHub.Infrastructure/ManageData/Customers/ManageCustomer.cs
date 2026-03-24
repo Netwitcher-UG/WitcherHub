@@ -597,29 +597,24 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             await _unitOfWork.BeginTransactionAsync(ct);
             try
             {
-                var address = await addressesRepo.FirstOrDefaultAsync(
-                    a => a.Id == dto.AddressId && a.CustomerId == dto.CustomerId,
+                var addresses = await addressesRepo.ListAsync(
+                    a => a.CustomerId == dto.CustomerId,
                     ct,
                     asNoTracking: false);
 
+                if (addresses.Count == 0) return;
+
+                var address = addresses.FirstOrDefault(a => a.Id == dto.AddressId);
                 if (address is null) return;
 
-                var wasDefault = address.IsDefault;
+                if (addresses.Count == 1)
+                    throw new BadRequestAppException("Cannot delete the last location.");
+
+                if (address.IsDefault)
+                    throw new BadRequestAppException("Cannot delete the default location. Please choose another default location first.");
 
                 addressesRepo.Remove(address);
                 await _unitOfWork.SaveChangesAsync(ct);
-
-                if (wasDefault)
-                {
-                    var remaining = await addressesRepo.ListAsync(a => a.CustomerId == dto.CustomerId, ct, asNoTracking: false);
-                    var next = remaining.OrderBy(a => a.Id).FirstOrDefault();
-                    if (next is not null)
-                    {
-                        next.IsDefault = true;
-                        addressesRepo.Update(next);
-                        await _unitOfWork.SaveChangesAsync(ct);
-                    }
-                }
 
                 await _unitOfWork.CommitTransactionAsync(ct);
 
@@ -633,7 +628,6 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                 throw;
             }
         }
-
         public async Task SetDefaultAddressAsync(SetDefaultCustomerAddressDto dto, CancellationToken ct = default)
         {
             if (dto.CustomerId == Guid.Empty) throw new BadRequestAppException("Invalid customer id.");

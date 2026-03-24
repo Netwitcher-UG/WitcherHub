@@ -8,11 +8,39 @@
 
 @functions {
     string FmtDate(DateTimeOffset? d) => d?.ToString("yyyy-MM-dd") ?? "";
-}
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+}
+<style>
+    .wh-btn-primary {
+        background-color: rgb(107 76 230);
+        border-color: rgb(107 76 230);
+        color: #fff;
+    }
+
+        .wh-btn-primary:hover,
+        .wh-btn-primary:focus,
+        .wh-btn-primary:active,
+        .wh-btn-primary.active,
+        .show > .wh-btn-primary.dropdown-toggle {
+            background-color: rgb(95 66 214);
+            border-color: rgb(95 66 214);
+            color: #fff;
+        }
+
+        .wh-btn-primary:focus {
+            box-shadow: 0 0 0 .25rem rgba(107, 76, 230, .25);
+        }
+
+        .wh-btn-primary:disabled,
+        .wh-btn-primary.disabled {
+            background-color: rgb(107 76 230);
+            border-color: rgb(107 76 230);
+            color: #fff;
+            opacity: .65;
+        }
+</style>
+<div class="mb-3">
     <h3 class="mb-0">Create Quote</h3>
-    <a class="btn btn-outline-secondary" asp-page="/Projects">Back</a>
 </div>
 
 <form method="post" class="card">
@@ -84,8 +112,13 @@
         </div>
 
         <div class="d-flex gap-2 mt-3">
-            <button class="btn btn-primary" type="submit">Create</button>
-            <a class="btn btn-outline-secondary" asp-page="/Projects">Cancel</a>
+            <button class="btn wh-btn-primary" type="submit">Create</button>
+            <a class="btn btn-outline-secondary"
+               asp-page="/Projects/Workspace"
+               asp-route-id="@Model.Form.Quote.ProjectId"
+               asp-route-tab="quotes">
+                Cancel
+            </a>
         </div>
     </div>
 </form>

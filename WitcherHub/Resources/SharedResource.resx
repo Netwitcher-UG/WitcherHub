@@ -225,4 +225,7 @@
   <data name="contractPage_Unsigned" xml:space="preserve">
     <value>Unsigned</value>
   </data>
+  <data name="quotePage_Title" xml:space="preserve">
+    <value>quotePage_Title</value>
+  </data>
 </root>

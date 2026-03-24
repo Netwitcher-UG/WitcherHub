@@ -191,18 +191,41 @@
             <span class="text-danger" asp-validation-for="Address.FullNameOrCompany"></span>
         </div>
         <div class="col-md-4">
-            
             <label class="form-label text-light">
                 Country <span class="text-danger">*</span>
             </label>
 
-            <select class="form-select"
-                    asp-for="Address.CountryCode"
+            <div class="dropdown">
+                <input type="text"
+                       class="form-control dropdown-toggle"
+                       id="create-country-combo"
+                       data-country-combo="true"
+                       data-country-menu="create-country-menu"
+                       data-country-select="Address_CountryCode"
+                       data-bs-toggle="dropdown"
+                       aria-expanded="false"
+                       autocomplete="off"
+                       placeholder="Search & select country..." />
+
+                <ul class="dropdown-menu w-100"
+                    id="create-country-menu"
+                    aria-labelledby="create-country-combo"
+                    style="max-height:280px; overflow-y:auto;">
+                </ul>
+            </div>
+
+            <select asp-for="Address.CountryCode"
                     asp-items="Model.CountryOptions"
+                    id="Address_CountryCode"
+                    class="form-select"
+                    data-country-name-target="Address_Country"
+                    tabindex="-1"
+                    aria-hidden="true"
+                    style="position:absolute !important; left:-10000px !important; top:auto !important; width:1px !important; height:1px !important; overflow:hidden !important; opacity:0 !important; pointer-events:none !important;"
                     required>
             </select>
 
-            <input type="hidden" asp-for="Address.Country" /> 
+            <input type="hidden" asp-for="Address.Country" id="Address_Country" />
 
             <span class="text-danger" asp-validation-for="Address.CountryCode"></span>
         </div>

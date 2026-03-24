@@ -103,11 +103,16 @@
         @if (showSignedPdfBtn)
         {
             <a class="btn btn-outline-success"
+               id="downloadSignedPdfBtn"
                asp-page="./Details"
                asp-page-handler="SignedPdf"
                asp-route-id="@Model.Quote.Id"
                title="Download signed PDF">
-                Signed PDF
+                <span class="signed-pdf-btn-text">Signed PDF</span>
+                <span class="spinner-border spinner-border-sm ms-2 d-none"
+                      id="downloadSignedPdfSpinner"
+                      role="status"
+                      aria-hidden="true"></span>
             </a>
         }
         else
@@ -390,6 +395,56 @@
                 } finally {
                     setPdfLoading(false);
                 }
+            });
+        })();
+                (function () {
+            const signedPdfBtn = document.getElementById('downloadSignedPdfBtn');
+            const signedPdfSpinner = document.getElementById('downloadSignedPdfSpinner');
+            const signedPdfText = signedPdfBtn?.querySelector('.signed-pdf-btn-text');
+
+            if (!signedPdfBtn || !signedPdfSpinner || !signedPdfText) return;
+
+            let signedPdfBusy = false;
+            let signedPdfResetTimer = null;
+
+            function setSignedPdfLoading(isBusy) {
+                signedPdfBusy = isBusy;
+
+                if (isBusy) {
+                    signedPdfBtn.classList.add('disabled');
+                    signedPdfBtn.setAttribute('aria-disabled', 'true');
+                    signedPdfSpinner.classList.remove('d-none');
+                    signedPdfText.textContent = 'Loading...';
+                } else {
+                    signedPdfBtn.classList.remove('disabled');
+                    signedPdfBtn.removeAttribute('aria-disabled');
+                    signedPdfSpinner.classList.add('d-none');
+                    signedPdfText.textContent = 'Signed PDF';
+                }
+            }
+
+            signedPdfBtn.addEventListener('click', function () {
+                if (signedPdfBusy) return;
+
+                setSignedPdfLoading(true);
+
+                if (signedPdfResetTimer) {
+                    clearTimeout(signedPdfResetTimer);
+                }
+
+                signedPdfResetTimer = setTimeout(function () {
+                    setSignedPdfLoading(false);
+                }, 4000);
+            });
+
+            window.addEventListener('focus', function () {
+                if (!signedPdfBusy) return;
+                setSignedPdfLoading(false);
+            });
+
+            window.addEventListener('pageshow', function () {
+                if (!signedPdfBusy) return;
+                setSignedPdfLoading(false);
             });
         })();
     </script>

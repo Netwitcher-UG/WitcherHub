@@ -1,5 +1,6 @@
 ﻿@page
 @using Microsoft.AspNetCore.Authorization
+@using System.Text.Json
 @using WitcherHub.Domain.SeedData
 @attribute [Authorize(Policy = AppPolicyPrefixes.Permission + AppPermissions.ManageNetwitcher)]
 @model IndexModel
@@ -38,6 +39,9 @@
 
 <input type="hidden" id="vcLexwareExportUrl" value="@Url.Page("./Index", "LexwareExport")" />
 <input type="hidden" id="vcLexwareDeleteUrl" value="@Url.Page("./Index", "LexwareDelete")" />
+<script type="application/json" id="countryOptionsJson">
+    @Html.Raw(JsonSerializer.Serialize(Model.CountryOptions.Select(x => new { code = x.Value, name = x.Text })))
+</script>
 <div class="modal fade quote-confirm-modal" id="DeleteClientConfirmModal" tabindex="-1" aria-labelledby="DeleteClientConfirmModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">

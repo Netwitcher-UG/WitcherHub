@@ -564,6 +564,7 @@
                 const pdfUrl = `${pdfBaseUrl}${joinerPdf}id=${encodeURIComponent(id)}`;
 
                 const tr = document.createElement('tr');
+                tr.className = 'wh-clickable-row';
                 tr.innerHTML = `
                     <td>${esc(invoiceNo)}</td>
                     <td>${invoiceStatusBadge(status)}</td>
@@ -572,9 +573,22 @@
                     <td>${esc(fmtDate(dueDate))}</td>
                     <td class="text-end">${totalText}</td>
                     <td class="text-end">
-                        <a class="btn btn-sm btn-outline-primary" href="${pdfUrl}" target="_blank" rel="noopener">Details</a>
+                        <a class="btn text-primary wh-icon-btn-plain"
+                           href="${pdfUrl}"
+                           target="_blank"
+                           rel="noopener"
+                           title="Details"
+                           aria-label="Details">
+                            <i class="material-icons-outlined">description</i>
+                        </a>
                     </td>
                 `;
+
+                tr.addEventListener('click', function (e) {
+                    if (e.target.closest('a,button,input,textarea,select,label')) return;
+                    window.open(pdfUrl, '_blank', 'noopener');
+                });
+
                 tbody.appendChild(tr);
             }
 
@@ -589,7 +603,6 @@
             toastError('Failed to load invoices.', 'Error');
         }
     }
-
     function setContractLoading(on) {
         $('vpContractLoading')?.classList.toggle('d-none', !on);
     }

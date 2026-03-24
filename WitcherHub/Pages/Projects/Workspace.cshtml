@@ -58,6 +58,63 @@
             margin: 14px 0;
             opacity: .15;
         }
+
+    .wh-btn-primary {
+        background-color: rgb(107 76 230);
+        border-color: rgb(107 76 230);
+        color: #fff;
+    }
+
+        .wh-btn-primary:hover,
+        .wh-btn-primary:focus,
+        .wh-btn-primary:active,
+        .wh-btn-primary.active,
+        .show > .wh-btn-primary.dropdown-toggle {
+            background-color: rgb(95 66 214);
+            border-color: rgb(95 66 214);
+            color: #fff;
+        }
+
+        .wh-btn-primary:focus {
+            box-shadow: 0 0 0 .25rem rgba(107, 76, 230, .25);
+        }
+
+        .wh-btn-primary:disabled,
+        .wh-btn-primary.disabled {
+            background-color: rgb(107 76 230);
+            border-color: rgb(107 76 230);
+            color: #fff;
+            opacity: .65;
+        }
+
+    .wh-icon-btn-plain {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+        .wh-icon-btn-plain i {
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .wh-icon-btn-plain:hover,
+        .wh-icon-btn-plain:focus,
+        .wh-icon-btn-plain:active {
+            border: 0 !important;
+            background: rgba(255,255,255,.06) !important;
+            box-shadow: none !important;
+        }
+
+    .wh-clickable-row {
+        cursor: pointer;
+    }
 </style>
 
 <input type="hidden" id="wsProjectId" value="@Model.ProjectId" />
@@ -93,9 +150,7 @@
             <div class="text-muted small" id="vp-meta"></div>
         </div>
 
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <a class="btn btn-outline-secondary" href="@Url.Page("/Projects")">Back to Projects</a>
-        </div>
+        
     </div>
 
     <div id="vpLoading" class="card border-0 shadow-sm rounded-4">
@@ -220,7 +275,7 @@
                                     </div>
 
                                     <div class="d-flex gap-2 mt-3">
-                                        <button class="btn btn-primary btn-sm" type="button" id="vpSaveBasicBtn">Save</button>
+                                        <button class="btn wh-btn-primary btn-sm" type="button" id="vpSaveBasicBtn">Save</button>
                                         <button class="btn btn-outline-secondary btn-sm" type="button" id="vpCancelBasicBtn">Cancel</button>
                                     </div>
                                 </div>
@@ -248,7 +303,7 @@
                         <button class="btn btn-outline-secondary" type="button" id="vp-quotes-searchBtn">Search</button>
                     </div>
 
-                    <a class="btn btn-primary" href="#" id="vp-newQuoteBtn">
+                    <a class="btn wh-btn-primary" href="#" id="vp-newQuoteBtn">
                         + New Quote
                     </a>
                 </div>

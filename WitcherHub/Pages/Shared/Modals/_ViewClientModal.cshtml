@@ -332,15 +332,11 @@
                                         <div class="card-body p-4">
                                             <div class="d-flex align-items-center justify-content-between mb-2">
                                                 <div class="fw-bold">Add Location</div>
-                                                <button type="button" class="btn btn-sm btn-light"
-                                                        data-bs-toggle="collapse" data-bs-target="#vc-addLocationCollapse">
-                                                    Close
-                                                </button>
+                                                
                                             </div>
 
                                             <form class="row g-3" id="vcAddLocationForm">
                                                 <input type="hidden" id="vc-clientId-addLocation" value="" />
-                                                <input type="hidden" id="vc-add-loc-countryCode" />
 
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label">Label</label>
@@ -349,8 +345,34 @@
                                                 </div>
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label">Country</label>
-                                                    <input class="form-control" id="vc-add-loc-country" />
-                                                    <div class="text-danger small mt-1" id="err-vc-add-loc-country"></div>
+
+                                                    <div class="dropdown">
+                                                        <input type="text"
+                                                               class="form-control form-control-sm dropdown-toggle"
+                                                               id="vc-add-loc-country-combo"
+                                                               data-country-combo="true"
+                                                               data-country-menu="vc-add-loc-country-menu"
+                                                               data-country-select="vc-add-loc-country-select"
+                                                               data-bs-toggle="dropdown"
+                                                               aria-expanded="false"
+                                                               autocomplete="off"
+                                                               placeholder="Search & select country..." />
+
+                                                        <ul class="dropdown-menu w-100"
+                                                            id="vc-add-loc-country-menu"
+                                                            aria-labelledby="vc-add-loc-country-combo"
+                                                            style="max-height:280px; overflow-y:auto;">
+                                                        </ul>
+                                                    </div>
+
+                                                    <select id="vc-add-loc-country-select"
+                                                            class="form-select"
+                                                            tabindex="-1"
+                                                            aria-hidden="true"
+                                                            style="position:absolute !important; left:-10000px !important; top:auto !important; width:1px !important; height:1px !important; overflow:hidden !important; opacity:0 !important; pointer-events:none !important;">
+                                                    </select>
+
+                                                    <div class="text-danger small mt-1" id="err-vc-add-loc-country-select"></div>
                                                 </div>
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label">City</label>
@@ -362,7 +384,7 @@
                                                     <input class="form-control" id="vc-add-loc-postal" />
                                                     <div class="text-danger small mt-1" id="err-vc-add-loc-postal"></div>
                                                 </div>
-                                                <div class="col-12 col-md-8">
+                                                <div class="col-12">
                                                     <label class="form-label">Street (raw)</label>
                                                     <input class="form-control" id="vc-add-loc-streetRaw" />
                                                 </div>
@@ -386,11 +408,11 @@
                                                     </div>
 
                                                     <div class="d-flex gap-2">
-                                                        <button type="button" class="btn btn-light btn-sm"
+                                                        <button type="button" class="btn btn-outline-secondary px-4"
                                                                 data-bs-toggle="collapse" data-bs-target="#vc-addLocationCollapse">
                                                             Cancel
                                                         </button>
-                                                        <button type="submit" class="btn btn-grd-primary btn-sm">
+                                                        <button type="submit" class="btn btn-grd-primary btn-sm" style="padding-left:25px;padding-right:25px;">
                                                             Add
                                                         </button>
                                                     </div>

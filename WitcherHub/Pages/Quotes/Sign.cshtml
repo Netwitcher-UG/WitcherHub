@@ -1,11 +1,22 @@
 ﻿@page "/quotes/sign/{id:guid?}"
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.Extensions.Localization
 @using System.Text.Json
+@using WitcherHub.Resources
 @attribute [AllowAnonymous]
 @model WitcherHub.Pages.Quotes.SignModel
+@inject IStringLocalizer<SharedResource> T
+
+@functions {
+    string L(string key, string fallback)
+    {
+        var value = T[key];
+        return value.ResourceNotFound ? fallback : value.Value;
+    }
+}
 
 @{
-    ViewData["Title"] = "Quote";
+    ViewData["Title"] = L("quotePage_Title", "Quote");
     Layout = "_ContractsLayout";
 }
 
@@ -13,80 +24,82 @@
     <link rel="stylesheet" href="~/css/contracts/contract-sign.css" asp-append-version="true" />
 
     <style>
-    .contractPage__container {
-        max-width: 1280px;
-    }
+        .contractPage__container {
+            max-width: 1280px;
+        }
 
-    .contractPage__paper {
-        max-width: 1180px;
-        padding: 28px 32px 24px;
-    }
-
-    .contractPage__contractHtml.quotePdfScope {
-        margin: 0;
-    }
-
-    .quotePdfScope {
-        color: #111827;
-        font-size: 13px;
-        line-height: 1.55;
-    }
-
-    .quotePdfScope .page {
-        padding: 0 !important;
-    }
-
-    .quotePdfScope .sumBox {
-        float: right;
-    }
-
-    .quotePdfScope .card,
-    .quotePdfScope .sumBox {
-        box-shadow: none;
-    }
-
-    .contractActions {
-        margin-top: 150px;
-    }
-
-    .contractSign {
-    margin-top: 42px;
-    padding-top: 30px;
-    border-top: 1px solid rgba(15, 23, 42, .08);
-}
-.contractSign__sigLine {
-    min-height: 42px;
-}
-
-.contractSign__placeholder {
-    display: block;
-    min-height: 22px;
-}
-    .contractSign__grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 40px;
-    }
-
-    .contractSign__title {
-        margin-bottom: 18px;
-    }
-
-    .contractSign__providerBlock {
-        white-space: pre-line;
-    }
-
-    @@media (max-width: 980px) {
         .contractPage__paper {
-            max-width: 100%;
-            padding: 20px 18px;
+            max-width: 1180px;
+            padding: 28px 32px 24px;
+        }
+
+        .contractPage__contractHtml.quotePdfScope {
+            margin: 0;
+        }
+
+        .quotePdfScope {
+            color: #111827;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+            .quotePdfScope .page {
+                padding: 0 !important;
+            }
+
+            .quotePdfScope .sumBox {
+                float: right;
+            }
+
+            .quotePdfScope .card,
+            .quotePdfScope .sumBox {
+                box-shadow: none;
+            }
+
+        .contractActions {
+            margin-top: 150px;
+        }
+
+        .contractSign {
+            margin-top: 42px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(15, 23, 42, .08);
+        }
+
+        .contractSign__sigLine {
+            min-height: 42px;
+        }
+
+        .contractSign__placeholder {
+            display: block;
+            min-height: 22px;
         }
 
         .contractSign__grid {
-            grid-template-columns: 1fr;
-            gap: 24px;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
         }
-    }
-</style>
+
+        .contractSign__title {
+            margin-bottom: 18px;
+        }
+
+        .contractSign__providerBlock {
+            white-space: pre-line;
+        }
+
+        @@media (max-width: 980px) {
+            .contractPage__paper {
+                max-width: 100%;
+                padding: 20px 18px;
+            }
+
+            .contractSign__grid {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+        }
+    </style>
 }
 
 <form method="post" id="afForm">
@@ -107,6 +120,11 @@
 </script>
 
 <div class="contractPage">
+    <div class="contractPage__langFab" aria-label="@L("contractPage_LanguageSwitch", "Language switch")">
+        <button class="contractPage__langBtn" type="button" data-culture="en">EN</button>
+        <button class="contractPage__langBtn" type="button" data-culture="de">DE</button>
+    </div>
+
     <div class="contractPage__container">
         <div class="contractPage__paper" id="paper">
 
@@ -118,32 +136,32 @@
                 <label class="contractActions__agree">
                     <input type="checkbox" id="chkAgree" />
                     <span>
-                        <strong>I confirm this quote.</strong><br />
-                        <span class="contractActions__text">Please review all details before signing.</span>
+                        <strong>@L("contractPage_AgreeTitle", "I confirm this quote.")</strong><br />
+                        <span class="contractActions__text">@L("contractPage_AgreeText", "Please review all details before signing.")</span>
                     </span>
                 </label>
 
                 <div class="contractActions__right">
-                    <div class="contractActions__badge" id="signedBadge">Unsigned</div>
+                    <div class="contractActions__badge" id="signedBadge">@L("contractPage_Unsigned", "Unsigned")</div>
 
                     <button class="contractActions__btn contractActions__btn--primary" type="button" id="btnOpen" disabled>
-                        Sign & Accept
+                        @L("contractPage_SignAccept", "Sign & Accept")
                     </button>
 
-                    <button class="contractActions__btn" type="button" id="btnPrint">Print</button>
-                    <button class="contractActions__btn" type="button" id="btnReset">Reset</button>
+                    <button class="contractActions__btn" type="button" id="btnPrint">@L("contractPage_Print", "Print")</button>
+                    <button class="contractActions__btn" type="button" id="btnReset">@L("contractPage_Reset", "Reset")</button>
                 </div>
             </div>
 
-            <section class="contractSign" aria-label="Quote signature">
-                <h2 class="contractSign__title">Signature</h2>
+            <section class="contractSign" aria-label="@L("contractPage_SignaturesTitle", "Quote signature")">
+                <h2 class="contractSign__title">@L("contractPage_SignaturesTitle", "Signature")</h2>
 
                 <div class="contractSign__grid">
                     <div>
-                        <div class="contractSign__party">Customer</div>
+                        <div class="contractSign__party">@L("contractPage_CustomerParty", "Customer")</div>
 
                         <div class="contractSign__row">
-                            <div class="contractSign__label">Name</div>
+                            <div class="contractSign__label">@L("contractPage_LabelName", "Name")</div>
                             <input id="customerName"
                                    class="contractSign__input"
                                    type="text"
@@ -152,7 +170,7 @@
                         </div>
 
                         <div class="contractSign__row">
-                            <div class="contractSign__label">Email</div>
+                            <div class="contractSign__label">@L("contractPage_LabelEmail", "Email")</div>
                             <input id="customerEmail"
                                    class="contractSign__input"
                                    type="email"
@@ -161,29 +179,29 @@
                         </div>
 
                         <div class="contractSign__row">
-                            <div class="contractSign__label">Date</div>
+                            <div class="contractSign__label">@L("contractPage_LabelDate", "Date")</div>
                             <div class="contractSign__line"><span id="customerDate"></span></div>
                         </div>
 
                         <div class="contractSign__row">
-                            <div class="contractSign__label">Signature</div>
+                            <div class="contractSign__label">@L("contractPage_LabelSignature", "Signature")</div>
                             <div id="sigBoxClick"
                                  class="contractSign__sigLine"
                                  role="button"
                                  tabindex="0"
-                                 aria-label="Add signature">
-                                <img id="sigImage" class="contractSign__sigImg" alt="Signature" />
+                                 aria-label="@L("contractPage_AddSignatureAria", "Add signature")">
+                                <img id="sigImage" class="contractSign__sigImg" alt="@L("contractPage_LabelSignature", "Signature")" />
                                 <span id="sigPlaceholder" class="contractSign__placeholder"></span>
                             </div>
                         </div>
 
                         <div class="contractSign__meta">
-                            Signed at: <span id="signedAt"></span>
+                            @L("contractPage_SignedAtLabel", "Signed at"): <span id="signedAt"></span>
                         </div>
                     </div>
 
                     <div>
-                        <div class="contractSign__party">Provider</div>
+                        <div class="contractSign__party">@L("contractPage_ProviderParty", "Provider")</div>
 
                         <div class="contractSign__providerBlock">
                             <div class="contractSign__providerName">@Model.ProviderName</div>
@@ -191,7 +209,7 @@
                         </div>
 
                         <div class="contractSign__providerNote">
-                            (Provider signs internally)
+                            (@L("contractPage_ProviderSignsInternally", "Provider signs internally"))
                         </div>
                     </div>
                 </div>
@@ -205,23 +223,23 @@
     <div class="contractPage__modal" id="sigModal" aria-hidden="true">
         <div class="contractPage__modalCard" role="dialog" aria-modal="true">
             <div class="contractPage__modalHead">
-                <div>Add signature</div>
-                <button class="contractPage__btn" type="button" id="btnClose" aria-label="Close">✕</button>
+                <div>@L("contractPage_ModalTitle", "Add signature")</div>
+                <button class="contractPage__btn" type="button" id="btnClose" aria-label="@L("contractPage_Close", "Close")">✕</button>
             </div>
 
             <div class="contractPage__modalBody">
-                <div class="contractPage__modalHint">Use your mouse or finger to sign below.</div>
+                <div class="contractPage__modalHint">@L("contractPage_ModalHint", "Use your mouse or finger to sign below.")</div>
 
                 <div class="contractPage__sigPad">
                     <canvas id="sigCanvas" tabindex="0"></canvas>
                 </div>
 
                 <div class="contractPage__modalActions">
-                    <button class="contractPage__btn" type="button" id="btnClear">Clear</button>
+                    <button class="contractPage__btn" type="button" id="btnClear">@L("contractPage_Clear", "Clear")</button>
                     <button class="contractPage__btn contractPage__btn--primary" type="button" id="btnAccept">
-                        Accept signature
+                        @L("contractPage_AcceptSignature", "Accept signature")
                     </button>
-                    <button class="contractPage__btn" type="button" id="btnCancel">Cancel</button>
+                    <button class="contractPage__btn" type="button" id="btnCancel">@L("contractPage_Cancel", "Cancel")</button>
                 </div>
 
                 <div class="contractPage__modalStatus" id="modalStatus"></div>
@@ -233,16 +251,21 @@
 @section Scripts {
     <script>
         window.contractPageI18n = {
-            fillName: "Please enter your name before signing.",
-            fillEmail: "Please enter your email before signing.",
-            fillFields: "Please fill all required fields.",
-            invalidEmail: "Please enter a valid email address.",
-            emptyCanvas: "Please sign first.",
-            mustAgree: "Please confirm agreement before signing.",
-            cleared: "Cleared.",
-            signedOk: "Quote signed successfully.",
-            signed: "Signed",
-            unsigned: "Unsigned"
+            fillName: "@L("contractPage_ErrFillName", "Please enter your name before signing.")",
+            fillEmail: "@L("contractPage_ErrFillEmail", "Please enter your email before signing.")",
+            fillFields: "@L("contractPage_ErrFillFields", "Please fill all required fields.")",
+            invalidEmail: "@L("contractPage_ErrInvalidEmail", "Please enter a valid email address.")",
+            emptyCanvas: "@L("contractPage_ErrEmptyCanvas", "Please sign first.")",
+            mustAgree: "@L("contractPage_ErrMustAgree", "Please confirm agreement before signing.")",
+            cleared: "@L("contractPage_Cleared", "Cleared.")",
+            signedOk: "@L("contractPage_SignedOk", "Quote signed successfully.")",
+            signed: "@L("contractPage_Signed", "Signed")",
+            unsigned: "@L("contractPage_Unsigned", "Unsigned")",
+            unauthorized: "@L("contractPage_ErrUnauthorized", "This signing link is invalid or expired.")",
+            alreadySigned: "@L("contractPage_ErrAlreadySigned", "This quote is already signed.")",
+            notFound: "@L("contractPage_ErrNotFound", "Quote not found.")",
+            genericError: "@L("contractPage_ErrGeneric", "Something went wrong. Please try again.")",
+            saving: "@L("contractPage_Saving", "Saving...")"
         };
     </script>
 

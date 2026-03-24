@@ -637,7 +637,7 @@ html[data-bs-theme="blue-theme"] #servicesTableCard {
 
 /* ===== View Service modal ===== */
 #ViewServiceModal .vs-view-modal-dialog {
-    max-width: min(1140px, calc(100vw - 32px));
+    max-width: min(1440px, calc(100vw - 32px));
     margin: 1rem auto;
 }
 

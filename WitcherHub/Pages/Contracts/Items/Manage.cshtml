@@ -7,7 +7,35 @@
 @{
     ViewData["Title"] = "Contract Positions";
 }
+<style>
+    .wh-btn-primary {
+        background-color: rgb(107 76 230);
+        border-color: rgb(107 76 230);
+        color: #fff;
+    }
 
+        .wh-btn-primary:hover,
+        .wh-btn-primary:focus,
+        .wh-btn-primary:active,
+        .wh-btn-primary.active,
+        .show > .wh-btn-primary.dropdown-toggle {
+            background-color: rgb(95 66 214);
+            border-color: rgb(95 66 214);
+            color: #fff;
+        }
+
+        .wh-btn-primary:focus {
+            box-shadow: 0 0 0 .25rem rgba(107, 76, 230, .25);
+        }
+
+        .wh-btn-primary:disabled,
+        .wh-btn-primary.disabled {
+            background-color: rgb(107 76 230);
+            border-color: rgb(107 76 230);
+            color: #fff;
+            opacity: .65;
+        }
+</style>
 @if (Model.Contract is null)
 {
     <div class="alert alert-danger">Contract not found.</div>
@@ -60,10 +88,6 @@
     </div>
 
     <div class="d-flex gap-2 flex-wrap">
-        <a class="btn btn-outline-secondary"
-           href="/Projects?openProjectId=@Model.Contract.ProjectId&tab=contracts">
-            Back to Project
-        </a>
         @if (Model.HasSavedOverrideDraft)
         {
             <a class="btn btn-outline-info"
@@ -72,19 +96,12 @@
                 Open Override
             </a>
         }
-        <!-- ✅ نفس Quotes: From Services -->
-        <a class="btn btn-outline-primary @(Model.IsLocked ? "disabled" : "")"
-           asp-page="/Contracts/Items/Create"
-           asp-route-contractId="@Model.ContractId"
-           aria-disabled="@(Model.IsLocked)">
-            From Services
-        </a>
 
         <form method="post" asp-page-handler="GenerateContract" class="d-inline"
               onsubmit="window.UI?.loading?.show?.('Generating contract...');">
             @Html.AntiForgeryToken()
             <input type="hidden" name="ContractId" value="@Model.ContractId" />
-            <button class="btn btn-primary d-inline-flex align-items-center gap-2"
+            <button class="btn wh-btn-primary d-inline-flex align-items-center gap-2"
                     type="submit"
                     @(Model.IsLocked || (Model.Contract.Items?.Count ?? 0) == 0 ? "disabled" : "")>
                 <span>Generate Contract</span>
@@ -93,7 +110,6 @@
         </form>
     </div>
 </div>
-
 @if (Model.IsLocked)
 {
     <div class="alert alert-warning">
@@ -109,14 +125,13 @@
     var disabledAttr = Model.IsLocked ? "disabled" : null;
 }
 <div class="card mb-3">
-    <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="card-header d-flex justify-content-between align-items-center"
+         role="button"
+         data-bs-toggle="collapse"
+         data-bs-target="#contractHeaderCollapse"
+         aria-expanded="true"
+         aria-controls="contractHeaderCollapse">
         <div class="fw-semibold">Header</div>
-        <button class="btn btn-sm btn-outline-secondary"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#contractHeaderCollapse">
-            Toggle
-        </button>
     </div>
 
     <div class="collapse show" id="contractHeaderCollapse">
@@ -160,7 +175,7 @@
                 <textarea class="form-control" rows="4" asp-for="HeaderTerms" disabled="@disabledAttr"></textarea>
 
                 <div class="col-12 d-flex justify-content-end">
-                    <button class="btn btn-primary" type="submit" disabled="@disabledAttr">
+                    <button class="btn wh-btn-primary" type="submit" disabled="@disabledAttr">
                         Save header
                     </button>
                 </div>
@@ -168,6 +183,8 @@
         </div>
     </div>
 </div>
+
+
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
@@ -179,6 +196,15 @@
     </div>
 
     <div class="card-body">
+        <div class="d-flex justify-content-end mb-3">
+            <a class="btn btn-outline-primary @(Model.IsLocked ? "disabled" : "")"
+               asp-page="/Contracts/Items/Create"
+               asp-route-contractId="@Model.ContractId"
+               aria-disabled="@(Model.IsLocked)">
+                From Services
+            </a>
+        </div>
+
         <div class="row g-2 align-items-end mb-3">
             <div class="col-12 col-md-8">
                 <label class="form-label mb-1">Search items</label>

@@ -93,34 +93,29 @@ namespace WitcherHub.Infrastructure.Common.Caching
         }
 
         public async Task<T> GetOrCreateAsync<T>(
-            string key,
-            Func<CancellationToken, Task<T>> factory,
-            AppCacheEntryOptions? options = null,
-            CancellationToken ct = default)
+    string key,
+    Func<CancellationToken, Task<T>> factory,
+    AppCacheEntryOptions? options = null,
+    CancellationToken ct = default)
         {
-            var existing = await GetAsync<T>(key, ct);
+            var existing = await GetAsync<T>(key, CancellationToken.None);
             if (existing is not null) return existing;
 
             var gate = _locks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
-            await gate.WaitAsync(ct);
+            await gate.WaitAsync(CancellationToken.None);
 
             try
             {
-                // double-check after lock
-                existing = await GetAsync<T>(key, ct);
+                existing = await GetAsync<T>(key, CancellationToken.None);
                 if (existing is not null) return existing;
 
-                var created = await factory(ct);
-                await SetAsync(key, created, options, ct);
+                var created = await factory(CancellationToken.None);
+                await SetAsync(key, created, options, CancellationToken.None);
                 return created;
             }
             finally
             {
                 gate.Release();
-
-                // best-effort cleanup
-                if (gate.CurrentCount == 1)
-                    _locks.TryRemove(key, out _);
             }
         }
 

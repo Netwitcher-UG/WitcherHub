@@ -5,7 +5,35 @@
 @{
     ViewData["Title"] = "Add Position";
 }
+<style>
+    .wh-btn-primary {
+        background-color: rgb(107 76 230);
+        border-color: rgb(107 76 230);
+        color: #fff;
+    }
 
+        .wh-btn-primary:hover,
+        .wh-btn-primary:focus,
+        .wh-btn-primary:active,
+        .wh-btn-primary.active,
+        .show > .wh-btn-primary.dropdown-toggle {
+            background-color: rgb(95 66 214);
+            border-color: rgb(95 66 214);
+            color: #fff;
+        }
+
+        .wh-btn-primary:focus {
+            box-shadow: 0 0 0 .25rem rgba(107, 76, 230, .25);
+        }
+
+        .wh-btn-primary:disabled,
+        .wh-btn-primary.disabled {
+            background-color: rgb(107 76 230);
+            border-color: rgb(107 76 230);
+            color: #fff;
+            opacity: .65;
+        }
+</style>
 @if (Model.Quote is null)
 {
     <div class="alert alert-danger">Quote not found.</div>
@@ -16,19 +44,13 @@
     var isDraft = Model.Quote.Status == DocumentStatus.Draft;
 }
 
-<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-    <div>
-        <div class="text-muted small">Add Position to</div>
-        <h3 class="mb-1">@Model.Quote.QuoteNo</h3>
-        <div class="text-muted small">
-            Status: <strong>@Model.Quote.Status</strong> &nbsp;|&nbsp;
-            Currency: <strong>@Model.Quote.Currency</strong>
-        </div>
+<div class="mb-3">
+    <div class="text-muted small">Add Position to</div>
+    <h3 class="mb-1">@Model.Quote.QuoteNo</h3>
+    <div class="text-muted small">
+        Status: <strong>@Model.Quote.Status</strong> &nbsp;|&nbsp;
+        Currency: <strong>@Model.Quote.Currency</strong>
     </div>
-
-    <a class="btn btn-outline-secondary"
-       asp-page="/Quotes/Edit"
-       asp-route-id="@Model.Quote.Id">Back</a>
 </div>
 
 @if (!isDraft)
@@ -135,24 +157,24 @@
                 <label class="form-label">Discount Value</label>
                 <input class="form-control" asp-for="Form.Item.DiscountValue" />
             </div>
-            <div class="row g-3 mt-1">
-                <div class="col-12 col-md-4">
-                    <label class="form-label">Unit Name</label>
-                    <input  asp-for ="Form.Item.UnitName"
-                           class="form-control"
-                           placeholder="e.g. Piece / Hour / Month" />
-                    <span class="text-danger small" asp-validation-for="Form.Item.UnitName"></span>
-                </div>
+            <div class="col-12 mt-1">
+    <label class="form-label">Unit Name</label>
+    <input asp-for="Form.Item.UnitName"
+           class="form-control w-100"
+           placeholder="e.g. Piece / Hour / Month" />
+    <span class="text-danger small" asp-validation-for="Form.Item.UnitName"></span>
+</div>
 
-                <div class="col-12 col-md-8">
-                    <label class="form-label">Description</label>
-                    <textarea asp-for="Form.Item.Description"
-                              class="form-control"
-                              rows="3"
-                              placeholder="This text will appear on the quote / invoice line"></textarea>
-                    <span class="text-danger small" asp-validation-for="Form.Item.Description"></span>
-                </div>
-            </div>
+<div class="col-12">
+    <label class="form-label">Description</label>
+    <textarea asp-for="Form.Item.Description"
+              class="form-control w-100"
+              rows="4"
+              placeholder="This text will appear on the quote / invoice line"></textarea>
+    <span class="text-danger small" asp-validation-for="Form.Item.Description"></span>
+</div>
+            
+            
             <!-- ✅ Config dynamic UI -->
             <div class="col-12" id="configBlock" style="display:none;">
                 <div class="card border bg-transparent">
@@ -202,7 +224,7 @@
         </div>
 
         <div class="d-flex gap-2 mt-3">
-            <button class="btn btn-primary" type="submit" id="btnSubmit">Add Item</button>
+            <button class="btn wh-btn-primary" type="submit" id="btnSubmit">Add Item</button>
             <a class="btn btn-outline-secondary"
                asp-page="/Quotes/Edit"
                asp-route-id="@Model.Quote.Id">Cancel</a>

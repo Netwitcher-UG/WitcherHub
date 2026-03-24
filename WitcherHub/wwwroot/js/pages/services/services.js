@@ -61,6 +61,37 @@
         "Rule.IsActive": "vs-add-rule-active",
         "IsActive": "vs-add-rule-active",
     };
+    function captureSearchState(input) {
+        const hadFocus = document.activeElement === input;
+
+        return {
+            hadFocus,
+            value: input?.value ?? '',
+            start: hadFocus && typeof input?.selectionStart === 'number' ? input.selectionStart : null,
+            end: hadFocus && typeof input?.selectionEnd === 'number' ? input.selectionEnd : null
+        };
+    }
+
+    function restoreSearchState(tableCardId, state) {
+        if (!state?.hadFocus) return;
+
+        requestAnimationFrame(function () {
+            const host = document.getElementById(tableCardId);
+            const input = host?.querySelector('.order-search input[name="q"]');
+            if (!input) return;
+
+            input.focus({ preventScroll: true });
+
+            const valueLength = input.value.length;
+            const start = Math.min(state.start ?? valueLength, valueLength);
+            const end = Math.min(state.end ?? valueLength, valueLength);
+
+            if (typeof input.setSelectionRange === 'function') {
+                input.setSelectionRange(start, end);
+            }
+        });
+    }
+   
 
     function mapUpdateRule(idx) {
         return {
@@ -106,7 +137,7 @@
             .replaceAll("'", '&#039;');
     }
     function $(id) { return document.getElementById(id); }
-
+    
     function toastSuccess(msg, title) { UI?.toast?.success ? UI.toast.success(msg, title) : alert((title ? title + ": " : "") + msg); }
     function toastInfo(msg, title) { UI?.toast?.info ? UI.toast.info(msg, title) : alert((title ? title + ": " : "") + msg); }
     function toastError(msg, title) { UI?.toast?.error ? UI.toast.error(msg, title) : alert((title ? title + ": " : "") + msg); }
@@ -761,7 +792,7 @@
                 <div class="${isEditing ? 'd-none' : ''}">
                   <div class="fw-semibold">${esc(r.name ?? '—')}</div>
                   <div class="text-muted small">
-                    Priority: ${esc(r.priority)} • Scope: ${esc(r.scope)} • Active: ${activeTxt}
+                    Priority: ${esc(r.priority)} • Scope: ${esc(scopeText(r.scope))} • Active: ${activeTxt}
                   </div>
                 </div>
 
@@ -785,8 +816,8 @@
                     <div class="col-6 col-md-3">
                       <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-scope">Scope</label>
                       <select class="form-select form-select-sm" id="vs-rule-${idx}-scope">
-                        <option value="LINE_ITEM">LINE_ITEM</option>
-                        <option value="INVOICE">INVOICE</option>
+                        <option value="LINE_ITEM">This Service</option>
+<option value="INVOICE">Overall Total</option>
                       </select>
                       <div class="text-danger small mt-1" id="err-vs-rule-${idx}-scope"></div>
                     </div>
@@ -829,11 +860,11 @@
                     <!-- Advanced expressions -->
                     <div class="col-12 d-none" id="vs-rule-${idx}-advWrap">
                       <div class="row g-2">
-                        <div class="col-12 col-md-8">
-                          <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-valueExpr">Value Expr</label>
-                          <input class="form-control form-control-sm" id="vs-rule-${idx}-valueExpr" value="${esc(r.valueExpr ?? '0')}" placeholder="ValueExpr" />
-                          <div class="text-danger small mt-1" id="err-vs-rule-${idx}-valueExpr"></div>
-                        </div>
+                        <div class="col-12">
+  <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-valueExpr">Value Expr</label>
+  <input class="form-control form-control-sm" id="vs-rule-${idx}-valueExpr" value="${esc(r.valueExpr ?? '0')}" placeholder="ValueExpr" />
+  <div class="text-danger small mt-1" id="err-vs-rule-${idx}-valueExpr"></div>
+</div>
 
                         <div class="col-12">
                           <label class="form-label mb-1 small text-muted" for="vs-rule-${idx}-conditionExpr">Condition Expr</label>
@@ -903,7 +934,12 @@
             }, { initFromInputs: true });
         }
     }
-
+    function scopeText(scope) {
+        const s = String(scope ?? '').trim().toUpperCase();
+        if (s === 'LINE_ITEM') return 'This Service';
+        if (s === 'INVOICE') return 'Overall Total';
+        return scope ?? '—';
+    }
     function renderService(svc) {
         $('vs-name').textContent = svc?.name ?? '—';
         $('vs-meta').textContent = `${svc?.serviceType} • ${svc?.pricingModel} • ${svc?.basePrice} ${svc?.defaultCurrency}`;
@@ -1203,4 +1239,164 @@
         });
     }
 
+
+
+    function initSearchClearButtons(root = document) {
+        root.querySelectorAll('.order-search').forEach(function (form) {
+            const input = form.querySelector('input[type="text"]');
+            const clearBtn = form.querySelector('[data-search-clear]');
+            if (!input || !clearBtn) return;
+
+            function syncClearButton() {
+                clearBtn.classList.toggle('d-none', !input.value.trim());
+            }
+
+            if (form.dataset.clearInit !== '1') {
+                form.dataset.clearInit = '1';
+
+                clearBtn.addEventListener('click', function () {
+                    input.value = '';
+                    syncClearButton();
+
+                    const pageInput = form.querySelector('input[type="hidden"][name]');
+                    if (pageInput) pageInput.value = '1';
+
+                    if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else {
+                        form.submit();
+                    }
+                });
+
+                input.addEventListener('input', syncClearButton);
+            }
+
+            syncClearButton();
+        });
+    }
+
+    function captureSearchState(input) {
+        const hadFocus = document.activeElement === input;
+
+        return {
+            hadFocus,
+            value: input?.value ?? '',
+            start: hadFocus && typeof input?.selectionStart === 'number' ? input.selectionStart : null,
+            end: hadFocus && typeof input?.selectionEnd === 'number' ? input.selectionEnd : null
+        };
+    }
+
+    function restoreSearchState(tableCardId, state) {
+        if (!state?.hadFocus) return;
+
+        requestAnimationFrame(function () {
+            const host = document.getElementById(tableCardId);
+            const input = host?.querySelector('.order-search input[type="text"]');
+            if (!input) return;
+
+            input.focus({ preventScroll: true });
+
+            const valueLength = input.value.length;
+            const start = Math.min(state.start ?? valueLength, valueLength);
+            const end = Math.min(state.end ?? valueLength, valueLength);
+
+            if (typeof input.setSelectionRange === 'function') {
+                input.setSelectionRange(start, end);
+            }
+        });
+    }
+
+    (function bindServicesLiveSearch() {
+        let debounceTimer = null;
+        let activeController = null;
+
+        function initServicesLiveSearch() {
+            const host = document.getElementById('servicesTableCard');
+            if (!host) return;
+
+            const form = host.querySelector('.order-search');
+            const input = form?.querySelector('input[type="text"]');
+            if (!form || !input) return;
+
+            initSearchClearButtons(host);
+
+            if (form.dataset.liveSearchBound === '1') return;
+            form.dataset.liveSearchBound = '1';
+
+            async function reloadServicesTable() {
+                const currentHost = document.getElementById('servicesTableCard');
+                if (!currentHost) return;
+
+                const currentForm = currentHost.querySelector('.order-search');
+                const currentInput = currentForm?.querySelector('input[type="text"]');
+                if (!currentForm || !currentInput) return;
+
+                const searchState = captureSearchState(currentInput);
+
+                const formData = new FormData(currentForm);
+
+                formData.set(currentInput.name, currentInput.value.trim());
+
+                const pageInput = currentForm.querySelector('input[type="hidden"][name]');
+                if (pageInput) {
+                    formData.set(pageInput.name, '1');
+                }
+
+                const url = new URL(window.location.href);
+                url.search = '';
+
+                for (const [key, value] of formData.entries()) {
+                    const v = String(value ?? '').trim();
+                    if (v) {
+                        url.searchParams.set(key, v);
+                    }
+                }
+
+                try {
+                    if (activeController) activeController.abort();
+                    activeController = new AbortController();
+
+                    const res = await fetch(url.toString(), {
+                        method: 'GET',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        signal: activeController.signal
+                    });
+
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                    const html = await res.text();
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    const newHost = doc.getElementById('servicesTableCard');
+                    if (!newHost) return;
+
+                    currentHost.outerHTML = newHost.outerHTML;
+
+                    window.history.replaceState({}, '', url.pathname + url.search);
+
+                    initServicesLiveSearch();
+                    restoreSearchState('servicesTableCard', searchState);
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                    console.error('Services live search failed:', err);
+                }
+            }
+
+            input.addEventListener('input', function () {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(reloadServicesTable, 500);
+            });
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                clearTimeout(debounceTimer);
+                reloadServicesTable();
+            });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initServicesLiveSearch);
+        } else {
+            initServicesLiveSearch();
+        }
+    })();
 })();

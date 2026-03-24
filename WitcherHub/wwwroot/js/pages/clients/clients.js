@@ -31,8 +31,8 @@
         "Address.Label": "vc-add-loc-label",
         "Address.City": "vc-add-loc-city",
         "Address.PostalCode": "vc-add-loc-postal",
-        "Address.CountryCode": "vc-add-loc-countryCode",   
-        "Address.Country": "vc-add-loc-country",          
+        "Address.CountryCode": "vc-add-loc-country-select",
+        "Address.Country": "vc-add-loc-country-select",
         "Address.StreetRaw": "vc-add-loc-streetRaw",
         "Address.AddressLine2": "vc-add-loc-line2",
         "Address.FullNameOrCompany": "vc-add-loc-fullname"
@@ -50,16 +50,17 @@
     function mapUpdateLocation(idx) {
         return {
             "Address.Label": `vc-loc-${idx}-label`,
-            "Address.CountryCode": `vc-loc-${idx}-countryCode`,
-            "Address.Country": `vc-loc-${idx}-country`,
+            "Address.CountryCode": `vc-loc-${idx}-country-select`,
+            "Address.Country": `vc-loc-${idx}-country-select`,
             "Address.City": `vc-loc-${idx}-city`,
             "Address.PostalCode": `vc-loc-${idx}-postal`,
             "Address.StreetRaw": `vc-loc-${idx}-streetRaw`,
             "Address.AddressLine2": `vc-loc-${idx}-line2`,
         };
     }
+    
 
-
+   
     function mapUpdateContact(idx) {
         return {
             "Contact.Salutation": `vc-c-${idx}-salutation`,
@@ -91,6 +92,203 @@
     }
 
     function $(id) { return document.getElementById(id); }
+    
+
+    
+    function initSearchClearButtons(root = document) {
+        root.querySelectorAll('.order-search').forEach(function (form) {
+            if (form.dataset.clearInit === '1') return;
+            form.dataset.clearInit = '1';
+
+            const input = form.querySelector('input[type="text"][name="q"]');
+            const clearBtn = form.querySelector('[data-search-clear]');
+            if (!input || !clearBtn) return;
+
+            function syncClearButton() {
+                clearBtn.classList.toggle('d-none', !input.value.trim());
+            }
+
+            clearBtn.addEventListener('click', function () {
+                input.value = '';
+                syncClearButton();
+
+                const pageInput = form.querySelector('input[name="p"]');
+                if (pageInput) pageInput.value = '1';
+
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            });
+
+            input.addEventListener('input', syncClearButton);
+            syncClearButton();
+        });
+    }
+    
+
+    const VC_COUNTRIES = readCountryOptions();
+
+    function readCountryOptions() {
+        const el = document.getElementById('countryOptionsJson');
+        if (!el) return [{ code: 'DE', name: 'Germany' }];
+
+        try {
+            const parsed = JSON.parse(el.textContent || '[]');
+            const items = (parsed || [])
+                .map(x => ({
+                    code: String(x.code ?? x.value ?? '').trim().toUpperCase(),
+                    name: String(x.name ?? x.text ?? '').trim()
+                }))
+                .filter(x => x.code.length === 2 && x.name.length > 0);
+
+            return items.length ? items : [{ code: 'DE', name: 'Germany' }];
+        } catch {
+            return [{ code: 'DE', name: 'Germany' }];
+        }
+    }
+
+    function countryCodeByName(name) {
+        const normalized = String(name ?? '').trim().toLowerCase();
+        const match = VC_COUNTRIES.find(x => x.name.toLowerCase() === normalized);
+        return match?.code ?? null;
+    }
+
+    function countryNameByCode(code) {
+        const normalized = String(code ?? '').trim().toUpperCase();
+        const match = VC_COUNTRIES.find(x => x.code === normalized);
+        return match?.name ?? 'Germany';
+    }
+
+    function buildCountrySelectOptionsHtml(selectedCode = 'DE') {
+        const code = String(selectedCode ?? 'DE').trim().toUpperCase() || 'DE';
+
+        return VC_COUNTRIES.map(x => `
+        <option value="${esc(x.code)}" ${x.code === code ? 'selected' : ''}>${esc(x.name)}</option>
+    `).join('');
+    }
+
+    function buildCountryMenuHtml(inputId, selectId, search = '', selectedCode = 'DE') {
+        const code = String(selectedCode ?? 'DE').trim().toUpperCase() || 'DE';
+        const q = String(search ?? '').trim().toLowerCase();
+
+        const filtered = !q
+            ? VC_COUNTRIES
+            : VC_COUNTRIES.filter(x =>
+                x.name.toLowerCase().includes(q) ||
+                x.code.toLowerCase().includes(q));
+
+        if (!filtered.length) {
+            return `<li><button type="button" class="dropdown-item disabled">No results found</button></li>`;
+        }
+
+        return filtered.map(x => `
+        <li>
+            <button type="button"
+                    class="dropdown-item ${x.code === code ? 'active' : ''}"
+                    data-country-option="true"
+                    data-country-input-id="${esc(inputId)}"
+                    data-country-select-id="${esc(selectId)}"
+                    data-country-code="${esc(x.code)}"
+                    data-country-name="${esc(x.name)}">
+                ${esc(x.name)}
+                <span class="text-muted ms-2">${esc(x.code)}</span>
+            </button>
+        </li>
+    `).join('');
+    }
+
+    function setCountryComboValue(inputId, menuId, selectId, code) {
+        const input = $(inputId);
+        const menu = $(menuId);
+        const select = $(selectId);
+        if (!input || !menu || !select) return;
+
+        const normalizedCode = String(code ?? 'DE').trim().toUpperCase() || 'DE';
+
+        select.innerHTML = buildCountrySelectOptionsHtml(normalizedCode);
+
+        if ([...select.options].some(o => o.value === normalizedCode)) {
+            select.value = normalizedCode;
+        } else {
+            select.value = 'DE';
+        }
+
+        const selectedName = countryNameByCode(select.value);
+        input.value = selectedName;
+        menu.innerHTML = buildCountryMenuHtml(inputId, selectId, input.value, select.value);
+
+        const hiddenCountryNameId = select.getAttribute('data-country-name-target');
+        if (hiddenCountryNameId) {
+            const hiddenCountryName = $(hiddenCountryNameId);
+            if (hiddenCountryName) {
+                hiddenCountryName.value = selectedName;
+            }
+        }
+    }
+    function initCountryCombo(inputId, menuId, selectId, selectedCode = 'DE') {
+        const select = $(selectId);
+        const input = $(inputId);
+        const menu = $(menuId);
+        if (!select || !input || !menu) return;
+
+        setCountryComboValue(inputId, menuId, selectId, select.value || selectedCode || 'DE');
+
+        input.removeAttribute('readonly');
+        input.removeAttribute('disabled');
+
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowDown' || e.key === 'Enter') {
+                if (window.bootstrap) {
+                    bootstrap.Dropdown.getOrCreateInstance(input).show();
+                }
+            }
+        });
+
+        input.addEventListener('focus', function () {
+            if (window.bootstrap) {
+                bootstrap.Dropdown.getOrCreateInstance(input).show();
+            }
+        });
+    }
+
+    function filterCountryCombo(inputId, menuId, selectId) {
+        const input = $(inputId);
+        const menu = $(menuId);
+        const select = $(selectId);
+        if (!input || !menu || !select) return;
+
+        const currentCode = String(select.value || 'DE').trim().toUpperCase() || 'DE';
+        menu.innerHTML = buildCountryMenuHtml(inputId, selectId, input.value, currentCode);
+
+        if (window.bootstrap) {
+            bootstrap.Dropdown.getOrCreateInstance(input).show();
+        }
+
+        const hiddenCountryNameId = select.getAttribute('data-country-name-target');
+        if (hiddenCountryNameId) {
+            const hiddenCountryName = $(hiddenCountryNameId);
+            if (hiddenCountryName) {
+                hiddenCountryName.value = input.value.trim();
+            }
+        }
+    }
+
+    function getSelectedCountry(selectId) {
+        const select = $(selectId);
+        if (!select || !select.options.length) {
+            return { code: 'DE', name: 'Germany' };
+        }
+
+        return {
+            code: select.value || 'DE',
+            name: select.options[select.selectedIndex]?.text || 'Germany'
+        };
+    }
+    function initCreateFormCountryCombo() {
+        initCountryCombo('create-country-combo', 'create-country-menu', 'Address_CountryCode', 'DE');
+    }
     function setText(id, value) { const el = $(id); if (el) el.textContent = value ?? '—'; }
     function setHtml(id, html) { const el = $(id); if (el) el.innerHTML = html ?? ''; }
 
@@ -323,7 +521,9 @@
     function renderAddresses(list) {
         const wrap = $('vc-addressList');
         const count = $('vc-addressCount');
-        if (count) count.textContent = (list?.length ?? 0);
+        const totalCount = (list?.length ?? 0);
+
+        if (count) count.textContent = totalCount;
         if (!wrap) return;
 
         if (!list || !list.length) {
@@ -334,7 +534,6 @@
         wrap.innerHTML = list.map((a, idx) => {
             const isEditing = (editingLocationIndex === idx);
 
-            // support old/mock keys too
             const streetRaw = a.streetRaw ?? a.street ?? '';
             const addressLine2 = a.addressLine2 ?? a.AddressLine2 ?? '';
             const postalCode = a.postalCode ?? a.PostalCode ?? '';
@@ -343,15 +542,28 @@
             const countryCode = a.countryCode ?? a.CountryCode ?? '';
             const label = a.label ?? a.Label ?? 'Location';
 
+            const selectedCountryCode = (countryCode || countryCodeByName(country) || 'DE').toUpperCase();
+            const displayCountry = country || countryNameByCode(selectedCountryCode);
+
             const line1 = streetRaw ?? '';
             const line2 = addressLine2 ? ` • ${esc(addressLine2)}` : '';
             const addressText = (line1 || addressLine2) ? `${esc(line1)}${line2}` : '—';
 
-            const cityText = `${esc(postalCode ?? '')} ${esc(city ?? '')}${(city || country) ? ', ' : ''}${esc(country ?? '')}`.trim() || '—';
+            const cityText = `${esc(postalCode ?? '')} ${esc(city ?? '')}${(city || displayCountry) ? ', ' : ''}${esc(displayCountry ?? '')}`.trim() || '—';
 
             const isDefault = !!(a.isDefault ?? a.IsDefault ?? a.Default);
             const defaultBadge = isDefault ? `<span class="badge bg-primary bg-opacity-10 text-primary ms-2">Default</span>` : '';
             const starIcon = isDefault ? 'star' : 'star_border';
+
+            const canDelete = !isDefault && totalCount > 1;
+            const deleteTitle = totalCount <= 1
+                ? 'You cannot delete the last location'
+                : isDefault
+                    ? 'Default location cannot be deleted. Choose another default location first.'
+                    : 'Delete';
+
+            const deleteBtnClass = canDelete ? 'text-danger' : 'text-muted';
+            const deleteDisabledAttr = canDelete ? '' : 'disabled aria-disabled="true"';
 
             return `
             <div class="card rounded-4 border bg-transparent shadow-none mb-0">
@@ -360,7 +572,6 @@
 
                         <div class="flex-grow-1">
 
-                            <!-- VIEW -->
                             <div class="${isEditing ? 'd-none' : ''}">
                                 <div class="fw-semibold">
                                     ${esc(label)}
@@ -370,7 +581,6 @@
                                 <div class="text-muted small">${cityText}</div>
                             </div>
 
-                            <!-- EDIT (inline) -->
                             <div class="${isEditing ? '' : 'd-none'}">
                                 <div class="row g-2">
 
@@ -389,48 +599,50 @@
                                         <div class="text-danger small mt-1" id="err-vc-loc-${idx}-label"></div>
                                     </div>
 
-                                    <div class="col-12 col-md-4">
-                                        <label class="form-label small mb-1" for="vc-loc-${idx}-country">
-                                            Country
-                                            <span class="material-icons-outlined text-muted ms-1"
-                                                  style="font-size:16px"
-                                                  data-bs-toggle="tooltip"
-                                                  title="Country name (optional). Example: Germany">info</span>
-                                        </label>
-                                        <input class="form-control form-control-sm"
-                                               id="vc-loc-${idx}-country"
-                                               value="${esc(country ?? '')}"
-                                               placeholder="Germany" />
-                                        <div class="text-danger small mt-1" id="err-vc-loc-${idx}-country"></div>
-                                    </div>
+                                    <div class="col-12 col-md-8">
+    <label class="form-label small mb-1" for="vc-loc-${idx}-country-combo">
+        Country
+        <span class="material-icons-outlined text-muted ms-1"
+              style="font-size:16px"
+              data-bs-toggle="tooltip"
+              title="Search & select country">info</span>
+    </label>
 
-                                    <div class="col-12 col-md-4">
-                                        <label class="form-label small mb-1" for="vc-loc-${idx}-city">City</label>
-                                        <input class="form-control form-control-sm"
-                                               id="vc-loc-${idx}-city"
-                                               value="${esc(city ?? '')}"
-                                               placeholder="Berlin" />
-                                        <div class="text-danger small mt-1" id="err-vc-loc-${idx}-city"></div>
-                                    </div>
+    <div class="dropdown">
+        <input type="text"
+               class="form-control form-control-sm dropdown-toggle"
+               id="vc-loc-${idx}-country-combo"
+               data-country-combo="true"
+               data-country-menu="vc-loc-${idx}-country-menu"
+               data-country-select="vc-loc-${idx}-country-select"
+               data-bs-toggle="dropdown"
+               aria-expanded="false"
+               autocomplete="off"
+               value="${esc(countryNameByCode(selectedCountryCode))}"
+               placeholder="Search & select country..." />
 
-                                    <div class="col-12 col-md-4">
-                                        <label class="form-label small mb-1" for="vc-loc-${idx}-countryCode">
-                                            Country Code
-                                            <span class="material-icons-outlined text-muted ms-1"
-                                                  style="font-size:16px"
-                                                  data-bs-toggle="tooltip"
-                                                  title="ISO 2-letter code. Example: DE, US, NL">info</span>
-                                        </label>
-                                        <input class="form-control form-control-sm"
-                                               id="vc-loc-${idx}-countryCode"
-                                               value="${esc(countryCode ?? '')}"
-                                               placeholder="DE" />
-                                        <div class="text-danger small mt-1" id="err-vc-loc-${idx}-countryCode"></div>
-                                    </div>
+        <ul class="dropdown-menu w-100"
+            id="vc-loc-${idx}-country-menu"
+            aria-labelledby="vc-loc-${idx}-country-combo"
+            style="max-height:280px; overflow-y:auto;">
+            ${buildCountryMenuHtml(`vc-loc-${idx}-country-combo`, `vc-loc-${idx}-country-select`, countryNameByCode(selectedCountryCode), selectedCountryCode)}
+        </ul>
+    </div>
+
+    <select id="vc-loc-${idx}-country-select"
+            class="form-select"
+            tabindex="-1"
+            aria-hidden="true"
+            style="position:absolute !important; left:-10000px !important; top:auto !important; width:1px !important; height:1px !important; overflow:hidden !important; opacity:0 !important; pointer-events:none !important;">
+        ${buildCountrySelectOptionsHtml(selectedCountryCode)}
+    </select>
+
+    <div class="text-danger small mt-1" id="err-vc-loc-${idx}-country-select"></div>
+</div>
 
                                     <div class="col-12 col-md-8">
                                         <label class="form-label small mb-1" for="vc-loc-${idx}-streetRaw">
-                                            Street (raw)
+                                            Street2222 (raw)
                                             <span class="material-icons-outlined text-muted ms-1"
                                                   style="font-size:16px"
                                                   data-bs-toggle="tooltip"
@@ -444,6 +656,15 @@
                                     </div>
 
                                     <div class="col-12 col-md-4">
+                                        <label class="form-label small mb-1" for="vc-loc-${idx}-city">City</label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-loc-${idx}-city"
+                                               value="${esc(city ?? '')}"
+                                               placeholder="Berlin" />
+                                        <div class="text-danger small mt-1" id="err-vc-loc-${idx}-city"></div>
+                                    </div>
+
+                                    <div class="col-12 col-md-4">
                                         <label class="form-label small mb-1" for="vc-loc-${idx}-postal">Postal Code</label>
                                         <input class="form-control form-control-sm"
                                                id="vc-loc-${idx}-postal"
@@ -452,7 +673,7 @@
                                         <div class="text-danger small mt-1" id="err-vc-loc-${idx}-postal"></div>
                                     </div>
 
-                                    <div class="col-12">
+                                    <div class="col-12 col-md-8">
                                         <label class="form-label small mb-1" for="vc-loc-${idx}-line2">
                                             Address Line 2
                                             <span class="material-icons-outlined text-muted ms-1"
@@ -472,7 +693,6 @@
 
                         </div>
 
-                        <!-- Actions -->
                         <div class="d-flex align-items-start gap-3">
 
                             <button type="button"
@@ -508,10 +728,11 @@
                             </button>
 
                             <button type="button"
-                                    class="btn p-0 border-0 bg-transparent text-danger"
-                                    title="Delete"
+                                    class="btn p-0 border-0 bg-transparent ${deleteBtnClass}"
+                                    title="${esc(deleteTitle)}"
                                     data-vc-action="delete-location"
-                                    data-index="${idx}">
+                                    data-index="${idx}"
+                                    ${deleteDisabledAttr}>
                                 <i class="material-icons-outlined">delete</i>
                             </button>
 
@@ -523,7 +744,6 @@
         `;
         }).join('');
 
-        // safe tooltips init (if you have initTooltips in your file)
         if (typeof initTooltips === 'function') initTooltips(wrap);
     }
 
@@ -775,6 +995,79 @@
         btn.click();
         btn.remove();
     });
+
+
+
+    document.addEventListener('input', function (e) {
+        const input = e.target.closest('[data-country-combo="true"]');
+        if (!input) return;
+
+        const menuId = input.getAttribute('data-country-menu');
+        const selectId = input.getAttribute('data-country-select');
+        if (!menuId || !selectId) return;
+
+        filterCountryCombo(input.id, menuId, selectId);
+    });
+
+    document.addEventListener('focusin', function (e) {
+        const input = e.target.closest('[data-country-combo="true"]');
+        if (!input) return;
+
+        const menuId = input.getAttribute('data-country-menu');
+        const selectId = input.getAttribute('data-country-select');
+        if (!menuId || !selectId) return;
+
+        filterCountryCombo(input.id, menuId, selectId);
+    });
+
+    document.addEventListener('click', function (e) {
+        const option = e.target.closest('[data-country-option="true"]');
+        if (option) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const inputId = option.getAttribute('data-country-input-id');
+            const selectId = option.getAttribute('data-country-select-id');
+            const code = option.getAttribute('data-country-code');
+            if (!inputId || !selectId || !code) return;
+
+            const input = $(inputId);
+            const menuId = input?.getAttribute('data-country-menu');
+            if (!menuId) return;
+
+            setCountryComboValue(inputId, menuId, selectId, code);
+
+            if (window.bootstrap && input) {
+                const dd = bootstrap.Dropdown.getOrCreateInstance(input);
+                dd.hide();
+                input.blur();
+            }
+
+            return;
+        }
+
+        const input = e.target.closest('[data-country-combo="true"]');
+        if (!input) return;
+
+        const menuId = input.getAttribute('data-country-menu');
+        const selectId = input.getAttribute('data-country-select');
+        if (!menuId || !selectId) return;
+
+        filterCountryCombo(input.id, menuId, selectId);
+    });
+
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initCountryCombo('vc-add-loc-country-combo', 'vc-add-loc-country-menu', 'vc-add-loc-country-select', 'DE');
+        initCreateFormCountryCombo();
+
+        const formModal = document.getElementById('FormModal');
+        if (formModal) {
+            formModal.addEventListener('shown.bs.modal', function () {
+                initCreateFormCountryCombo();
+            });
+        }
+    });
     document.addEventListener('DOMContentLoaded', () => {
         const typeSelect = document.getElementById("type");
         const firstName = document.getElementById("firstName");
@@ -888,13 +1181,17 @@
         const delClient = $('vc-clientId-deleteClient'); if (delClient) delClient.value = client?.id ?? '';
         const basicId = $('vc-clientId-basic'); if (basicId) basicId.value = client?.id ?? '';
 
-
         // hidden ids (add forms)
         const a1 = $('vc-clientId-addLocation'); if (a1) a1.value = client?.id ?? '';
         const a2 = $('vc-clientId-addContact'); if (a2) a2.value = client?.id ?? '';
 
+        const addLocFullName = $('vc-add-loc-fullname');
+        if (addLocFullName) addLocFullName.value = client?.name ?? '';
+
+        initCountryCombo('vc-add-loc-country-combo', 'vc-add-loc-country-menu', 'vc-add-loc-country-select', 'DE');
+
         currentClientId = client?.id ?? null;
-        currentClient = client ?? null;   
+        currentClient = client ?? null;
         toggleBasicNameFields(client?.type ?? "Individual");
     }
     function renderEmailEditRows(list) {
@@ -1221,13 +1518,15 @@
             const addressId = client.addresses?.[idx]?.id;
             if (!addressId) return toastError('AddressId missing.', 'Error');
 
+            const selectedCountry = getSelectedCountry(`vc-loc-${idx}-country-select`);
+
             const payload = {
                 customerId: client.id,
                 addressId: addressId,
                 address: {
                     label: $('vc-loc-' + idx + '-label')?.value?.trim() || 'Location',
-                    countryCode: $('vc-loc-' + idx + '-countryCode')?.value?.trim() || null,
-                    country: $('vc-loc-' + idx + '-country')?.value?.trim() || null,
+                    countryCode: selectedCountry.code || 'DE',
+                    country: selectedCountry.name || 'Germany',
                     city: $('vc-loc-' + idx + '-city')?.value?.trim() || '',
                     postalCode: $('vc-loc-' + idx + '-postal')?.value?.trim() || '',
                     streetRaw: $('vc-loc-' + idx + '-streetRaw')?.value?.trim() || 'N/A',
@@ -1235,7 +1534,6 @@
                     fullNameOrCompany: currentClient?.name ?? '',
                     isDefault: !!client.addresses?.[idx]?.isDefault
                 }
-
             };
 
             try {
@@ -1283,8 +1581,21 @@
             const url = document.getElementById('vcDeleteAddressUrl')?.value;
             if (!url) return toastError('vcDeleteAddressUrl not found', 'Error');
 
-            const addressId = client.addresses?.[idx]?.id;
+            const addresses = client.addresses ?? [];
+            const targetAddress = addresses[idx];
+            const addressId = targetAddress?.id;
+
             if (!addressId) return toastError('AddressId missing.', 'Error');
+
+            if (addresses.length <= 1) {
+                toastError('The last location cannot be deleted.', 'Validation');
+                return;
+            }
+
+            if (targetAddress.isDefault) {
+                toastError('Default location cannot be deleted. Please choose another default location first.', 'Validation');
+                return;
+            }
 
             const doDelete = async function () {
                 try {
@@ -1294,7 +1605,7 @@
                     toastSuccess('Location deleted (DB).', 'Success');
                 } catch (err) {
                     console.error(err);
-                    toastError('Failed to delete location.', 'Error');
+                    toastError(err?.payload?.message || 'Failed to delete location.', 'Error');
                 }
             };
 
@@ -1442,12 +1753,14 @@
             const url = document.getElementById('vcAddAddressUrl')?.value;
             if (!url) return toastError('vcAddAddressUrl not found', 'Error');
             clearErrors('vc-add-loc');
+            const selectedCountry = getSelectedCountry('vc-add-loc-country-select');
+
             const payload = {
                 customerId: currentClient.id,
                 address: {
                     label: $('vc-add-loc-label')?.value?.trim() || 'Location',
-                    countryCode: $('vc-add-loc-countryCode')?.value?.trim() || null,
-                    country: $('vc-add-loc-country')?.value?.trim() || null,
+                    countryCode: selectedCountry.code || 'DE',
+                    country: selectedCountry.name || 'Germany',
                     city: $('vc-add-loc-city')?.value?.trim() || '',
                     postalCode: $('vc-add-loc-postal')?.value?.trim() || '',
                     streetRaw: $('vc-add-loc-streetRaw')?.value?.trim() || 'N/A',
@@ -1455,7 +1768,6 @@
                     fullNameOrCompany: $('vc-add-loc-fullname')?.value?.trim() || currentClient.name,
                     isDefault: !!$('vc-add-loc-default')?.checked
                 }
-
             };
 
             try {
@@ -1464,6 +1776,12 @@
                 renderClient(currentClient);
 
                 addLocForm.reset();
+
+                initCountryCombo('vc-add-loc-country-combo', 'vc-add-loc-country-menu', 'vc-add-loc-country-select', 'DE');
+
+                const addLocFullName = $('vc-add-loc-fullname');
+                if (addLocFullName) addLocFullName.value = currentClient?.name ?? '';
+
                 const c = $('vc-addLocationCollapse');
                 if (c) bootstrap.Collapse.getOrCreateInstance(c, { toggle: false }).hide();
                 clearErrors('vc-add-loc');
@@ -1886,8 +2204,9 @@
 
         // first run (on open/initial)
         renumberCreateEmailRows(modalEl);
-    });
 
+    });
+    
     // ---------- Emails (View + Edit in VC) ----------
     function emailBadge(kind, email) {
         const k = (kind || 'business').toLowerCase();
@@ -2021,6 +2340,129 @@
             el.classList.toggle("d-none", !isCompany);
         });
     }
+    
+
+    function captureSearchState(input) {
+        const hadFocus = document.activeElement === input;
+
+        return {
+            hadFocus,
+            value: input?.value ?? '',
+            start: hadFocus && typeof input?.selectionStart === 'number' ? input.selectionStart : null,
+            end: hadFocus && typeof input?.selectionEnd === 'number' ? input.selectionEnd : null
+        };
+    }
+
+    function restoreSearchState(tableCardId, state) {
+        if (!state?.hadFocus) return;
+
+        requestAnimationFrame(function () {
+            const host = document.getElementById(tableCardId);
+            const input = host?.querySelector('.order-search input[name="q"]');
+            if (!input) return;
+
+            input.focus({ preventScroll: true });
+
+            const valueLength = input.value.length;
+            const start = Math.min(state.start ?? valueLength, valueLength);
+            const end = Math.min(state.end ?? valueLength, valueLength);
+
+            if (typeof input.setSelectionRange === 'function') {
+                input.setSelectionRange(start, end);
+            }
+        });
+    }
+
+    (function bindClientsLiveSearch() {
+        let debounceTimer = null;
+        let activeController = null;
+
+        function initClientsLiveSearch() {
+            const host = document.getElementById('clientsTableCard');
+            if (!host) return;
+
+            const form = host.querySelector('.order-search');
+            const input = form?.querySelector('input[name="q"]');
+            if (!form || !input) return;
+            initSearchClearButtons(host);
+            if (form.dataset.liveSearchBound === '1') return;
+            form.dataset.liveSearchBound = '1';
+
+            async function reloadClientsTable() {
+                const currentHost = document.getElementById('clientsTableCard');
+                if (!currentHost) return;
+
+                const currentForm = currentHost.querySelector('.order-search');
+                const currentInput = currentForm?.querySelector('input[name="q"]');
+                if (!currentForm || !currentInput) return;
+
+                const searchState = captureSearchState(currentInput);
+
+                const url = new URL(window.location.href);
+                const q = currentInput.value.trim();
+
+                if (q) url.searchParams.set('q', q);
+                else url.searchParams.delete('q');
+
+                url.searchParams.set('p', '1');
+
+                const pageSizeInput = currentForm.querySelector('input[name="pageSize"]');
+                if (pageSizeInput?.value) {
+                    url.searchParams.set('pageSize', pageSizeInput.value);
+                }
+
+                try {
+                    if (activeController) activeController.abort();
+                    activeController = new AbortController();
+
+                    const res = await fetch(url.toString(), {
+                        method: 'GET',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        signal: activeController.signal
+                    });
+
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                    const html = await res.text();
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    const newHost = doc.getElementById('clientsTableCard');
+                    if (!newHost) return;
+
+                    currentHost.outerHTML = newHost.outerHTML;
+
+                    window.history.replaceState({}, '', url.pathname + url.search);
+
+                    initClientsLiveSearch();
+                    restoreSearchState('clientsTableCard', searchState);
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                    console.error('Clients live search failed:', err);
+                }
+            }
+
+            input.addEventListener('input', function () {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(reloadClientsTable, 500);
+            });
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                clearTimeout(debounceTimer);
+                reloadClientsTable();
+            });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initClientsLiveSearch);
+        } else {
+            initClientsLiveSearch();
+        }
+    })();
+
+
+
+
+
 
 
 })();
