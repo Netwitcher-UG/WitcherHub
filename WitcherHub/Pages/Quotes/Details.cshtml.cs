@@ -13,6 +13,7 @@ using WitcherHub.Application.Models.DTO.Quotes;
 using WitcherHub.Application.Models.Email;
 using WitcherHub.Application.Services.Email;
 using WitcherHub.Infrastructure.Data.Context;
+using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Infrastructure.Services.Pdf;
 using WitcherHub.Infrastructure.Services.Quotes;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
@@ -29,6 +30,7 @@ namespace WitcherHub.Pages.Quotes
         private readonly IEmailTemplateRenderer _emailRenderer;
         private readonly IConfiguration _cfg;
         private readonly QuotePublicLinkService _quotePublicLinkService;
+        private readonly LexwareInvoiceSyncService _lexwareInvoiceSyncService;
 
         public DetailsModel(
                 IQuote quotes,
@@ -37,6 +39,7 @@ namespace WitcherHub.Pages.Quotes
                 IEmailService email,
                 IEmailTemplateRenderer emailRenderer,
                 IConfiguration cfg,
+                     LexwareInvoiceSyncService lexwareInvoiceSyncService,
                 QuotePublicLinkService quotePublicLinkService)
         {
             _quotes = quotes;
@@ -44,6 +47,7 @@ namespace WitcherHub.Pages.Quotes
             _pdf = pdf;
             _email = email;
             _emailRenderer = emailRenderer;
+            _lexwareInvoiceSyncService = lexwareInvoiceSyncService;
             _cfg = cfg;
             _quotePublicLinkService = quotePublicLinkService;
         }
@@ -53,6 +57,8 @@ namespace WitcherHub.Pages.Quotes
 
         public WitcherHub.Application.Models.View.Quotes.QuoteViews.QuoteDetailsView? Quote { get; private set; }
         public bool HasSignedQuotePdf { get; private set; }
+  
+        public bool ShowManualInvoiceButton { get; private set; }
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             try
@@ -68,6 +74,8 @@ namespace WitcherHub.Pages.Quotes
                     .AsNoTracking()
                     .Where(x => x.QuoteId == Id && x.SignedAt != null && x.SignatureData != null)
                     .AnyAsync(ct);
+
+                await LoadQuoteStateAsync(ct);
 
                 return Page();
             }
@@ -86,7 +94,155 @@ namespace WitcherHub.Pages.Quotes
                 return RedirectToPage("/Projects");
             }
         }
+        public async Task<IActionResult> OnPostGenerateInvoiceAsync(CancellationToken ct)
+        {
+            try
+            {
+                if (Id == Guid.Empty)
+                    throw new BadRequestAppException("Invalid quote id.");
 
+                var quote = await _db.Quotes
+                    .Include(q => q.Items)
+                    .FirstOrDefaultAsync(q => q.Id == Id, ct);
+
+                if (quote is null)
+                    throw new NotFoundAppException("Quote not found.");
+
+                var isSigned =
+                    quote.Status == DocumentStatus.Signed ||
+                    await _db.QuoteSignatures
+                        .AsNoTracking()
+                        .AnyAsync(x => x.QuoteId == quote.Id && x.SignedAt != null, ct);
+
+                if (!isSigned)
+                    throw new BadRequestAppException("Invoice can only be generated after the quote is signed.");
+
+                if (quote.InvoiceSendMode != InvoiceSendMode.Manual)
+                    throw new BadRequestAppException("Manual invoice generation is available only for quotes with Manual invoice mode.");
+
+                if (quote.Items == null || quote.Items.Count == 0)
+                    throw new BadRequestAppException("Please add at least one Position first.");
+
+                var today = DateOnly.FromDateTime(DateTime.UtcNow);
+                var hasOneTimeItems = quote.Items.Any(i => i.BillingCycle == BillingCycle.OneTime);
+                var hasRecurringItems = quote.Items.Any(i => i.BillingCycle != BillingCycle.OneTime);
+
+                var results = new List<InvoiceGenerationResult>();
+
+                if (hasRecurringItems)
+                {
+                    var start =
+                        quote.RecurringStartDate ??
+                        (quote.SignedAt.HasValue
+                            ? DateOnly.FromDateTime(quote.SignedAt.Value.UtcDateTime)
+                            : quote.IssuedAt.HasValue
+                                ? DateOnly.FromDateTime(quote.IssuedAt.Value.UtcDateTime)
+                                : today);
+
+                    quote.RecurringEnabled = true;
+                    quote.RecurringIsActive = true;
+
+                    if (quote.NextRecurringInvoiceDate == null)
+                        quote.NextRecurringInvoiceDate = start;
+
+                    await _db.SaveChangesAsync(ct);
+                }
+
+                if (hasOneTimeItems)
+                {
+                    results.Add(await _lexwareInvoiceSyncService.CreateOneTimeInvoiceFromQuoteAsync(quote.Id, ct));
+                }
+
+                if (hasRecurringItems)
+                {
+                    if (!quote.NextRecurringInvoiceDate.HasValue)
+                    {
+                        results.Add(InvoiceGenerationResult.Warning("Recurring start date is missing."));
+                    }
+                    else if (quote.NextRecurringInvoiceDate.Value > today)
+                    {
+                        results.Add(InvoiceGenerationResult.Warning(
+                            $"Recurring invoice is not due yet. Next cycle date is {quote.NextRecurringInvoiceDate.Value:yyyy-MM-dd}."));
+                    }
+                    else
+                    {
+                        while (quote.NextRecurringInvoiceDate.HasValue &&
+                               quote.NextRecurringInvoiceDate.Value <= today)
+                        {
+                            var recurringResult =
+                                await _lexwareInvoiceSyncService.CreateRecurringInvoiceFromQuoteAsync(
+                                    quote.Id,
+                                    quote.NextRecurringInvoiceDate.Value,
+                                    ct);
+
+                            results.Add(recurringResult);
+
+                            if (!recurringResult.Created)
+                                break;
+
+                            await _db.Entry(quote).ReloadAsync(ct);
+                        }
+                    }
+                }
+
+                var createdCount = results.Count(r => r.Created);
+                var message = string.Join(" ",
+                    results.Select(r => r.Message)
+                           .Where(m => !string.IsNullOrWhiteSpace(m))
+                           .Distinct());
+
+                if (createdCount > 0)
+                {
+                    TempData["Toast.Type"] = "success";
+                    TempData["Toast.Title"] = "Done";
+                    TempData["Toast.Message"] = message;
+                }
+                else
+                {
+                    TempData["Toast.Type"] = "warning";
+                    TempData["Toast.Title"] = "Invoice not created";
+                    TempData["Toast.Message"] = string.IsNullOrWhiteSpace(message)
+                        ? "No invoice was created."
+                        : message;
+                }
+            }
+            catch (Exception ex) when (ex is BadRequestAppException or NotFoundAppException)
+            {
+                TempData["Toast.Type"] = "warning";
+                TempData["Toast.Title"] = "Invoice not created";
+                TempData["Toast.Message"] = ex.Message;
+            }
+            catch (Exception ex)
+            {
+                TempData["Toast.Type"] = "warning";
+                TempData["Toast.Title"] = "Invoice failed";
+                TempData["Toast.Message"] = ex.GetBaseException().Message;
+            }
+
+            return RedirectToPage("./Details", new { id = Id });
+        }
+        private async Task LoadQuoteStateAsync(CancellationToken ct)
+        {
+            var quote = await _db.Quotes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(q => q.Id == Id, ct);
+
+            if (quote is null)
+            {
+                ShowManualInvoiceButton = false;
+                return;
+            }
+
+            var isSigned =
+                quote.Status == DocumentStatus.Signed ||
+                await _db.QuoteSignatures
+                    .AsNoTracking()
+                    .AnyAsync(x => x.QuoteId == quote.Id && x.SignedAt != null, ct);
+
+            ShowManualInvoiceButton =
+                isSigned &&
+                quote.InvoiceSendMode == InvoiceSendMode.Manual;
+        }
         public async Task<IActionResult> OnGetSignedPdfAsync(CancellationToken ct)
         {
             try

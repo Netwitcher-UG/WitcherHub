@@ -1,26 +1,33 @@
-using Ganss.Xss;
-using Markdig;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using WitcherHub.Application.Common.CacheKeys;
 using WitcherHub.Application.Common.Caching;
 using WitcherHub.Application.Interfaces;
+using WitcherHub.Application.Interfaces.BackgroundTasks;
 using WitcherHub.Application.Interfaces.Email;
 using WitcherHub.Application.Models.DTO.Contracts;
+using WitcherHub.Application.Models.Email;
 using WitcherHub.Application.Services.Email;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
 using WitcherHub.Infrastructure.Services.Contracts;
+using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Infrastructure.Services.Pdf;
 using WitcherHub.Infrastructure.Services.Quotes;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
-using WitcherHub.Application.Models.Email;
 
 namespace WitcherHub.Pages.Quotes
 {
@@ -35,25 +42,31 @@ namespace WitcherHub.Pages.Quotes
         private readonly IPdfGenerator _pdf;
         private readonly IEmailService _email;
         private readonly IEmailTemplateRenderer _emailRenderer;
+        private readonly IBackgroundTaskQueue _bg;
+        private readonly IServiceScopeFactory _scopeFactory;
 
         public SignModel(
             AppDbContext db,
             QuotePublicLinkService quotePublicLinkService,
             ContractCreationService contractCreationService,
             ILogger<SignModel> logger,
-    IAppCache cache,
-    IPdfGenerator pdf,
-    IEmailService email,
-    IEmailTemplateRenderer emailRenderer)
+            IAppCache cache,
+            IPdfGenerator pdf,
+            IEmailService email,
+            IEmailTemplateRenderer emailRenderer,
+            IBackgroundTaskQueue bg,
+            IServiceScopeFactory scopeFactory)
         {
             _db = db;
             _quotePublicLinkService = quotePublicLinkService;
             _contractCreationService = contractCreationService;
             _logger = logger;
             _cache = cache;
-            _email = email;
             _pdf = pdf;
+            _email = email;
             _emailRenderer = emailRenderer;
+            _bg = bg;
+            _scopeFactory = scopeFactory;
         }
 
         [BindProperty(SupportsGet = true)]
@@ -62,59 +75,71 @@ namespace WitcherHub.Pages.Quotes
         [BindProperty(SupportsGet = true, Name = "t")]
         public string? Token { get; set; }
 
-        public string QuoteHtml { get; private set; } = "";
-
+        public string QuoteHtml { get; private set; } = string.Empty;
         public bool IsSigned { get; private set; }
         public string? SignedAtIso { get; private set; }
         public string? SignatureDataUrl { get; private set; }
-
         public string? SignerNamePrefill { get; private set; }
         public string? SignerEmailPrefill { get; private set; }
-
-        public string ProviderName { get; private set; } = "";
-        public string ProviderAddress { get; private set; } = "";
+        public string ProviderName { get; private set; } = string.Empty;
+        public string ProviderAddress { get; private set; } = string.Empty;
 
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             if (Id == Guid.Empty)
+            {
                 return NotFound();
+            }
 
             if (string.IsNullOrWhiteSpace(Token))
+            {
                 return Unauthorized();
+            }
 
             var link = await _quotePublicLinkService.ValidateActiveLinkAsync(Token, ct);
             if (link is null || link.QuoteId != Id)
+            {
                 return Unauthorized();
+            }
 
             await _quotePublicLinkService.MarkOpenedAsync(link.Id, ct);
 
             var quote = await LoadQuoteAsync(ct);
             if (quote is null)
+            {
                 return NotFound();
+            }
 
             var docModel = BuildQuotePdfModel(quote);
 
             ProviderName = docModel.CompanyName;
-            ProviderAddress = string.Join("\n", new[]
-            {
-                docModel.CompanyLine1,
-                docModel.CompanyLine2,
-                docModel.CompanyLine3,
-                docModel.CompanyEmail
-            }.Where(x => !string.IsNullOrWhiteSpace(x)));
+            ProviderAddress = string.Join(
+                "\n",
+                new[]
+                {
+                    docModel.CompanyLine1,
+                    docModel.CompanyLine2,
+                    docModel.CompanyLine3,
+                    docModel.CompanyEmail
+                }.Where(x => !string.IsNullOrWhiteSpace(x)));
 
             var customer = quote.Project.Customer;
             var defaultName = customer.Type == CustomerType.Individual
                 ? BuildName(customer.FirstName, customer.LastName, customer.Name)
-                : (customer.Name ?? "").Trim();
+                : (customer.Name ?? string.Empty).Trim();
 
-            SignerNamePrefill = string.IsNullOrWhiteSpace(defaultName) ? "Customer" : defaultName;
+            SignerNamePrefill = string.IsNullOrWhiteSpace(defaultName)
+                ? "Customer"
+                : defaultName;
+
             SignerEmailPrefill = link.RecipientEmail;
 
             if (quote.Status == DocumentStatus.Signed || quote.SignedAt is not null)
             {
                 IsSigned = true;
-                SignedAtIso = (quote.SignedAt ?? DateTimeOffset.UtcNow).UtcDateTime.ToString("o");
+                SignedAtIso = (quote.SignedAt ?? DateTimeOffset.UtcNow)
+                    .UtcDateTime
+                    .ToString("o");
             }
 
             var sig = quote.Signatures
@@ -130,17 +155,21 @@ namespace WitcherHub.Pages.Quotes
                 }
 
                 if (sig.SignatureData is not null &&
-                    sig.SignatureData.RootElement.TryGetProperty("dataUrl", out var p) &&
-                    p.ValueKind == JsonValueKind.String)
+                    sig.SignatureData.RootElement.TryGetProperty("dataUrl", out var dataUrlProp) &&
+                    dataUrlProp.ValueKind == JsonValueKind.String)
                 {
-                    SignatureDataUrl = p.GetString();
+                    SignatureDataUrl = dataUrlProp.GetString();
                 }
 
                 if (!string.IsNullOrWhiteSpace(sig.SignerName))
+                {
                     SignerNamePrefill = sig.SignerName;
+                }
 
                 if (!string.IsNullOrWhiteSpace(sig.SignerEmail))
+                {
                     SignerEmailPrefill = sig.SignerEmail;
+                }
             }
 
             var fullHtml = QuotePdfHtmlBuilder.Build(docModel);
@@ -149,49 +178,92 @@ namespace WitcherHub.Pages.Quotes
             return Page();
         }
 
-        public async Task<IActionResult> OnPostSignAsync([FromQuery(Name = "t")] string? t, CancellationToken ct)
+        public async Task<IActionResult> OnPostSignAsync(
+            [FromQuery(Name = "t")] string? t,
+            CancellationToken ct)
         {
             if (Id == Guid.Empty)
-                return new JsonResult(new { ok = false, message = "Invalid quote id." }) { StatusCode = 400 };
+            {
+                return new JsonResult(new { ok = false, message = "Invalid quote id." })
+                {
+                    StatusCode = 400
+                };
+            }
 
             if (string.IsNullOrWhiteSpace(t))
-                return new JsonResult(new { ok = false, message = "Unauthorized." }) { StatusCode = 401 };
+            {
+                return new JsonResult(new { ok = false, message = "Unauthorized." })
+                {
+                    StatusCode = 401
+                };
+            }
 
             Token = t.Trim();
 
             var link = await _quotePublicLinkService.ValidateActiveLinkAsync(Token, ct);
             if (link is null || link.QuoteId != Id)
-                return new JsonResult(new { ok = false, message = "Unauthorized." }) { StatusCode = 401 };
+            {
+                return new JsonResult(new { ok = false, message = "Unauthorized." })
+                {
+                    StatusCode = 401
+                };
+            }
 
-            var signerName = (Request.Form["SignerName"].ToString() ?? "").Trim();
-            var signerEmail = (Request.Form["SignerEmail"].ToString() ?? "").Trim();
-            var signatureDataUrl = (Request.Form["SignatureDataUrl"].ToString() ?? "").Trim();
+            var signerName = (Request.Form["SignerName"].ToString() ?? string.Empty).Trim();
+            var signerEmail = (Request.Form["SignerEmail"].ToString() ?? string.Empty).Trim();
+            var signatureDataUrl = (Request.Form["SignatureDataUrl"].ToString() ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(signerName) || string.IsNullOrWhiteSpace(signerEmail))
-                return new JsonResult(new { ok = false, code = "FIELDS_REQUIRED" }) { StatusCode = 400 };
+            {
+                return new JsonResult(new { ok = false, code = "FIELDS_REQUIRED" })
+                {
+                    StatusCode = 400
+                };
+            }
 
-            if (!System.Text.RegularExpressions.Regex.IsMatch(signerEmail, @"^[^\s@]+@[^\s@]+\.[^\s@]+$"))
-                return new JsonResult(new { ok = false, code = "INVALID_EMAIL" }) { StatusCode = 400 };
+            if (!Regex.IsMatch(signerEmail, @"^[^\s@]+@[^\s@]+\.[^\s@]+$"))
+            {
+                return new JsonResult(new { ok = false, code = "INVALID_EMAIL" })
+                {
+                    StatusCode = 400
+                };
+            }
 
-            if (string.IsNullOrWhiteSpace(signatureDataUrl) || !signatureDataUrl.StartsWith("data:image/"))
-                return new JsonResult(new { ok = false, message = "Invalid signature data." }) { StatusCode = 400 };
+            if (string.IsNullOrWhiteSpace(signatureDataUrl) ||
+                !signatureDataUrl.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
+            {
+                return new JsonResult(new { ok = false, message = "Invalid signature data." })
+                {
+                    StatusCode = 400
+                };
+            }
 
             var now = DateTimeOffset.UtcNow;
 
             var updated = await _db.Quotes
                 .Where(q => q.Id == Id && q.SignedAt == null && q.Status != DocumentStatus.Signed)
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(q => q.SignedAt, now)
-                    .SetProperty(q => q.Status, DocumentStatus.Signed),
+                .ExecuteUpdateAsync(
+                    s => s
+                        .SetProperty(q => q.SignedAt, now)
+                        .SetProperty(q => q.Status, DocumentStatus.Signed),
                     ct);
 
             if (updated == 0)
             {
                 var exists = await _db.Quotes.AnyAsync(q => q.Id == Id, ct);
-                if (!exists)
-                    return new JsonResult(new { ok = false, message = "Quote not found." }) { StatusCode = 404 };
 
-                return new JsonResult(new { ok = false, message = "Quote already signed." }) { StatusCode = 409 };
+                if (!exists)
+                {
+                    return new JsonResult(new { ok = false, message = "Quote not found." })
+                    {
+                        StatusCode = 404
+                    };
+                }
+
+                return new JsonResult(new { ok = false, message = "Quote already signed." })
+                {
+                    StatusCode = 409
+                };
             }
 
             var payload = JsonSerializer.SerializeToDocument(new
@@ -216,10 +288,14 @@ namespace WitcherHub.Pages.Quotes
             await _cache.BumpVersionAsync(QuoteCacheKeys.ListVersionKey, ct);
 
             var emailQueued = false;
+            var afterSignQueued = false;
+            string? afterSignAction = null;
+            Quote? signedQuote = null;
 
             try
             {
-                var signedQuote = await LoadQuoteAsync(ct);
+                signedQuote = await LoadQuoteAsync(ct);
+
                 if (signedQuote is not null)
                 {
                     await SendSignedQuoteEmailAsync(
@@ -235,101 +311,277 @@ namespace WitcherHub.Pages.Quotes
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Quote signed but signed confirmation email failed. QuoteId={QuoteId}", Id);
+                _logger.LogError(
+                    ex,
+                    "Quote signed but signed confirmation email failed. QuoteId={QuoteId}",
+                    Id);
             }
 
-            _logger.LogInformation("Quote signed successfully. QuoteId={QuoteId}", Id);
+            if (signedQuote is not null)
+            {
+                try
+                {
+                    if (signedQuote.AfterCustomerSignAction == QuoteAfterSignAction.Contract)
+                    {
+                        afterSignAction = "contract";
+
+                        await QueueCreateContractFromQuoteAsync(
+                            signedQuote.Id,
+                            signerName,
+                            signerEmail);
+
+                        afterSignQueued = true;
+                    }
+                    else if (signedQuote.AfterCustomerSignAction == QuoteAfterSignAction.Invoice)
+                    {
+                        afterSignAction = "invoice";
+                        await QueueInvoiceFlowFromQuoteAsync(signedQuote.Id);
+                        afterSignQueued = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Quote after-sign action queue failed. QuoteId={QuoteId}, Action={Action}",
+                        signedQuote.Id,
+                        signedQuote.AfterCustomerSignAction);
+                }
+            }
+
+            _logger.LogInformation(
+                "Quote signed successfully. QuoteId={QuoteId}, AfterSignAction={AfterSignAction}, AfterSignQueued={AfterSignQueued}",
+                Id,
+                afterSignAction,
+                afterSignQueued);
 
             return new JsonResult(new
             {
                 ok = true,
                 signedAtIso = now.UtcDateTime.ToString("o"),
-                emailQueued
+                emailQueued,
+                afterSignAction,
+                afterSignQueued
+            });
+        }
+
+        private async Task QueueCreateContractFromQuoteAsync(
+            Guid quoteId,
+            string signerName,
+            string signerEmail)
+        {
+            await _bg.QueueAsync(async token =>
+            {
+                using var scope = _scopeFactory.CreateScope();
+
+                try
+                {
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    var contractCreationService = scope.ServiceProvider.GetRequiredService<ContractCreationService>();
+
+                    var quote = await db.Quotes
+                        .Include(q => q.Project)
+                        .Include(q => q.Items)
+                            .ThenInclude(i => i.Service)
+                        .FirstOrDefaultAsync(q => q.Id == quoteId, token);
+
+                    if (quote is null)
+                    {
+                        _logger.LogWarning(
+                            "Create contract from quote skipped: quote not found. QuoteId={QuoteId}",
+                            quoteId);
+
+                        return;
+                    }
+
+                    var request = BuildGenerateContractRequestFromQuote(
+                        quote,
+                        signerName,
+                        signerEmail);
+
+                    var contractId = await contractCreationService.GenerateAndCreateAsync(request, token);
+
+                    _logger.LogInformation(
+                        "Contract created from signed quote. QuoteId={QuoteId}, ContractId={ContractId}",
+                        quoteId,
+                        contractId);
+                }
+                catch (OperationCanceledException oce)
+                {
+                    _logger.LogWarning(
+                        oce,
+                        "Create contract from quote canceled. QuoteId={QuoteId}",
+                        quoteId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Create contract from quote failed. QuoteId={QuoteId}",
+                        quoteId);
+
+                    throw;
+                }
+            });
+        }
+
+        private async Task QueueInvoiceFlowFromQuoteAsync(Guid quoteId)
+        {
+            await _bg.QueueAsync(async token =>
+            {
+                using var scope = _scopeFactory.CreateScope();
+
+                try
+                {
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    var lex = scope.ServiceProvider.GetRequiredService<LexwareInvoiceSyncService>();
+
+                    var quote = await db.Quotes
+                        .Include(q => q.Items)
+                        .FirstOrDefaultAsync(q => q.Id == quoteId, token);
+
+                    if (quote is null)
+                    {
+                        _logger.LogWarning(
+                            "Quote not found in background invoice job. QuoteId={QuoteId}",
+                            quoteId);
+
+                        return;
+                    }
+
+                    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+                    var hasRecurringItems = quote.Items.Any(i => i.BillingCycle != BillingCycle.OneTime);
+                    var hasOneTimeItems = quote.Items.Any(i => i.BillingCycle == BillingCycle.OneTime);
+
+                    if (hasRecurringItems)
+                    {
+                        var start = quote.RecurringStartDate
+                            ?? (quote.SignedAt.HasValue
+                                ? DateOnly.FromDateTime(quote.SignedAt.Value.UtcDateTime)
+                                : quote.IssuedAt.HasValue
+                                    ? DateOnly.FromDateTime(quote.IssuedAt.Value.UtcDateTime)
+                                    : today);
+
+                        quote.RecurringEnabled = true;
+                        quote.RecurringIsActive = true;
+
+                        if (!quote.RecurringStartDate.HasValue)
+                        {
+                            quote.RecurringStartDate = start;
+                        }
+
+                        if (!quote.NextRecurringInvoiceDate.HasValue)
+                        {
+                            quote.NextRecurringInvoiceDate = start;
+                        }
+
+                        await db.SaveChangesAsync(token);
+                    }
+
+                    if (quote.InvoiceSendMode == InvoiceSendMode.Automatic)
+                    {
+                        if (hasOneTimeItems)
+                        {
+                            await lex.CreateOneTimeInvoiceFromQuoteAsync(quoteId, token);
+                        }
+
+                        if (hasRecurringItems &&
+                            quote.NextRecurringInvoiceDate.HasValue &&
+                            quote.NextRecurringInvoiceDate.Value <= today)
+                        {
+                            await lex.CreateRecurringInvoiceFromQuoteAsync(
+                                quoteId,
+                                quote.NextRecurringInvoiceDate.Value,
+                                token);
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogInformation(
+                            "Invoice generation skipped because quote uses manual mode. QuoteId={QuoteId}",
+                            quoteId);
+                    }
+
+                    _logger.LogInformation(
+                        "Quote invoice background flow completed. QuoteId={QuoteId}",
+                        quoteId);
+                }
+                catch (OperationCanceledException oce)
+                {
+                    _logger.LogWarning(
+                        oce,
+                        "Quote invoice background flow canceled. QuoteId={QuoteId}",
+                        quoteId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Quote invoice background flow failed. QuoteId={QuoteId}",
+                        quoteId);
+
+                    throw;
+                }
             });
         }
 
         private static string BuildSignedQuotePdfHtml(
-    QuotePdfHtmlBuilder.QuotePdfDocumentModel model,
-    string signerName,
-    string signerEmail,
-    DateTimeOffset signedAt,
-    string signatureDataUrl)
+            QuotePdfHtmlBuilder.QuotePdfDocumentModel model,
+            string signerName,
+            string signerEmail,
+            DateTimeOffset signedAt,
+            string signatureDataUrl)
         {
             var html = QuotePdfHtmlBuilder.Build(model);
 
             var extraStyle = """
-<style>
-  .signedQuoteBlock{
-    margin: 28px 0 0 0;
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
-
-  .signedQuoteCard{
-    border: 1px solid #dbe3ee;
-    border-radius: 14px;
-    padding: 18px 20px;
-    background: #ffffff;
-  }
-
-  .signedQuoteTitle{
-    font-size: 18px;
-    font-weight: 800;
-    color: #0f172a;
-    margin: 0 0 14px 0;
-  }
-
-  .signedQuoteRow{
-    margin: 6px 0;
-    font-size: 12.5px;
-    line-height: 1.6;
-    color: #111827;
-  }
-
-  .signedQuoteRow strong{
-    display: inline-block;
-    min-width: 120px;
-  }
-
-  .signedQuoteImage{
-    margin-top: 14px;
-  }
-
-  .signedQuoteImage img{
-    max-width: 260px;
-    max-height: 120px;
-    display: block;
-  }
-
-  .signedQuoteLine{
-    width: 260px;
-    border-top: 1px solid #111827;
-    margin-top: 8px;
-  }
-</style>
-""";
+                <style>
+                    .signedQuoteBlock { margin: 28px 0 0 0; page-break-inside: avoid; break-inside: avoid; }
+                    .signedQuoteCard { border: 1px solid #dbe3ee; border-radius: 14px; padding: 18px 20px; background: #ffffff; }
+                    .signedQuoteTitle { font-size: 18px; font-weight: 800; color: #0f172a; margin: 0 0 14px 0; }
+                    .signedQuoteRow { margin: 6px 0; font-size: 12.5px; line-height: 1.6; color: #111827; }
+                    .signedQuoteRow strong { display: inline-block; min-width: 120px; }
+                    .signedQuoteImage { margin-top: 14px; }
+                    .signedQuoteImage img { max-width: 260px; max-height: 120px; display: block; }
+                    .signedQuoteLine { width: 260px; border-top: 1px solid #111827; margin-top: 8px; }
+                </style>
+                """;
 
             var signatureBlock = $"""
-<div class="signedQuoteBlock">
-  <div class="signedQuoteCard">
-    <h2 class="signedQuoteTitle">Kundenunterschrift</h2>
-    <div class="signedQuoteRow"><strong>Angebot:</strong> {WebUtility.HtmlEncode(model.QuoteNo)}</div>
-    <div class="signedQuoteRow"><strong>Projekt:</strong> {WebUtility.HtmlEncode(model.ProjectTitle)}</div>
-    <div class="signedQuoteRow"><strong>Name:</strong> {WebUtility.HtmlEncode(signerName ?? "")}</div>
-    <div class="signedQuoteRow"><strong>E-Mail:</strong> {WebUtility.HtmlEncode(signerEmail ?? "")}</div>
-    <div class="signedQuoteRow"><strong>Signiert am:</strong> {WebUtility.HtmlEncode(signedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))}</div>
+                <div class="signedQuoteBlock">
+                    <div class="signedQuoteCard">
+                        <h2 class="signedQuoteTitle">Kundenunterschrift</h2>
 
-    <div class="signedQuoteImage">
-      <img src="{WebUtility.HtmlEncode(signatureDataUrl ?? "")}" alt="Signature" />
-      <div class="signedQuoteLine"></div>
-    </div>
-  </div>
-</div>
-""";
+                        <div class="signedQuoteRow">
+                            <strong>Angebot:</strong> {WebUtility.HtmlEncode(model.QuoteNo)}
+                        </div>
+                        <div class="signedQuoteRow">
+                            <strong>Projekt:</strong> {WebUtility.HtmlEncode(model.ProjectTitle)}
+                        </div>
+                        <div class="signedQuoteRow">
+                            <strong>Name:</strong> {WebUtility.HtmlEncode(signerName ?? string.Empty)}
+                        </div>
+                        <div class="signedQuoteRow">
+                            <strong>E-Mail:</strong> {WebUtility.HtmlEncode(signerEmail ?? string.Empty)}
+                        </div>
+                        <div class="signedQuoteRow">
+                            <strong>Signiert am:</strong> {WebUtility.HtmlEncode(signedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))}
+                        </div>
+
+                        <div class="signedQuoteImage">
+                            <img src="{WebUtility.HtmlEncode(signatureDataUrl ?? string.Empty)}" alt="Signature" />
+                            <div class="signedQuoteLine"></div>
+                        </div>
+                    </div>
+                </div>
+                """;
 
             if (html.Contains("</head>", StringComparison.OrdinalIgnoreCase))
             {
-                html = html.Replace("</head>", extraStyle + "</head>", StringComparison.OrdinalIgnoreCase);
+                html = html.Replace(
+                    "</head>",
+                    extraStyle + "</head>",
+                    StringComparison.OrdinalIgnoreCase);
             }
             else
             {
@@ -338,7 +590,10 @@ namespace WitcherHub.Pages.Quotes
 
             if (html.Contains("</body>", StringComparison.OrdinalIgnoreCase))
             {
-                html = html.Replace("</body>", signatureBlock + "</body>", StringComparison.OrdinalIgnoreCase);
+                html = html.Replace(
+                    "</body>",
+                    signatureBlock + "</body>",
+                    StringComparison.OrdinalIgnoreCase);
             }
             else
             {
@@ -348,24 +603,16 @@ namespace WitcherHub.Pages.Quotes
             return html;
         }
 
-
         private async Task SendSignedQuoteEmailAsync(
-    Quote quote,
-    string signerName,
-    string signerEmail,
-    DateTimeOffset signedAt,
-    string signatureDataUrl,
-    CancellationToken ct)
+            Quote quote,
+            string signerName,
+            string signerEmail,
+            DateTimeOffset signedAt,
+            string signatureDataUrl,
+            CancellationToken ct)
         {
             var model = BuildQuotePdfModel(quote);
-
-            var html = BuildSignedQuotePdfHtml(
-                model,
-                signerName,
-                signerEmail,
-                signedAt,
-                signatureDataUrl);
-
+            var html = BuildSignedQuotePdfHtml(model, signerName, signerEmail, signedAt, signatureDataUrl);
             var pdfBytes = _pdf.FromHtml(html, $"Angebot {model.QuoteNo} - signed");
 
             var subject = $"Ihr unterschriebenes Angebot {model.QuoteNo}";
@@ -390,16 +637,23 @@ namespace WitcherHub.Pages.Quotes
                 Subject = subject,
                 HtmlBody = emailHtml,
                 TextBody = null,
-                To = [],
-                Bcc = [new EmailAddress(signerEmail, signerName)],
-                Attachments =
-                [
-                    new EmailAttachment($"{model.QuoteNo}-signed.pdf", "application/pdf", pdfBytes)
-                ]
+                To = new List<EmailAddress>(),
+                Bcc = new List<EmailAddress>
+                {
+                    new EmailAddress(signerEmail, signerName)
+                },
+                Attachments = new List<EmailAttachment>
+                {
+                    new EmailAttachment(
+                        $"{model.QuoteNo}-signed.pdf",
+                        "application/pdf",
+                        pdfBytes)
+                }
             };
 
             await _email.QueueNowAsync(msg, ct);
         }
+
         private async Task<Quote?> LoadQuoteAsync(CancellationToken ct)
         {
             return await _db.Quotes
@@ -417,32 +671,36 @@ namespace WitcherHub.Pages.Quotes
                 .Include(q => q.Signatures)
                 .FirstOrDefaultAsync(q => q.Id == Id, ct);
         }
+
         private static GenerateContractDocumentRequest BuildGenerateContractRequestFromQuote(
-    Quote quote,
-    string signerName,
-    string signerEmail)
+            Quote quote,
+            string signerName,
+            string signerEmail)
         {
             return new GenerateContractDocumentRequest
             {
                 ProjectId = quote.ProjectId,
                 ContractNo = null,
-                ProjectTitle = string.IsNullOrWhiteSpace(quote.Project?.Title) ? "Project" : quote.Project.Title!,
-                Currency = string.IsNullOrWhiteSpace(quote.Currency) ? "EUR" : quote.Currency!,
+                ProjectTitle = string.IsNullOrWhiteSpace(quote.Project?.Title)
+                    ? "Project"
+                    : quote.Project.Title!,
+                Currency = string.IsNullOrWhiteSpace(quote.Currency)
+                    ? "EUR"
+                    : quote.Currency!,
                 StartDate = DateOnly.FromDateTime(DateTime.UtcNow),
                 EndDate = null,
-
                 SignerName = signerName,
                 SignerEmail = signerEmail,
-
                 LeaveCustomerFieldsBlank = false,
                 IncludePricesInServicesSection = true,
-
                 Services = (quote.Items ?? new List<QuoteItem>())
                     .OrderBy(x => x.Position)
                     .Select((x, index) => new ContractServiceLineDto
                     {
                         Position = x.Position > 0 ? x.Position : index + 1,
-                        Title = string.IsNullOrWhiteSpace(x.Title) ? $"Position {index + 1}" : x.Title.Trim(),
+                        Title = string.IsNullOrWhiteSpace(x.Title)
+                            ? $"Position {index + 1}"
+                            : x.Title.Trim(),
                         ServiceName = x.Service?.Name,
                         ServiceType = x.Service?.ServiceType.ToString(),
                         PricingModel = x.Service?.PricingModel.ToString(),
@@ -456,10 +714,12 @@ namespace WitcherHub.Pages.Quotes
         private static decimal? ResolveQuoteItemAgreedPrice(QuoteItem item)
         {
             var baseTotal = item.Quantity * item.UnitPrice;
-
             var total = ReadDec(item.PriceBreakdown, "total", 0m);
+
             if (total > 0m)
+            {
                 return total;
+            }
 
             var subTotal = ReadDec(item.PriceBreakdown, "subTotal", baseTotal);
             return subTotal > 0m ? subTotal : baseTotal;
@@ -468,12 +728,16 @@ namespace WitcherHub.Pages.Quotes
         private static Dictionary<string, object> JsonDocumentToDictionary(JsonDocument? doc)
         {
             if (doc is null || doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
                 return new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            }
 
             var result = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var p in doc.RootElement.EnumerateObject())
-                result[p.Name] = JsonElementToObject(p.Value) ?? string.Empty;
+            foreach (var property in doc.RootElement.EnumerateObject())
+            {
+                result[property.Name] = JsonElementToObject(property.Value) ?? string.Empty;
+            }
 
             return result;
         }
@@ -493,6 +757,7 @@ namespace WitcherHub.Pages.Quotes
                     .ToList(),
 
                 JsonValueKind.String => element.GetString(),
+
                 JsonValueKind.Number => element.TryGetDecimal(out var m)
                     ? m
                     : element.TryGetDouble(out var d)
@@ -504,6 +769,7 @@ namespace WitcherHub.Pages.Quotes
                 _ => null
             };
         }
+
         private static QuotePdfHtmlBuilder.QuotePdfDocumentModel BuildQuotePdfModel(Quote q)
         {
             var customer = q.Project.Customer;
@@ -527,12 +793,11 @@ namespace WitcherHub.Pages.Quotes
                     .FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
 
             var isIndividual = customer.Type == CustomerType.Individual;
-
             var personName = BuildName(customer.FirstName, customer.LastName, customer.Name);
-            var companyName = (customer.Name ?? "").Trim();
+            var companyName = (customer.Name ?? string.Empty).Trim();
 
             string? pdfCompanyName = null;
-            string pdfDisplayName = "";
+            var pdfDisplayName = string.Empty;
 
             if (isIndividual)
             {
@@ -542,17 +807,16 @@ namespace WitcherHub.Pages.Quotes
             else
             {
                 pdfCompanyName = companyName;
-                pdfDisplayName = "";
+                pdfDisplayName = string.Empty;
             }
 
             var lines = new List<QuotePdfHtmlBuilder.QuotePdfLine>();
             decimal sumSub = 0m;
             decimal sumDisc = 0m;
 
-            foreach (var it in (q.Items ?? []).OrderBy(x => x.Position))
+            foreach (var it in (q.Items ?? new List<QuoteItem>()).OrderBy(x => x.Position))
             {
                 var baseTotal = it.Quantity * it.UnitPrice;
-
                 var sub = ReadDec(it.PriceBreakdown, "subTotal", baseTotal);
                 var disc = ReadNestedDec(it.PriceBreakdown, "discount", "amount", 0m);
                 var total = ReadDec(it.PriceBreakdown, "total", sub);
@@ -560,7 +824,7 @@ namespace WitcherHub.Pages.Quotes
                 lines.Add(new QuotePdfHtmlBuilder.QuotePdfLine
                 {
                     Position = it.Position,
-                    Title = it.Title ?? "",
+                    Title = it.Title ?? string.Empty,
                     ServiceName = it.Service?.Name,
                     Quantity = it.Quantity,
                     UnitPrice = it.UnitPrice,
@@ -589,8 +853,7 @@ namespace WitcherHub.Pages.Quotes
                 IssuedAt = q.IssuedAt,
                 ExpiresAt = q.ExpiresAt,
                 Notes = q.Notes,
-                ProjectTitle = q.Project?.Title ?? "",
-
+                ProjectTitle = q.Project?.Title ?? string.Empty,
                 Customer = new QuotePdfHtmlBuilder.QuotePdfCustomer
                 {
                     CompanyName = pdfCompanyName,
@@ -601,7 +864,6 @@ namespace WitcherHub.Pages.Quotes
                     Country = addr?.Country,
                     Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim()
                 },
-
                 Lines = lines,
                 Totals = new QuotePdfHtmlBuilder.QuotePdfTotals
                 {
@@ -617,58 +879,59 @@ namespace WitcherHub.Pages.Quotes
         private static string ExtractRenderableHtml(string html)
         {
             if (string.IsNullOrWhiteSpace(html))
+            {
                 return string.Empty;
+            }
 
             var styleBlock = ExtractStyleBlock(html);
             var bodyBlock = ExtractBodyBlock(html);
-
             var scopedStyleBlock = ScopeQuoteStyleBlock(styleBlock, ".quotePdfScope");
 
-            return (scopedStyleBlock ?? "") + bodyBlock;
+            return scopedStyleBlock + bodyBlock;
         }
+
         private static string ScopeQuoteStyleBlock(string htmlStyleBlock, string scopeSelector)
         {
             if (string.IsNullOrWhiteSpace(htmlStyleBlock))
+            {
                 return string.Empty;
+            }
 
             var css = htmlStyleBlock;
 
             css = Regex.Replace(
                 css,
                 @"@page\s*\{.*?\}",
-                "",
+                string.Empty,
                 RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
             css = css.Replace("html, body", scopeSelector, StringComparison.OrdinalIgnoreCase);
             css = css.Replace("body, html", scopeSelector, StringComparison.OrdinalIgnoreCase);
-
-            css = Regex.Replace(
-                css,
-                @"(?<![-\w])body(?![-\w])",
-                scopeSelector,
-                RegexOptions.IgnoreCase);
-
-            css = Regex.Replace(
-                css,
-                @"(?<![-\w])html(?![-\w])",
-                scopeSelector,
-                RegexOptions.IgnoreCase);
+            css = Regex.Replace(css, @"(?<![-\w])body(?![-\w])", scopeSelector, RegexOptions.IgnoreCase);
+            css = Regex.Replace(css, @"(?<![-\w])html(?![-\w])", scopeSelector, RegexOptions.IgnoreCase);
 
             return css;
         }
+
         private static string ExtractStyleBlock(string html)
         {
             var start = html.IndexOf("<style", StringComparison.OrdinalIgnoreCase);
             if (start < 0)
+            {
                 return string.Empty;
+            }
 
             var openEnd = html.IndexOf('>', start);
             if (openEnd < 0)
+            {
                 return string.Empty;
+            }
 
             var close = html.IndexOf("</style>", openEnd, StringComparison.OrdinalIgnoreCase);
             if (close < 0)
+            {
                 return string.Empty;
+            }
 
             return html.Substring(start, (close + "</style>".Length) - start);
         }
@@ -677,41 +940,67 @@ namespace WitcherHub.Pages.Quotes
         {
             var bodyStart = html.IndexOf("<body", StringComparison.OrdinalIgnoreCase);
             if (bodyStart < 0)
+            {
                 return html;
+            }
 
             bodyStart = html.IndexOf('>', bodyStart);
             if (bodyStart < 0)
+            {
                 return html;
+            }
 
             bodyStart++;
 
             var bodyEnd = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
             if (bodyEnd < 0 || bodyEnd <= bodyStart)
+            {
                 return html.Substring(bodyStart);
+            }
 
             return html.Substring(bodyStart, bodyEnd - bodyStart);
         }
 
         private static string BuildName(string? first, string? last, string? fallback)
         {
-            var f = (first ?? "").Trim();
-            var l = (last ?? "").Trim();
+            var f = (first ?? string.Empty).Trim();
+            var l = (last ?? string.Empty).Trim();
             var both = (f + " " + l).Trim();
-            return string.IsNullOrWhiteSpace(both) ? (fallback ?? "").Trim() : both;
+
+            return string.IsNullOrWhiteSpace(both)
+                ? (fallback ?? string.Empty).Trim()
+                : both;
         }
 
         private static decimal ReadDec(JsonDocument? doc, string prop, decimal fallback = 0m)
         {
             try
             {
-                if (doc is null) return fallback;
-                var root = doc.RootElement;
-                if (!root.TryGetProperty(prop, out var v)) return fallback;
+                if (doc is null)
+                {
+                    return fallback;
+                }
 
-                if (v.ValueKind == JsonValueKind.Number && v.TryGetDecimal(out var d)) return d;
-                if (v.ValueKind == JsonValueKind.String &&
-                    decimal.TryParse(v.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var ds))
-                    return ds;
+                var root = doc.RootElement;
+                if (!root.TryGetProperty(prop, out var value))
+                {
+                    return fallback;
+                }
+
+                if (value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var decimalValue))
+                {
+                    return decimalValue;
+                }
+
+                if (value.ValueKind == JsonValueKind.String &&
+                    decimal.TryParse(
+                        value.GetString(),
+                        NumberStyles.Any,
+                        CultureInfo.InvariantCulture,
+                        out var parsed))
+                {
+                    return parsed;
+                }
 
                 return fallback;
             }
@@ -721,20 +1010,49 @@ namespace WitcherHub.Pages.Quotes
             }
         }
 
-        private static decimal ReadNestedDec(JsonDocument? doc, string parent, string prop, decimal fallback = 0m)
+        private static decimal ReadNestedDec(
+            JsonDocument? doc,
+            string parent,
+            string prop,
+            decimal fallback = 0m)
         {
             try
             {
-                if (doc is null) return fallback;
-                var root = doc.RootElement;
-                if (!root.TryGetProperty(parent, out var p)) return fallback;
-                if (p.ValueKind != JsonValueKind.Object) return fallback;
-                if (!p.TryGetProperty(prop, out var v)) return fallback;
+                if (doc is null)
+                {
+                    return fallback;
+                }
 
-                if (v.ValueKind == JsonValueKind.Number && v.TryGetDecimal(out var d)) return d;
-                if (v.ValueKind == JsonValueKind.String &&
-                    decimal.TryParse(v.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var ds))
-                    return ds;
+                var root = doc.RootElement;
+                if (!root.TryGetProperty(parent, out var parentElement))
+                {
+                    return fallback;
+                }
+
+                if (parentElement.ValueKind != JsonValueKind.Object)
+                {
+                    return fallback;
+                }
+
+                if (!parentElement.TryGetProperty(prop, out var value))
+                {
+                    return fallback;
+                }
+
+                if (value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var decimalValue))
+                {
+                    return decimalValue;
+                }
+
+                if (value.ValueKind == JsonValueKind.String &&
+                    decimal.TryParse(
+                        value.GetString(),
+                        NumberStyles.Any,
+                        CultureInfo.InvariantCulture,
+                        out var parsed))
+                {
+                    return parsed;
+                }
 
                 return fallback;
             }

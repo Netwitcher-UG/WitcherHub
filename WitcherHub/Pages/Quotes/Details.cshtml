@@ -68,7 +68,18 @@
             <span class="pdf-btn-text">PDF</span>
             <span class="spinner-border spinner-border-sm ms-2 d-none" id="downloadPdfSpinner" role="status" aria-hidden="true"></span>
         </a>
-
+        @if (Model.ShowManualInvoiceButton)
+        {
+            <form method="post"
+                  asp-page="./Details"
+                  asp-page-handler="GenerateInvoice"
+                  asp-route-id="@Model.Quote.Id"
+                  class="d-inline">
+                <button type="submit" class="btn btn-success" id="quoteGenerateInvoiceBtn">
+                    Create Invoice
+                </button>
+            </form>
+        }
         @if (showCopyLinkBtn)
         {
             <button type="button"

@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -62,6 +61,67 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             _invoiceNotificationService = invoiceNotificationService;
         }
 
+        private sealed class InvoiceSourceContext
+        {
+            public Guid ProjectId { get; init; }
+            public Guid? ContractId { get; init; }
+            public Guid? QuoteId { get; init; }
+            public Customer Customer { get; init; } = default!;
+            public string DocumentNumber { get; init; } = string.Empty;
+            public string DocumentLabel { get; init; } = string.Empty; // contract / quote
+            public DocumentStatus Status { get; init; }
+            public InvoiceSendMode InvoiceSendMode { get; init; }
+            public bool ApplyVat { get; init; } = true;
+            public string? Currency { get; init; }
+
+            public Guid SourceId => ContractId ?? QuoteId ?? Guid.Empty;
+
+            public static InvoiceSourceContext FromContract(Contract contract) => new()
+            {
+                ProjectId = contract.ProjectId,
+                ContractId = contract.Id,
+                QuoteId = null,
+                Customer = contract.Project.Customer,
+                DocumentNumber = contract.ContractNo,
+                DocumentLabel = "contract",
+                Status = contract.Status,
+                InvoiceSendMode = contract.InvoiceSendMode,
+                ApplyVat = true,
+                Currency = contract.Currency
+            };
+
+            public static InvoiceSourceContext FromQuote(Quote quote) => new()
+            {
+                ProjectId = quote.ProjectId,
+                ContractId = null,
+                QuoteId = quote.Id,
+                Customer = quote.Project.Customer,
+                DocumentNumber = quote.QuoteNo,
+                DocumentLabel = "quote",
+                Status = quote.Status,
+                InvoiceSendMode = quote.InvoiceSendMode,
+                ApplyVat = quote.ApplyVat,
+                Currency = quote.Currency
+            };
+        }
+
+        private sealed class InvoiceSourceItemData
+        {
+            public Guid? ServiceId { get; init; }
+            public string Title { get; init; } = string.Empty;
+            public string? Description { get; init; }
+            public decimal Quantity { get; init; }
+            public decimal UnitPrice { get; init; }
+            public int Position { get; init; }
+            public JsonDocument Config { get; init; } = JsonDocument.Parse("{}");
+            public BillingCycle BillingCycle { get; init; } = BillingCycle.OneTime;
+            public DiscountType? DiscountType { get; init; }
+            public decimal? DiscountValue { get; init; }
+            public ServiceUnitType UnitType { get; init; } = ServiceUnitType.Custom;
+            public string UnitName { get; init; } = string.Empty;
+            public string? ServiceDefaultCurrency { get; init; }
+        }
+
         public async Task<InvoiceGenerationResult> CreateOneTimeInvoiceFromContractAsync(
             Guid contractId,
             CancellationToken ct)
@@ -91,16 +151,50 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             }
 
             return await CreateInvoiceInternalAsync(
-                contract,
-                items,
+                InvoiceSourceContext.FromContract(contract),
+                items.Select(MapSourceItem).ToList(),
                 invoiceDate: DateOnly.FromDateTime(DateTime.UtcNow),
                 originType: InvoiceOriginType.ContractOneTime,
                 recurringCycleKey: null,
                 isRecurringInvoice: false,
-                finalizeOnLexware: contract.InvoiceSendMode == InvoiceSendMode.Automatic,
-                dispatchStatus: contract.InvoiceSendMode == InvoiceSendMode.Automatic
-                    ? InvoiceDispatchStatus.SentAutomatically
-                    : InvoiceDispatchStatus.PendingManualSend,
+                ct: ct);
+        }
+
+        public async Task<InvoiceGenerationResult> CreateOneTimeInvoiceFromQuoteAsync(
+            Guid quoteId,
+            CancellationToken ct)
+        {
+            var quote = await LoadQuoteAsync(quoteId, ct);
+
+            var items = quote.Items
+                .Where(x => x.BillingCycle == BillingCycle.OneTime)
+                .OrderBy(x => x.Position)
+                .ToList();
+
+            if (items.Count == 0)
+            {
+                _logger.LogInformation("No one-time items found. QuoteId={QuoteId}", quoteId);
+                return InvoiceGenerationResult.Warning("No one-time items found for this quote.");
+            }
+
+            var existing = await _db.Invoices.AnyAsync(
+                x => x.QuoteId == quoteId &&
+                     x.OriginType == InvoiceOriginType.QuoteOneTime,
+                ct);
+
+            if (existing)
+            {
+                _logger.LogInformation("One-time invoice already exists. QuoteId={QuoteId}", quoteId);
+                return InvoiceGenerationResult.Warning("A one-time invoice already exists for this quote.");
+            }
+
+            return await CreateInvoiceInternalAsync(
+                InvoiceSourceContext.FromQuote(quote),
+                items.Select(MapSourceItem).ToList(),
+                invoiceDate: DateOnly.FromDateTime(DateTime.UtcNow),
+                originType: InvoiceOriginType.QuoteOneTime,
+                recurringCycleKey: null,
+                isRecurringInvoice: false,
                 ct: ct);
         }
 
@@ -172,16 +266,12 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             }
 
             var result = await CreateInvoiceInternalAsync(
-                contract,
-                items,
+                InvoiceSourceContext.FromContract(contract),
+                items.Select(MapSourceItem).ToList(),
                 invoiceDate: cycleDate,
                 originType: InvoiceOriginType.ContractRecurring,
                 recurringCycleKey: cycleKey,
                 isRecurringInvoice: true,
-                finalizeOnLexware: contract.InvoiceSendMode == InvoiceSendMode.Automatic,
-                dispatchStatus: contract.InvoiceSendMode == InvoiceSendMode.Automatic
-                    ? InvoiceDispatchStatus.SentAutomatically
-                    : InvoiceDispatchStatus.PendingManualSend,
                 ct: ct);
 
             if (!result.Created)
@@ -194,6 +284,107 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 contract.NextRecurringInvoiceDate > contract.RecurringEndDate.Value)
             {
                 contract.RecurringIsActive = false;
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            return result;
+        }
+
+        public async Task<InvoiceGenerationResult> CreateRecurringInvoiceFromQuoteAsync(
+            Guid quoteId,
+            DateOnly cycleDate,
+            CancellationToken ct)
+        {
+            var quote = await LoadQuoteAsync(quoteId, ct);
+
+            if (!quote.RecurringEnabled || !quote.RecurringIsActive)
+            {
+                _logger.LogInformation("Recurring disabled/inactive. QuoteId={QuoteId}", quoteId);
+                return InvoiceGenerationResult.Warning("Recurring billing is disabled or inactive for this quote.");
+            }
+
+            if (quote.RecurringEndDate.HasValue && cycleDate > quote.RecurringEndDate.Value)
+            {
+                _logger.LogInformation(
+                    "Recurring cycle skipped because beyond end date. QuoteId={QuoteId} CycleDate={CycleDate}",
+                    quoteId,
+                    cycleDate);
+
+                return InvoiceGenerationResult.Warning(
+                    $"Recurring billing already ended before cycle {cycleDate:yyyy-MM-dd}.");
+            }
+
+            var recurringStartDate =
+                quote.RecurringStartDate ??
+                (quote.SignedAt.HasValue
+                    ? DateOnly.FromDateTime(quote.SignedAt.Value.UtcDateTime)
+                    : quote.IssuedAt.HasValue
+                        ? DateOnly.FromDateTime(quote.IssuedAt.Value.UtcDateTime)
+                        : cycleDate);
+
+            var items = quote.Items
+                .Where(x => x.BillingCycle != BillingCycle.OneTime)
+                .Where(x => IsItemDueForCycle(
+                    x.BillingCycle,
+                    recurringStartDate,
+                    cycleDate))
+                .OrderBy(x => x.Position)
+                .ToList();
+
+            if (items.Count == 0)
+            {
+                _logger.LogInformation(
+                    "No recurring items due for cycle. QuoteId={QuoteId} CycleDate={CycleDate}",
+                    quoteId,
+                    cycleDate);
+
+                quote.NextRecurringInvoiceDate = CalculateNextRecurringDate(cycleDate);
+                quote.LastRecurringInvoiceRunAt = DateTimeOffset.UtcNow;
+
+                await _db.SaveChangesAsync(ct);
+
+                return InvoiceGenerationResult.Warning(
+                    $"No recurring items are due for cycle {cycleDate:yyyy-MM-dd}.");
+            }
+
+            var cycleKey = $"{quote.Id:N}:{cycleDate:yyyy-MM-dd}";
+
+            var exists = await _db.Invoices.AnyAsync(
+                x => x.QuoteId == quoteId &&
+                     x.RecurringCycleKey == cycleKey,
+                ct);
+
+            if (exists)
+            {
+                _logger.LogInformation(
+                    "Recurring invoice already exists. QuoteId={QuoteId} CycleKey={CycleKey}",
+                    quoteId,
+                    cycleKey);
+
+                return InvoiceGenerationResult.Warning(
+                    $"A recurring invoice already exists for cycle {cycleDate:yyyy-MM-dd}.");
+            }
+
+            var result = await CreateInvoiceInternalAsync(
+                InvoiceSourceContext.FromQuote(quote),
+                items.Select(MapSourceItem).ToList(),
+                invoiceDate: cycleDate,
+                originType: InvoiceOriginType.QuoteRecurring,
+                recurringCycleKey: cycleKey,
+                isRecurringInvoice: true,
+                ct: ct);
+
+            if (!result.Created)
+                return result;
+
+            quote.NextRecurringInvoiceDate = CalculateNextRecurringDate(cycleDate);
+            quote.LastRecurringInvoiceRunAt = DateTimeOffset.UtcNow;
+
+            if (quote.RecurringEndDate.HasValue &&
+                quote.NextRecurringInvoiceDate > quote.RecurringEndDate.Value)
+            {
+                quote.RecurringIsActive = false;
             }
 
             await _db.SaveChangesAsync(ct);
@@ -238,20 +429,18 @@ namespace WitcherHub.Infrastructure.Services.Lexware
         }
 
         private async Task<InvoiceGenerationResult> CreateInvoiceInternalAsync(
-     Contract contract,
-     List<ContractItem> sourceItems,
-     DateOnly invoiceDate,
-     InvoiceOriginType originType,
-     string? recurringCycleKey,
-     bool isRecurringInvoice,
-     bool finalizeOnLexware,
-     InvoiceDispatchStatus dispatchStatus,
-     CancellationToken ct)
+            InvoiceSourceContext source,
+            List<InvoiceSourceItemData> sourceItems,
+            DateOnly invoiceDate,
+            InvoiceOriginType originType,
+            string? recurringCycleKey,
+            bool isRecurringInvoice,
+            CancellationToken ct)
         {
-            if (contract.Status != DocumentStatus.Signed)
-                return InvoiceGenerationResult.Warning("Contract is not signed yet.");
+            if (source.Status != DocumentStatus.Signed)
+                return InvoiceGenerationResult.Warning($"{source.DocumentLabel} is not signed yet.");
 
-            var customer = contract.Project.Customer;
+            var customer = source.Customer;
 
             var billing = customer.Addresses?
                 .OrderByDescending(a => a.IsDefault)
@@ -273,31 +462,38 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 string.IsNullOrWhiteSpace(city))
             {
                 _logger.LogWarning(
-                    "Lexware skipped: missing recipient address data. ContractId={ContractId}, CustomerId={CustomerId}",
-                    contract.Id,
+                    "Lexware skipped: missing recipient address data. Source={Source} SourceId={SourceId}, CustomerId={CustomerId}",
+                    source.DocumentLabel,
+                    source.SourceId,
                     customer.Id);
 
                 return InvoiceGenerationResult.Warning(
                     "Invoice was not created because recipient address data is incomplete.");
             }
 
-            var currency = ResolveCurrency(contract, sourceItems);
+            var currency = ResolveCurrency(source.Currency, sourceItems);
             var invoiceDateUtc = new DateTimeOffset(invoiceDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            var taxRate = source.ApplyVat ? FixedTaxRatePercentage : 0m;
+
+            var finalizeOnLexware = source.InvoiceSendMode == InvoiceSendMode.Automatic;
+            var dispatchStatus = source.InvoiceSendMode == InvoiceSendMode.Automatic
+                ? InvoiceDispatchStatus.SentAutomatically
+                : InvoiceDispatchStatus.PendingManualSend;
 
             var lexLineItems = sourceItems
                 .OrderBy(i => i.Position)
                 .Select(i => new LexwareInvoiceLineItem
                 {
                     Type = "custom",
-                    Name = ResolveTitle(i),
-                    Description = ResolveDescription(i),
+                    Name = i.Title,
+                    Description = i.Description,
                     Quantity = i.Quantity <= 0 ? 1m : i.Quantity,
-                    UnitName = ResolveUnitName(i),
+                    UnitName = i.UnitName,
                     UnitPrice = new LexwareUnitPrice
                     {
                         Currency = currency,
-                        NetAmount = ResolveNetAmount(i),
-                        TaxRatePercentage = FixedTaxRatePercentage
+                        NetAmount = i.UnitPrice,
+                        TaxRatePercentage = taxRate
                     },
                     DiscountPercentage = ResolveDiscountPercent(i)
                 })
@@ -340,13 +536,14 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                     ShippingDate = invoiceDateUtc
                 },
                 Title = "Rechnung",
-                Introduction = BuildGermanInvoiceIntroduction(contract, isRecurringInvoice, invoiceDate),
+                Introduction = BuildGermanInvoiceIntroduction(source, isRecurringInvoice, invoiceDate),
                 Remark = BuildGermanInvoiceRemark()
             };
 
             _logger.LogInformation(
-                "Lexware create START. ContractId={ContractId} Recurring={Recurring} Finalize={Finalize}",
-                contract.Id,
+                "Lexware create START. Source={Source} SourceId={SourceId} Recurring={Recurring} Finalize={Finalize}",
+                source.DocumentLabel,
+                source.SourceId,
                 isRecurringInvoice,
                 finalizeOnLexware);
 
@@ -355,10 +552,11 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             var localInvoice = new Invoice
             {
-                ProjectId = contract.ProjectId,
-                ContractId = contract.Id,
+                ProjectId = source.ProjectId,
+                ContractId = source.ContractId,
+                QuoteId = source.QuoteId,
                 Currency = currency,
-                ApplyVat = true,
+                ApplyVat = source.ApplyVat,
                 OriginType = originType,
                 IsRecurringInvoice = isRecurringInvoice,
                 RecurringCycleDate = isRecurringInvoice ? invoiceDate : null,
@@ -367,9 +565,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 SentAt = dispatchStatus == InvoiceDispatchStatus.SentAutomatically
                     ? DateTimeOffset.UtcNow
                     : null,
-                Notes = isRecurringInvoice
-                    ? $"Generated recurring invoice from contract {contract.ContractNo}"
-                    : $"Generated one-time invoice from contract {contract.ContractNo}",
+                Notes = BuildGeneratedInvoiceNote(source, isRecurringInvoice),
                 LexwareInvoiceId = created.Id,
                 LexwareResourceUri = created.ResourceUri,
                 LexwareVersion = created.Version
@@ -381,7 +577,8 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 fallbackCurrency: currency,
                 fallbackIssueAt: invoiceDateUtc,
                 defaultPaymentTermDays: _opt.DefaultPaymentTermDays,
-                contractItemsForServiceMapping: sourceItems);
+                sourceItemsForServiceMapping: sourceItems,
+                defaultTaxRatePercent: taxRate);
 
             if (string.IsNullOrWhiteSpace(localInvoice.InvoiceNo))
             {
@@ -414,8 +611,9 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             }
 
             _logger.LogInformation(
-                "Lexware invoice created. ContractId={ContractId} LocalId={LocalId} LexId={LexId}",
-                contract.Id,
+                "Lexware invoice created. Source={Source} SourceId={SourceId} LocalId={LocalId} LexId={LexId}",
+                source.DocumentLabel,
+                source.SourceId,
                 localInvoice.Id,
                 localInvoice.LexwareInvoiceId);
 
@@ -447,10 +645,79 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             return contract;
         }
 
+        private async Task<Quote> LoadQuoteAsync(Guid quoteId, CancellationToken ct)
+        {
+            var quote = await _db.Quotes
+                .Include(q => q.Project)
+                    .ThenInclude(p => p.Customer)
+                        .ThenInclude(cu => cu.Addresses)
+                .Include(q => q.Project)
+                    .ThenInclude(p => p.Customer)
+                        .ThenInclude(cu => cu.EmailAddresses)
+                .Include(q => q.Project)
+                    .ThenInclude(p => p.Customer)
+                        .ThenInclude(cu => cu.Contacts)
+                .Include(q => q.Items)
+                    .ThenInclude(i => i.Service)
+                .FirstOrDefaultAsync(q => q.Id == quoteId, ct);
+
+            if (quote == null)
+                throw new InvalidOperationException("Quote not found.");
+
+            return quote;
+        }
+
+        private static InvoiceSourceItemData MapSourceItem(ContractItem item) => new()
+        {
+            ServiceId = item.ServiceId,
+            Title = ResolveTitle(item),
+            Description = ResolveDescription(item),
+            Quantity = item.Quantity <= 0 ? 1m : item.Quantity,
+            UnitPrice = ResolveNetAmount(item),
+            Position = item.Position,
+            Config = item.Config ?? JsonDocument.Parse("{}"),
+            BillingCycle = item.BillingCycle,
+            DiscountType = item.DiscountType,
+            DiscountValue = item.DiscountValue,
+            UnitType = ResolveUnitType(item),
+            UnitName = ResolveUnitName(item),
+            ServiceDefaultCurrency = item.Service?.DefaultCurrency
+        };
+
+        private static InvoiceSourceItemData MapSourceItem(QuoteItem item) => new()
+        {
+            ServiceId = item.ServiceId,
+            Title = ResolveTitle(item),
+            Description = ResolveDescription(item),
+            Quantity = item.Quantity <= 0 ? 1m : item.Quantity,
+            UnitPrice = ResolveNetAmount(item),
+            Position = item.Position,
+            Config = item.Config ?? JsonDocument.Parse("{}"),
+            BillingCycle = item.BillingCycle,
+            DiscountType = item.DiscountType,
+            DiscountValue = item.DiscountValue,
+            UnitType = ResolveUnitType(item),
+            UnitName = ResolveUnitName(item),
+            ServiceDefaultCurrency = item.Service?.DefaultCurrency
+        };
+
         private static decimal ResolveNetAmount(ContractItem item)
         {
             var unit =
                 item.AgreedPrice ??
+                (item.UnitPrice > 0 ? item.UnitPrice : (decimal?)null) ??
+                (item.Service != null && item.Service.BasePrice > 0 ? item.Service.BasePrice : (decimal?)null) ??
+                0m;
+
+            if (unit < 0)
+                unit = 0m;
+
+            return unit;
+        }
+
+        private static decimal ResolveNetAmount(QuoteItem item)
+        {
+            var unit =
                 (item.UnitPrice > 0 ? item.UnitPrice : (decimal?)null) ??
                 (item.Service != null && item.Service.BasePrice > 0 ? item.Service.BasePrice : (decimal?)null) ??
                 0m;
@@ -473,20 +740,57 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             return 0m;
         }
 
-        private static string ResolveCurrency(Contract contract, IEnumerable<ContractItem> sourceItems)
+        private static decimal ResolveDiscountPercent(QuoteItem item)
         {
-            var contractCurrency = CleanPrintText(contract.Currency);
-            if (!string.IsNullOrWhiteSpace(contractCurrency))
-                return contractCurrency!;
+            if (item.DiscountType == DiscountType.Percent &&
+                item.DiscountValue.HasValue &&
+                item.DiscountValue.Value > 0)
+            {
+                return item.DiscountValue.Value;
+            }
+
+            return 0m;
+        }
+
+        private static decimal ResolveDiscountPercent(InvoiceSourceItemData item)
+        {
+            if (item.DiscountType == DiscountType.Percent &&
+                item.DiscountValue.HasValue &&
+                item.DiscountValue.Value > 0)
+            {
+                return item.DiscountValue.Value;
+            }
+
+            return 0m;
+        }
+
+        private static string ResolveCurrency(string? documentCurrency, IEnumerable<InvoiceSourceItemData> sourceItems)
+        {
+            var normalizedCurrency = CleanPrintText(documentCurrency);
+            if (!string.IsNullOrWhiteSpace(normalizedCurrency))
+                return normalizedCurrency!;
 
             var serviceCurrency = sourceItems
-                .Select(i => CleanPrintText(i.Service?.DefaultCurrency))
+                .Select(i => CleanPrintText(i.ServiceDefaultCurrency))
                 .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
 
             return !string.IsNullOrWhiteSpace(serviceCurrency) ? serviceCurrency! : "EUR";
         }
 
         private static string ResolveTitle(ContractItem item)
+        {
+            var title = CleanPrintText(item.Title);
+            if (!string.IsNullOrWhiteSpace(title))
+                return title!;
+
+            var serviceName = CleanPrintText(item.Service?.Name);
+            if (!string.IsNullOrWhiteSpace(serviceName))
+                return serviceName!;
+
+            return $"Position {item.Position}";
+        }
+
+        private static string ResolveTitle(QuoteItem item)
         {
             var title = CleanPrintText(item.Title);
             if (!string.IsNullOrWhiteSpace(title))
@@ -508,6 +812,15 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             return CleanPrintText(item.Service?.Description);
         }
 
+        private static string? ResolveDescription(QuoteItem item)
+        {
+            var description = CleanPrintText(item.Description);
+            if (!string.IsNullOrWhiteSpace(description))
+                return description;
+
+            return CleanPrintText(item.Service?.Description);
+        }
+
         private static ServiceUnitType ResolveUnitType(ContractItem item)
         {
             if (item.UnitType != ServiceUnitType.Custom)
@@ -519,7 +832,31 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             return MapPricingModelToUnitType(item.Service?.PricingModel);
         }
 
+        private static ServiceUnitType ResolveUnitType(QuoteItem item)
+        {
+            if (item.UnitType != ServiceUnitType.Custom)
+                return item.UnitType;
+
+            if (item.Service != null && item.Service.UnitType != ServiceUnitType.Custom)
+                return item.Service.UnitType;
+
+            return MapPricingModelToUnitType(item.Service?.PricingModel);
+        }
+
         private static string ResolveUnitName(ContractItem item)
+        {
+            var itemUnitName = CleanPrintText(item.UnitName);
+            if (!string.IsNullOrWhiteSpace(itemUnitName))
+                return itemUnitName!;
+
+            var serviceUnitName = CleanPrintText(item.Service?.UnitName);
+            if (!string.IsNullOrWhiteSpace(serviceUnitName))
+                return serviceUnitName!;
+
+            return GetDefaultUnitName(ResolveUnitType(item), item.Service?.PricingModel);
+        }
+
+        private static string ResolveUnitName(QuoteItem item)
         {
             var itemUnitName = CleanPrintText(item.UnitName);
             if (!string.IsNullOrWhiteSpace(itemUnitName))
@@ -651,18 +988,27 @@ namespace WitcherHub.Infrastructure.Services.Lexware
         }
 
         private static string BuildGermanInvoiceIntroduction(
-            Contract contract,
+            InvoiceSourceContext source,
             bool isRecurringInvoice,
             DateOnly invoiceDate)
         {
+            var basisWord = source.DocumentLabel == "contract" ? "Vertrag" : "Angebot";
+
             if (isRecurringInvoice)
             {
                 return
-                    $"Hiermit berechnen wir Ihnen die vertraglich vereinbarten wiederkehrenden Leistungen " +
-                    $"für den Abrechnungszeitraum {invoiceDate:MM.yyyy} gemäß Vertrag {contract.ContractNo}.";
+                    $"Hiermit berechnen wir Ihnen die vereinbarten wiederkehrenden Leistungen " +
+                    $"für den Abrechnungszeitraum {invoiceDate:MM.yyyy} gemäß {basisWord} {source.DocumentNumber}.";
             }
 
-            return $"Hiermit berechnen wir Ihnen die vertraglich vereinbarten Leistungen gemäß Vertrag {contract.ContractNo}.";
+            return $"Hiermit berechnen wir Ihnen die vereinbarten Leistungen gemäß {basisWord} {source.DocumentNumber}.";
+        }
+
+        private static string BuildGeneratedInvoiceNote(InvoiceSourceContext source, bool isRecurringInvoice)
+        {
+            return isRecurringInvoice
+                ? $"Generated recurring invoice from {source.DocumentLabel} {source.DocumentNumber}"
+                : $"Generated one-time invoice from {source.DocumentLabel} {source.DocumentNumber}";
         }
 
         private static string BuildGermanInvoiceRemark()
@@ -723,7 +1069,8 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 fallbackCurrency: invoice.Currency ?? "EUR",
                 fallbackIssueAt: invoice.IssuedAt ?? nowUtc,
                 defaultPaymentTermDays: _opt.DefaultPaymentTermDays,
-                contractItemsForServiceMapping: null);
+                sourceItemsForServiceMapping: null,
+                defaultTaxRatePercent: invoice.ApplyVat ? FixedTaxRatePercentage : 0m);
 
             invoice.LexwareSyncedAt = nowUtc;
 
@@ -753,7 +1100,8 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             string fallbackCurrency,
             DateTimeOffset fallbackIssueAt,
             int defaultPaymentTermDays,
-            List<ContractItem>? contractItemsForServiceMapping)
+            List<InvoiceSourceItemData>? sourceItemsForServiceMapping,
+            decimal defaultTaxRatePercent)
         {
             var root = invDoc.RootElement;
 
@@ -804,7 +1152,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 invoice.Items = new List<InvoiceItem>();
             }
 
-            var newItems = BuildInvoiceItemsFromLexware(root, contractItemsForServiceMapping);
+            var newItems = BuildInvoiceItemsFromLexware(root, sourceItemsForServiceMapping);
 
             foreach (var it in newItems)
             {
@@ -812,7 +1160,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 invoice.Items.Add(it);
             }
 
-            var totals = BuildTotalsFromLexware(root, invoice.Items, voucherStatus, FixedTaxRatePercentage);
+            var totals = BuildTotalsFromLexware(root, invoice.Items, voucherStatus, defaultTaxRatePercent);
             totals.Invoice = invoice;
 
             if (invoice.Totals == null)
@@ -833,10 +1181,10 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
         private List<InvoiceItem> BuildInvoiceItemsFromLexware(
             JsonElement root,
-            List<ContractItem>? contractItems)
+            List<InvoiceSourceItemData>? sourceItems)
         {
             var list = new List<InvoiceItem>();
-            var orderedContractItems = contractItems?.OrderBy(a => a.Position).ToList();
+            var orderedSourceItems = sourceItems?.OrderBy(a => a.Position).ToList();
 
             if (root.TryGetProperty("lineItems", out var li) && li.ValueKind == JsonValueKind.Array)
             {
@@ -855,25 +1203,25 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                     var lexwareName = TryGetString(x, "name") ?? $"Position {pos}";
                     var lexwareUnitName = TryGetString(x, "unitName");
                     var lexwareDescription = TryGetString(x, "description");
-                    var ci = orderedContractItems?.ElementAtOrDefault(pos - 1);
-             
+                    var si = orderedSourceItems?.ElementAtOrDefault(pos - 1);
+
                     var item = new InvoiceItem
                     {
-                        Title = ci != null ? ResolveTitle(ci) : lexwareName,
-                        Description = ci != null
-    ? ResolveDescription(ci) ?? string.Empty
-    : (lexwareDescription ?? string.Empty),
+                        Title = si != null ? si.Title : lexwareName,
+                        Description = si != null
+                            ? si.Description ?? string.Empty
+                            : (lexwareDescription ?? string.Empty),
                         Quantity = qty,
                         UnitPrice = unitNet,
                         Position = pos,
-                        ServiceId = ci?.ServiceId,
-                        Config = ci?.Config ?? JsonDocument.Parse("{}"),
-                        BillingCycle = ci?.BillingCycle ?? BillingCycle.OneTime,
-                        DiscountType = ci?.DiscountType,
-                        DiscountValue = ci?.DiscountValue,
-                        UnitType = ci != null ? ResolveUnitType(ci) : ServiceUnitType.Custom,
-                        UnitName = ci != null
-                            ? ResolveUnitName(ci)
+                        ServiceId = si?.ServiceId,
+                        Config = si?.Config ?? JsonDocument.Parse("{}"),
+                        BillingCycle = si?.BillingCycle ?? BillingCycle.OneTime,
+                        DiscountType = si?.DiscountType,
+                        DiscountValue = si?.DiscountValue,
+                        UnitType = si != null ? si.UnitType : ServiceUnitType.Custom,
+                        UnitName = si != null
+                            ? si.UnitName
                             : (!string.IsNullOrWhiteSpace(lexwareUnitName)
                                 ? lexwareUnitName!
                                 : GetDefaultUnitName(ServiceUnitType.Custom))
@@ -892,24 +1240,24 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 return list;
             }
 
-            if (orderedContractItems != null && orderedContractItems.Count > 0)
+            if (orderedSourceItems != null && orderedSourceItems.Count > 0)
             {
-                foreach (var ci in orderedContractItems)
+                foreach (var si in orderedSourceItems)
                 {
                     list.Add(new InvoiceItem
                     {
-                        Title = ResolveTitle(ci),
-                        Description = ResolveDescription(ci) ?? string.Empty,
-                        Quantity = ci.Quantity <= 0 ? 1m : ci.Quantity,
-                        UnitPrice = ResolveNetAmount(ci),
-                        Position = ci.Position,
-                        ServiceId = ci.ServiceId,
-                        Config = ci.Config ?? JsonDocument.Parse("{}"),
-                        BillingCycle = ci.BillingCycle,
-                        DiscountType = ci.DiscountType,
-                        DiscountValue = ci.DiscountValue,
-                        UnitType = ResolveUnitType(ci),
-                        UnitName = ResolveUnitName(ci)
+                        Title = si.Title,
+                        Description = si.Description ?? string.Empty,
+                        Quantity = si.Quantity <= 0 ? 1m : si.Quantity,
+                        UnitPrice = si.UnitPrice,
+                        Position = si.Position,
+                        ServiceId = si.ServiceId,
+                        Config = si.Config ?? JsonDocument.Parse("{}"),
+                        BillingCycle = si.BillingCycle,
+                        DiscountType = si.DiscountType,
+                        DiscountValue = si.DiscountValue,
+                        UnitType = si.UnitType,
+                        UnitName = si.UnitName
                     });
                 }
             }
