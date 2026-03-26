@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json.Serialization;
 using WitcherHub.Configuration.Extensions;
+using WitcherHub.Infrastructure.Services.Pdf;
 
 var builder = WebApplication.CreateBuilder(args);
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -20,6 +21,11 @@ builder.Services.AddPresentation(builder.Configuration);
 
     
 var app = builder.Build();
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var playwrightBrowserInstaller = scope.ServiceProvider.GetRequiredService<PlaywrightBrowserInstaller>();
+    await playwrightBrowserInstaller.EnsureInstalledAsync();
+}
 var supportedCultures = new[] { new CultureInfo("en"), new CultureInfo("de") };
 
 app.UseRequestLocalization(new RequestLocalizationOptions

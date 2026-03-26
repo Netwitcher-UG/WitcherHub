@@ -1,5 +1,4 @@
-using DinkToPdf;
-using DinkToPdf.Contracts;
+
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -161,8 +160,9 @@ namespace WitcherHub.Infrastructure
     configuration.GetSection(ContractTemplateOptions.SectionName));
 
             services.AddScoped<IContractDocumentGenerator, ContractDocumentGenerator>();
-            services.AddSingleton<IConverter>(new SynchronizedConverter(new PdfTools()));
-            services.AddSingleton<IPdfGenerator, DinkToPdfGenerator>();
+            
+            services.AddSingleton<IPdfGenerator, PlaywrightPdfGenerator>();
+            services.AddSingleton<PlaywrightBrowserInstaller>();
             services.AddScoped<ContractCreationService>();
             services.AddScoped<IInvoiceNotificationService, InvoiceNotificationService>();
             services.AddScoped<QuotePublicLinkService>();

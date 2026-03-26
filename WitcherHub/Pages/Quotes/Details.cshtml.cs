@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -487,6 +488,35 @@ namespace WitcherHub.Pages.Quotes
         // =========================
         // Helpers
         // =========================
+
+        private static string MapBillingCycleText(BillingCycle billingCycle)
+        {
+            return billingCycle switch
+            {
+                BillingCycle.OneTime => "Einmalig",
+                BillingCycle.Monthly => "Monatlich",
+                BillingCycle.Quarterly => "Vierteljährlich",
+                BillingCycle.SemiAnnual => "Halbjährlich",
+                BillingCycle.Annual => "Jährlich",
+                _ => billingCycle.ToString()
+            };
+        }
+
+        private static string BuildDiscountDisplay(DiscountType? discountType, decimal? discountValue)
+        {
+            if (discountType is null || discountValue is null || discountValue.Value <= 0m)
+                return "—";
+
+            var de = CultureInfo.GetCultureInfo("de-DE");
+
+            return discountType switch
+            {
+                DiscountType.Percent => discountValue.Value.ToString("0.##", de) + " %",
+                DiscountType.Fixed => discountValue.Value.ToString("N2", de) + " €",
+                DiscountType.Amount => discountValue.Value.ToString("N2", de) + " €",
+                _ => discountValue.Value.ToString("0.##", de)
+            };
+        }
         private async Task<QuotePdfHtmlBuilder.QuotePdfDocumentModel> LoadPdfModelAsync(CancellationToken ct)
         {
             if (Id == Guid.Empty)
@@ -528,7 +558,6 @@ namespace WitcherHub.Pages.Quotes
                 })
                 .FirstOrDefaultAsync(ct);
 
-            // Email: EmailAddresses أولاً
             var email = await _db.CustomerEmailAddresses
                 .AsNoTracking()
                 .Where(e => e.CustomerId == cust.Id)
@@ -537,7 +566,6 @@ namespace WitcherHub.Pages.Quotes
                 .Select(e => e.Email)
                 .FirstOrDefaultAsync(ct);
 
-            // fallback: Contacts
             if (string.IsNullOrWhiteSpace(email))
             {
                 email = await _db.CustomerContacts
@@ -549,7 +577,6 @@ namespace WitcherHub.Pages.Quotes
                     .FirstOrDefaultAsync(ct);
             }
 
-            // ✅ اسم العميل فقط من Customer
             var isIndividual = cust.Type.ToString().Equals("Individual", StringComparison.OrdinalIgnoreCase);
 
             var personName = BuildName(cust.FirstName, cust.LastName, cust.Name);
@@ -566,40 +593,54 @@ namespace WitcherHub.Pages.Quotes
             else
             {
                 pdfCompanyName = companyName;
-                pdfDisplayName = ""; // ✅ لا نعرض سطر ثاني
+                pdfDisplayName = "";
             }
 
+            var vatPercent = q.ApplyVat ? 19m : 0m;
+
             var lines = new List<QuotePdfHtmlBuilder.QuotePdfLine>();
-            decimal sumSub = 0m, sumDisc = 0m, sumTax = 0m, sumTotal = 0m;
+
+            decimal sumBase = 0m;
+            decimal sumDisc = 0m;
+            decimal sumNet = 0m;
+            decimal sumTax = 0m;
+            decimal sumTotal = 0m;
 
             foreach (var it in (q.Items ?? []).OrderBy(x => x.Position))
             {
-                var baseTotal = it.Quantity * it.UnitPrice;
+                var fallbackBase = it.Quantity * it.UnitPrice;
 
-                var sub = ReadDec(it.PriceBreakdown, "subTotal", baseTotal);
+                var baseTotal = ReadDec(it.PriceBreakdown, "baseTotal", fallbackBase);
                 var disc = ReadNestedDec(it.PriceBreakdown, "discount", "amount", 0m);
-                var total = sub; // ✅ line total بدون ضريبة
+                var sub = ReadDec(it.PriceBreakdown, "subTotal", Math.Max(0m, baseTotal - disc));
+                var total = ReadDec(it.PriceBreakdown, "total", sub);
+
+                if (total <= 0m)
+                    total = sub > 0m ? sub : Math.Max(0m, baseTotal - disc);
 
                 lines.Add(new QuotePdfHtmlBuilder.QuotePdfLine
                 {
                     Position = it.Position,
                     Title = it.Title ?? "",
-                    ServiceName = it.ServiceName,
+                    Description = string.IsNullOrWhiteSpace(it.Description) ? null : it.Description.Trim(),
                     Quantity = it.Quantity,
                     UnitPrice = it.UnitPrice,
-                    SubTotal = sub,
+                    BillingCycleText = MapBillingCycleText(it.BillingCycle),
+                    VatPercent = vatPercent,
+                    DiscountDisplay = BuildDiscountDisplay(it.DiscountType, it.DiscountValue),
+                    SubTotal = baseTotal,
                     Discount = disc,
-                    Tax = 0m,     // ✅ no per-line tax
-                    Total = total // ✅ no per-line tax
+                    Tax = 0m,
+                    Total = total
                 });
 
-                sumSub += sub;
+                sumBase += baseTotal;
                 sumDisc += disc;
+                sumNet += total;
             }
-            var vatPercent = q.ApplyVat ? 19m : 0m;
-            sumTax = q.ApplyVat ? Math.Max(0m, sumSub * 0.19m) : 0m;
-            sumTotal = sumSub + sumTax;
-          
+
+            sumTax = q.ApplyVat ? Math.Max(0m, sumNet * 0.19m) : 0m;
+            sumTotal = sumNet + sumTax;
 
             return new QuotePdfHtmlBuilder.QuotePdfDocumentModel
             {
@@ -628,7 +669,7 @@ namespace WitcherHub.Pages.Quotes
                 Lines = lines,
                 Totals = new QuotePdfHtmlBuilder.QuotePdfTotals
                 {
-                    SubTotal = sumSub,
+                    SubTotal = sumBase,
                     Discount = sumDisc,
                     Tax = sumTax,
                     Total = sumTotal,
@@ -636,6 +677,7 @@ namespace WitcherHub.Pages.Quotes
                 }
             };
         }
+
         private static string NormalizeBaseUrl(string baseUrl)
         {
             baseUrl = (baseUrl ?? "").Trim().TrimEnd('/');
@@ -704,22 +746,22 @@ namespace WitcherHub.Pages.Quotes
             var extraStyle = """
 <style>
   .signedQuoteBlock{
-    margin: 28px 0 0 0;
+    margin: 24px 0 0 0;
     page-break-inside: avoid;
     break-inside: avoid;
   }
 
   .signedQuoteCard{
-    border: 1px solid #dbe3ee;
-    border-radius: 14px;
+    border: 1px solid #d7c7f3;
+    border-radius: 18px;
     padding: 18px 20px;
-    background: #ffffff;
+    background: linear-gradient(180deg, #ffffff, #faf5ff);
   }
 
   .signedQuoteTitle{
     font-size: 18px;
     font-weight: 800;
-    color: #0f172a;
+    color: #2e1065;
     margin: 0 0 14px 0;
   }
 
@@ -727,12 +769,13 @@ namespace WitcherHub.Pages.Quotes
     margin: 6px 0;
     font-size: 12.5px;
     line-height: 1.6;
-    color: #111827;
+    color: #31263f;
   }
 
   .signedQuoteRow strong{
     display: inline-block;
     min-width: 120px;
+    color: #6b21a8;
   }
 
   .signedQuoteImage{
@@ -747,7 +790,7 @@ namespace WitcherHub.Pages.Quotes
 
   .signedQuoteLine{
     width: 260px;
-    border-top: 1px solid #111827;
+    border-top: 1px solid #7c3aed;
     margin-top: 8px;
   }
 </style>

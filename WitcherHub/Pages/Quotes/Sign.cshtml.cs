@@ -526,62 +526,88 @@ namespace WitcherHub.Pages.Quotes
         }
 
         private static string BuildSignedQuotePdfHtml(
-            QuotePdfHtmlBuilder.QuotePdfDocumentModel model,
-            string signerName,
-            string signerEmail,
-            DateTimeOffset signedAt,
-            string signatureDataUrl)
+    QuotePdfHtmlBuilder.QuotePdfDocumentModel model,
+    string signerName,
+    string signerEmail,
+    DateTimeOffset signedAt,
+    string signatureDataUrl)
         {
             var html = QuotePdfHtmlBuilder.Build(model);
 
             var extraStyle = """
-                <style>
-                    .signedQuoteBlock { margin: 28px 0 0 0; page-break-inside: avoid; break-inside: avoid; }
-                    .signedQuoteCard { border: 1px solid #dbe3ee; border-radius: 14px; padding: 18px 20px; background: #ffffff; }
-                    .signedQuoteTitle { font-size: 18px; font-weight: 800; color: #0f172a; margin: 0 0 14px 0; }
-                    .signedQuoteRow { margin: 6px 0; font-size: 12.5px; line-height: 1.6; color: #111827; }
-                    .signedQuoteRow strong { display: inline-block; min-width: 120px; }
-                    .signedQuoteImage { margin-top: 14px; }
-                    .signedQuoteImage img { max-width: 260px; max-height: 120px; display: block; }
-                    .signedQuoteLine { width: 260px; border-top: 1px solid #111827; margin-top: 8px; }
-                </style>
-                """;
+<style>
+  .signedQuoteBlock{
+    margin: 24px 0 0 0;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .signedQuoteCard{
+    border: 1px solid #d7c7f3;
+    border-radius: 18px;
+    padding: 18px 20px;
+    background: linear-gradient(180deg, #ffffff, #faf5ff);
+  }
+
+  .signedQuoteTitle{
+    font-size: 18px;
+    font-weight: 800;
+    color: #2e1065;
+    margin: 0 0 14px 0;
+  }
+
+  .signedQuoteRow{
+    margin: 6px 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #31263f;
+  }
+
+  .signedQuoteRow strong{
+    display: inline-block;
+    min-width: 120px;
+    color: #6b21a8;
+  }
+
+  .signedQuoteImage{
+    margin-top: 14px;
+  }
+
+  .signedQuoteImage img{
+    max-width: 260px;
+    max-height: 120px;
+    display: block;
+  }
+
+  .signedQuoteLine{
+    width: 260px;
+    border-top: 1px solid #7c3aed;
+    margin-top: 8px;
+  }
+</style>
+""";
 
             var signatureBlock = $"""
-                <div class="signedQuoteBlock">
-                    <div class="signedQuoteCard">
-                        <h2 class="signedQuoteTitle">Kundenunterschrift</h2>
+<div class="signedQuoteBlock">
+  <div class="signedQuoteCard">
+    <h2 class="signedQuoteTitle">Kundenunterschrift</h2>
+    <div class="signedQuoteRow"><strong>Angebot:</strong> {WebUtility.HtmlEncode(model.QuoteNo)}</div>
+    <div class="signedQuoteRow"><strong>Projekt:</strong> {WebUtility.HtmlEncode(model.ProjectTitle)}</div>
+    <div class="signedQuoteRow"><strong>Name:</strong> {WebUtility.HtmlEncode(signerName ?? "")}</div>
+    <div class="signedQuoteRow"><strong>E-Mail:</strong> {WebUtility.HtmlEncode(signerEmail ?? "")}</div>
+    <div class="signedQuoteRow"><strong>Signiert am:</strong> {WebUtility.HtmlEncode(signedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))}</div>
 
-                        <div class="signedQuoteRow">
-                            <strong>Angebot:</strong> {WebUtility.HtmlEncode(model.QuoteNo)}
-                        </div>
-                        <div class="signedQuoteRow">
-                            <strong>Projekt:</strong> {WebUtility.HtmlEncode(model.ProjectTitle)}
-                        </div>
-                        <div class="signedQuoteRow">
-                            <strong>Name:</strong> {WebUtility.HtmlEncode(signerName ?? string.Empty)}
-                        </div>
-                        <div class="signedQuoteRow">
-                            <strong>E-Mail:</strong> {WebUtility.HtmlEncode(signerEmail ?? string.Empty)}
-                        </div>
-                        <div class="signedQuoteRow">
-                            <strong>Signiert am:</strong> {WebUtility.HtmlEncode(signedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))}
-                        </div>
-
-                        <div class="signedQuoteImage">
-                            <img src="{WebUtility.HtmlEncode(signatureDataUrl ?? string.Empty)}" alt="Signature" />
-                            <div class="signedQuoteLine"></div>
-                        </div>
-                    </div>
-                </div>
-                """;
+    <div class="signedQuoteImage">
+      <img src="{WebUtility.HtmlEncode(signatureDataUrl ?? "")}" alt="Signature" />
+      <div class="signedQuoteLine"></div>
+    </div>
+  </div>
+</div>
+""";
 
             if (html.Contains("</head>", StringComparison.OrdinalIgnoreCase))
             {
-                html = html.Replace(
-                    "</head>",
-                    extraStyle + "</head>",
-                    StringComparison.OrdinalIgnoreCase);
+                html = html.Replace("</head>", extraStyle + "</head>", StringComparison.OrdinalIgnoreCase);
             }
             else
             {
@@ -590,10 +616,7 @@ namespace WitcherHub.Pages.Quotes
 
             if (html.Contains("</body>", StringComparison.OrdinalIgnoreCase))
             {
-                html = html.Replace(
-                    "</body>",
-                    signatureBlock + "</body>",
-                    StringComparison.OrdinalIgnoreCase);
+                html = html.Replace("</body>", signatureBlock + "</body>", StringComparison.OrdinalIgnoreCase);
             }
             else
             {
@@ -810,37 +833,49 @@ namespace WitcherHub.Pages.Quotes
                 pdfDisplayName = string.Empty;
             }
 
+            var vatPercent = q.ApplyVat ? 19m : 0m;
+
             var lines = new List<QuotePdfHtmlBuilder.QuotePdfLine>();
-            decimal sumSub = 0m;
-            decimal sumDisc = 0m;
+
+            decimal sumBase = 0m; // قبل الخصم
+            decimal sumDisc = 0m; // الخصم
+            decimal sumNet = 0m;  // بعد الخصم
 
             foreach (var it in (q.Items ?? new List<QuoteItem>()).OrderBy(x => x.Position))
             {
-                var baseTotal = it.Quantity * it.UnitPrice;
-                var sub = ReadDec(it.PriceBreakdown, "subTotal", baseTotal);
+                var fallbackBase = it.Quantity * it.UnitPrice;
+
+                var baseTotal = ReadDec(it.PriceBreakdown, "baseTotal", fallbackBase);
                 var disc = ReadNestedDec(it.PriceBreakdown, "discount", "amount", 0m);
+                var sub = ReadDec(it.PriceBreakdown, "subTotal", Math.Max(0m, baseTotal - disc));
                 var total = ReadDec(it.PriceBreakdown, "total", sub);
+
+                if (total <= 0m)
+                    total = sub > 0m ? sub : Math.Max(0m, baseTotal - disc);
 
                 lines.Add(new QuotePdfHtmlBuilder.QuotePdfLine
                 {
                     Position = it.Position,
                     Title = it.Title ?? string.Empty,
-                    ServiceName = it.Service?.Name,
+                    Description = string.IsNullOrWhiteSpace(it.Description) ? null : it.Description.Trim(),
                     Quantity = it.Quantity,
                     UnitPrice = it.UnitPrice,
-                    SubTotal = sub,
+                    BillingCycleText = MapBillingCycleText(it.BillingCycle),
+                    VatPercent = vatPercent,
+                    DiscountDisplay = BuildDiscountDisplay(it.DiscountType, it.DiscountValue),
+                    SubTotal = baseTotal, // صار قبل الخصم
                     Discount = disc,
                     Tax = 0m,
-                    Total = total
+                    Total = total         // الصافي بعد الخصم
                 });
 
-                sumSub += sub;
+                sumBase += baseTotal;
                 sumDisc += disc;
+                sumNet += total;
             }
 
-            var vatPercent = q.ApplyVat ? 19m : 0m;
-            var sumTax = q.ApplyVat ? Math.Max(0m, sumSub * 0.19m) : 0m;
-            var sumTotal = sumSub + sumTax;
+            var sumTax = q.ApplyVat ? Math.Max(0m, sumNet * 0.19m) : 0m;
+            var sumTotal = sumNet + sumTax;
 
             return new QuotePdfHtmlBuilder.QuotePdfDocumentModel
             {
@@ -867,7 +902,7 @@ namespace WitcherHub.Pages.Quotes
                 Lines = lines,
                 Totals = new QuotePdfHtmlBuilder.QuotePdfTotals
                 {
-                    SubTotal = sumSub,
+                    SubTotal = sumBase,
                     Discount = sumDisc,
                     Tax = sumTax,
                     Total = sumTotal,
@@ -876,6 +911,34 @@ namespace WitcherHub.Pages.Quotes
             };
         }
 
+        private static string MapBillingCycleText(BillingCycle billingCycle)
+        {
+            return billingCycle switch
+            {
+                BillingCycle.OneTime => "Einmalig",
+                BillingCycle.Monthly => "Monatlich",
+                BillingCycle.Quarterly => "Vierteljährlich",
+                BillingCycle.SemiAnnual => "Halbjährlich",
+                BillingCycle.Annual => "Jährlich",
+                _ => billingCycle.ToString()
+            };
+        }
+
+        private static string BuildDiscountDisplay(DiscountType? discountType, decimal? discountValue)
+        {
+            if (discountType is null || discountValue is null || discountValue.Value <= 0m)
+                return "—";
+
+            var de = CultureInfo.GetCultureInfo("de-DE");
+
+            return discountType switch
+            {
+                DiscountType.Percent => discountValue.Value.ToString("0.##", de) + " %",
+                DiscountType.Fixed => discountValue.Value.ToString("N2", de) + " €",
+                DiscountType.Amount => discountValue.Value.ToString("N2", de) + " €",
+                _ => discountValue.Value.ToString("0.##", de)
+            };
+        }
         private static string ExtractRenderableHtml(string html)
         {
             if (string.IsNullOrWhiteSpace(html))
