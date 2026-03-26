@@ -1,7 +1,7 @@
 # Agenturvertrag
 
 **Vertragsnummer:** {{CONTRACT_NO}}  
-**Projekt:** {{PROJECT_TITLE}}  
+**Projekt:** {{PROJECT_TITLE}}
 
 ## Vertragspartner
 
@@ -14,23 +14,10 @@
 nachfolgend gemeinsam „Parteien“.
 
 ## Vertragsgegenstand
-Der Anbieter erbringt die in **Anlage A (Leistungsbeschreibung)** beschriebenen Leistungen für das oben genannte Projekt.
-
-## Geltung der AGB
-Die Allgemeinen Geschäftsbedingungen (AGB) sind diesem Vertrag als **Anlage B** beigefügt und werden Bestandteil dieses Vertrages.
-
-## Rangfolge / Vorrang
-Im Falle von Widersprüchen gilt folgende Reihenfolge:
-1) dieser Vertrag einschließlich **Anlage A** (Leistungsbeschreibung),
-2) **Anlage B** (AGB).
+Der Anbieter erbringt die für das oben genannte Projekt vereinbarten Leistungen gemäß **Anlage A – Leistungsbeschreibung**.
 
 ## Anlage A – Leistungsbeschreibung
 {{SERVICES_SECTION}}
 
-### Preisübersicht
+## Preisübersicht
 {{PRICE_BOX}}
-
----
-
-## Anlage B – Allgemeine Geschäftsbedingungen (AGB)
-{{AGB_BODY}}

@@ -120,6 +120,24 @@
   <data name="contractPage_AcceptSignature" xml:space="preserve">
     <value>Accept Signature</value>
   </data>
+  <data name="contractPage_AgreeContractLink" xml:space="preserve">
+    <value>AgreeContractLink</value>
+  </data>
+  <data name="contractPage_AgreeHelp" xml:space="preserve">
+    <value>AgreeHelp</value>
+  </data>
+  <data name="contractPage_AgreeMiddle" xml:space="preserve">
+    <value>AgreeMiddle</value>
+  </data>
+  <data name="contractPage_AgreePrefix" xml:space="preserve">
+    <value>AgreePrefix</value>
+  </data>
+  <data name="contractPage_AgreeSuffix" xml:space="preserve">
+    <value>AgreeSuffix</value>
+  </data>
+  <data name="contractPage_AgreeTermsLink" xml:space="preserve">
+    <value>AgreeTermsLink</value>
+  </data>
   <data name="contractPage_AgreeText" xml:space="preserve">
     <value>I have read and agree to the terms of this contract</value>
   </data>

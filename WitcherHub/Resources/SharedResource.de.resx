@@ -120,6 +120,24 @@
   <data name="contractPage_AcceptSignature" xml:space="preserve">
     <value>Unterschrift bestätigen</value>
   </data>
+  <data name="contractPage_AgreeContractLink" xml:space="preserve">
+    <value>Vertrag</value>
+  </data>
+  <data name="contractPage_AgreeHelp" xml:space="preserve">
+    <value>Bitte lesen Sie beide Inhalte sorgfältig, bevor Sie unterschreiben.</value>
+  </data>
+  <data name="contractPage_AgreeMiddle" xml:space="preserve">
+    <value>gelesen und stimme dem</value>
+  </data>
+  <data name="contractPage_AgreePrefix" xml:space="preserve">
+    <value>Ich habe die</value>
+  </data>
+  <data name="contractPage_AgreeSuffix" xml:space="preserve">
+    <value>zu.</value>
+  </data>
+  <data name="contractPage_AgreeTermsLink" xml:space="preserve">
+    <value>AGB</value>
+  </data>
   <data name="contractPage_AgreeText" xml:space="preserve">
     <value>Ich habe die Bedingungen gelesen und stimme dem Vertrag zu.</value>
   </data>

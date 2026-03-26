@@ -40,14 +40,9 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             var baseTemplate = await ReadTextSmartAsync(templatePath, ct);
 
-            // 2) Load AGB
-            var agbPath = Path.Combine(AppContext.BaseDirectory, _opt.AgbDePath);
-            if (!File.Exists(agbPath))
-                throw new InvalidOperationException($"AGB file not found: {agbPath}");
+           
 
-            var agbBody = await ReadTextSmartAsync(agbPath, ct);
-
-            // 3) Prepare customer/provider blocks
+            // 2) Prepare customer/provider blocks
             var customerBlock = request.CustomerBlockOverride;
             if (string.IsNullOrWhiteSpace(customerBlock))
             {
@@ -63,7 +58,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             providerBlock = FormatPartyBlockMarkdown(providerBlock);
             customerBlock = FormatPartyBlockMarkdown(customerBlock);
 
-            // 4) Prepare payload for GPT
+            // 3) Prepare payload for GPT
             var servicesPayload = request.Services
                 .OrderBy(s => s.Position)
                 .Select(s => new
@@ -123,7 +118,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             structured.GeneratedBy = "openai";
             structured.GeneratedAt = DateTimeOffset.UtcNow;
 
-            // 5) Convert Structured → Markdown (temporary rendering layer)
+            // 4) Convert Structured → Markdown (temporary rendering layer)
             var servicesMarkdown = RenderStructuredToMarkdown(structured, request.Currency);
             // build fallback price map from line items (AgreedPrice)
             var agreedByPosition = request.Services
@@ -131,7 +126,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 .ToDictionary(g => g.Key, g => g.FirstOrDefault()?.AgreedPrice);
 
             var priceBox = BuildPriceBoxMarkdown(structured, agreedByPosition, request.Currency);
-            // 6) Merge template
+            // 5) Merge template
             var tokens = new Dictionary<string, string?>
             {
                 ["CONTRACT_NO"] = string.IsNullOrWhiteSpace(request.ContractNo) ? "" : request.ContractNo,
@@ -139,9 +134,8 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 ["PROVIDER_BLOCK"] = providerBlock,
                 ["CUSTOMER_BLOCK"] = customerBlock,
                 ["SIGNER_NAME"] = request.SignerName,
-                ["AGB_BODY"] = agbBody,
                 ["SERVICES_SECTION"] = servicesMarkdown,
-                ["PRICE_BOX"] = priceBox, // ✅ new
+                ["PRICE_BOX"] = priceBox,
             };
 
             var full = ReplaceTokens(baseTemplate, tokens);
@@ -206,7 +200,7 @@ Hard Rules (must follow):
 - Professional, business tone.
 - DO NOT write any legal terms, payment terms, due dates, cancellation rights, warranties, liability limits, or references to laws/paragraphs.
 - DO NOT define any acceptance deadlines (no days/weeks/months). Acceptance is governed by AGB. Keep acceptanceCriteria as measurable checks only (format, completeness, consistency).
-- No contradictions with AGB. If uncertain, stay generic and factual.
+- Avoid legal wording and stay generic, factual, and operational.
 - Each list item must be a single line (no line breaks inside items).
 - {(includePrices ? "Use provided pricing fields if available. Never invent prices." : "Do not invent pricing values.")}
 - Do not add extra properties.
@@ -483,7 +477,7 @@ Additional instructions:
 
             sb.AppendLine($"|  | **Gesamtbetrag (Brutto)** | **{grossTotal.ToString("N2", de)} {currency}** |");
             sb.AppendLine();
-            sb.AppendLine("_Alle Beträge netto zzgl. gesetzlicher Umsatzsteuer, sofern nicht anders ausgewiesen. Zahlungsbedingungen gemäß Anlage B (AGB)._");
+            sb.AppendLine("_Alle Beträge netto zzgl. gesetzlicher Umsatzsteuer, sofern nicht anders ausgewiesen._");
 
             return sb.ToString().Trim();
 
