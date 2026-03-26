@@ -125,6 +125,39 @@
                 gap: 24px;
             }
         }
+
+        .contractActions__agree {
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.contractActions__agree input[type="checkbox"] {
+    margin-top: 3px;
+    flex-shrink: 0;
+}
+
+.contractActions__agree > span {
+    line-height: 1.6;
+}
+
+.contractActions__agree a {
+    color: #6d28d9;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.contractActions__agree a:hover {
+    color: #5b21b6;
+}
+
+.contractActions__text {
+    display: block;
+    margin-top: 4px;
+    color: #6b7280;
+    font-size: 12px;
+    line-height: 1.5;
+}
     </style>
 }
 
@@ -159,13 +192,31 @@
             </div>
 
             <div class="contractActions" id="contractActions">
-                <label class="contractActions__agree">
-                    <input type="checkbox" id="chkAgree" />
-                    <span>
-                        <strong>@L("contractPage_AgreeTitle", "I confirm this quote.")</strong><br />
-                        <span class="contractActions__text">@L("contractPage_AgreeText", "Please review all details before signing.")</span>
-                    </span>
-                </label>
+                <label class="contractActions__agree" for="chkAgree">
+    <input type="checkbox" id="chkAgree" />
+
+    <span>
+        Ich habe die
+        <a id="termsLink"
+           href="https://netwitcher.com/de/agb-fuer-agenturen"
+           target="_blank"
+           rel="noopener noreferrer">
+            Bedingungen
+        </a>
+        gelesen und stimme dem
+        <a id="contractLink"
+           href="https://netwitcher.com/de/datenschutzerklaerung"
+           target="_blank"
+           rel="noopener noreferrer">
+            Vertrag
+        </a>
+        zu.
+
+        <span class="contractActions__text">
+            Bitte lesen Sie beide Inhalte sorgfältig, bevor Sie unterschreiben.
+        </span>
+    </span>
+</label>
 
                 <div class="contractActions__right">
                     <div class="contractActions__badge" id="signedBadge">@L("contractPage_Unsigned", "Unsigned")</div>
