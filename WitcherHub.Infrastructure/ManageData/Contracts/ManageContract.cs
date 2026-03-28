@@ -465,6 +465,14 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
         // =========================
         // ITEMS: CREATE
         // =========================
+
+        public async Task<(JsonDocument Breakdown, decimal EffectiveUnitPrice)> PreviewItemPriceAsync(
+    ContractItemDto item,
+    CancellationToken ct = default)
+        {
+            if (item is null) throw new BadRequestAppException("Invalid payload.");
+            return await BuildBreakdownAsync(item, ct);
+        }
         public async Task<Guid> CreateItemAsync(CreateContractItemDto dto, CancellationToken ct = default)
         {
             if (dto is null) throw new BadRequestAppException("Invalid payload.");

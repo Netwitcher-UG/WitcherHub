@@ -54,7 +54,16 @@ namespace WitcherHub.Pages.Contracts.Items
 
         [BindProperty]
         public CreateContractItemDto Form { get; set; } = new();
-
+        public sealed class PreviewPriceRequest
+        {
+            public Guid ServiceId { get; set; }
+            public decimal Quantity { get; set; } = 1;
+            public string? BillingCycle { get; set; } = "OneTime";
+            public string? DiscountType { get; set; }
+            public decimal? DiscountValue { get; set; }
+            public string ConfigJson { get; set; } = "{}";
+            public List<Guid> PricingRuleIds { get; set; } = new();
+        }
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             if (ContractId == Guid.Empty) return NotFound();
@@ -123,7 +132,80 @@ namespace WitcherHub.Pages.Contracts.Items
 
             return new JsonResult(rules);
         }
+        public async Task<IActionResult> OnPostPreviewPriceAsync(
+    [FromBody] PreviewPriceRequest request,
+    CancellationToken ct)
+        {
+            try
+            {
+                if (request is null || request.ServiceId == Guid.Empty)
+                    return BadRequest(new { ok = false, message = "Service is required." });
 
+                JsonDocument configDoc;
+                try
+                {
+                    configDoc = JsonDocument.Parse(string.IsNullOrWhiteSpace(request.ConfigJson) ? "{}" : request.ConfigJson);
+                }
+                catch
+                {
+                    return BadRequest(new { ok = false, message = "Invalid JSON config." });
+                }
+
+                var service = await _services.GetServiceAsync(request.ServiceId, ct);
+                if (service is null) return NotFound(new { ok = false, message = "Service not found." });
+
+                // Parsing Enums
+                var billingCycle = BillingCycle.OneTime;
+                if (!string.IsNullOrWhiteSpace(request.BillingCycle))
+                {
+                    if (Enum.TryParse<BillingCycle>(request.BillingCycle, true, out var parsedBC)) billingCycle = parsedBC;
+                    else if (int.TryParse(request.BillingCycle, out var bcInt) && Enum.IsDefined(typeof(BillingCycle), bcInt)) billingCycle = (BillingCycle)bcInt;
+                }
+
+                DiscountType? discountType = null;
+                if (!string.IsNullOrWhiteSpace(request.DiscountType))
+                {
+                    if (Enum.TryParse<DiscountType>(request.DiscountType, true, out var parsedDT)) discountType = parsedDT;
+                    else if (int.TryParse(request.DiscountType, out var dtInt) && Enum.IsDefined(typeof(DiscountType), dtInt)) discountType = (DiscountType)dtInt;
+                }
+
+                var item = new ContractItemDto
+                {
+                    ServiceId = request.ServiceId,
+                    Title = service.Name ?? "",
+                    Quantity = request.Quantity < 0 ? 0 : request.Quantity,
+                    UnitPrice = service.BasePrice,
+                    Config = configDoc,
+                    DiscountType = discountType,
+                    DiscountValue = request.DiscountValue,
+                    BillingCycle = billingCycle,
+                    PricingRuleIds = request.PricingRuleIds ?? new List<Guid>()
+                };
+
+                var (breakdown, effectiveUnitPrice) = await _contracts.PreviewItemPriceAsync(item, ct);
+
+                return new JsonResult(new
+                {
+                    ok = true,
+                    serviceName = service.Name ?? "",
+                    defaultUnitName = service.DefaultUnitName ?? "",
+                    defaultDescription = service.DefaultDescription ?? "",
+                    effectiveUnitPrice,
+                    configJson = JsonSerializer.Serialize(item.Config.RootElement),
+                    breakdown = JsonSerializer.Deserialize<object>(breakdown.RootElement.GetRawText())
+                });
+            }
+            catch (BadRequestAppException ex)
+            {
+                Response.StatusCode = 400;
+                return new JsonResult(new { ok = false, message = ex.Message });
+            }
+            catch (Exception)
+            {
+                Response.StatusCode = 500;
+                return new JsonResult(new { ok = false, message = "Internal error during preview." });
+            }
+        }
         public async Task<IActionResult> OnPostAsync(CancellationToken ct)
         {
             try

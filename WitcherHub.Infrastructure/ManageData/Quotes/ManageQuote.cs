@@ -399,6 +399,14 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
         // =========================
         // ITEMS: CREATE
         // =========================
+
+        public async Task<(JsonDocument Breakdown, decimal EffectiveUnitPrice)> PreviewItemPriceAsync(
+    QuoteItemDto item,
+    CancellationToken ct = default)
+        {
+            if (item is null) throw new BadRequestAppException("Invalid payload.");
+            return await BuildBreakdownAsync(item, ct);
+        }
         public async Task<Guid> CreateItemAsync(CreateQuoteItemDto dto, CancellationToken ct = default)
         {
             if (dto is null) throw new BadRequestAppException("Invalid payload.");

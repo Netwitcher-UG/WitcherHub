@@ -16,8 +16,22 @@
     return JSON.stringify(obj ?? {}, null, pretty ? 2 : 0);
   }
 
+  function dispatchAppEvent(name) {
+    document.dispatchEvent(new CustomEvent(name));
+  }
+
+  function debounce(fn, wait) {
+    let t = null;
+    return function () {
+      const ctx = this;
+      const args = arguments;
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(ctx, args), wait);
+    };
+  }
+
   // -----------------------------
-  // Service Combo (typeahead over hidden <select>)
+  // Service Combo
   // -----------------------------
   (function initServiceCombo() {
     const combo = document.getElementById('serviceCombo');
@@ -35,7 +49,7 @@
       menu.innerHTML = '';
       if (!list.length) {
         const li = document.createElement('li');
-        li.innerHTML = `<span class="dropdown-item-text text-muted">No results</span>`;
+        li.innerHTML = '<span class="dropdown-item-text text-muted">No results</span>';
         menu.appendChild(li);
         return;
       }
@@ -67,7 +81,6 @@
       dd.show();
     }
 
-    // init selection (postback)
     if (select.value) {
       const cur = all.find(x => x.value === select.value);
       if (cur) combo.value = cur.text;
@@ -96,15 +109,13 @@
   })();
 
   // -----------------------------
-  // Pricing Rules (loads by serviceId)
+  // Pricing Rules
   // -----------------------------
   (function initRules() {
     const serviceSelect = document.getElementById('serviceSelect');
-
     const rulesBlock = document.getElementById('rulesBlock');
     const ruleCombo = document.getElementById('ruleCombo');
     const ruleMenu = document.getElementById('ruleMenu');
-
     const selectedRulesWrap = document.getElementById('selectedRules');
     const hiddenInputsWrap = document.getElementById('ruleHiddenInputs');
 
@@ -113,12 +124,17 @@
     const ruleDd = bootstrap.Dropdown.getOrCreateInstance(ruleCombo, { autoClose: true });
 
     let allRules = [];
-    const selected = new Map(); // id -> rule
+    const selected = new Map();
+
+    function notifyRulesChanged() {
+      dispatchAppEvent('quote-item-rules-changed');
+    }
 
     function clearSelected() {
       selected.clear();
       selectedRulesWrap.innerHTML = '';
       hiddenInputsWrap.innerHTML = '';
+      notifyRulesChanged();
     }
 
     function addHidden(id) {
@@ -137,6 +153,7 @@
 
     function renderSelected() {
       selectedRulesWrap.innerHTML = '';
+
       for (const r of selected.values()) {
         const badge = document.createElement('span');
         badge.className = 'badge bg-primary bg-opacity-10 text-primary d-inline-flex align-items-center gap-2';
@@ -147,11 +164,14 @@
             <i class="material-icons-outlined" style="font-size:18px; line-height:1;">close</i>
           </button>
         `;
+
         badge.querySelector('button').addEventListener('click', () => {
           selected.delete(r.id);
           removeHidden(r.id);
           renderSelected();
+          notifyRulesChanged();
         });
+
         selectedRulesWrap.appendChild(badge);
       }
     }
@@ -160,7 +180,7 @@
       ruleMenu.innerHTML = '';
       if (!list.length) {
         const li = document.createElement('li');
-        li.innerHTML = `<span class="dropdown-item-text text-muted">No rules</span>`;
+        li.innerHTML = '<span class="dropdown-item-text text-muted">No rules</span>';
         ruleMenu.appendChild(li);
         return;
       }
@@ -170,12 +190,13 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'dropdown-item';
-        btn.textContent = `${r.name}${r.label ? " — " + r.label : ""}`;
+        btn.textContent = `${r.name}${r.label ? ' — ' + r.label : ''}`;
         btn.addEventListener('click', () => {
           if (!selected.has(r.id)) {
             selected.set(r.id, r);
             addHidden(r.id);
             renderSelected();
+            notifyRulesChanged();
           }
           ruleCombo.value = '';
           ruleDd.hide();
@@ -208,12 +229,14 @@
       allRules = Array.isArray(data) ? data : [];
       if (!allRules.length) {
         rulesBlock.style.display = 'none';
+        notifyRulesChanged();
         return;
       }
 
       rulesBlock.style.display = '';
       ruleCombo.value = '';
       renderMenu(allRules);
+      notifyRulesChanged();
     }
 
     ruleCombo.addEventListener('focus', filterAndShowRules);
@@ -229,7 +252,6 @@
       if (e.key === 'Escape') ruleDd.hide();
     });
 
-    // do not attach change here; we do it once in combined handler below
     window.__loadRulesForService = loadRulesForService;
 
     if (serviceSelect.value) loadRulesForService(serviceSelect.value);
@@ -246,7 +268,6 @@
     const cfgLoading = document.getElementById('cfgLoading');
     const resetBtn = document.getElementById('cfgResetBtn');
     const formatBtn = document.getElementById('cfgFormatBtn');
-
     const cfgJson = document.getElementById('cfg-json');
     const cfgJsonHidden = document.getElementById('cfg-json-hidden');
     const btnSubmit = document.getElementById('btnSubmit');
@@ -260,12 +281,12 @@
       const text = stringifyJson(cfg, pretty);
       cfgJson.value = text;
       cfgJsonHidden.value = text;
+      dispatchAppEvent('quote-item-config-changed');
     }
 
     function normalizeCfgBySchema() {
       if (!schema || schema.type !== 'object' || !schema.properties) return;
 
-      // drop unknown keys if additionalProperties === false
       if (schema.additionalProperties === false) {
         const allowed = new Set(Object.keys(schema.properties));
         Object.keys(cfg).forEach(k => {
@@ -273,7 +294,6 @@
         });
       }
 
-      // apply defaults
       Object.entries(schema.properties).forEach(([key, def]) => {
         if (cfg[key] === undefined && def && typeof def === 'object' && def.default !== undefined) {
           cfg[key] = def.default;
@@ -292,8 +312,16 @@
       const hasEnum = Array.isArray(def.enum);
       const t = (def.type || (hasEnum ? 'string' : 'string'));
 
-      if (t === 'boolean') { control.checked = !!val; return; }
-      if (val === undefined || val === null) { control.value = ''; return; }
+      if (t === 'boolean') {
+        control.checked = !!val;
+        return;
+      }
+
+      if (val === undefined || val === null) {
+        control.value = '';
+        return;
+      }
+
       control.value = String(val);
     }
 
@@ -301,23 +329,37 @@
       const hasEnum = Array.isArray(def.enum);
       const t = (def.type || (hasEnum ? 'string' : 'string'));
 
-      if (t === 'boolean') { cfg[key] = !!control.checked; return; }
+      if (t === 'boolean') {
+        cfg[key] = !!control.checked;
+        return;
+      }
 
       if (control.value === '' || control.value === null || control.value === undefined) {
         delete cfg[key];
         return;
       }
 
-      if (hasEnum) { cfg[key] = control.value; return; }
+      if (hasEnum) {
+        cfg[key] = control.value;
+        return;
+      }
+
       if (t === 'integer') {
         const n = Number(control.value);
-        if (!Number.isFinite(n)) { delete cfg[key]; return; }
+        if (!Number.isFinite(n)) {
+          delete cfg[key];
+          return;
+        }
         cfg[key] = Math.trunc(n);
         return;
       }
+
       if (t === 'number') {
         const n = Number(control.value);
-        if (!Number.isFinite(n)) { delete cfg[key]; return; }
+        if (!Number.isFinite(n)) {
+          delete cfg[key];
+          return;
+        }
         cfg[key] = n;
         return;
       }
@@ -363,8 +405,7 @@
         div.appendChild(control);
         div.appendChild(lab2);
         wrapper.appendChild(div);
-      }
-      else if (hasEnum) {
+      } else if (hasEnum) {
         control = document.createElement('select');
         control.className = 'form-select';
         control.id = inputId(key);
@@ -383,8 +424,7 @@
         });
 
         wrapper.appendChild(control);
-      }
-      else if (t === 'integer' || t === 'number') {
+      } else if (t === 'integer' || t === 'number') {
         control = document.createElement('input');
         control.type = 'number';
         control.className = 'form-control';
@@ -396,8 +436,7 @@
         if (typeof def.maximum === 'number') control.max = String(def.maximum);
 
         wrapper.appendChild(control);
-      }
-      else {
+      } else {
         control = document.createElement('input');
         control.type = 'text';
         control.className = 'form-control';
@@ -417,8 +456,15 @@
         wrapper.appendChild(help);
       }
 
-      control.addEventListener('change', () => { writeValueFromControl(key, def, control); syncJsonTargets(false); });
-      control.addEventListener('input', () => { writeValueFromControl(key, def, control); syncJsonTargets(false); });
+      control.addEventListener('change', () => {
+        writeValueFromControl(key, def, control);
+        syncJsonTargets(false);
+      });
+
+      control.addEventListener('input', () => {
+        writeValueFromControl(key, def, control);
+        syncJsonTargets(false);
+      });
 
       setControlValue(def, control, cfg[key]);
       col.appendChild(wrapper);
@@ -430,6 +476,7 @@
 
       if (!schema || schema.type !== 'object' || !schema.properties || typeof schema.properties !== 'object') {
         cfgEmpty.classList.remove('d-none');
+        dispatchAppEvent('quote-item-config-changed');
         return;
       }
 
@@ -457,7 +504,6 @@
 
       configBlock.style.display = '';
 
-      // start from current json (postback safe)
       const parsed = tryParseJson(cfgJson.value);
       cfg = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
 
@@ -499,7 +545,7 @@
     formatBtn?.addEventListener('click', () => {
       const p = tryParseJson(cfgJson.value);
       if (!p) {
-        alert("Invalid JSON.");
+        alert('Invalid JSON.');
         return;
       }
       cfg = p;
@@ -507,20 +553,17 @@
       syncJsonTargets(true);
     });
 
-    // Combined service change:
     serviceSelect.addEventListener('change', async () => {
       const serviceId = serviceSelect.value;
 
-      // load rules
       if (window.__loadRulesForService) {
-        window.__loadRulesForService(serviceId);
+        await window.__loadRulesForService(serviceId);
       }
 
-      // load schema + render config
       await loadSchema(serviceId);
+      dispatchAppEvent('quote-item-service-changed');
     });
 
-    // initial (postback)
     if (serviceSelect.value) {
       loadSchema(serviceSelect.value);
       if (window.__loadRulesForService) window.__loadRulesForService(serviceSelect.value);
@@ -529,44 +572,173 @@
       cfg = {};
       syncJsonTargets(false);
     }
+  })();
 
-    })();
-    (function () {
-        if (window.quoteDateTheme) return;
+  // -----------------------------
+  // Live Price Preview Logic
+  // -----------------------------
+  (function initLivePricePreview() {
+    const form = document.querySelector('form[method="post"]');
+    const serviceSelect = document.getElementById('serviceSelect');
+    const quantityInput = document.getElementById('Form_Item_Quantity');
+    const billingCycleSelect = document.getElementById('Form_Item_BillingCycle');
+    const discountTypeSelect = document.getElementById('Form_Item_DiscountType');
+    const discountValueInput = document.getElementById('Form_Item_DiscountValue');
+    const unitNameInput = document.getElementById('Form_Item_UnitName');
+    const descriptionInput = document.getElementById('Form_Item_Description');
+    const cfgJsonHidden = document.getElementById('cfg-json-hidden');
+    const previewCard = document.getElementById('livePriceCard');
+    const previewEmpty = document.getElementById('livePriceEmpty');
+    const previewContent = document.getElementById('livePriceContent');
+    const previewStatus = document.getElementById('livePriceStatus');
+    const previewBaseUnit = document.getElementById('previewBaseUnit');
+    const previewEffectiveUnit = document.getElementById('previewEffectiveUnit');
+    const previewDiscount = document.getElementById('previewDiscount');
+    const previewTotal = document.getElementById('previewTotal');
+    const previewRules = document.getElementById('previewRules');
+    const previewRulesEmpty = document.getElementById('previewRulesEmpty');
 
-        function init(root) {
-            const scope = root || document;
+    if (!form || !serviceSelect || !previewCard || !previewEmpty || !previewContent) return;
 
-            scope.querySelectorAll('input[type="date"].js-themed-date, input[type="date"].js-datepicker')
-                .forEach(function (input) {
-                    if (input.dataset.dateThemeReady === "1") return;
-                    input.dataset.dateThemeReady = "1";
+    const currency = previewCard.dataset.currency || 'EUR';
+    let controller = null;
 
-                    input.classList.add("js-datepicker");
-                    input.style.cursor = "pointer";
+    function formatMoney(value) {
+      const number = Number(value || 0);
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: 'currency', currency, minimumFractionDigits: 2
+        }).format(number);
+      } catch { return `${number.toFixed(2)} ${currency}`; }
+    }
 
-                    input.addEventListener("mousedown", function () {
-                        if (input.disabled || input.readOnly) return;
+    function getSelectedRuleIds() {
+      return Array.from(document.querySelectorAll('input[name="Form.Item.PricingRuleIds"]'))
+        .map(x => x.value).filter(Boolean);
+    }
 
-                        try { input.focus({ preventScroll: true }); }
-                        catch { input.focus(); }
-
-                        if (typeof input.showPicker === "function") {
-                            try { input.showPicker(); } catch (_) { }
-                        }
-                    });
-                });
+ async function fetchPreview() {
+        const serviceId = serviceSelect.value;
+        if (!serviceId) {
+            previewCard.style.display = 'none';
+            return;
         }
 
-        window.quoteDateTheme = { init: init };
+        if (controller) controller.abort();
+        controller = new AbortController();
 
-        if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", function () {
-                init(document);
+        const rawDiscountValue = (discountValueInput?.value || '').trim();
+
+        // بناء الـ Payload ليتوافق مع الـ Request Model الجديد في C#
+        const payload = {
+            serviceId: serviceId,
+            quantity: parseFloat(quantityInput?.value || '1') || 1,
+            billingCycle: billingCycleSelect?.value || 'OneTime',
+            discountType: discountTypeSelect?.value || null,
+            discountValue: rawDiscountValue === '' ? null : parseFloat(rawDiscountValue),
+            configJson: cfgJsonHidden?.value || "{}",
+            pricingRuleIds: getSelectedRuleIds()
+        };
+
+        try {
+            const res = await fetch('?handler=PreviewPrice', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': form.querySelector('input[name="__RequestVerificationToken"]').value
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal
             });
-        } else {
-            init(document);
-        }
-    })();
 
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok || !data?.ok) {
+                previewCard.style.display = '';
+                previewEmpty.classList.remove('d-none');
+                previewContent.classList.add('d-none');
+                previewEmpty.textContent = data?.message || 'Unable to calculate live price preview.';
+                console.error('Preview error:', data);
+                return;
+            }
+
+            // استخراج البيانات من الـ Breakdown المرتجع من السيرفر
+            const breakdown = data.breakdown || {};
+            const rules = Array.isArray(breakdown.pricingRules) ? breakdown.pricingRules : [];
+
+            const discountFromField = Number(breakdown?.discount?.fromField || 0);
+            const discountFromRules = Number(breakdown?.discount?.fromRules || 0);
+            const discountAmount = Number(
+                breakdown?.discount?.amount ?? (discountFromField + discountFromRules)
+            );
+
+            // تحديث عناصر الواجهة
+            previewCard.style.display = '';
+            previewEmpty.classList.add('d-none');
+            previewContent.classList.remove('d-none');
+
+            if (previewStatus) {
+                previewStatus.textContent = data.serviceName || 'Live price calculated';
+            }
+
+            previewBaseUnit.textContent = formatMoney(Number(breakdown.baseUnitPrice || 0));
+            previewEffectiveUnit.textContent = formatMoney(Number(data.effectiveUnitPrice ?? breakdown.unitPrice ?? 0));
+            previewDiscount.textContent = discountAmount > 0 ? formatMoney(discountAmount) : '—';
+            previewTotal.textContent = formatMoney(Number(breakdown.total || 0));
+
+            // عرض القواعد المطبقة (Pricing Rules) بشكل ديناميكي
+            if (previewRules && previewRulesEmpty) {
+                previewRules.innerHTML = '';
+
+                if (!rules.length) {
+                    previewRulesEmpty.classList.remove('d-none');
+                } else {
+                    previewRulesEmpty.classList.add('d-none');
+
+                    rules.forEach(rule => {
+                        const beforeTotal = Number(rule.beforeTotal || 0);
+                        const afterTotal = Number(rule.afterTotal || 0);
+                        const discountApplied = Number(rule.discountApplied || 0);
+                        const delta = afterTotal - beforeTotal;
+
+                        let effectText = 'Applied';
+                        if (discountApplied > 0) {
+                            effectText = `- ${formatMoney(discountApplied)}`;
+                        } else if (Math.abs(delta) > 0.0001) {
+                            effectText = `${delta > 0 ? '+' : '-'} ${formatMoney(Math.abs(delta))}`;
+                        } else if (rule.afterUnitPrice !== undefined && rule.afterUnitPrice !== null) {
+                            effectText = `${formatMoney(Number(rule.afterUnitPrice))} / unit`;
+                        }
+
+                        const row = document.createElement('div');
+                        row.className = 'd-flex align-items-center justify-content-between gap-3 border rounded px-3 py-2';
+                        row.innerHTML = `
+            <div>
+              <div class="fw-semibold">${rule.name || 'Rule'}</div>
+              <div class="small text-muted">${rule.action || 'Applied'}</div>
+            </div>
+            <div class="fw-semibold text-nowrap">${effectText}</div>
+          `;
+                        previewRules.appendChild(row);
+                    });
+                }
+            }
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                console.error('Live preview error:', e);
+            }
+        }
+    }
+
+    const debouncedFetch = debounce(fetchPreview, 400);
+
+    [quantityInput, billingCycleSelect, discountTypeSelect, discountValueInput].forEach(el => {
+      el?.addEventListener('change', debouncedFetch);
+      el?.addEventListener('input', debouncedFetch);
+    });
+
+    document.addEventListener('quote-item-rules-changed', debouncedFetch);
+    document.addEventListener('quote-item-config-changed', debouncedFetch);
+    document.addEventListener('quote-item-service-changed', fetchPreview);
+  })();
 })();

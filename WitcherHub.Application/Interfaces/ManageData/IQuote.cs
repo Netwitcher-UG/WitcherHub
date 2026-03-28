@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.Json;
 using WitcherHub.Application.Common.Pagination;
 using WitcherHub.Application.Models.DTO.Quotes;
 using WitcherHub.Application.Models.View.Quotes;
@@ -23,6 +24,9 @@ namespace WitcherHub.Application.Interfaces.ManageData
         Task DeleteAsync(Guid id, CancellationToken ct = default);
 
         // Items ops
+        Task<(JsonDocument Breakdown, decimal EffectiveUnitPrice)> PreviewItemPriceAsync(
+    QuoteItemDto item,
+    CancellationToken ct = default);
         Task<Guid> CreateItemAsync(CreateQuoteItemDto dto, CancellationToken ct = default);
         Task UpdateItemAsync(UpdateQuoteItemDto dto, CancellationToken ct = default);
         Task DeleteItemAsync(DeleteQuoteItemDto dto, CancellationToken ct = default);

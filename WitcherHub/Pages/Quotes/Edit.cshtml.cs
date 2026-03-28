@@ -98,6 +98,7 @@ namespace WitcherHub.Pages.Quotes
             NewItem.Item.Quantity = 1;
             NewItem.Item.UnitPrice = 0;
             NewItem.Item.Title = "";
+            NewItem.Item.BillingCycle = BillingCycle.OneTime;
             NewItem.Item.DiscountType = null;
             NewItem.Item.DiscountValue = null;
             NewItemConfigJson = "{}";

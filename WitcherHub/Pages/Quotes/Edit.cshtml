@@ -494,34 +494,47 @@
     <div class="offcanvas-body">
         <form method="post" asp-page-handler="AddItem" asp-route-id="@Model.Id" id="addItemForm">
             <input type="hidden" asp-for="Id" />
+            <input type="hidden" id="ni-service-id" value="" />
 
             <div class="mb-3">
                 <label class="form-label">Title</label>
-                <input class="form-control" asp-for="NewItem.Item.Title" />
+                <input class="form-control" asp-for="NewItem.Item.Title" id="ni-title" />
                 <span class="text-danger small" asp-validation-for="NewItem.Item.Title"></span>
             </div>
+
             <div class="mb-3">
                 <label class="form-label">Unit Name</label>
-                <input class="form-control" asp-for="NewItem.Item.UnitName" />
+                <input class="form-control" asp-for="NewItem.Item.UnitName" id="ni-unitname" />
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Description</label>
-                <textarea class="form-control" asp-for="NewItem.Item.Description" rows="3"></textarea>
+                <textarea class="form-control" asp-for="NewItem.Item.Description" id="ni-description" rows="3"></textarea>
             </div>
+
             <div class="row g-2">
                 <div class="col-4">
                     <label class="form-label">Qty</label>
-                    <input class="form-control"  asp-for="NewItem.Item.Quantity" />
-
+                    <input class="form-control" asp-for="NewItem.Item.Quantity" id="ni-qty" />
                 </div>
+
                 <div class="col-4">
                     <label class="form-label">Unit</label>
-                    <input class="form-control" asp-for="NewItem.Item.UnitPrice" />
+                    <input class="form-control" asp-for="NewItem.Item.UnitPrice" id="ni-unit" />
                 </div>
+
                 <div class="col-4">
                     <label class="form-label">Pos</label>
-                    <input class="form-control" asp-for="NewItem.Item.Position" />
+                    <input class="form-control" asp-for="NewItem.Item.Position" id="ni-pos" />
+                </div>
+
+                <div class="mt-2">
+                    <label class="form-label">BillingCycle</label>
+                    <select class="form-select"
+                            asp-for="NewItem.Item.BillingCycle"
+                            asp-items="Html.GetEnumSelectList<BillingCycle>()"
+                            id="ni-billing">
+                    </select>
                 </div>
             </div>
 
@@ -529,7 +542,7 @@
                 <div class="accordion-item">
                     <h2 class="accordion-header" id="addItemAdvancedHeading">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#addItemAdvancedBody">
-                            Advanced ( discounts / config)
+                            Advanced (discounts / config)
                         </button>
                     </h2>
 
@@ -538,29 +551,95 @@
                             <div class="row g-2">
                                 <div class="col-6">
                                     <label class="form-label">Discount Type</label>
-                                    <select class="form-select" asp-for="NewItem.Item.DiscountType">
+                                    <select class="form-select" asp-for="NewItem.Item.DiscountType" id="ni-disctype">
                                         <option value="">-- none --</option>
                                         <option value="Percent">Percent</option>
                                         <option value="Amount">Amount</option>
                                         <option value="Fixed">Fixed</option>
                                     </select>
                                 </div>
+
                                 <div class="col-6">
                                     <label class="form-label">Discount Value</label>
-                                    <input class="form-control" asp-for="NewItem.Item.DiscountValue" />
+                                    <input class="form-control" asp-for="NewItem.Item.DiscountValue" id="ni-discval" />
                                 </div>
                             </div>
 
                             <div class="mt-3">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <label class="form-label mb-0">Config (JSON)</label>
-                                    <button class="btn btn-sm btn-outline-secondary" type="button" onclick="formatJson('ni-config')">Format</button>
+                                <div class="card border bg-transparent">
+                                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                        <div class="fw-semibold">Config</div>
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" id="niCfgResetBtn">
+                                                Reset
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    data-bs-toggle="collapse"
+                                                    data-bs-target="#niCfgRawCollapse"
+                                                    aria-expanded="false">
+                                                Raw JSON
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="card-body">
+                                        <div id="ni-cfgLoading" class="text-muted small d-none">Loading config schema…</div>
+
+                                        <div id="ni-cfgEmpty" class="text-muted small d-none">
+                                            This item has no config schema. Existing config will be shown as editable fields when possible.
+                                        </div>
+
+                                        <div id="ni-cfgFields" class="row g-3"></div>
+
+                                        <div class="collapse mt-3" id="niCfgRawCollapse">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <label class="form-label mb-0">Config (JSON)</label>
+                                                <button class="btn btn-sm btn-outline-secondary" type="button" onclick="formatJson('ni-config')">
+                                                    Format
+                                                </button>
+                                            </div>
+
+                                            <textarea class="form-control mt-2 font-monospace" rows="7" asp-for="NewItemConfigJson" id="ni-config"></textarea>
+                                            <span class="text-danger small" asp-validation-for="NewItemConfigJson"></span>
+                                        </div>
+
+                                        <div class="alert alert-info mt-3 mb-0">
+                                            PriceBreakdown will be recalculated automatically when you add the item.
+                                        </div>
+                                    </div>
                                 </div>
-                                <textarea class="form-control mt-2" rows="6" asp-for="NewItemConfigJson" id="ni-config"></textarea>
-                                <span class="text-danger small" asp-validation-for="NewItemConfigJson"></span>
-                                <div class="form-text">Example: {"hours": 12, "rush": true}</div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="my-3" />
+
+            <div class="card bg-transparent border">
+                <div class="card-header fw-semibold">Price preview</div>
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div class="text-muted">Subtotal</div>
+                        <div class="fw-semibold" id="ni-prev-sub">0.00</div>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-2">
+                        <div class="text-muted">Discount</div>
+                        <div class="fw-semibold" id="ni-prev-disc">-0.00</div>
+                    </div>
+
+                    <hr class="my-2" />
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-muted">Total</div>
+                        <div class="fs-4 fw-bold" id="ni-prev-total">0.00</div>
+                    </div>
+
+                    <div class="text-muted small mt-2">
+                        *Preview is client-side. Final pricing is recalculated on Add.
                     </div>
                 </div>
             </div>
@@ -752,536 +831,535 @@
         </div>
     </div>
 </div>
-
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-    <script src="~/js/pages/quotes/date-input-theme.js" asp-append-version="true"></script>
 
     <script>
-        // Filter items table
-        (function () {
-            const search = document.getElementById('itemSearch');
-            if (!search) return;
+        (function() {
+            const serviceSchemaEndpoint = '@Url.Page("/Quotes/Items/Create", "ServiceSchema")';
 
-            function applyFilter() {
-                const q = (search.value || '').trim().toLowerCase();
-                document.querySelectorAll('#itemsTable tbody tr').forEach(tr => {
-                    const title = (tr.getAttribute('data-title') || '');
-                    tr.style.display = (!q || title.includes(q)) ? '' : 'none';
-                });
+            const editors = {
+                ni: { schema: null, baseObject: {} },
+                ei: { schema: null, baseObject: {} }
+            };
+
+            function byId(id) {
+                return document.getElementById(id);
             }
 
-            search.addEventListener('input', applyFilter);
-        })();
+            function encodeHtml(value) {
+                return (value ?? '')
+                    .toString()
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
 
-        function eiComputePreview() {
-            const qty = parseFloat(document.getElementById('ei-qty')?.value || '0') || 0;
-            const unit = parseFloat(document.getElementById('ei-unit')?.value || '0') || 0;
+            function deepClone(obj) {
+                return JSON.parse(JSON.stringify(obj || {}));
+            }
 
-            const sub = qty * unit;
-
-            const discType = (document.getElementById('ei-disctype')?.value || '').trim();
-            const discVal = parseFloat(document.getElementById('ei-discval')?.value || '0') || 0;
-
-            let discAmt = 0;
-            if (discType === 'Percent') discAmt = sub * (discVal / 100.0);
-            else if (discType === 'Amount') discAmt = discVal;
-            else if (discType === 'Fixed') discAmt = discVal;
-
-            if (discAmt > sub) discAmt = sub;
-            if (discAmt < 0) discAmt = 0;
-
-            const total = Math.max(0, sub - discAmt);
-
-            const f = (n) => (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
-
-            const elSub = document.getElementById('ei-prev-sub');
-            const elDisc = document.getElementById('ei-prev-disc');
-            const elTotal = document.getElementById('ei-prev-total');
-
-            if (elSub) elSub.textContent = f(sub);
-            if (elDisc) elDisc.textContent = '-' + f(discAmt);
-            if (elTotal) elTotal.textContent = f(total);
-        }
-
-        const eiServiceSchemaEndpoint = '@Url.Page("/Quotes/Items/Create", "ServiceSchema")';
-        let eiConfigBaseObject = {};
-        let eiLastSchema = null;
-
-        function eiEncodeHtml(value) {
-            return (value ?? '')
-                .toString()
-                .replaceAll('&', '&amp;')
-                .replaceAll('<', '&lt;')
-                .replaceAll('>', '&gt;')
-                .replaceAll('"', '&quot;')
-                .replaceAll("'", '&#39;');
-        }
-
-        function eiParseJsonSafe(text) {
-            try {
-                const parsed = JSON.parse(text || '{}');
-                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                    return parsed;
+            function parseJsonSafe(text) {
+                try {
+                    const parsed = JSON.parse(text || '{}');
+                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                        return parsed;
+                    }
+                    return {};
+                } catch {
+                    return {};
                 }
-                return {};
-            } catch {
-                return {};
             }
-        }
 
-        function eiDeepClone(obj) {
-            return JSON.parse(JSON.stringify(obj || {}));
-        }
+            function tryParseJsonObject(text) {
+                try {
+                    const parsed = JSON.parse(text || '{}');
+                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                        return parsed;
+                    }
+                    return {};
+                } catch {
+                    return null;
+                }
+            }
 
-        function eiSetConfigJson(obj) {
-            const raw = document.getElementById('ei-config');
-            if (!raw) return;
-            raw.value = JSON.stringify(obj || {}, null, 2);
-        }
+            function buildSchemaUrl(serviceId) {
+                const url = new URL(serviceSchemaEndpoint, window.location.origin);
+                url.searchParams.set('serviceId', serviceId);
+                return url.toString();
+            }
 
-        function eiBuildSchemaUrl(serviceId) {
-            const url = new URL(eiServiceSchemaEndpoint, window.location.origin);
-            url.searchParams.set('serviceId', serviceId);
-            return url.toString();
-        }
+            function setConfigJson(prefix, obj) {
+                const raw = byId(prefix + '-config');
+                if (!raw) return;
+                raw.value = JSON.stringify(obj || {}, null, 2);
+            }
 
-        function eiGuessFieldType(value) {
-            if (typeof value === 'boolean') return 'boolean';
-            if (typeof value === 'number') return Number.isInteger(value) ? 'integer' : 'number';
-            return 'string';
-        }
+            function guessFieldType(value) {
+                if (typeof value === 'boolean') return 'boolean';
+                if (typeof value === 'number') return Number.isInteger(value) ? 'integer' : 'number';
+                return 'string';
+            }
 
-        function eiNormalizeSchemaFields(schema, currentConfig) {
-            let fields = [];
+            function normalizeSchemaFields(schema, currentConfig) {
+                let fields = [];
 
-            if (schema && typeof schema === 'object') {
-                if (schema.properties && typeof schema.properties === 'object' && !Array.isArray(schema.properties)) {
-                    const required = Array.isArray(schema.required) ? schema.required : [];
+                if (schema && typeof schema === 'object') {
+                    if (schema.properties && typeof schema.properties === 'object' && !Array.isArray(schema.properties)) {
+                        const required = Array.isArray(schema.required) ? schema.required : [];
 
-                    fields = Object.entries(schema.properties).map(([name, meta]) => {
-                        const m = meta || {};
-                        const enumValues = Array.isArray(m.enum) ? m.enum : null;
-                        let type = (m.type || '').toString().toLowerCase();
-
-                        if (enumValues) type = 'select';
-                        if (!type) type = eiGuessFieldType(currentConfig?.[name]);
-
-                        return {
-                            name,
-                            title: m.title || m.label || name,
-                            description: m.description || '',
-                            type,
-                            enumValues,
-                            required: required.includes(name),
-                            defaultValue: m.default,
-                            minimum: m.minimum,
-                            maximum: m.maximum
-                        };
-                    });
-                } else if (Array.isArray(schema.fields)) {
-                    fields = schema.fields
-                        .filter(x => x && (x.name || x.key))
-                        .map(x => {
-                            const enumValues = Array.isArray(x.enum) ? x.enum : null;
-                            let type = (x.type || '').toString().toLowerCase();
+                        fields = Object.entries(schema.properties).map(([name, meta]) => {
+                            const m = meta || {};
+                            const enumValues = Array.isArray(m.enum) ? m.enum : null;
+                            let type = (m.type || '').toString().toLowerCase();
 
                             if (enumValues) type = 'select';
-                            if (!type) type = eiGuessFieldType(currentConfig?.[x.name || x.key]);
+                            if (!type) type = guessFieldType(currentConfig?.[name]);
 
                             return {
-                                name: x.name || x.key,
-                                title: x.title || x.label || x.name || x.key,
-                                description: x.description || '',
+                                name,
+                                title: m.title || m.label || name,
+                                description: m.description || '',
                                 type,
                                 enumValues,
-                                required: !!x.required,
-                                defaultValue: x.default,
-                                minimum: x.minimum,
-                                maximum: x.maximum
+                                required: required.includes(name),
+                                defaultValue: m.default,
+                                minimum: m.minimum,
+                                maximum: m.maximum
                             };
                         });
+                    }
+                    else if (Array.isArray(schema.fields)) {
+                        fields = schema.fields
+                            .filter(x => x && (x.name || x.key))
+                            .map(x => {
+                                const enumValues = Array.isArray(x.enum) ? x.enum : null;
+                                let type = (x.type || '').toString().toLowerCase();
+
+                                if (enumValues) type = 'select';
+                                if (!type) type = guessFieldType(currentConfig?.[x.name || x.key]);
+
+                                return {
+                                    name: x.name || x.key,
+                                    title: x.title || x.label || x.name || x.key,
+                                    description: x.description || '',
+                                    type,
+                                    enumValues,
+                                    required: !!x.required,
+                                    defaultValue: x.default,
+                                    minimum: x.minimum,
+                                    maximum: x.maximum
+                                };
+                            });
+                    }
                 }
+
+                if (!fields.length) {
+                    fields = Object.entries(currentConfig || {}).map(([name, value]) => ({
+                        name,
+                        title: name,
+                        description: '',
+                        type: guessFieldType(value),
+                        enumValues: null,
+                        required: false,
+                        defaultValue: value
+                    }));
+                }
+
+                return fields.filter(x => !!x.name);
             }
 
-            if (!fields.length) {
-                fields = Object.entries(currentConfig || {}).map(([name, value]) => ({
-                    name,
-                    title: name,
-                    description: '',
-                    type: eiGuessFieldType(value),
-                    enumValues: null,
-                    required: false,
-                    defaultValue: value
-                }));
+            function resolveFieldValue(field, currentConfig) {
+                if (currentConfig && Object.prototype.hasOwnProperty.call(currentConfig, field.name)) {
+                    return currentConfig[field.name];
+                }
+
+                if (field.defaultValue !== undefined) return field.defaultValue;
+                if (field.type === 'boolean') return false;
+                return '';
             }
 
-            return fields.filter(x => !!x.name);
-        }
+            function syncConfigFromFields(prefix) {
+                const state = editors[prefix];
+                const container = byId(prefix + '-cfgFields');
+                if (!container) return;
 
-        function eiResolveFieldValue(field, currentConfig) {
-            if (currentConfig && Object.prototype.hasOwnProperty.call(currentConfig, field.name)) {
-                return currentConfig[field.name];
-            }
+                const next = deepClone(state.baseObject);
 
-            if (field.defaultValue !== undefined) {
-                return field.defaultValue;
-            }
+                container.querySelectorAll('[data-' + prefix + '-config-input]').forEach(el => {
+                    const name = el.getAttribute('data-config-name');
+                    const type = (el.getAttribute('data-config-type') || 'string').toLowerCase();
 
-            if (field.type === 'boolean') return false;
-            return '';
-        }
+                    if (!name) return;
 
-        function eiRenderConfigFields(schema, currentConfig) {
-            const container = document.getElementById('ei-cfgFields');
-            const emptyEl = document.getElementById('ei-cfgEmpty');
+                    delete next[name];
 
-            if (!container || !emptyEl) return;
+                    if (type === 'boolean') {
+                        next[name] = !!el.checked;
+                        return;
+                    }
 
-            const fields = eiNormalizeSchemaFields(schema, currentConfig);
-            eiLastSchema = schema;
+                    const raw = (el.value || '').trim();
+                    if (raw === '') return;
 
-            if (!fields.length) {
-                container.innerHTML = '';
-                emptyEl.classList.remove('d-none');
-                eiSetConfigJson(currentConfig || {});
-                return;
-            }
+                    if (type === 'integer') {
+                        const parsed = parseInt(raw, 10);
+                        if (!Number.isNaN(parsed)) next[name] = parsed;
+                        return;
+                    }
 
-            emptyEl.classList.add('d-none');
+                    if (type === 'number') {
+                        const parsed = parseFloat(raw);
+                        if (!Number.isNaN(parsed)) next[name] = parsed;
+                        return;
+                    }
 
-            const html = fields.map((field, index) => {
-                const id = `ei-cfg-${index}`;
-                const label = eiEncodeHtml(field.title || field.name);
-                const name = eiEncodeHtml(field.name);
-                const desc = field.description ? `<div class="form-text">${eiEncodeHtml(field.description)}</div>` : '';
-                const requiredMark = field.required ? ' <span class="text-danger">*</span>' : '';
-                const value = eiResolveFieldValue(field, currentConfig);
-
-                let type = (field.type || 'string').toString().toLowerCase();
-                if (type === 'bool') type = 'boolean';
-                if (type === 'int') type = 'integer';
-                if (type === 'text') type = 'string';
-
-                if (type === 'boolean') {
-                    return `
-                        <div class="col-12 col-md-6">
-                            <div class="form-check mt-4">
-                                <input class="form-check-input"
-                                       type="checkbox"
-                                       id="${id}"
-                                       data-ei-config-input
-                                       data-config-name="${name}"
-                                       data-config-type="boolean"
-                                       ${value ? 'checked' : ''} />
-                                <label class="form-check-label" for="${id}">
-                                    ${label}${requiredMark}
-                                </label>
-                            </div>
-                            ${desc}
-                        </div>
-                    `;
-                }
-
-                if (type === 'select' && Array.isArray(field.enumValues) && field.enumValues.length > 0) {
-                    const options = field.enumValues.map(opt => {
-                        const optVal = opt?.toString() ?? '';
-                        const selected = (value?.toString() ?? '') === optVal ? 'selected' : '';
-                        return `<option value="${eiEncodeHtml(optVal)}" ${selected}>${eiEncodeHtml(optVal)}</option>`;
-                    }).join('');
-
-                    return `
-                        <div class="col-12 col-md-6">
-                            <label class="form-label" for="${id}">${label}${requiredMark}</label>
-                            <select class="form-select"
-                                    id="${id}"
-                                    data-ei-config-input
-                                    data-config-name="${name}"
-                                    data-config-type="string">
-                                ${options}
-                            </select>
-                            ${desc}
-                        </div>
-                    `;
-                }
-
-                const isNumber = type === 'number' || type === 'integer';
-                const inputType = isNumber ? 'number' : 'text';
-                const step = type === 'integer' ? '1' : (type === 'number' ? 'any' : null);
-                const minAttr = field.minimum !== undefined && field.minimum !== null ? `min="${field.minimum}"` : '';
-                const maxAttr = field.maximum !== undefined && field.maximum !== null ? `max="${field.maximum}"` : '';
-
-                return `
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="${id}">${label}${requiredMark}</label>
-                        <input class="form-control"
-                               id="${id}"
-                               type="${inputType}"
-                               value="${eiEncodeHtml(value)}"
-                               data-ei-config-input
-                               data-config-name="${name}"
-                               data-config-type="${eiEncodeHtml(type)}"
-                               ${step ? `step="${step}"` : ''}
-                               ${minAttr}
-                               ${maxAttr} />
-                        ${desc}
-                    </div>
-                `;
-            }).join('');
-
-            container.innerHTML = html;
-
-            container.querySelectorAll('[data-ei-config-input]').forEach(el => {
-                el.addEventListener('input', eiSyncConfigFromFields);
-                el.addEventListener('change', eiSyncConfigFromFields);
-            });
-
-            eiSyncConfigFromFields();
-        }
-
-        function eiSyncConfigFromFields() {
-            const container = document.getElementById('ei-cfgFields');
-            if (!container) return;
-
-            const next = eiDeepClone(eiConfigBaseObject);
-
-            container.querySelectorAll('[data-ei-config-input]').forEach(el => {
-                const name = el.getAttribute('data-config-name');
-                const type = (el.getAttribute('data-config-type') || 'string').toLowerCase();
-
-                if (!name) return;
-
-                delete next[name];
-
-                if (type === 'boolean') {
-                    next[name] = !!el.checked;
-                    return;
-                }
-
-                const raw = (el.value || '').trim();
-                if (raw === '') return;
-
-                if (type === 'integer') {
-                    const parsed = parseInt(raw, 10);
-                    if (!Number.isNaN(parsed)) next[name] = parsed;
-                    return;
-                }
-
-                if (type === 'number') {
-                    const parsed = parseFloat(raw);
-                    if (!Number.isNaN(parsed)) next[name] = parsed;
-                    return;
-                }
-
-                next[name] = raw;
-            });
-
-            eiSetConfigJson(next);
-        }
-
-        async function eiLoadConfigEditor(serviceId, configText) {
-            const loadingEl = document.getElementById('ei-cfgLoading');
-            const emptyEl = document.getElementById('ei-cfgEmpty');
-            const currentConfig = eiParseJsonSafe(configText);
-
-            eiConfigBaseObject = eiDeepClone(currentConfig);
-
-            if (loadingEl) loadingEl.classList.remove('d-none');
-            if (emptyEl) emptyEl.classList.add('d-none');
-
-            try {
-                if (!serviceId) {
-                    eiRenderConfigFields(null, currentConfig);
-                    return;
-                }
-
-                const res = await fetch(eiBuildSchemaUrl(serviceId), {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' },
-                    credentials: 'same-origin'
+                    next[name] = raw;
                 });
 
-                const text = await res.text();
-                let schema = null;
+                setConfigJson(prefix, next);
+            }
 
-                if (res.ok && text && text.trim() && text.trim() !== 'null') {
-                    schema = JSON.parse(text);
+            function renderConfigFields(prefix, schema, currentConfig) {
+                const state = editors[prefix];
+                const container = byId(prefix + '-cfgFields');
+                const emptyEl = byId(prefix + '-cfgEmpty');
+
+                if (!container || !emptyEl) return;
+
+                const fields = normalizeSchemaFields(schema, currentConfig);
+                state.schema = schema;
+
+                if (!fields.length) {
+                    container.innerHTML = '';
+                    emptyEl.classList.remove('d-none');
+                    setConfigJson(prefix, currentConfig || {});
+                    return;
                 }
 
-                eiRenderConfigFields(schema, currentConfig);
-            } catch {
-                eiRenderConfigFields(null, currentConfig);
-            } finally {
-                if (loadingEl) loadingEl.classList.add('d-none');
+                emptyEl.classList.add('d-none');
+
+                const html = fields.map((field, index) => {
+                    const id = `${prefix}-cfg-${index}`;
+                    const label = encodeHtml(field.title || field.name);
+                    const name = encodeHtml(field.name);
+                    const desc = field.description
+                        ? `<div class="form-text">${encodeHtml(field.description)}</div>`
+                        : '';
+                    const requiredMark = field.required ? ' <span class="text-danger">*</span>' : '';
+                    const value = resolveFieldValue(field, currentConfig);
+
+                    let type = (field.type || 'string').toString().toLowerCase();
+                    if (type === 'bool') type = 'boolean';
+                    if (type === 'int') type = 'integer';
+                    if (type === 'text') type = 'string';
+
+                    if (type === 'boolean') {
+                        return `
+                                    <div class="col-12 col-md-6">
+                                        <div class="form-check mt-4">
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   id="${id}"
+                                                   data-${prefix}-config-input
+                                                   data-config-name="${name}"
+                                                   data-config-type="boolean"
+                                                   ${value ? 'checked' : ''} />
+                                            <label class="form-check-label" for="${id}">
+                                                ${label}${requiredMark}
+                                            </label>
+                                        </div>
+                                        ${desc}
+                                    </div>
+                                `;
+                    }
+
+                    if (type === 'select' && Array.isArray(field.enumValues) && field.enumValues.length > 0) {
+                        const options = field.enumValues.map(opt => {
+                            const optVal = opt?.toString() ?? '';
+                            const selected = (value?.toString() ?? '') === optVal ? 'selected' : '';
+                            return `<option value="${encodeHtml(optVal)}" ${selected}>${encodeHtml(optVal)}</option>`;
+                        }).join('');
+
+                        return `
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="${id}">${label}${requiredMark}</label>
+                                        <select class="form-select"
+                                                id="${id}"
+                                                data-${prefix}-config-input
+                                                data-config-name="${name}"
+                                                data-config-type="string">
+                                            ${options}
+                                        </select>
+                                        ${desc}
+                                    </div>
+                                `;
+                    }
+
+                    const isNumber = type === 'number' || type === 'integer';
+                    const inputType = isNumber ? 'number' : 'text';
+                    const step = type === 'integer' ? '1' : (type === 'number' ? 'any' : null);
+                    const minAttr = field.minimum !== undefined && field.minimum !== null ? `min="${field.minimum}"` : '';
+                    const maxAttr = field.maximum !== undefined && field.maximum !== null ? `max="${field.maximum}"` : '';
+
+                    return `
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label" for="${id}">${label}${requiredMark}</label>
+                                    <input class="form-control"
+                                           id="${id}"
+                                           type="${inputType}"
+                                           value="${encodeHtml(value)}"
+                                           data-${prefix}-config-input
+                                           data-config-name="${name}"
+                                           data-config-type="${encodeHtml(type)}"
+                                           ${step ? `step="${step}"` : ''}
+                                           ${minAttr}
+                                           ${maxAttr} />
+                                    ${desc}
+                                </div>
+                            `;
+                }).join('');
+
+                container.innerHTML = html;
+
+                container.querySelectorAll('[data-' + prefix + '-config-input]').forEach(el => {
+                    el.addEventListener('input', function() {
+                        syncConfigFromFields(prefix);
+                    });
+
+                    el.addEventListener('change', function() {
+                        syncConfigFromFields(prefix);
+                    });
+                });
+
+                syncConfigFromFields(prefix);
             }
-        }
 
-        document.addEventListener('show.bs.offcanvas', function (e) {
-            const el = e.target;
-            if (!el || el.id !== 'EditItemCanvas') return;
+            async function loadConfigEditor(prefix, serviceId, configText) {
+                const state = editors[prefix];
+                const loadingEl = byId(prefix + '-cfgLoading');
+                const emptyEl = byId(prefix + '-cfgEmpty');
+                const currentConfig = parseJsonSafe(configText);
 
-            const btn = e.relatedTarget;
+                state.baseObject = deepClone(currentConfig);
 
-            if (btn) {
-                document.getElementById('ei-id').value = btn.getAttribute('data-item-id') || '';
-                document.getElementById('ei-service-id').value = btn.getAttribute('data-item-service-id') || '';
-                document.getElementById('ei-title').value = btn.getAttribute('data-item-title') || '';
-                document.getElementById('ei-qty').value = btn.getAttribute('data-item-qty') || '1';
-                document.getElementById('ei-unit').value = btn.getAttribute('data-item-unit') || '0';
-                document.getElementById('ei-pos').value = btn.getAttribute('data-item-pos') || '1';
-                document.getElementById('ei-billing').value = btn.getAttribute('data-item-billingcycle') || '0';
-                document.getElementById('ei-disctype').value = btn.getAttribute('data-item-disctype') || '';
-                document.getElementById('ei-discval').value = btn.getAttribute('data-item-discval') || '';
-                document.getElementById('ei-unitname').value = btn.getAttribute('data-item-unitname') || '';
-                document.getElementById('ei-description').value = btn.getAttribute('data-item-description') || '';
-
-                const b64 = btn.getAttribute('data-item-config-b64');
-                let cfgText = '{}';
+                if (loadingEl) loadingEl.classList.remove('d-none');
+                if (emptyEl) emptyEl.classList.add('d-none');
 
                 try {
-                    if (b64) {
-                        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-                        cfgText = new TextDecoder('utf-8').decode(bytes);
+                    if (!serviceId) {
+                        renderConfigFields(prefix, null, currentConfig);
+                        return;
                     }
+
+                    const res = await fetch(buildSchemaUrl(serviceId), {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        credentials: 'same-origin'
+                    });
+
+                    const text = await res.text();
+                    let schema = null;
+
+                    if (res.ok && text && text.trim() && text.trim() !== 'null') {
+                        schema = JSON.parse(text);
+                    }
+
+                    renderConfigFields(prefix, schema, currentConfig);
                 } catch {
-                    cfgText = '{}';
+                    renderConfigFields(prefix, null, currentConfig);
+                } finally {
+                    if (loadingEl) loadingEl.classList.add('d-none');
                 }
-
-                document.getElementById('ei-config').value = cfgText;
             }
 
-            const serviceId = document.getElementById('ei-service-id')?.value || '';
-            const cfgText = document.getElementById('ei-config')?.value || '{}';
+            function computePreview(prefix) {
+                const qty = parseFloat(byId(prefix + '-qty')?.value || '0') || 0;
+                const unit = parseFloat(byId(prefix + '-unit')?.value || '0') || 0;
 
-            eiLoadConfigEditor(serviceId, cfgText);
-            eiComputePreview();
-        });
+                const sub = qty * unit;
 
-        (function () {
-            const ids = ['ei-qty', 'ei-unit', 'ei-disctype', 'ei-discval'];
-            ids.forEach(id => {
-                const el = document.getElementById(id);
-                if (!el) return;
-                el.addEventListener('input', eiComputePreview);
-                el.addEventListener('change', eiComputePreview);
-            });
+                const discType = (byId(prefix + '-disctype')?.value || '').trim();
+                const discVal = parseFloat(byId(prefix + '-discval')?.value || '0') || 0;
 
-            const resetBtn = document.getElementById('eiCfgResetBtn');
-            if (resetBtn) {
-                resetBtn.addEventListener('click', function () {
-                    eiRenderConfigFields(eiLastSchema, eiDeepClone(eiConfigBaseObject));
+                let discAmt = 0;
+
+                if (discType === 'Percent') {
+                    discAmt = sub * (discVal / 100.0);
+                } else if (discType === 'Amount') {
+                    discAmt = discVal;
+                } else if (discType === 'Fixed') {
+                    discAmt = discVal;
+                }
+
+                if (discAmt > sub) discAmt = sub;
+                if (discAmt < 0) discAmt = 0;
+
+                const total = Math.max(0, sub - discAmt);
+
+                const format = (n) => {
+                    return (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
+                };
+
+                const elSub = byId(prefix + '-prev-sub');
+                const elDisc = byId(prefix + '-prev-disc');
+                const elTotal = byId(prefix + '-prev-total');
+
+                if (elSub) elSub.textContent = format(sub);
+                if (elDisc) elDisc.textContent = '-' + format(discAmt);
+                if (elTotal) elTotal.textContent = format(total);
+            }
+
+            function bindPreview(prefix) {
+                ['qty', 'unit', 'disctype', 'discval'].forEach(suffix => {
+                    const el = byId(prefix + '-' + suffix);
+                    if (!el) return;
+
+                    el.addEventListener('input', function() {
+                        computePreview(prefix);
+                    });
+
+                    el.addEventListener('change', function() {
+                        computePreview(prefix);
+                    });
                 });
             }
 
-            const rawConfigEl = document.getElementById('ei-config');
-            if (rawConfigEl) {
-                rawConfigEl.addEventListener('change', function () {
-                    const current = eiParseJsonSafe(rawConfigEl.value);
-                    eiRenderConfigFields(eiLastSchema, current);
-                });
-            }
-        })();
-
-        function formatJson(textareaId) {
-            const el = document.getElementById(textareaId);
-            if (!el) return;
-
-            try {
-                const obj = JSON.parse(el.value || "{}");
-                el.value = JSON.stringify(obj, null, 2);
-
-                if (textareaId === 'ei-config') {
-                    eiRenderConfigFields(eiLastSchema, eiParseJsonSafe(el.value));
-                }
-            } catch {
-                alert("Invalid JSON. Please fix it first.");
-            }
-        }
-        window.formatJson = formatJson;
-
-        (function () {
-            const openAdd = @openAddCanvas.ToString().ToLowerInvariant();
-            const openEdit = @openEditCanvas.ToString().ToLowerInvariant();
-
-            if (openAdd) {
-                const el = document.getElementById('AddItemCanvas');
-                if (el) bootstrap.Offcanvas.getOrCreateInstance(el).show();
-            }
-
-            if (openEdit) {
-                const el = document.getElementById('EditItemCanvas');
-                if (el) bootstrap.Offcanvas.getOrCreateInstance(el).show();
-            }
-        })();
-
-        (function () {
-            if (window.quoteDateTheme) {
-                window.quoteDateTheme.init(document);
-            }
-        })();
-
-        (function () {
-            const modalEl = document.getElementById('DeleteConfirmModal');
-            const titleEl = document.getElementById('DeleteConfirmModalLabel');
-            const messageEl = document.getElementById('DeleteConfirmModalMessage');
-            const confirmBtn = document.getElementById('DeleteConfirmModalSubmit');
-
-            if (!modalEl || !titleEl || !messageEl || !confirmBtn || !window.bootstrap) return;
-
-            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-            let pendingForm = null;
-
-            document.addEventListener('click', function (e) {
-                const btn = e.target.closest('.js-delete-open');
+            function bindConfigReset(prefix) {
+                const btn = byId(prefix + 'CfgResetBtn');
                 if (!btn) return;
 
-                pendingForm = btn.closest('form');
-                if (!pendingForm) return;
+                btn.addEventListener('click', function() {
+                    renderConfigFields(prefix, editors[prefix].schema, deepClone(editors[prefix].baseObject));
+                });
+            }
 
-                titleEl.textContent = btn.getAttribute('data-delete-title') || 'Confirm delete';
-                messageEl.textContent = btn.getAttribute('data-delete-message') || 'Are you sure?';
+            function bindRawConfig(prefix) {
+                const raw = byId(prefix + '-config');
+                if (!raw) return;
 
-                modal.show();
-            });
+                raw.addEventListener('change', function() {
+                    const parsed = tryParseJsonObject(raw.value);
+                    if (parsed === null) return;
+                    renderConfigFields(prefix, editors[prefix].schema, parsed);
+                });
+            }
 
-            confirmBtn.addEventListener('click', function () {
-                if (!pendingForm) return;
-
-                const form = pendingForm;
-                pendingForm = null;
-                modal.hide();
-
-                if (typeof form.requestSubmit === 'function') {
-                    form.requestSubmit();
-                } else {
-                    form.submit();
+            function decodeBase64Utf8(b64) {
+                try {
+                    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+                    return new TextDecoder('utf-8').decode(bytes);
+                } catch {
+                    return '{}';
                 }
-            });
-
-            modalEl.addEventListener('hidden.bs.modal', function () {
-                pendingForm = null;
-            });
-        })();
-
-        (function () {
-            const actionEl = document.getElementById('quoteAfterSignAction');
-            const modeWrapEl = document.getElementById('quoteInvoiceSendModeWrap');
-            const modeEl = document.getElementById('quoteInvoiceSendMode');
-
-            function toggleInvoiceMode() {
-                if (!actionEl) return;
-
-                const isInvoice = actionEl.value === '@((int)QuoteAfterSignAction.Invoice)';
-                if (modeWrapEl) modeWrapEl.classList.toggle('d-none', !isInvoice);
-                if (modeEl) modeEl.disabled = !isInvoice;
             }
 
-            if (actionEl) {
-                actionEl.addEventListener('change', toggleInvoiceMode);
-                toggleInvoiceMode();
+            function populateEditFromButton(btn) {
+                if (!btn) return;
+
+                const mappings = [
+                    ['ei-id', 'data-item-id'],
+                    ['ei-service-id', 'data-item-service-id'],
+                    ['ei-title', 'data-item-title'],
+                    ['ei-qty', 'data-item-qty'],
+                    ['ei-unit', 'data-item-unit'],
+                    ['ei-pos', 'data-item-pos'],
+                    ['ei-billing', 'data-item-billingcycle'],
+                    ['ei-disctype', 'data-item-disctype'],
+                    ['ei-discval', 'data-item-discval'],
+                    ['ei-unitname', 'data-item-unitname'],
+                    ['ei-description', 'data-item-description']
+                ];
+
+                mappings.forEach(([id, attr]) => {
+                    const el = byId(id);
+                    if (!el) return;
+                    el.value = btn.getAttribute(attr) || '';
+                });
+
+                const cfgEl = byId('ei-config');
+                if (cfgEl) {
+                    const b64 = btn.getAttribute('data-item-config-b64');
+                    cfgEl.value = b64 ? decodeBase64Utf8(b64) : '{}';
+                }
             }
+
+            function formatJson(textareaId) {
+                const el = byId(textareaId);
+                if (!el) return;
+
+                try {
+                    const obj = JSON.parse(el.value || '{}');
+                    el.value = JSON.stringify(obj, null, 2);
+
+                    if (textareaId === 'ni-config') {
+                        renderConfigFields('ni', editors.ni.schema, parseJsonSafe(el.value));
+                    } else if (textareaId === 'ei-config') {
+                        renderConfigFields('ei', editors.ei.schema, parseJsonSafe(el.value));
+                    }
+                } catch {
+                    alert('Invalid JSON. Please fix it first.');
+                }
+            }
+
+            window.formatJson = formatJson;
+
+            document.addEventListener('DOMContentLoaded', function() {
+                bindPreview('ni');
+                bindPreview('ei');
+
+                bindConfigReset('ni');
+                bindConfigReset('ei');
+
+                bindRawConfig('ni');
+                bindRawConfig('ei');
+
+                const addCanvas = byId('AddItemCanvas');
+                if (addCanvas) {
+                    addCanvas.addEventListener('show.bs.offcanvas', async function() {
+                        const serviceId = byId('ni-service-id')?.value || '';
+                        const configText = byId('ni-config')?.value || '{}';
+
+                        await loadConfigEditor('ni', serviceId, configText);
+                        computePreview('ni');
+                    });
+                }
+
+                const editCanvas = byId('EditItemCanvas');
+                if (editCanvas) {
+                    editCanvas.addEventListener('show.bs.offcanvas', async function(e) {
+                        const btn = e.relatedTarget;
+                        if (btn) {
+                            populateEditFromButton(btn);
+                        }
+
+                        const serviceId = byId('ei-service-id')?.value || '';
+                        const configText = byId('ei-config')?.value || '{}';
+
+                        await loadConfigEditor('ei', serviceId, configText);
+                        computePreview('ei');
+                    });
+                }
+
+                const openAdd = @openAddCanvas.ToString().ToLowerInvariant();
+                const openEdit = @openEditCanvas.ToString().ToLowerInvariant();
+
+                if (openAdd && addCanvas && window.bootstrap) {
+                    bootstrap.Offcanvas.getOrCreateInstance(addCanvas).show();
+                }
+
+                if (openEdit && editCanvas && window.bootstrap) {
+                    bootstrap.Offcanvas.getOrCreateInstance(editCanvas).show();
+                }
+
+                computePreview('ni');
+                computePreview('ei');
+            });
         })();
     </script>
+}
 }
 
 

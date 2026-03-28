@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using WitcherHub.Application.Common.Pagination;
@@ -16,7 +17,9 @@ namespace WitcherHub.Application.Interfaces.ManageData
             int pageSize = 10,
             string? search = null,
             CancellationToken ct = default);
-
+        Task<(JsonDocument Breakdown, decimal EffectiveUnitPrice)> PreviewItemPriceAsync(
+    ContractItemDto item,
+    CancellationToken ct = default);
         Task<ContractViews.ContractDetailsView?> GetContractAsync(Guid id, CancellationToken ct = default);
 
         Task<Guid> CreateAsync(ContractDTOs dto, CancellationToken ct = default);
