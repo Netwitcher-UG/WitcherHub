@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Contracts;
@@ -19,9 +19,10 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             _contractManager = contractManager;
         }
 
+
         public async Task<Guid> GenerateAndCreateAsync(
-            GenerateContractDocumentRequest request,
-            CancellationToken ct = default)
+    GenerateContractDocumentRequest request,
+    CancellationToken ct = default)
         {
             if (request.ProjectId == Guid.Empty)
                 throw new InvalidOperationException("ProjectId is required.");
@@ -29,7 +30,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             // 1️⃣ Generate contract (AI)
             var generated = await _generator.GenerateAsync(request, ct);
 
-            // 2️⃣ Build persistence DTO
+            // 2️⃣ Build persistence DTO with Data Linking
             var dto = new ContractDTOs
             {
                 Contract = new ContractDto
@@ -40,18 +41,28 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                     StartDate = request.StartDate,
                     EndDate = request.EndDate,
                     Terms = generated.FullDocument,
+                    FromQuote = true,
                     TermsStructured = generated.Structured
                 },
-                Items = generated.Structured.Positions
-                    .OrderBy(p => p.PositionNo)
-                    .Select(p => new ContractItemDto
-                    {
-                        Title = p.Title,
-                        AgreedPrice = p.LineNetPrice,
-                        Position = p.PositionNo,
-                        Config = JsonDocument.Parse("{}")
-                    })
-                    .ToList()
+                Items = (request.Services ?? new List<ContractServiceLineDto>())
+    .OrderBy(s => s.Position)
+    .Select(s => new ContractItemDto
+    {
+        ServiceId = s.ServiceId,
+        Title = s.Title, // أو العنوان من الـ AI إذا كنت تفضله
+        Quantity = s.Quantity <= 0 ? 1m : s.Quantity,
+        UnitPrice = s.UnitPrice,
+        BillingCycle = s.BillingCycle,
+        DiscountType = s.DiscountType,
+        DiscountValue = s.DiscountValue,
+        AgreedPrice = s.AgreedPrice,
+    
+        Position = s.Position,
+        Config = s.Config is not null
+            ? JsonDocument.Parse(JsonSerializer.Serialize(s.Config))
+            : JsonDocument.Parse("{}")
+    })
+    .ToList()
             };
 
             // 3️⃣ Save to DB

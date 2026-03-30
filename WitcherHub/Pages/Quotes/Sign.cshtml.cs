@@ -708,6 +708,7 @@ namespace WitcherHub.Pages.Quotes
             string signerName,
             string signerEmail)
         {
+          
             return new GenerateContractDocumentRequest
             {
                 ProjectId = quote.ProjectId,
@@ -725,20 +726,27 @@ namespace WitcherHub.Pages.Quotes
                 LeaveCustomerFieldsBlank = false,
                 IncludePricesInServicesSection = true,
                 Services = (quote.Items ?? new List<QuoteItem>())
-                    .OrderBy(x => x.Position)
-                    .Select((x, index) => new ContractServiceLineDto
-                    {
-                        Position = x.Position > 0 ? x.Position : index + 1,
-                        Title = string.IsNullOrWhiteSpace(x.Title)
-                            ? $"Position {index + 1}"
-                            : x.Title.Trim(),
-                        ServiceName = x.Service?.Name,
-                        ServiceType = x.Service?.ServiceType.ToString(),
-                        PricingModel = x.Service?.PricingModel.ToString(),
-                        AgreedPrice = ResolveQuoteItemAgreedPrice(x),
-                        Config = JsonDocumentToDictionary(x.Config)
-                    })
-                    .ToList()
+    .OrderBy(x => x.Position)
+    .Select((x, index) => new ContractServiceLineDto
+    {
+        Position = x.Position > 0 ? x.Position : index + 1,
+        ServiceId = x.ServiceId,
+        Title = string.IsNullOrWhiteSpace(x.Title) ? $"Position {index + 1}" : x.Title.Trim(),
+
+        // نقل حقول التسعير كاملة
+        Quantity = x.Quantity,
+        UnitPrice = x.UnitPrice,
+        BillingCycle = x.BillingCycle,
+        DiscountType = x.DiscountType,
+        DiscountValue = x.DiscountValue,
+
+        ServiceName = x.Service?.Name,
+        ServiceType = x.Service?.ServiceType.ToString(),
+        PricingModel = x.Service?.PricingModel.ToString(),
+        AgreedPrice = ResolveQuoteItemAgreedPrice(x),
+        Config = JsonDocumentToDictionary(x.Config)
+    })
+    .ToList()
             };
         }
 

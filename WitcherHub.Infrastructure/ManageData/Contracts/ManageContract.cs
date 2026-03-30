@@ -311,6 +311,7 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                     TermsStructured = structuredJson,
                     StartDate = dto.Contract.StartDate,
                     EndDate = dto.Contract.EndDate,
+                    FromQuote=dto.Contract.FromQuote,
                     SignedAt = dto.Contract.SignedAt
                 };
 
@@ -328,7 +329,12 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                             ServiceId = it.ServiceId,
                             Config = it.Config ?? JsonDocument.Parse("{}"),
                             AgreedPrice = it.AgreedPrice,
-                            Position = it.Position > 0 ? it.Position : pos
+                            Position = it.Position > 0 ? it.Position : pos,
+                            Quantity = it.Quantity <= 0 ? 1m : it.Quantity,
+                            UnitPrice = it.UnitPrice,
+                            BillingCycle = it.BillingCycle,
+                            DiscountType = it.DiscountType,
+                            DiscountValue = it.DiscountValue
                         });
                         pos++;
                     }
@@ -395,8 +401,14 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                         ServiceId = it.ServiceId,
                         Config = it.Config ?? JsonDocument.Parse("{}"),
                         AgreedPrice = it.AgreedPrice,
-                        Position = it.Position > 0 ? it.Position : pos
-                    });
+                        Position = it.Position > 0 ? it.Position : pos ,
+                        Quantity = it.Quantity <= 0 ? 1m : it.Quantity,
+                        UnitPrice = it.UnitPrice,
+                        BillingCycle = it.BillingCycle,
+                        DiscountType = it.DiscountType,
+                        DiscountValue = it.DiscountValue
+             
+            });
                     pos++;
                 }
             }

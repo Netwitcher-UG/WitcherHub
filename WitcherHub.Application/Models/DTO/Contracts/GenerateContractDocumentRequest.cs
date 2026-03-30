@@ -1,4 +1,7 @@
-﻿namespace WitcherHub.Application.Models.DTO.Contracts
+using WitcherHub.Infrastructure.Data.Models;
+using static WitcherHub.Infrastructure.Data.Models.Enums;
+
+namespace WitcherHub.Application.Models.DTO.Contracts
 {
     public class GenerateContractDocumentRequest
     {
@@ -39,9 +42,14 @@
         public string? ServiceName { get; set; }
         public string? ServiceType { get; set; }
         public string? PricingModel { get; set; }
-
+        public Guid? ServiceId { get; set; }
         public decimal? AgreedPrice { get; set; }
+        public decimal Quantity { get; set; } = 1;
+        public decimal UnitPrice { get; set; } = 0m;
+        public BillingCycle BillingCycle { get; set; } = BillingCycle.OneTime;
 
+        public DiscountType? DiscountType { get; set; }
+        public decimal? DiscountValue { get; set; }
         // config متغير (بديل JsonDocument لأنه أسهل للسواغر)
         public Dictionary<string, object> Config { get; set; } = new();
     }

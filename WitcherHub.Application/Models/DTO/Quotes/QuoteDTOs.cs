@@ -21,7 +21,7 @@ namespace WitcherHub.Application.Models.DTO.Quotes
 
         public DateTimeOffset? IssuedAt { get; set; }
         public DateTimeOffset? ExpiresAt { get; set; }
-        public bool ApplyVat { get; set; } = false;
+        public bool ApplyVat { get; set; } = true;
         public DocumentStatus Status { get; set; } = DocumentStatus.Draft;
         public QuoteAfterSignAction AfterCustomerSignAction { get; set; } = QuoteAfterSignAction.Contract;
         public InvoiceSendMode InvoiceSendMode { get; set; } = InvoiceSendMode.Automatic;
@@ -36,8 +36,8 @@ namespace WitcherHub.Application.Models.DTO.Quotes
         public Guid? ServiceId { get; set; }
         public string Title { get; set; } = "";
 
-        public string Description { get; set; } = string.Empty;
-        public string UnitName { get; set; } = string.Empty;
+        public string? Description { get; set; } = string.Empty;
+        public string? UnitName { get; set; } = string.Empty;
 
         public decimal Quantity { get; set; } = 1;
         public decimal UnitPrice { get; set; }

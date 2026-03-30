@@ -22,8 +22,9 @@ namespace WitcherHub.Infrastructure.Data.Models
         [MaxLength(10)]
         public string Currency { get; set; } = "EUR";
 
-        public bool ApplyVat { get; set; } = false;
+        public bool ApplyVat { get; set; } = true;
         public string? Terms { get; set; }
+        public bool? FromQuote { get; set; } = false;
 
         public Guid? CreatedById { get; set; }
         public AppUser? CreatedBy { get; set; }

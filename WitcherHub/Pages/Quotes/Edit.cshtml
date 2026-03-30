@@ -131,22 +131,21 @@
     var items = Model.Quote.Items.OrderBy(x => x.Position).ToList();
 
     // Totals for the sidebar
-    decimal sumSub = 0m;
+    decimal sumSub = 0m;   // subtotal before discount
     decimal sumDisc = 0m;
     decimal sumTax = 0m;
     decimal sumTotal = 0m;
 
     foreach (var it in items)
     {
-        var subTotal = ReadDec(it.PriceBreakdown, "subTotal", it.LineTotal);
+        var gross = it.Quantity * it.UnitPrice;
         var discountAmt = ReadNestedDec(it.PriceBreakdown, "discount", "amount", 0m);
 
-        sumSub += subTotal;
+        sumSub += gross;
         sumDisc += discountAmt;
     }
 
-    // ✅ VAT على كامل الفاتورة فقط
-    var net = Math.Max(0m, sumSub - sumDisc);      // ✅ بعد الخصم
+    var net = Math.Max(0m, sumSub - sumDisc);
     sumTax = (Model.Quote.ApplyVat ? net * 0.19m : 0m);
     sumTotal = net + sumTax;
 
