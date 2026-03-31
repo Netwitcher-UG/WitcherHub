@@ -6,7 +6,7 @@ namespace WitcherHub.Configuration.Extensions
     {
         public static async Task SeedAsync(this WebApplication app)
         {
-            using var scope = app.Services.CreateScope();
+            await using var scope = app.Services.CreateAsyncScope();
             var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Seeder");
 
             try

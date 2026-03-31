@@ -7,18 +7,17 @@
   </PropertyGroup>
 
 	<ItemGroup>
+		<Compile Remove="Services\Mapping\**" />
 		<Content Remove="$(NuGetPackageRoot)**\BuildHost-net472\**;$(NuGetPackageRoot)**\BuildHost-netcore\**" />
+		<EmbeddedResource Remove="Services\Mapping\**" />
 		<None Remove="$(NuGetPackageRoot)**\BuildHost-net472\**;$(NuGetPackageRoot)**\BuildHost-netcore\**" />
+		<None Remove="Services\Mapping\**" />
 	</ItemGroup>
 
 
 	<ItemGroup>
     <ProjectReference Include="..\WitcherHub.Application\WitcherHub.Application.csproj" />
     <ProjectReference Include="..\WitcherHub.Domain\WitcherHub.Domain.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Services\Mapping\" />
   </ItemGroup>
 
   <ItemGroup>
