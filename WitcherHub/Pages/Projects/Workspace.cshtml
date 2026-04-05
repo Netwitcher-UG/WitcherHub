@@ -134,6 +134,7 @@
 
 <input type="hidden" id="vcInvoiceDetailsPdfUrl" value="@Url.Page("/Invoices/Details", "Pdf")" />
 <input type="hidden" id="vcInvoicePdfViewerUrl" value="@Url.Page("/Invoices/PdfViewer")" />
+<input type="hidden" id="vcClientDetailsBaseUrl" value="/Clients/Details" />
 
 <input type="hidden" id="antiForgeryToken" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />
 
@@ -174,7 +175,14 @@
                     Customer
                 </a>
             </div>
-            <div class="fw-semibold" id="vp-customerName">—</div>
+
+            <a class="fw-semibold text-decoration-none"
+               id="vp-customerName"
+               href="#"
+               title="Open customer details">
+                —
+            </a>
+
             <div class="text-muted small" id="vp-customerEmail">—</div>
         </div>
 

@@ -547,14 +547,11 @@ namespace WitcherHub.Pages
 <div class="vc-actions-wrap">
     {{exportBtn}}
 
-    <button type="button"
-            class="btn vc-icon-btn text-secondary"
-            title="View"
-            data-bs-toggle="modal"
-            data-bs-target="#ViewClientModal"
-            data-client-id="{{Enc(customerId)}}">
-        <i class="material-icons-outlined">visibility</i>
-    </button>
+    <a class="btn vc-icon-btn text-secondary"
+   title="View"
+   href="/Clients/Details/{{Enc(customerId)}}">
+    <i class="material-icons-outlined">visibility</i>
+</a>
 
     <button type="button"
             class="btn vc-icon-btn text-danger"

@@ -45,6 +45,25 @@
 }
 
 <div class="mb-3">
+    <div class="mb-1 d-flex flex-wrap gap-2 align-items-center text-muted small">
+        <a class="text-decoration-none text-muted"
+           asp-page="/Projects/Workspace"
+           asp-route-id="@Model.Quote.ProjectId"
+           asp-route-tab="quotes"
+           title="Back to Project Workspace - Quotes">
+            Project Workspace / Quotes
+        </a>
+
+        <span>/</span>
+
+        <a class="text-decoration-none text-muted"
+           asp-page="/Quotes/Edit"
+           asp-route-id="@Model.Quote.Id"
+           title="Back to Edit Quote">
+            Edit Quote
+        </a>
+    </div>
+
     <div class="text-muted small">Add Position to</div>
     <h3 class="mb-1">@Model.Quote.QuoteNo</h3>
     <div class="text-muted small">
@@ -214,7 +233,7 @@
 <div class="col-12">
     <label class="form-label">Description</label>
     <textarea asp-for="Form.Item.Description"
-              class="form-control w-100"
+              class="form-control w-100 soft-placeholder"
               rows="4"
               placeholder="This text will appear on the quote / invoice line"></textarea>
     <span class="text-danger small" asp-validation-for="Form.Item.Description"></span>
