@@ -473,6 +473,18 @@
             this.render();
             this.updateTextarea();
         }
+        reset() {
+            this.fields = [];
+            this.allowAdditional = false;
+
+            const chk = this.el.querySelector('[data-sb="allowAdditional"]');
+            if (chk) chk.checked = false;
+
+            this.render();
+
+            this.textarea.value = "";
+            this.textarea.dispatchEvent(new Event("input", { bubbles: true }));
+        }
     }
 
     function typeOptionsHtml(selected) {
@@ -527,6 +539,17 @@
             inst.loadFromTextarea(true);
         });
     }
+    document.addEventListener("schema-builder:reset", (e) => {
+        const containerSel = e.detail?.container;
+        if (!containerSel) return;
 
+        const container = document.querySelector(containerSel);
+        if (!container) return;
+
+        const inst = INSTANCES.get(container);
+        if (!inst) return;
+
+        inst.reset();
+    });
     document.addEventListener("DOMContentLoaded", initAll);
 })();

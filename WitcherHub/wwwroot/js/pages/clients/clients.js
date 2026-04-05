@@ -1068,44 +1068,7 @@
             });
         }
     });
-    document.addEventListener('DOMContentLoaded', () => {
-        const typeSelect = document.getElementById("type");
-        const firstName = document.getElementById("firstName");
-        const lastName = document.getElementById("lastName");
-        const hiddenName = document.getElementById("hiddenName");
-        const companyName = document.getElementById("companyName");
-
-        function updateUI() {
-            const isCompany = typeSelect.value === "Company";
-
-            document.querySelectorAll(".individual-only").forEach(x => x.classList.toggle("d-none", isCompany));
-            document.querySelectorAll(".company-only").forEach(x => x.classList.toggle("d-none", !isCompany));
-
-            if (!isCompany) {
-                companyName?.removeAttribute("required");
-                firstName?.setAttribute("required", "required");
-                lastName?.setAttribute("required", "required");
-            } else {
-                companyName?.setAttribute("required", "required");
-                firstName?.removeAttribute("required");
-                lastName?.removeAttribute("required");
-            }
-
-            buildName();
-        }
-
-        function buildName() {
-            if (typeSelect.value === "Individual") {
-                hiddenName.value = `${firstName.value} ${lastName.value}`.trim();
-            }
-        }
-
-        firstName?.addEventListener("input", buildName);
-        lastName?.addEventListener("input", buildName);
-        typeSelect?.addEventListener("change", updateUI);
-
-        updateUI();
-    });
+    
 
 
     // ---------- Render Client ----------
@@ -1322,58 +1285,157 @@
         const modalEl = document.getElementById('FormModal');
         if (!modalEl) return;
 
+        const form = modalEl.querySelector('form');
         const typeSelect = modalEl.querySelector('#type');
         const contactSection = modalEl.querySelector('#contactSection');
-        const modalTitle = modalEl.querySelector('.modal-title'); // optional
+        const modalTitle = modalEl.querySelector('.modal-title');
 
-        if (!typeSelect || !contactSection) return;
+        if (!form || !typeSelect || !contactSection) return;
 
         function updateCreateModalUI() {
             const isCompany = typeSelect.value === 'Company';
-            contactSection.classList.toggle('d-none', !isCompany);
-            if (modalTitle) modalTitle.textContent = isCompany ? 'Add Company' : 'Add Individual';
-        }
 
-        // ✅ NEW: clear validation when modal closes
-        function clearRazorValidationState(form) {
-            // jQuery validate (if موجود)
-            if (window.jQuery) {
-                const $form = window.jQuery(form);
-                const v = $form.data('validator');
-                if (v && typeof v.resetForm === 'function') v.resetForm();
+            contactSection.classList.toggle('d-none', !isCompany);
+
+            if (modalTitle) {
+                modalTitle.textContent = isCompany ? 'Add Company' : 'Add Individual';
             }
 
-            // field messages
+            modalEl.querySelectorAll(".individual-only").forEach(x => {
+                x.classList.toggle("d-none", isCompany);
+            });
+
+            modalEl.querySelectorAll(".company-only").forEach(x => {
+                x.classList.toggle("d-none", !isCompany);
+            });
+
+            const firstName = modalEl.querySelector('#firstName');
+            const lastName = modalEl.querySelector('#lastName');
+            const companyName = modalEl.querySelector('#companyName');
+            const hiddenName = modalEl.querySelector('#hiddenName');
+
+            if (!isCompany) {
+                companyName?.removeAttribute("required");
+                firstName?.setAttribute("required", "required");
+                lastName?.setAttribute("required", "required");
+
+                if (hiddenName) {
+                    hiddenName.value = `${firstName?.value ?? ''} ${lastName?.value ?? ''}`.trim();
+                }
+            } else {
+                companyName?.setAttribute("required", "required");
+                firstName?.removeAttribute("required");
+                lastName?.removeAttribute("required");
+            }
+        }
+
+        function clearRazorValidationState(form) {
+            if (window.jQuery) {
+                const $form = window.jQuery(form);
+                const validator = $form.data('validator');
+                const unobtrusive = $form.data('unobtrusiveValidation');
+
+                if (validator && typeof validator.resetForm === 'function') {
+                    validator.resetForm();
+                }
+
+                if (unobtrusive) {
+                    $form.removeData('validator');
+                    $form.removeData('unobtrusiveValidation');
+                    window.jQuery.validator.unobtrusive.parse(form);
+                }
+            }
+
             form.querySelectorAll('[data-valmsg-for]').forEach(el => {
                 el.textContent = '';
                 el.classList.remove('field-validation-error');
                 el.classList.add('field-validation-valid');
             });
 
-            // summary
-            form.querySelectorAll('[data-valmsg-summary="true"]').forEach(el => {
-                el.innerHTML = '';
-                el.classList.remove('validation-summary-errors');
-                el.classList.add('validation-summary-valid');
-            });
-
-            // input error styles
             form.querySelectorAll('.input-validation-error').forEach(el => {
                 el.classList.remove('input-validation-error');
                 el.removeAttribute('aria-invalid');
             });
+
+            form.querySelectorAll('.validation-summary-errors, .validation-summary-valid, [data-valmsg-summary="true"]').forEach(el => {
+                el.classList.remove('validation-summary-errors');
+                el.classList.add('validation-summary-valid');
+                el.innerHTML = '';
+            });
+
+            form.querySelectorAll('.text-danger').forEach(el => {
+                if (el.hasAttribute('data-valmsg-for') || el.hasAttribute('data-valmsg-summary')) {
+                    el.textContent = '';
+                }
+            });
         }
 
-        modalEl.addEventListener('hidden.bs.modal', function () {
-            const form = modalEl.querySelector('form');
-            if (form) clearRazorValidationState(form);
-        });
+        function resetCreateCustomerModal() {
+            // 1) امسح الحقول النصية
+            modalEl.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], textarea').forEach(el => {
+                el.value = '';
+            });
+
+            // 2) reset للـ checkbox / radio
+            modalEl.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(el => {
+                el.checked = el.defaultChecked;
+            });
+
+            // 3) reset للـ selects
+            modalEl.querySelectorAll('select').forEach(sel => {
+                if (sel.id === 'type') {
+                    sel.value = 'Individual';
+                } else if (sel.id === 'Address_CountryCode') {
+                    sel.value = 'DE';
+                } else {
+                    sel.selectedIndex = 0;
+                }
+            });
+
+            // 4) hidden fields الخاصة
+            const hiddenName = modalEl.querySelector('#hiddenName');
+            if (hiddenName) hiddenName.value = '';
+
+            const hiddenCountry = modalEl.querySelector('#Address_Country');
+            if (hiddenCountry) hiddenCountry.value = 'Germany';
+
+            // 5) reset قائمة الإيميلات إلى صف واحد فقط
+            const emailList = modalEl.querySelector('#create-email-list');
+            if (emailList) {
+                emailList.innerHTML = '';
+                emailList.appendChild(createEmailRowDom(0, 'business', ''));
+                renumberCreateEmailRows(modalEl);
+            }
+
+            // 6) reset country combo
+            initCreateFormCountryCombo();
+
+            // 7) reset validation
+            clearRazorValidationState(form);
+
+            // 8) update UI حسب النوع
+            updateCreateModalUI();
+
+            // 9) reparse unobtrusive validation بعد إعادة بناء الإيميلات
+            if (window.jQuery && window.jQuery.validator && window.jQuery.validator.unobtrusive) {
+                window.jQuery(form).removeData('validator');
+                window.jQuery(form).removeData('unobtrusiveValidation');
+                window.jQuery.validator.unobtrusive.parse(form);
+            }
+        }
 
         typeSelect.addEventListener('change', updateCreateModalUI);
-        modalEl.addEventListener('shown.bs.modal', updateCreateModalUI);
+
+        modalEl.addEventListener('shown.bs.modal', function () {
+            updateCreateModalUI();
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            resetCreateCustomerModal();
+        });
+
         updateCreateModalUI();
     });
-
     // ---------- Delegated actions (Basic + Locations + Contacts) ----------
     document.addEventListener('click', async function (e) {
         const b = e.target.closest('[data-vc-action]');

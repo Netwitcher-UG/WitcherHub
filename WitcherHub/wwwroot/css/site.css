@@ -722,3 +722,8 @@ html[data-bs-theme="blue-theme"] #servicesTableCard {
 #ViewServiceModal .btn-outline-info.active * {
     color: #fff !important;
 }
+
+.soft-placeholder::placeholder {
+    color: rgba(255, 255, 255, 0.32);
+    opacity: 1;
+}

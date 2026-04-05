@@ -1399,4 +1399,93 @@
             initServicesLiveSearch();
         }
     })();
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const modalEl = document.getElementById('FormModal');
+        if (!modalEl) return;
+
+        const form = modalEl.querySelector('form');
+        if (!form) return;
+
+        function clearRazorValidationState(formEl) {
+            if (window.jQuery) {
+                const $form = window.jQuery(formEl);
+                const validator = $form.data('validator');
+                const unobtrusive = $form.data('unobtrusiveValidation');
+
+                if (validator && typeof validator.resetForm === 'function') {
+                    validator.resetForm();
+                }
+
+                formEl.querySelectorAll('[data-valmsg-for]').forEach(el => {
+                    el.textContent = '';
+                    el.classList.remove('field-validation-error');
+                    el.classList.add('field-validation-valid');
+                });
+
+                formEl.querySelectorAll('[data-valmsg-summary="true"]').forEach(el => {
+                    el.innerHTML = '';
+                    el.classList.remove('validation-summary-errors');
+                    el.classList.add('validation-summary-valid');
+                });
+
+                formEl.querySelectorAll('.input-validation-error').forEach(el => {
+                    el.classList.remove('input-validation-error');
+                    el.removeAttribute('aria-invalid');
+                });
+
+                if (unobtrusive && window.jQuery.validator?.unobtrusive) {
+                    $form.removeData('validator');
+                    $form.removeData('unobtrusiveValidation');
+                    window.jQuery.validator.unobtrusive.parse(formEl);
+                }
+            }
+        }
+
+        function resetCreateServiceModal() {
+            // reset عام أولي
+            form.reset();
+
+            // الحقول النصية والقيم المطلوبة
+            const name = form.querySelector('[name="Service.Name"]');
+            const currency = form.querySelector('[name="Service.DefaultCurrency"]');
+            const basePrice = form.querySelector('[name="Service.BasePrice"]');
+            const defaultUnit = form.querySelector('[name="Service.DefaultUnitName"]');
+            const defaultDescription = form.querySelector('[name="Service.DefaultDescription"]');
+            const configSchemaJson = form.querySelector('[name="Service.ConfigSchemaJson"]');
+            const isActive = form.querySelector('[name="Service.IsActive"]');
+            const serviceType = form.querySelector('[name="Service.ServiceType"]');
+            const pricingModel = form.querySelector('[name="Service.PricingModel"]');
+
+            if (name) name.value = '';
+            if (currency) currency.value = 'EUR';
+            if (basePrice) basePrice.value = '';
+            if (defaultUnit) defaultUnit.value = '';
+            if (defaultDescription) defaultDescription.value = '';
+            if (configSchemaJson) configSchemaJson.value = '';
+
+            if (serviceType) serviceType.selectedIndex = 0;
+            if (pricingModel) pricingModel.selectedIndex = 0;
+
+            if (isActive) {
+                isActive.checked = true;
+            }
+
+            // رجّع التبويب إلى Schema Builder
+            const builderTabBtn = document.getElementById('cs-create-builder-tab');
+            if (builderTabBtn && window.bootstrap) {
+                bootstrap.Tab.getOrCreateInstance(builderTabBtn).show();
+            }
+
+            document.dispatchEvent(new CustomEvent('schema-builder:reset', {
+                detail: { container: '#csb-create' }
+            }));
+
+            clearRazorValidationState(form);
+        }
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            resetCreateServiceModal();
+        });
+    });
 })();
