@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using WitcherHub.Application.Common.CacheKeys;
 using WitcherHub.Application.Common.Caching;
+using WitcherHub.Application.Models.DTO.Invoices;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
 using WitcherHub.Infrastructure.Services.Invoices;
@@ -149,14 +150,17 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 _logger.LogInformation("One-time invoice already exists. ContractId={ContractId}", contractId);
                 return InvoiceGenerationResult.Warning("A one-time invoice already exists for this contract.");
             }
+            var invoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
 
             return await CreateInvoiceInternalAsync(
                 InvoiceSourceContext.FromContract(contract),
                 items.Select(MapSourceItem).ToList(),
-                invoiceDate: DateOnly.FromDateTime(DateTime.UtcNow),
+                invoiceDate: invoiceDate,
                 originType: InvoiceOriginType.ContractOneTime,
                 recurringCycleKey: null,
                 isRecurringInvoice: false,
+                servicePeriodStart: contract.StartDate ?? invoiceDate,
+                servicePeriodEnd: contract.EndDate ?? contract.RecurringEndDate,
                 ct: ct);
         }
 
@@ -206,13 +210,22 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 return InvoiceGenerationResult.Warning("A one-time invoice already exists for this quote.");
             }
 
+            var invoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
+
+            var quoteServiceStart =
+                ToDateOnly(quote.IssuedAt) ??
+                ToDateOnly(quote.SignedAt) ??
+                invoiceDate;
+
             return await CreateInvoiceInternalAsync(
                 InvoiceSourceContext.FromQuote(quote),
                 items.Select(MapSourceItem).ToList(),
-                invoiceDate: DateOnly.FromDateTime(DateTime.UtcNow),
+                invoiceDate: invoiceDate,
                 originType: InvoiceOriginType.QuoteOneTime,
                 recurringCycleKey: null,
                 isRecurringInvoice: false,
+                servicePeriodStart: quoteServiceStart,
+                servicePeriodEnd: ToDateOnly(quote.ExpiresAt) ?? quote.RecurringEndDate,
                 ct: ct);
         }
 
@@ -284,13 +297,15 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             }
 
             var result = await CreateInvoiceInternalAsync(
-                InvoiceSourceContext.FromContract(contract),
-                items.Select(MapSourceItem).ToList(),
-                invoiceDate: cycleDate,
-                originType: InvoiceOriginType.ContractRecurring,
-                recurringCycleKey: cycleKey,
-                isRecurringInvoice: true,
-                ct: ct);
+     InvoiceSourceContext.FromContract(contract),
+     items.Select(MapSourceItem).ToList(),
+     invoiceDate: cycleDate,
+     originType: InvoiceOriginType.ContractRecurring,
+     recurringCycleKey: cycleKey,
+     isRecurringInvoice: true,
+     servicePeriodStart: cycleDate,
+     servicePeriodEnd: contract.RecurringEndDate ?? contract.EndDate,
+     ct: ct);
 
             if (!result.Created)
                 return result;
@@ -404,14 +419,15 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             }
 
             var result = await CreateInvoiceInternalAsync(
-                InvoiceSourceContext.FromQuote(quote),
-                items.Select(MapSourceItem).ToList(),
-                invoiceDate: cycleDate,
-                originType: InvoiceOriginType.QuoteRecurring,
-                recurringCycleKey: cycleKey,
-                isRecurringInvoice: true,
-                ct: ct);
-
+           InvoiceSourceContext.FromQuote(quote),
+           items.Select(MapSourceItem).ToList(),
+           invoiceDate: cycleDate,
+           originType: InvoiceOriginType.QuoteRecurring,
+           recurringCycleKey: cycleKey,
+           isRecurringInvoice: true,
+           servicePeriodStart: cycleDate,
+           servicePeriodEnd: quote.RecurringEndDate ?? ToDateOnly(quote.ExpiresAt),
+           ct: ct);
             if (!result.Created)
                 return result;
 
@@ -508,13 +524,15 @@ namespace WitcherHub.Infrastructure.Services.Lexware
         }
 
         private async Task<InvoiceGenerationResult> CreateInvoiceInternalAsync(
-            InvoiceSourceContext source,
-            List<InvoiceSourceItemData> sourceItems,
-            DateOnly invoiceDate,
-            InvoiceOriginType originType,
-            string? recurringCycleKey,
-            bool isRecurringInvoice,
-            CancellationToken ct)
+          InvoiceSourceContext source,
+          List<InvoiceSourceItemData> sourceItems,
+          DateOnly invoiceDate,
+          InvoiceOriginType originType,
+          string? recurringCycleKey,
+          bool isRecurringInvoice,
+          DateOnly? servicePeriodStart,
+          DateOnly? servicePeriodEnd,
+          CancellationToken ct)
         {
             if (source.Status != DocumentStatus.Signed)
                 return InvoiceGenerationResult.Warning($"{source.DocumentLabel} is not signed yet.");
@@ -549,10 +567,17 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 return InvoiceGenerationResult.Warning(
                     "Invoice was not created because recipient address data is incomplete.");
             }
-
             var currency = ResolveCurrency(source.Currency, sourceItems);
-            var invoiceDateUtc = new DateTimeOffset(invoiceDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            var invoiceDateUtc = ToLexwareDate(invoiceDate);
             var taxRate = source.ApplyVat ? FixedTaxRatePercentage : 0m;
+
+            var effectiveServiceStart = servicePeriodStart ?? invoiceDate;
+            var effectiveServiceStartUtc = ToLexwareDate(effectiveServiceStart);
+            DateTimeOffset? effectiveServiceEndUtc = servicePeriodEnd.HasValue
+       ? ToLexwareDate(servicePeriodEnd.Value)
+       : null;
+
+
 
             //var finalizeOnLexware = source.InvoiceSendMode == InvoiceSendMode.Automatic;
             //var dispatchStatus = source.InvoiceSendMode == InvoiceSendMode.Automatic
@@ -617,8 +642,9 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 },
                 ShippingConditions = new LexwareShippingConditions
                 {
-                    ShippingType = "service",
-                    ShippingDate = invoiceDateUtc
+                    ShippingType = effectiveServiceEndUtc.HasValue ? "serviceperiod" : "service",
+                    ShippingDate = effectiveServiceStartUtc,
+                    ShippingEndDate = effectiveServiceEndUtc
                 },
                 Title = "Rechnung",
                 Introduction = BuildGermanInvoiceIntroduction(source, isRecurringInvoice, invoiceDate),
@@ -656,12 +682,22 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             //    LexwareVersion = created.Version
             //};
 
+            _logger.LogInformation(
+    "Lexware request shippingConditions: {Shipping}",
+    JsonSerializer.Serialize(req.ShippingConditions));
+
             var created = await _lex.CreateInvoiceAsync(req, finalize: finalizeOnLexware, ct);
             var invDoc = await GetInvoiceAfterFinalizeAsync(
                 created.Id,
                 maxAttempts: 8,
                 delay: TimeSpan.FromSeconds(1),
                 ct);
+
+            _logger.LogInformation(
+    "Lexware response shippingConditions: {Shipping}",
+    invDoc.RootElement.TryGetProperty("shippingConditions", out var sc)
+        ? sc.GetRawText()
+        : "<missing>");
 
             var localInvoice = new Invoice
             {
@@ -1598,5 +1634,15 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             return true;
         }
+        private static DateOnly? ToDateOnly(DateTimeOffset? value)
+        {
+            if (!value.HasValue)
+                return null;
+
+            return DateOnly.FromDateTime(value.Value.UtcDateTime);
+        }
+
+        private static DateTimeOffset ToLexwareDate(DateOnly value)
+            => new DateTimeOffset(value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
     }
 }
