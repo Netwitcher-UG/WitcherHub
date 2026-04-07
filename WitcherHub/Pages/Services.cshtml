@@ -72,44 +72,5 @@
     <script src="~/js/pages/services/schema-builder.js" asp-append-version="true"></script>
     <script src="~/js/pages/services/services.js" asp-append-version="true"></script>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const form = document.querySelector('#servicesTableCard form.order-search');
-            if (!form) return;
-
-            const input = form.querySelector('input[name="q"]');
-            if (!input) return;
-
-            const pageInput = form.querySelector('input[name="p"]');
-            let timer = null;
-            let lastSubmittedValue = input.value;
-
-            input.addEventListener('input', function () {
-                clearTimeout(timer);
-
-                timer = setTimeout(function () {
-                    const currentValue = input.value;
-
-                    if (currentValue === lastSubmittedValue) return;
-
-                    if (pageInput) pageInput.value = '1';
-                    lastSubmittedValue = currentValue;
-
-                    form.requestSubmit();
-                }, 500);
-            });
-
-            input.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    clearTimeout(timer);
-
-                    if (pageInput) pageInput.value = '1';
-                    lastSubmittedValue = input.value;
-
-                    form.requestSubmit();
-                }
-            });
-        });
-    </script>
+   
 }

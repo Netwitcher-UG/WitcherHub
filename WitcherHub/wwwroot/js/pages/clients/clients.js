@@ -71,7 +71,26 @@
             "Contact.Phone": `vc-c-${idx}-phone`,
         };
     }
+    async function initClientDetailsPage() {
+        const idEl = document.getElementById('vcPageClientId');
+        if (!idEl) return;
 
+        const id = (idEl.value || '').trim();
+        if (!id) {
+            toastError('Missing client id.', 'Error');
+            return;
+        }
+
+        try {
+            renderClient({ id, type: '—', name: 'Loading...', addresses: [], contacts: [], projects: [] });
+            const client = await fetchClientById(id);
+            renderClient(client);
+        } catch (err) {
+            console.error('Load client page failed:', err);
+            toastError('Client not found or failed to load.', 'Error');
+            renderClient({ id, type: '—', name: 'Client not found', addresses: [], contacts: [], projects: [] });
+        }
+    }
 
     // ---------- Helpers ----------
     function esc(s) {
@@ -366,47 +385,6 @@
     })();
 
 
-    // ---------- Mock Data (demo) ----------
-    const mockClients = {
-        "demo-individual": {
-            id: "demo-individual",
-            type: "Individual",
-            name: "Anas Sadek",
-            email: "anas@email.com",
-            phone: "+49 174 234 5678",
-            taxId: "—",
-            notes: "VIP customer, prefers email.",
-            addresses: [
-                { label: "Home", isDefault: true, street: "Alexanderplatz", streetNr: "1", city: "Berlin", country: "Germany", postalCode: "10178", addressLine2: "" }
-            ],
-            contacts: [],
-            projects: [
-                { name: "Website Redesign", status: "Active" },
-                { name: "Maintenance", status: "Planned" }
-            ]
-        },
-        "demo-company": {
-            id: "demo-company",
-            type: "Company",
-            name: "ACME LLC",
-            email: "finance@acme.com",
-            phone: "+1 212 555 0199",
-            taxId: "CR-123456",
-            notes: "Company account. Multiple locations.",
-            addresses: [
-                { label: "Billing", isDefault: true, street: "5th Avenue", streetNr: "500", city: "New York", country: "USA", postalCode: "10018", addressLine2: "Floor 12" },
-                { label: "Shipping", isDefault: false, street: "Industrial Rd", streetNr: "77", city: "Newark", country: "USA", postalCode: "07102", addressLine2: "" }
-            ],
-            contacts: [
-                { isPrimary: true, name: "Sara Ahmed", position: "Manager", email: "sara@acme.com", phone: "+1 212 555 0101" },
-                { isPrimary: false, name: "John Finch", position: "Finance", email: "john@acme.com", phone: "+1 212 555 0102" }
-            ],
-            projects: [
-                { name: "ERP Integration", status: "Active" },
-                { name: "Invoice Portal", status: "Planned" }
-            ]
-        }
-    };
 
     // ---------- Modal Session State ----------
     let currentClientId = null;
@@ -971,29 +949,17 @@
 
     // ---- row click => open client modal (overview) ----
     document.addEventListener('click', function (e) {
-        // لا تفتح إذا الضغط داخل أزرار الأكشن أو أي زر/رابط/حقل
         if (e.target.closest('.vc-actions-wrap')) return;
         if (e.target.closest('button, a, input, textarea, select, label')) return;
 
         const tr = e.target.closest('tr');
         if (!tr) return;
 
-        // خذ id من أي عنصر في السطر يحمل data-client-id (عادة موجود في زر view/delete)
         const idEl = tr.querySelector('[data-client-id]');
         const id = idEl?.getAttribute('data-client-id') || '';
         if (!id) return;
 
-        // افتح نفس المودال الذي تفتحه أيقونة view
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'd-none';
-        btn.setAttribute('data-bs-toggle', 'modal');
-        btn.setAttribute('data-bs-target', '#ViewClientModal'); // ✅ تأكد هذا نفس ID المودال عندك
-        btn.setAttribute('data-client-id', id);
-
-        document.body.appendChild(btn);
-        btn.click();
-        btn.remove();
+        window.location.href = `/Clients/Details/${encodeURIComponent(id)}`;
     });
 
 
@@ -1067,45 +1033,10 @@
                 initCreateFormCountryCombo();
             });
         }
+
+        initClientDetailsPage();
     });
-    document.addEventListener('DOMContentLoaded', () => {
-        const typeSelect = document.getElementById("type");
-        const firstName = document.getElementById("firstName");
-        const lastName = document.getElementById("lastName");
-        const hiddenName = document.getElementById("hiddenName");
-        const companyName = document.getElementById("companyName");
-
-        function updateUI() {
-            const isCompany = typeSelect.value === "Company";
-
-            document.querySelectorAll(".individual-only").forEach(x => x.classList.toggle("d-none", isCompany));
-            document.querySelectorAll(".company-only").forEach(x => x.classList.toggle("d-none", !isCompany));
-
-            if (!isCompany) {
-                companyName?.removeAttribute("required");
-                firstName?.setAttribute("required", "required");
-                lastName?.setAttribute("required", "required");
-            } else {
-                companyName?.setAttribute("required", "required");
-                firstName?.removeAttribute("required");
-                lastName?.removeAttribute("required");
-            }
-
-            buildName();
-        }
-
-        function buildName() {
-            if (typeSelect.value === "Individual") {
-                hiddenName.value = `${firstName.value} ${lastName.value}`.trim();
-            }
-        }
-
-        firstName?.addEventListener("input", buildName);
-        lastName?.addEventListener("input", buildName);
-        typeSelect?.addEventListener("change", updateUI);
-
-        updateUI();
-    });
+    
 
 
     // ---------- Render Client ----------
@@ -1272,108 +1203,164 @@
         return map;
     }
 
-    // ---------- Modal Open (Server) ----------
-    const viewModalEl = $('ViewClientModal');
-    if (viewModalEl) {
-        viewModalEl.addEventListener('show.bs.modal', async function (event) {
-            closeAllCollapses();
-            editingLocationIndex = null;
-            editingContactIndex = null;
-            setBasicMode(false);
-
-            const btn = event.relatedTarget;
-            const id = btn?.getAttribute('data-client-id');
-
-            if (!id) {
-                toastError('Missing client id.', 'Error');
-                renderClient({ id: '—', type: '—', name: 'Client not found', addresses: [], contacts: [], projects: [] });
-                return;
-            }
-
-            // عرض placeholder سريع داخل المودال
-            renderClient({ id, type: '—', name: 'Loading...', addresses: [], contacts: [], projects: [] });
-
-            try {
-                // ✅ 1) اجلب من السيرفر
-                const client = await fetchClientById(id);
-
-                // ✅ 2) اعرض
-                renderClient(client);
-
-            } catch (err) {
-                console.error('Load client failed:', err);
-
-                // (اختياري) fallback للـ mock لو تبي
-                const fallback = mockClients[id];
-                if (fallback) {
-                    toastInfo('Loaded from mock (server failed).', 'Info');
-                    renderClient(fallback);
-                    return;
-                }
-
-                toastError('Client not found or failed to load.', 'Error');
-                renderClient({ id, type: '—', name: 'Client not found', addresses: [], contacts: [], projects: [] });
-            }
-        });
-    }
+    
 
     // ---------- Create Modal (FormModal) : show/hide contact section ----------
     document.addEventListener('DOMContentLoaded', function () {
         const modalEl = document.getElementById('FormModal');
         if (!modalEl) return;
 
+        const form = modalEl.querySelector('form');
         const typeSelect = modalEl.querySelector('#type');
         const contactSection = modalEl.querySelector('#contactSection');
-        const modalTitle = modalEl.querySelector('.modal-title'); // optional
+        const modalTitle = modalEl.querySelector('.modal-title');
 
-        if (!typeSelect || !contactSection) return;
+        if (!form || !typeSelect || !contactSection) return;
 
         function updateCreateModalUI() {
             const isCompany = typeSelect.value === 'Company';
-            contactSection.classList.toggle('d-none', !isCompany);
-            if (modalTitle) modalTitle.textContent = isCompany ? 'Add Company' : 'Add Individual';
-        }
 
-        // ✅ NEW: clear validation when modal closes
-        function clearRazorValidationState(form) {
-            // jQuery validate (if موجود)
-            if (window.jQuery) {
-                const $form = window.jQuery(form);
-                const v = $form.data('validator');
-                if (v && typeof v.resetForm === 'function') v.resetForm();
+            contactSection.classList.toggle('d-none', !isCompany);
+
+            if (modalTitle) {
+                modalTitle.textContent = isCompany ? 'Add Company' : 'Add Individual';
             }
 
-            // field messages
+            modalEl.querySelectorAll(".individual-only").forEach(x => {
+                x.classList.toggle("d-none", isCompany);
+            });
+
+            modalEl.querySelectorAll(".company-only").forEach(x => {
+                x.classList.toggle("d-none", !isCompany);
+            });
+
+            const firstName = modalEl.querySelector('#firstName');
+            const lastName = modalEl.querySelector('#lastName');
+            const companyName = modalEl.querySelector('#companyName');
+            const hiddenName = modalEl.querySelector('#hiddenName');
+
+            if (!isCompany) {
+                companyName?.removeAttribute("required");
+                firstName?.setAttribute("required", "required");
+                lastName?.setAttribute("required", "required");
+
+                if (hiddenName) {
+                    hiddenName.value = `${firstName?.value ?? ''} ${lastName?.value ?? ''}`.trim();
+                }
+            } else {
+                companyName?.setAttribute("required", "required");
+                firstName?.removeAttribute("required");
+                lastName?.removeAttribute("required");
+            }
+        }
+
+        function clearRazorValidationState(form) {
+            if (window.jQuery) {
+                const $form = window.jQuery(form);
+                const validator = $form.data('validator');
+                const unobtrusive = $form.data('unobtrusiveValidation');
+
+                if (validator && typeof validator.resetForm === 'function') {
+                    validator.resetForm();
+                }
+
+                if (unobtrusive) {
+                    $form.removeData('validator');
+                    $form.removeData('unobtrusiveValidation');
+                    window.jQuery.validator.unobtrusive.parse(form);
+                }
+            }
+
             form.querySelectorAll('[data-valmsg-for]').forEach(el => {
                 el.textContent = '';
                 el.classList.remove('field-validation-error');
                 el.classList.add('field-validation-valid');
             });
 
-            // summary
-            form.querySelectorAll('[data-valmsg-summary="true"]').forEach(el => {
-                el.innerHTML = '';
-                el.classList.remove('validation-summary-errors');
-                el.classList.add('validation-summary-valid');
-            });
-
-            // input error styles
             form.querySelectorAll('.input-validation-error').forEach(el => {
                 el.classList.remove('input-validation-error');
                 el.removeAttribute('aria-invalid');
             });
+
+            form.querySelectorAll('.validation-summary-errors, .validation-summary-valid, [data-valmsg-summary="true"]').forEach(el => {
+                el.classList.remove('validation-summary-errors');
+                el.classList.add('validation-summary-valid');
+                el.innerHTML = '';
+            });
+
+            form.querySelectorAll('.text-danger').forEach(el => {
+                if (el.hasAttribute('data-valmsg-for') || el.hasAttribute('data-valmsg-summary')) {
+                    el.textContent = '';
+                }
+            });
         }
 
-        modalEl.addEventListener('hidden.bs.modal', function () {
-            const form = modalEl.querySelector('form');
-            if (form) clearRazorValidationState(form);
-        });
+        function resetCreateCustomerModal() {
+            // 1) امسح الحقول النصية
+            modalEl.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], textarea').forEach(el => {
+                el.value = '';
+            });
+
+            // 2) reset للـ checkbox / radio
+            modalEl.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(el => {
+                el.checked = el.defaultChecked;
+            });
+
+            // 3) reset للـ selects
+            modalEl.querySelectorAll('select').forEach(sel => {
+                if (sel.id === 'type') {
+                    sel.value = 'Individual';
+                } else if (sel.id === 'Address_CountryCode') {
+                    sel.value = 'DE';
+                } else {
+                    sel.selectedIndex = 0;
+                }
+            });
+
+            // 4) hidden fields الخاصة
+            const hiddenName = modalEl.querySelector('#hiddenName');
+            if (hiddenName) hiddenName.value = '';
+
+            const hiddenCountry = modalEl.querySelector('#Address_Country');
+            if (hiddenCountry) hiddenCountry.value = 'Germany';
+
+            // 5) reset قائمة الإيميلات إلى صف واحد فقط
+            const emailList = modalEl.querySelector('#create-email-list');
+            if (emailList) {
+                emailList.innerHTML = '';
+                emailList.appendChild(createEmailRowDom(0, 'business', ''));
+                renumberCreateEmailRows(modalEl);
+            }
+
+            // 6) reset country combo
+            initCreateFormCountryCombo();
+
+            // 7) reset validation
+            clearRazorValidationState(form);
+
+            // 8) update UI حسب النوع
+            updateCreateModalUI();
+
+            // 9) reparse unobtrusive validation بعد إعادة بناء الإيميلات
+            if (window.jQuery && window.jQuery.validator && window.jQuery.validator.unobtrusive) {
+                window.jQuery(form).removeData('validator');
+                window.jQuery(form).removeData('unobtrusiveValidation');
+                window.jQuery.validator.unobtrusive.parse(form);
+            }
+        }
 
         typeSelect.addEventListener('change', updateCreateModalUI);
-        modalEl.addEventListener('shown.bs.modal', updateCreateModalUI);
+
+        modalEl.addEventListener('shown.bs.modal', function () {
+            updateCreateModalUI();
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            resetCreateCustomerModal();
+        });
+
         updateCreateModalUI();
     });
-
     // ---------- Delegated actions (Basic + Locations + Contacts) ----------
     document.addEventListener('click', async function (e) {
         const b = e.target.closest('[data-vc-action]');
@@ -1390,7 +1377,29 @@
         if (action === 'cancel-basic') { setBasicMode(false); return; }
         if (action === 'export-lexware') {
             if (client?.lexwareType !== 'NotExported') return;
-            toastInfo('Export will be implemented in the next step (Lexware integration).', 'Lexware');
+
+            const url = document.getElementById('vcLexwareExportUrl')?.value;
+            if (!url) return toastError('Export url not found', 'Lexware');
+
+            try {
+                b.disabled = true;
+                toastInfo('Exporting to Lexware...', 'Lexware');
+
+                await postJson(url, { customerId: client.id });
+
+                sessionStorage.setItem('lx_toast', JSON.stringify({
+                    type: 'success',
+                    title: 'Lexware',
+                    message: 'Exported successfully.'
+                }));
+
+                window.location.reload();
+            } catch (err) {
+                console.error(err);
+                toastError(err?.payload?.message || 'Export failed.', 'Lexware');
+            } finally {
+                b.disabled = false;
+            }
             return;
         }
 
@@ -1892,15 +1901,21 @@
         const baseUrl = document.getElementById('vcClientUrl')?.value;
         if (!baseUrl) throw new Error('vcClientUrl not found');
 
-        const joiner = baseUrl.includes('?') ? '&' : '?';
-        const url = `${baseUrl}${joiner}id=${encodeURIComponent(id)}`;
+        const url = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}id=${encodeURIComponent(id)}`;
 
-        const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const res = await fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        });
+
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`HTTP ${res.status}: ${text}`);
+        }
 
         const data = await res.json();
         return normalizeClient(data);
-
     }
     async function postJson(url, body) {
         const token = document.getElementById('antiForgeryToken')?.value;

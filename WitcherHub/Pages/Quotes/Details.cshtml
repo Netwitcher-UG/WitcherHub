@@ -36,10 +36,28 @@
 
     string FmtDate(DateTimeOffset? d) => d?.ToString("yyyy-MM-dd") ?? "—";
 }
-
-<div class="d-flex justify-content-between align-items-start mb-3">
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
     <div>
-        <div class="text-muted small">Quote</div>
+        <div class="mb-1 d-flex flex-wrap gap-2 align-items-center text-muted small">
+            <a class="text-decoration-none text-muted"
+               asp-page="/Projects/Workspace"
+               asp-route-id="@Model.Quote.ProjectId"
+               asp-route-tab="quotes"
+               title="Back to Project Workspace - Quotes">
+                Project Workspace / Quotes
+            </a>
+
+            <span>/</span>
+
+            <a class="text-decoration-none text-muted"
+               asp-page="/Quotes/Edit"
+               asp-route-id="@Model.Quote.Id"
+               title="Back to Edit Quote">
+                Edit Quote
+            </a>
+        </div>
+
+        <div class="text-muted small">Quote Details</div>
         <h3 class="mb-1">@Model.Quote.QuoteNo</h3>
 
         <div class="d-flex gap-2 align-items-center flex-wrap">
@@ -56,9 +74,7 @@
         </div>
     </div>
 
-    <div class="d-flex gap-2">
-        
-
+    <div class="d-flex gap-2 flex-wrap">
         <a class="btn btn-outline-primary"
            id="downloadPdfBtn"
            asp-page="./Details"
@@ -69,6 +85,7 @@
             <span class="pdf-btn-text">PDF</span>
             <span class="spinner-border spinner-border-sm ms-2 d-none" id="downloadPdfSpinner" role="status" aria-hidden="true"></span>
         </a>
+
         @if (Model.ShowManualInvoiceButton)
         {
             <form method="post"
@@ -81,6 +98,7 @@
                 </button>
             </form>
         }
+
         @if (showCopyLinkBtn)
         {
             <button type="button"
@@ -91,6 +109,7 @@
                 Send
             </button>
         }
+
         @if (showCopyLinkBtn)
         {
             <button type="button"
@@ -124,7 +143,6 @@
                 Edit
             </a>
         }
-        
     </div>
 </div>
 

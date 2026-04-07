@@ -125,7 +125,11 @@ namespace WitcherHub.Infrastructure.Services.Invoices
                 From = new EmailAddress("no-reply@invalid.local", "WitcherHub"),
                 Subject = subject,
                 HtmlBody = html,
-                TextBody = $"Guten Tag {recipientName}, im Anhang finden Sie Ihre Rechnung {invoiceNo} als PDF.",
+                TextBody =
+                    $"Guten Tag {recipientName},\n\n" +
+                    $"im Anhang finden Sie Ihre Rechnung {invoiceNo} als PDF.\n" +
+                    $"Nach Zahlungseingang beginnen wir mit dem Projekt.\n\n" +
+                    $"Bei Fragen zu dieser Rechnung stehen wir Ihnen gerne zur Verfügung.",
                 To =
                 [
                     new EmailAddress(recipientEmail, recipientName)

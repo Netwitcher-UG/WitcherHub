@@ -246,8 +246,24 @@
         $('vp-statusBadge').innerHTML = statusBadgeHtml(p.status);
         $('vp-meta').textContent = p.id ? `ID: ${p.id}` : '';
 
-        $('vp-customerName').textContent = p.customer?.name ?? '—';
-        $('vp-customerEmail').textContent = p.customer?.email ?? '—';
+        const customerNameEl = $('vp-customerName');
+        const customerEmailEl = $('vp-customerEmail');
+
+        if (customerNameEl) {
+            customerNameEl.textContent = p.customer?.name ?? '—';
+
+            if (p.customer?.id) {
+                customerNameEl.href = `/Clients/Details/${encodeURIComponent(p.customer.id)}`;
+                customerNameEl.classList.remove('text-muted', 'pe-none');
+            } else {
+                customerNameEl.href = '#';
+                customerNameEl.classList.add('text-muted', 'pe-none');
+            }
+        }
+
+        if (customerEmailEl) {
+            customerEmailEl.textContent = p.customer?.email ?? '—';
+        }
 
         $('vp-v-title').textContent = p.title ?? '—';
         $('vp-v-desc').textContent = p.description ?? '—';
