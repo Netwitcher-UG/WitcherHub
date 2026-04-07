@@ -367,13 +367,20 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                     $"Recurring billing already ended before cycle {cycleDate:yyyy-MM-dd}.");
             }
 
+            //var recurringStartDate =
+            //    quote.RecurringStartDate ??
+            //    (quote.SignedAt.HasValue
+            //        ? DateOnly.FromDateTime(quote.SignedAt.Value.UtcDateTime)
+            //        : quote.IssuedAt.HasValue
+            //            ? DateOnly.FromDateTime(quote.IssuedAt.Value.UtcDateTime)
+            //            : cycleDate);
             var recurringStartDate =
-                quote.RecurringStartDate ??
-                (quote.SignedAt.HasValue
-                    ? DateOnly.FromDateTime(quote.SignedAt.Value.UtcDateTime)
-                    : quote.IssuedAt.HasValue
-                        ? DateOnly.FromDateTime(quote.IssuedAt.Value.UtcDateTime)
-                        : cycleDate);
+    quote.RecurringStartDate ??
+    (quote.SignedAt.HasValue
+        ? DateOnly.FromDateTime(quote.SignedAt.Value.Date)
+        : quote.IssuedAt.HasValue
+            ? DateOnly.FromDateTime(quote.IssuedAt.Value.Date)
+            : cycleDate);
 
             var items = quote.Items
                 .Where(x => x.BillingCycle != BillingCycle.OneTime)
@@ -1301,8 +1308,8 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                 : invoice.Currency;
 
             invoice.IssuedAt = voucherDateUtc;
-            invoice.IssueDate = DateOnly.FromDateTime(voucherDateUtc.UtcDateTime);
-
+            //invoice.IssueDate = DateOnly.FromDateTime(voucherDateUtc.UtcDateTime);
+            invoice.IssueDate = DateOnly.FromDateTime(voucherDateUtc.Date);
             var dueDate = TryGetDateOnly(root, "dueDate");
             if (dueDate is null)
             {
@@ -1610,7 +1617,8 @@ namespace WitcherHub.Infrastructure.Services.Lexware
                     DateTimeStyles.RoundtripKind,
                     out var dto))
                 {
-                    return DateOnly.FromDateTime(ToUtc(dto).UtcDateTime);
+                    //return DateOnly.FromDateTime(ToUtc(dto).UtcDateTime);
+                    return DateOnly.FromDateTime(dto.Date);
                 }
             }
 
@@ -1639,7 +1647,7 @@ namespace WitcherHub.Infrastructure.Services.Lexware
             if (!value.HasValue)
                 return null;
 
-            return DateOnly.FromDateTime(value.Value.UtcDateTime);
+            return DateOnly.FromDateTime(value.Value.Date);
         }
 
         private static DateTimeOffset ToLexwareDate(DateOnly value)
