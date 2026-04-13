@@ -304,6 +304,86 @@ namespace WitcherHub.Pages.Projects
                 { StatusCode = 500 };
             }
         }
+        public async Task<IActionResult> OnPostChangeInvoiceStatusAsync(
+          Guid invoiceId,
+          DocumentStatus status,
+          CancellationToken ct)
+        {
+            try
+            {
+                if (ProjectId == Guid.Empty || invoiceId == Guid.Empty)
+                    return new JsonResult(new
+                    {
+                        ok = false,
+                        toast = new { type = "error", title = "Error", message = "Invalid project or invoice id." }
+                    })
+                    { StatusCode = 400 };
+
+                var allowed =
+                    status == DocumentStatus.Open ||
+                    status == DocumentStatus.Overdue ||
+                    status == DocumentStatus.Paid ||
+                    status == DocumentStatus.Cancelled;
+
+                if (!allowed)
+                {
+                    return new JsonResult(new
+                    {
+                        ok = false,
+                        toast = new
+                        {
+                            type = "error",
+                            title = "Invalid status",
+                            message = "Allowed statuses are Open, Overdue, Paid, and Cancelled."
+                        }
+                    })
+                    { StatusCode = 400 };
+                }
+
+                var invoice = await _db.Invoices
+                    .FirstOrDefaultAsync(x => x.Id == invoiceId && x.ProjectId == ProjectId, ct);
+
+                if (invoice is null)
+                    return new JsonResult(new
+                    {
+                        ok = false,
+                        toast = new { type = "error", title = "Not found", message = "Invoice not found." }
+                    })
+                    { StatusCode = 404 };
+
+                invoice.Status = status;
+
+                // لو عندك UpdatedAt في الـ Invoice model
+                // invoice.UpdatedAt = DateTime.UtcNow;
+
+                await _db.SaveChangesAsync(ct);
+
+                return new JsonResult(new
+                {
+                    ok = true,
+                    data = new
+                    {
+                        invoiceId = invoice.Id,
+                        status = invoice.Status.ToString()
+                    },
+                    toast = new
+                    {
+                        type = "success",
+                        title = "Done",
+                        message = $"Invoice status changed to {invoice.Status}."
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return new JsonResult(new
+                {
+                    ok = false,
+                    toast = new { type = "error", title = "Server error", message = ex.GetBaseException().Message }
+                })
+                { StatusCode = 500 };
+            }
+        }
         private static string NormalizeTab(string? tab)
         {
             return (tab ?? "").Trim().ToLowerInvariant() switch

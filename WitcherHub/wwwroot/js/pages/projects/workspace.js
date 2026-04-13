@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
     'use strict';
 
     window.UI = window.UI || {};
@@ -73,12 +73,101 @@
 
     function invoiceStatusBadge(st) {
         const s = (st ?? '').toString().toLowerCase();
-        if (s === 'paid') return `<span class="badge bg-success bg-opacity-10 text-success">Paid</span>`;
-        if (s === 'void') return `<span class="badge bg-secondary bg-opacity-10 text-secondary">Void</span>`;
-        if (s === 'issued') return `<span class="badge bg-info bg-opacity-10 text-info">Issued</span>`;
+
+        if (s === 'paid') {
+            return `<span class="badge bg-success bg-opacity-10 text-success">Paid</span>`;
+        }
+
+        if (s === 'overdue') {
+            return `<span class="badge bg-danger bg-opacity-10 text-danger">Overdue</span>`;
+        }
+
+        if (s === 'cancelled' || s === 'void') {
+            return `<span class="badge bg-secondary bg-opacity-10 text-secondary">Cancelled</span>`;
+        }
+
+        if (s === 'open' || s === 'issued') {
+            return `<span class="badge bg-info bg-opacity-10 text-info">Open</span>`;
+        }
+
         return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
     }
+    function normalizeInvoiceStatusForSelect(st) {
+        const s = (st ?? '').toString().toLowerCase();
 
+        if (s === 'paid') return 'Paid';
+        if (s === 'overdue') return 'Overdue';
+        if (s === 'cancelled' || s === 'void') return 'Cancelled';
+        return 'Open';
+    }
+
+    function openInvoiceStatusModal(id, invoiceNo, status) {
+        $('vpChangeInvoiceStatusInvoiceId').value = id || '';
+        $('vpChangeInvoiceStatusInvoiceNo').textContent = invoiceNo || '—';
+        $('vpChangeInvoiceStatusSelect').value = normalizeInvoiceStatusForSelect(status);
+
+        const modalEl = $('vpChangeInvoiceStatusModal');
+        if (!modalEl) return;
+
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    async function changeInvoiceStatus() {
+        const url = $('vcChangeInvoiceStatusUrl')?.value || '';
+        const token = $('antiForgeryToken')?.value || '';
+        const invoiceId = $('vpChangeInvoiceStatusInvoiceId')?.value || '';
+        const status = $('vpChangeInvoiceStatusSelect')?.value || '';
+
+        if (!url) {
+            toastError('Change invoice status URL not found.', 'Error');
+            return;
+        }
+
+        if (!invoiceId) {
+            toastError('Invoice id is missing.', 'Error');
+            return;
+        }
+
+        const btn = $('vpChangeInvoiceStatusConfirmBtn');
+        if (btn) btn.disabled = true;
+
+        try {
+            const body =
+                `invoiceId=${encodeURIComponent(invoiceId)}` +
+                `&status=${encodeURIComponent(status)}`;
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'Accept': 'application/json',
+                    ...(token ? { 'RequestVerificationToken': token } : {})
+                },
+                body
+            });
+
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok || !data?.ok) {
+                showToast(data?.toast || { type: 'error', title: 'Error', message: 'Failed to change invoice status.' });
+                return;
+            }
+
+            showToast(data.toast || { type: 'success', title: 'Done', message: 'Invoice status changed successfully.' });
+
+            const modalEl = $('vpChangeInvoiceStatusModal');
+            if (modalEl) {
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            }
+
+            await loadInvoices({ page: invoicesState.page, q: invoicesState.q || '' });
+        } catch (err) {
+            console.error(err);
+            toastError('Failed to change invoice status.', 'Error');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
     function badgeHtml(status) {
         const s = (status || '').toString().toLowerCase();
         if (s === 'signed') return `<span class="badge bg-success bg-opacity-10 text-success">Signed</span>`;
@@ -588,16 +677,26 @@
                     <td>${esc(fmtDate(issueDate))}</td>
                     <td>${esc(fmtDate(dueDate))}</td>
                     <td class="text-end">${totalText}</td>
-                    <td class="text-end">
-                        <a class="btn text-primary wh-icon-btn-plain"
-                           href="${pdfUrl}"
-                           target="_blank"
-                           rel="noopener"
-                           title="Details"
-                           aria-label="Details">
-                            <i class="material-icons-outlined">description</i>
-                        </a>
-                    </td>
+                  <td class="text-end">
+    <button type="button"
+            class="btn text-warning wh-icon-btn-plain js-change-invoice-status"
+            data-id="${esc(id)}"
+            data-invoice-no="${esc(invoiceNo)}"
+            data-status="${esc(status ?? '')}"
+            title="Change Status"
+            aria-label="Change Status">
+        <i class="material-icons-outlined">edit</i>
+    </button>
+
+    <a class="btn text-primary wh-icon-btn-plain"
+       href="${pdfUrl}"
+       target="_blank"
+       rel="noopener"
+       title="Details"
+       aria-label="Details">
+        <i class="material-icons-outlined">description</i>
+    </a>
+</td>
                 `;
 
                 tr.addEventListener('click', function (e) {
@@ -1054,7 +1153,19 @@
             loadProjectContractSnapshot();
         }
     });
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.js-change-invoice-status');
+        if (!btn) return;
 
+        e.preventDefault();
+        e.stopPropagation();
+
+        openInvoiceStatusModal(
+            btn.getAttribute('data-id'),
+            btn.getAttribute('data-invoice-no'),
+            btn.getAttribute('data-status')
+        );
+    });
     $('vp-quotes-searchBtn')?.addEventListener('click', function () {
         loadQuotes({ page: 1, q: $('vp-quotes-q')?.value?.trim() || '' });
     });
@@ -1091,7 +1202,7 @@
     $('vpContractSendBtn')?.addEventListener('click', openSendConfirm);
     $('vpContractCopyLinkBtn')?.addEventListener('click', copyProjectContractLink);
     $('vpSendContractConfirmBtn')?.addEventListener('click', sendProjectContract);
-
+    $('vpChangeInvoiceStatusConfirmBtn')?.addEventListener('click', changeInvoiceStatus);
     (function bindDatePickers() {
         function bindOne(el) {
             if (!el || el.dataset.dpBound === '1') return;
@@ -1118,4 +1229,5 @@
     })();
 
     document.addEventListener('DOMContentLoaded', loadProject);
+
 })();

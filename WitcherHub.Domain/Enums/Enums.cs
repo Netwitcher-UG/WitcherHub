@@ -13,9 +13,18 @@ namespace WitcherHub.Infrastructure.Data.Models
         // حالة الوثائق (نستخدمها للـ Quote/Contract/Invoice)
         public enum DocumentStatus
         {
-            Draft, Sent, Accepted, Rejected,
-            Signed, Terminated,
-            Issued, Paid, Void
+            Draft = 0,
+            Sent = 1,
+            Accepted = 2,
+            Rejected = 3,
+            Signed = 4,
+            Terminated = 5,
+            Issued = 6,
+            Paid = 7,
+            Void = 8,
+            Open = 9,
+            Overdue = 10,
+            Cancelled = 11
         }
         public enum QuoteAfterSignAction
         {
