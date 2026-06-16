@@ -285,8 +285,11 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
             var projectsRepo = _unitOfWork.Repo<Project>();
             var contractsRepo = _unitOfWork.Repo<Contract>();
 
-            var projectExists = await projectsRepo.AnyAsync(x => x.Id == dto.Contract.ProjectId, ct);
-            if (!projectExists) throw new NotFoundAppException("Project not found.");
+            var project = await projectsRepo.Query(asNoTracking: false)
+      .FirstOrDefaultAsync(x => x.Id == dto.Contract.ProjectId, ct);
+
+            if (project is null)
+                throw new NotFoundAppException("Project not found.");
 
             await _unitOfWork.BeginTransactionAsync(ct);
             try
@@ -314,7 +317,7 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                     FromQuote=dto.Contract.FromQuote,
                     SignedAt = dto.Contract.SignedAt
                 };
-
+                project.Status = GetProjectStatusAfterContractState(contract.Status, contract.SignedAt);
                 if (dto.Items is not null && dto.Items.Count > 0)
                 {
                     int pos = 1;
@@ -383,6 +386,9 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
             contract.EndDate = dto.Contract.EndDate;
             contract.SignedAt = dto.Contract.SignedAt;
             contract.Status = dto.Contract.Status;
+
+            if (IsContractSignedOrAccepted(contract.Status, contract.SignedAt))
+                await SetProjectStatusAsync(contract.ProjectId, ProjectStatus.Active, ct);
 
             if (dto.Items is not null)
             {
@@ -466,6 +472,9 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
             entity.Terms = terms;
 
             entity.InvoiceSendMode = invoiceSendMode;
+
+            if (IsContractSignedOrAccepted(entity.Status, entity.SignedAt))
+                await SetProjectStatusAsync(entity.ProjectId, ProjectStatus.Active, ct);
 
             repo.Update(entity);
 
@@ -1237,6 +1246,24 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                 throw new BadRequestAppException("Invalid status for quote.");
         }
 
+        private static bool IsContractSignedOrAccepted(DocumentStatus status, DateTimeOffset? signedAt)
+    => signedAt.HasValue || status is DocumentStatus.Signed or DocumentStatus.Accepted;
+
+        private static ProjectStatus GetProjectStatusAfterContractState(DocumentStatus status, DateTimeOffset? signedAt)
+            => IsContractSignedOrAccepted(status, signedAt) ? ProjectStatus.Active : ProjectStatus.Waiting;
+
+        private async Task SetProjectStatusAsync(Guid projectId, ProjectStatus status, CancellationToken ct)
+        {
+            var projectsRepo = _unitOfWork.Repo<Project>();
+
+            var project = await projectsRepo.Query(asNoTracking: false)
+                .FirstOrDefaultAsync(x => x.Id == projectId, ct);
+
+            if (project is null)
+                throw new NotFoundAppException("Project not found.");
+
+            project.Status = status;
+        }
         private async Task<string> GenerateQuoteNoAsync(IRepository<Quote> repo, CancellationToken ct)
         {
             var year = DateTime.UtcNow.Year;

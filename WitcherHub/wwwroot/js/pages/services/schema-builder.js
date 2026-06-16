@@ -72,7 +72,10 @@
     }
 
     function normalizeKey(key) {
-        return (key || "").trim();
+        return (key || "")
+            .trim()
+            .replace(/\s+/g, "_")
+            .replace(/[^\p{L}\p{N}_]/gu, "");
     }
 
     function parseNumberOrNull(v) {
@@ -143,7 +146,65 @@
 
         return fields;
     }
+    function validateFieldsForSchema(fields) {
+        const errors = [];
 
+        for (let i = 0; i < fields.length; i++) {
+            const f = fields[i];
+            const rowNo = i + 1;
+
+            const key = normalizeKey(f.key);
+            const label = (f.label || "").trim();
+            const displayName = label || key || `Row ${rowNo}`;
+            const type = f.type || "string";
+            const isRequired = toBool(f.required);
+
+            const hasDefault =
+                f.default !== null &&
+                f.default !== undefined &&
+                String(f.default).trim() !== "";
+
+            if (!key) {
+                errors.push(`Row ${rowNo}: Key is required.`);
+                continue;
+            }
+
+            if (isRequired && !hasDefault) {
+                errors.push(`${displayName}: Default value is required when Req is checked.`);
+            }
+
+            if (type === "select") {
+                const opts = (f.options || "")
+                    .split(",")
+                    .map(x => x.trim())
+                    .filter(x => x.length > 0);
+
+                if (opts.length === 0) {
+                    errors.push(`${displayName}: Select field must have options.`);
+                }
+
+                if (hasDefault && opts.length > 0 && !opts.includes(String(f.default).trim())) {
+                    errors.push(`${displayName}: Default value must be one of the select options.`);
+                }
+            }
+
+            if ((type === "integer" || type === "number") && hasDefault) {
+                const n = Number(String(f.default).trim());
+                if (!Number.isFinite(n)) {
+                    errors.push(`${displayName}: Default value must be a number.`);
+                }
+            }
+
+            if (type === "boolean" && hasDefault) {
+                const v = String(f.default).trim().toLowerCase();
+                if (v !== "true" && v !== "false") {
+                    errors.push(`${displayName}: Boolean default must be true or false.`);
+                }
+            }
+        }
+
+        return errors;
+    }
     function fieldsToSchema(fields, allowAdditional) {
         const schema = {
             type: "object",
@@ -188,8 +249,22 @@
                 if (max !== null) prop.maxLength = Math.trunc(max);
             }
 
+           
             // default
-            const def = parseDefaultByType(prop.type === "string" && prop.enum ? "string" : prop.type, f.default);
+            let defaultText = f.default;
+
+            if ((defaultText === null || defaultText === undefined || String(defaultText).trim() === "")) {
+                if (prop.type === "boolean") {
+                    defaultText = "false";
+                } else if (prop.type === "integer" || prop.type === "number") {
+                    const min = parseNumberOrNull(f.min);
+                    defaultText = min !== null ? String(min) : "0";
+                } else if (prop.enum && prop.enum.length > 0) {
+                    defaultText = prop.enum[0];
+                }
+            }
+
+            const def = parseDefaultByType(prop.type === "string" && prop.enum ? "string" : prop.type, defaultText);
             if (def !== null) prop.default = def;
 
             schema.properties[key] = prop;
@@ -313,8 +388,8 @@
                 }
 
                 if (action === "updateJson") {
-                    this.updateTextarea();
-                    updateMsg("JSON updated.");
+                    const ok = this.updateTextarea(true);
+                    if (ok) updateMsg("JSON updated.");
                 }
 
                 if (action === "loadJson") {
@@ -353,8 +428,8 @@
 
                 this.fields[idx][prop] = inp.type === "checkbox" ? inp.checked : inp.value;
 
-                // auto-update JSON
-                this.updateTextarea();
+                // auto-update JSON بدون إظهار رسائل مزعجة أثناء الكتابة
+                this.updateTextarea(false);
             });
 
             this.el.addEventListener("change", (e) => {
@@ -431,8 +506,25 @@
             const chk = $(this.el, '[data-sb="allowAdditional"]');
             chk.checked = !!this.allowAdditional;
         }
+        updateTextarea(showErrors = false) {
+            const msg = $(this.el, '[data-sb="message"]');
 
-        updateTextarea() {
+            const errors = validateFieldsForSchema(this.fields);
+
+            if (errors.length > 0) {
+                if (msg) {
+                    msg.innerHTML = errors.map(e => `• ${escapeHtml(e)}`).join("<br>");
+                    msg.style.display = "block";
+                }
+
+                return false;
+            }
+
+            if (msg) {
+                msg.textContent = "";
+                msg.style.display = "none";
+            }
+
             const schema = fieldsToSchema(this.fields, this.allowAdditional);
 
             // إذا ما في ولا property، خلّيها فاضية بدل JSON فاضي
@@ -440,11 +532,13 @@
             if (!hasProps) {
                 this.textarea.value = "";
                 this.textarea.dispatchEvent(new Event("input", { bubbles: true }));
-                return;
+                return true;
             }
 
             this.textarea.value = JSON.stringify(schema, null, 2);
             this.textarea.dispatchEvent(new Event("input", { bubbles: true }));
+
+            return true;
         }
 
         loadFromTextarea(silent) {
@@ -551,5 +645,24 @@
 
         inst.reset();
     });
+
+    document.addEventListener("schema-builder:load-by-textarea", (e) => {
+        const textareaSel = e.detail?.textarea;
+        if (!textareaSel) return;
+
+        const textarea = document.querySelector(textareaSel);
+        if (!textarea) return;
+
+        for (const inst of INSTANCES.values()) {
+            if (inst.textarea === textarea) {
+                inst.loadFromTextarea(true);
+                return;
+            }
+        }
+    });
+
     document.addEventListener("DOMContentLoaded", initAll);
+
+   
 })();
+

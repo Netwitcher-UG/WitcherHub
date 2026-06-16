@@ -255,7 +255,19 @@ namespace WitcherHub.Pages.Quotes
                         .SetProperty(q => q.SignedAt, now)
                         .SetProperty(q => q.Status, DocumentStatus.Signed),
                     ct);
+            if (updated > 0)
+            {
+                var signedProjectId = await _db.Quotes
+                    .Where(q => q.Id == Id)
+                    .Select(q => q.ProjectId)
+                    .FirstAsync(ct);
 
+                await _db.Set<Project>()
+                    .Where(p => p.Id == signedProjectId)
+                    .ExecuteUpdateAsync(
+                        s => s.SetProperty(p => p.Status, ProjectStatus.Active),
+                        ct);
+            }
             if (updated == 0)
             {
                 var exists = await _db.Quotes.AnyAsync(q => q.Id == Id, ct);
@@ -408,6 +420,12 @@ namespace WitcherHub.Pages.Quotes
                         signerEmail);
 
                     var contractId = await contractCreationService.GenerateAndCreateAsync(request, token);
+
+                    await db.Set<Project>()
+    .Where(p => p.Id == quote.ProjectId)
+    .ExecuteUpdateAsync(
+        s => s.SetProperty(p => p.Status, ProjectStatus.Active),
+        token);
 
                     _logger.LogInformation(
                         "Contract created from signed quote. QuoteId={QuoteId}, ContractId={ContractId}",

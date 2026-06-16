@@ -28,6 +28,9 @@
 
         "Service.IsActive": "vs-basic-active",
         "IsActive": "vs-basic-active",
+
+        "Service.ConfigSchemaJson": "vs-basic-config",
+        "ConfigSchemaJson": "vs-basic-config"
     };
 
     const mapAddRule = {
@@ -964,11 +967,20 @@
         setEnumSelect($('vs-basic-serviceType'), svc?.serviceType);
         setEnumSelect($('vs-basic-pricingModel'), svc?.pricingModel);
 
-        $('vs-schema').textContent = svc?.configSchema ? JSON.stringify(svc.configSchema, null, 2) : '';
-        $('vs-basic-config').value = ''; // فارغة = لا تغيير
+        const schemaJson = svc?.configSchema
+            ? (typeof svc.configSchema === 'string'
+                ? svc.configSchema
+                : JSON.stringify(svc.configSchema, null, 2))
+            : '';
 
+        $('vs-schema').textContent = schemaJson;
+        $('vs-basic-config').value = schemaJson;
+        document.dispatchEvent(new CustomEvent('schema-builder:load-by-textarea', {
+            detail: { textarea: '#vs-basic-config' }
+        }));
         // ✅ Dynamic fields from schema
         vcSetRuleVarsForService(svc);
+
 
         setBasicMode(false);
         renderRules(svc?.pricingRules ?? []);
@@ -1066,7 +1078,15 @@
 
         if (!currentService) return;
 
-        if (action === 'edit-basic') { setBasicMode(true); return; }
+        if (action === 'edit-basic') {
+            setBasicMode(true);
+
+            document.dispatchEvent(new CustomEvent('schema-builder:load-by-textarea', {
+                detail: { textarea: '#vs-basic-config' }
+            }));
+
+            return;
+        }
         if (action === 'cancel-basic') { setBasicMode(false); return; }
 
         if (action === 'save-basic') {
@@ -1097,6 +1117,9 @@
                 const updatedRaw = await postJson(url, payload);
                 renderService(normalizeService(updatedRaw));
                 toastSuccess('Saved successfully.', 'Success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
             } catch (err) {
                 console.error(err);
                 if (err?.status === 400 && err?.payload?.errors) {

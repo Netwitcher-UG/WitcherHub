@@ -104,7 +104,26 @@ namespace WitcherHub.Infrastructure.Services.Lexware
 
             return all;
         }
+        public async Task<JsonDocument> GetPaymentAsync(string voucherId, CancellationToken ct = default)
+        {
+            using var res = await SendWithRetryAsync(() =>
+            {
+                var req = new HttpRequestMessage(HttpMethod.Get, $"/v1/payments/{voucherId}");
+                req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                return req;
+            }, ct);
 
+            var payload = await res.Content.ReadAsStringAsync(ct);
+
+            // في Lexware قد ترجع 406 إذا كانت الفاتورة draft على payments endpoint
+            if (res.StatusCode == HttpStatusCode.NotAcceptable)
+                return JsonDocument.Parse("{}");
+
+            if (!res.IsSuccessStatusCode)
+                throw new InvalidOperationException($"Lexware GetPayment failed: {(int)res.StatusCode} {payload}");
+
+            return JsonDocument.Parse(payload);
+        }
         public async Task<JsonElement> CreateContactAsync(object payload, CancellationToken ct = default)
         {
             using var res = await _http.PostAsJsonAsync("/v1/contacts", payload, ct);

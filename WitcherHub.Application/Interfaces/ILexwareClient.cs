@@ -9,7 +9,7 @@ namespace WitcherHub.Application.Interfaces
         Task<IReadOnlyList<JsonElement>> GetAllContactsAsync(CancellationToken cancellationToken = default);
         Task<JsonElement> CreateContactAsync(object payload, CancellationToken ct = default);
         Task DeleteContactAsync(string lexwareContactId, CancellationToken ct = default);
-
+        Task<JsonDocument> GetPaymentAsync(string voucherId, CancellationToken ct = default);
         Task FinalizeInvoiceAsync(string id, CancellationToken ct = default);
 
     }

@@ -175,6 +175,29 @@ namespace WitcherHub.Infrastructure.ManageData.Services
         }
 
         // =========================
+        // LookupAsync
+        // =========================
+        public async Task<List<ServiceViews.ServiceListItemView>> GetServiceLookupAsync(CancellationToken ct = default)
+        {
+            var repo = _unitOfWork.Repo<ServiceCatalogItem>();
+
+            return await repo.Query(asNoTracking: true)
+                .Where(x => x.IsActive)
+                .OrderBy(x => x.Name)
+                .Select(x => new ServiceViews.ServiceListItemView
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+                    ServiceType = x.ServiceType,
+                    PricingModel = x.PricingModel,
+                    BasePrice = x.BasePrice,
+                    DefaultCurrency = x.DefaultCurrency,
+                    IsActive = x.IsActive
+                })
+                .ToListAsync(ct);
+        }
+
+        // =========================
         // Service CRUD
         // =========================
         public async Task<Guid> CreateAsync(ServiceCatalogDTOs dto, CancellationToken ct = default)

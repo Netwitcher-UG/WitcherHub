@@ -1,4 +1,4 @@
-﻿using Mapster;
+using Mapster;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using WitcherHub.Application.Common.CacheKeys;
@@ -56,7 +56,12 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             pageSize = pageSize is < 1 or > 200 ? 10 : pageSize;
 
             var version = await _cache.GetOrCreateVersionAsync(CustomerCacheKeys.ListVersionKey, ct);
-            var cacheKey = CustomerCacheKeys.ListWithVersion(page, pageSize, search, version);
+
+            var normalizedSearch = string.IsNullOrWhiteSpace(search)
+    ? null
+    : search.Trim().ToLowerInvariant();
+
+            var cacheKey = CustomerCacheKeys.ListWithVersion(page, pageSize, normalizedSearch, version);
 
             return await _cache.GetOrCreateAsync(
                 cacheKey,
@@ -67,21 +72,42 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                     // DB-side query (fast)
                     var q = repo.Query(asNoTracking: true);
 
-                    if (!string.IsNullOrWhiteSpace(search))
+                    //if (!string.IsNullOrWhiteSpace(search))
+                    //{
+                    //    var s = search.Trim();
+                    //    var escaped = EscapeLike(s);
+                    //    var pattern = $"%{escaped}%";
+
+                    //    // SQL Server safe LIKE with escape char '!'
+                    //    q = q.Where(c =>
+                    //            EF.Functions.Like(c.Name, pattern, "!") ||
+                    //            (c.Phone != null && EF.Functions.Like(c.Phone, pattern, "!")) ||
+                    //            (c.TaxId != null && EF.Functions.Like(c.TaxId, pattern, "!")) ||
+                    //            c.EmailAddresses.Any(e => EF.Functions.Like(e.Email, pattern, "!"))
+                    //        );
+                    //}
+                    if (!string.IsNullOrWhiteSpace(normalizedSearch))
                     {
-                        var s = search.Trim();
-                        var escaped = EscapeLike(s);
+                        var escaped = EscapeLike(normalizedSearch);
                         var pattern = $"%{escaped}%";
 
-                        // SQL Server safe LIKE with escape char '!'
                         q = q.Where(c =>
-                                EF.Functions.Like(c.Name, pattern, "!") ||
-                                (c.Phone != null && EF.Functions.Like(c.Phone, pattern, "!")) ||
-                                (c.TaxId != null && EF.Functions.Like(c.TaxId, pattern, "!")) ||
-                                c.EmailAddresses.Any(e => EF.Functions.Like(e.Email, pattern, "!"))
-                            );
-                    }
+                            EF.Functions.Like(c.Name.ToLower(), pattern, "!") ||
 
+                            (c.Phone != null &&
+                             EF.Functions.Like(c.Phone.ToLower(), pattern, "!")) ||
+
+                            (c.TaxId != null &&
+                             EF.Functions.Like(c.TaxId.ToLower(), pattern, "!")) ||
+
+                            c.EmailAddresses.Any(e =>
+                                EF.Functions.Like(e.Email.ToLower(), pattern, "!")) ||
+
+                            c.Addresses.Any(a =>
+                                a.City != null &&
+                                EF.Functions.Like(a.City.ToLower(), pattern, "!"))
+                        );
+                    }
                     var total = await q.LongCountAsync(token);
                     if (total == 0)
                         return PagedResult<CustomerViews.CustomerListItemView>.Empty(page, pageSize);

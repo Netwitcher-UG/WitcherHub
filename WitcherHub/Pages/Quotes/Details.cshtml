@@ -7,6 +7,8 @@
 @{
     var showSignedPdfBtn = Model.HasSignedQuotePdf;
     var showCopyLinkBtn = !Model.HasSignedQuotePdf;
+
+    var hasItems = (Model.Quote?.Items?.Count ?? 0) > 0;
 }
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 <form method="post" id="quoteCopyLinkAfForm">
@@ -75,52 +77,54 @@
     </div>
 
     <div class="d-flex gap-2 flex-wrap">
-        <a class="btn btn-outline-primary"
-           id="downloadPdfBtn"
-           asp-page="./Details"
-           asp-page-handler="Pdf"
-           asp-route-id="@Model.Quote.Id"
-           data-fallback-name="@($"{Model.Quote.QuoteNo}.pdf")"
-           title="Download PDF">
-            <span class="pdf-btn-text">PDF</span>
-            <span class="spinner-border spinner-border-sm ms-2 d-none" id="downloadPdfSpinner" role="status" aria-hidden="true"></span>
-        </a>
-
-        @if (Model.ShowManualInvoiceButton)
+        @if (hasItems)
         {
-            <form method="post"
-                  asp-page="./Details"
-                  asp-page-handler="GenerateInvoice"
-                  asp-route-id="@Model.Quote.Id"
-                  class="d-inline">
-                <button type="submit" class="btn btn-success" id="quoteGenerateInvoiceBtn">
-                    Create Invoice
+            <a class="btn btn-outline-primary"
+            id="downloadPdfBtn"
+            asp-page="./Details"
+            asp-page-handler="Pdf"
+            asp-route-id="@Model.Quote.Id"
+            data-fallback-name="@($"{Model.Quote.QuoteNo}.pdf")"
+            title="Download PDF">
+                <span class="pdf-btn-text">PDF</span>
+                <span class="spinner-border spinner-border-sm ms-2 d-none" id="downloadPdfSpinner" role="status" aria-hidden="true"></span>
+            </a>
+
+            @if (Model.ShowManualInvoiceButton)
+            {
+                <form method="post"
+                asp-page="./Details"
+                asp-page-handler="GenerateInvoice"
+                asp-route-id="@Model.Quote.Id"
+                class="d-inline">
+                    <button type="submit" class="btn btn-success" id="quoteGenerateInvoiceBtn">
+                        Create Invoice
+                    </button>
+                </form>
+            }
+
+            @if (showCopyLinkBtn)
+            {
+                <button type="button"
+                class="btn btn-success"
+                data-bs-toggle="modal"
+                data-bs-target="#SendQuoteModal"
+                title="Send quote to customer">
+                    Send
                 </button>
-            </form>
-        }
+            }
 
-        @if (showCopyLinkBtn)
-        {
-            <button type="button"
-                    class="btn btn-success"
-                    data-bs-toggle="modal"
-                    data-bs-target="#SendQuoteModal"
-                    title="Send quote to customer">
-                Send
-            </button>
+            @if (showCopyLinkBtn)
+            {
+                <button type="button"
+                class="btn btn-outline-info"
+                id="copyQuoteLinkBtn"
+                title="Copy public signing link">
+                    Copy Link
+                </button>
+            }
         }
-
-        @if (showCopyLinkBtn)
-        {
-            <button type="button"
-                    class="btn btn-outline-info"
-                    id="copyQuoteLinkBtn"
-                    title="Copy public signing link">
-                Copy Link
-            </button>
-        }
-
-        @if (showSignedPdfBtn)
+        @if (showSignedPdfBtn && hasItems)
         {
             <a class="btn btn-outline-success"
                id="downloadSignedPdfBtn"

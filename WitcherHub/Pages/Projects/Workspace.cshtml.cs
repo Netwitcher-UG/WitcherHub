@@ -14,17 +14,20 @@ namespace WitcherHub.Pages.Projects
         private readonly IProject _projects;
         private readonly AppDbContext _db;
         private readonly LexwareInvoiceSyncService _lexwareInvoiceSyncService;
+        private readonly LexwareInvoiceStatusSyncService _lexwareInvoiceStatusSyncService;
         private readonly InvoicePublicLinkService _invoicePublicLinkService;
 
         public WorkspaceModel(
-     IProject projects,
-     AppDbContext db,
-     LexwareInvoiceSyncService lexwareInvoiceSyncService,
-     InvoicePublicLinkService invoicePublicLinkService)
+      IProject projects,
+      AppDbContext db,
+      LexwareInvoiceSyncService lexwareInvoiceSyncService,
+      LexwareInvoiceStatusSyncService lexwareInvoiceStatusSyncService,
+      InvoicePublicLinkService invoicePublicLinkService)
         {
             _projects = projects;
             _db = db;
             _lexwareInvoiceSyncService = lexwareInvoiceSyncService;
+            _lexwareInvoiceStatusSyncService = lexwareInvoiceStatusSyncService;
             _invoicePublicLinkService = invoicePublicLinkService;
         }
 
@@ -305,9 +308,9 @@ namespace WitcherHub.Pages.Projects
             }
         }
         public async Task<IActionResult> OnPostChangeInvoiceStatusAsync(
-          Guid invoiceId,
-          DocumentStatus status,
-          CancellationToken ct)
+      Guid invoiceId,
+      DocumentStatus status,
+      CancellationToken ct)
         {
             try
             {
@@ -340,37 +343,23 @@ namespace WitcherHub.Pages.Projects
                     { StatusCode = 400 };
                 }
 
-                var invoice = await _db.Invoices
-                    .FirstOrDefaultAsync(x => x.Id == invoiceId && x.ProjectId == ProjectId, ct);
-
-                if (invoice is null)
-                    return new JsonResult(new
-                    {
-                        ok = false,
-                        toast = new { type = "error", title = "Not found", message = "Invoice not found." }
-                    })
-                    { StatusCode = 404 };
-
-                invoice.Status = status;
-
-                // لو عندك UpdatedAt في الـ Invoice model
-                // invoice.UpdatedAt = DateTime.UtcNow;
-
-                await _db.SaveChangesAsync(ct);
+                var result = await _lexwareInvoiceStatusSyncService
+                    .ChangeStatusFromWebsiteAsync(ProjectId, invoiceId, status, ct);
 
                 return new JsonResult(new
                 {
                     ok = true,
                     data = new
                     {
-                        invoiceId = invoice.Id,
-                        status = invoice.Status.ToString()
+                        invoiceId = result.InvoiceId,
+                        status = result.LocalStatus,
+                        lexwareStatus = result.LexwareStatus
                     },
                     toast = new
                     {
                         type = "success",
                         title = "Done",
-                        message = $"Invoice status changed to {invoice.Status}."
+                        message = result.Message
                     }
                 });
             }

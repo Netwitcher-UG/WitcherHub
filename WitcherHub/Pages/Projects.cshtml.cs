@@ -491,10 +491,25 @@ namespace WitcherHub.Pages
         {
             var (cls, txt) = st switch
             {
-                ProjectStatus.Active => ("badge bg-success bg-opacity-10 text-success", "Active"),
-                ProjectStatus.Closed => ("badge bg-secondary bg-opacity-10 text-secondary", "Closed"),
-                _ => ("badge bg-warning bg-opacity-10 text-warning", "Draft")
+                ProjectStatus.Active =>
+                    ("badge bg-success bg-opacity-10 text-success", "Active"),
+
+                ProjectStatus.Waiting =>
+                    ("badge bg-info bg-opacity-10 text-info", "Waiting"),
+
+                ProjectStatus.Closed =>
+                    ("badge bg-secondary bg-opacity-10 text-secondary", "Closed"),
+
+                ProjectStatus.Cancelled =>
+                    ("badge bg-danger bg-opacity-10 text-danger", "Cancelled"),
+
+                ProjectStatus.Draft =>
+                    ("badge bg-warning bg-opacity-10 text-warning", "Draft"),
+
+                _ =>
+                    ("badge bg-warning bg-opacity-10 text-warning", st.ToString())
             };
+
             return new Microsoft.AspNetCore.Html.HtmlString($"<span class='{cls}'>{txt}</span>");
         }
 

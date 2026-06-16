@@ -1,6 +1,7 @@
 @page
 @using System.Text
 @using System.Text.Json
+@using System.Globalization
 @using static WitcherHub.Infrastructure.Data.Models.Enums
 @model WitcherHub.Pages.Quotes.EditModel
 
@@ -138,7 +139,7 @@
 
     foreach (var it in items)
     {
-        var gross = it.Quantity * it.UnitPrice;
+        var gross = ReadDec(it.PriceBreakdown, "baseTotal", it.Quantity * it.UnitPrice);
         var discountAmt = ReadNestedDec(it.PriceBreakdown, "discount", "amount", 0m);
 
         sumSub += gross;
@@ -379,7 +380,7 @@
                             <tbody>
                                 @foreach (var it in items)
                                 {
-                                    var subTotal = ReadDec(it.PriceBreakdown, "subTotal", it.LineTotal);
+                                    var subTotal = ReadDec(it.PriceBreakdown, "baseTotal", it.Quantity * it.UnitPrice);
                                     var discountAmt = ReadNestedDec(it.PriceBreakdown, "discount", "amount", 0m);
                                     var total = ReadDec(it.PriceBreakdown, "total", it.LineTotal);
 
@@ -424,8 +425,10 @@
                                                         data-item-id="@it.Id"
                                                         data-item-service-id="@it.ServiceId"
                                                         data-item-title="@it.Title"
-                                                        data-item-qty="@it.Quantity"
-                                                        data-item-unit="@it.UnitPrice"
+                                                        data-item-qty="@(it.Quantity.ToString("0.########", CultureInfo.InvariantCulture))"
+                                                        data-item-unit="@(it.UnitPrice.ToString("0.########", CultureInfo.InvariantCulture))"
+                                                        data-item-discval="@(it.DiscountValue?.ToString("0.########", CultureInfo.InvariantCulture) ?? "")"
+                                                       data-item-unit="@it.UnitPrice"
                                                         data-item-pos="@it.Position"
                                                         data-item-description="@it.Description"
                                                         data-item-unitname="@it.UnitName"
@@ -532,7 +535,7 @@
             <div class="row g-2">
                 <div class="col-4">
                     <label class="form-label">Qty</label>
-                    <input class="form-control" asp-for="NewItem.Item.Quantity" id="ni-qty" />
+                    <input class="form-control"  asp-for="NewItem.Item.Quantity" id="ni-qty" />
                 </div>
 
                 <div class="col-4">
@@ -697,7 +700,7 @@
             <div class="row g-2">
                 <div class="col-4">
                     <label class="form-label">Qty</label>
-                    <input class="form-control"  asp-for="EditItem.Item.Quantity" id="ei-qty" />
+                    <input class="form-control"asp-for="EditItem.Item.Quantity" id="ei-qty" />
                 </div>
                 <div class="col-4">
                     <label class="form-label">Unit</label>
@@ -1322,7 +1325,76 @@
             }
 
             window.formatJson = formatJson;
+            let pendingDeleteForm = null;
 
+function submitDeleteForm(form) {
+    if (!form) return;
+
+    if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+    } else {
+        form.submit();
+    }
+}
+
+function bindDeleteConfirm() {
+    if (window.__quoteDeleteConfirmBound) return;
+    window.__quoteDeleteConfirmBound = true;
+
+    const modalEl = byId('DeleteConfirmModal');
+    const titleEl = byId('DeleteConfirmModalLabel');
+    const messageEl = byId('DeleteConfirmModalMessage');
+    const submitBtn = byId('DeleteConfirmModalSubmit');
+
+    const modal = modalEl && window.bootstrap
+        ? bootstrap.Modal.getOrCreateInstance(modalEl)
+        : null;
+
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.js-delete-open');
+        if (!btn) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        pendingDeleteForm = btn.closest('form.js-delete-form') || btn.closest('form');
+
+        if (!pendingDeleteForm) {
+            console.warn('Delete button has no parent form.');
+            return;
+        }
+
+        const title = btn.getAttribute('data-delete-title') || 'Confirm delete';
+        const message = btn.getAttribute('data-delete-message') || 'Are you sure?';
+
+        if (titleEl) titleEl.textContent = title;
+        if (messageEl) messageEl.textContent = message;
+
+        if (modal) {
+            modal.show();
+        } else {
+            if (confirm(message)) {
+                submitDeleteForm(pendingDeleteForm);
+            }
+        }
+    });
+
+    if (submitBtn) {
+        submitBtn.addEventListener('click', function () {
+            if (!pendingDeleteForm) return;
+
+            submitBtn.disabled = true;
+            submitDeleteForm(pendingDeleteForm);
+        });
+    }
+
+    if (modalEl) {
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            pendingDeleteForm = null;
+            if (submitBtn) submitBtn.disabled = false;
+        });
+    }
+}
             document.addEventListener('DOMContentLoaded', function() {
                 bindPreview('ni');
                 bindPreview('ei');
@@ -1332,7 +1404,7 @@
 
                 bindRawConfig('ni');
                 bindRawConfig('ei');
-
+                bindDeleteConfirm();
                 const addCanvas = byId('AddItemCanvas');
                 if (addCanvas) {
                     addCanvas.addEventListener('show.bs.offcanvas', async function() {

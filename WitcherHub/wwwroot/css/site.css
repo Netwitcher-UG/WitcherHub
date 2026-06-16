@@ -578,9 +578,13 @@ html[data-bs-theme="blue-theme"] #clientsTableCard {
     cursor: pointer;
 }
 
-#clientsTableCard tbody tr > td {
-    transition: background-color .16s ease, box-shadow .16s ease;
-}
+    #clientsTableCard tbody tr > td {
+        transition: background-color .16s ease, box-shadow .16s ease;
+        max-width: 220px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 
 #clientsTableCard tbody tr:hover > td {
     background: var(--wh-client-row-hover-bg, rgba(255,255,255,.05)) !important;
@@ -727,3 +731,13 @@ html[data-bs-theme="blue-theme"] #servicesTableCard {
     color: rgba(255, 255, 255, 0.32);
     opacity: 1;
 }
+/* Service dropdown menu scroll */
+#serviceMenu {
+    max-height: 320px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+    #serviceMenu .dropdown-item {
+        white-space: normal;
+    }

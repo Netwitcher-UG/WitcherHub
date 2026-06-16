@@ -8,7 +8,7 @@ namespace WitcherHub.Infrastructure.Data.Models
     public class Enums
     {
         public enum CustomerType { Individual, Company }
-        public enum ProjectStatus { Draft, Active, Closed, Cancelled }
+        public enum ProjectStatus { Draft, Active, Closed, Cancelled, Waiting }
 
         // حالة الوثائق (نستخدمها للـ Quote/Contract/Invoice)
         public enum DocumentStatus

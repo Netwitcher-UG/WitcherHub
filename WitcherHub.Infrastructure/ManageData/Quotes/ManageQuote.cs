@@ -232,8 +232,11 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
             var projectsRepo = _unitOfWork.Repo<Project>();
             var quotesRepo = _unitOfWork.Repo<Quote>();
 
-            var projectExists = await projectsRepo.AnyAsync(x => x.Id == dto.Quote.ProjectId, ct);
-            if (!projectExists) throw new NotFoundAppException("Project not found.");
+            var project = await projectsRepo.Query(asNoTracking: false)
+      .FirstOrDefaultAsync(x => x.Id == dto.Quote.ProjectId, ct);
+
+            if (project is null)
+                throw new NotFoundAppException("Project not found.");
 
             await _unitOfWork.BeginTransactionAsync(ct);
             try
@@ -287,7 +290,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 }
 
                 ApplyDerivedRecurringState(quote);
-
+                project.Status = GetProjectStatusAfterQuoteState(quote.Status);
                 await quotesRepo.AddAsync(quote, ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
@@ -366,7 +369,8 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
             }
 
             ApplyDerivedRecurringState(quote);
-
+            if (IsQuoteSignedOrAccepted(quote.Status))
+                await SetProjectStatusAsync(quote.ProjectId, ProjectStatus.Active, ct);
             await _unitOfWork.SaveChangesAsync(ct);
 
             await InvalidateAfterQuoteChangeAsync(id, ct);
@@ -482,6 +486,13 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                     asNoTracking: false);
 
                 if (item is null) throw new NotFoundAppException("Quote item not found.");
+
+                if (dto.Item.PricingRuleIds is null || dto.Item.PricingRuleIds.Count == 0)
+                {
+                    var existingRuleIds = ExtractAppliedPricingRuleIds(item.PriceBreakdown);
+                    if (existingRuleIds.Count > 0)
+                        dto.Item.PricingRuleIds = existingRuleIds;
+                }
 
                 item.Title = (dto.Item.Title ?? item.Title ?? "").Trim();
                 item.Description = string.IsNullOrWhiteSpace(dto.Item.Description) ? string.Empty : dto.Item.Description.Trim();
@@ -1093,7 +1104,38 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
 
             return Math.Min(baseAmount, value);
         }
+        private static List<Guid> ExtractAppliedPricingRuleIds(JsonDocument? breakdown)
+        {
+            var ids = new List<Guid>();
 
+            try
+            {
+                if (breakdown is null || breakdown.RootElement.ValueKind != JsonValueKind.Object)
+                    return ids;
+
+                if (!breakdown.RootElement.TryGetProperty("pricingRules", out var rules) ||
+                    rules.ValueKind != JsonValueKind.Array)
+                    return ids;
+
+                foreach (var rule in rules.EnumerateArray())
+                {
+                    if (rule.ValueKind != JsonValueKind.Object) continue;
+                    if (!rule.TryGetProperty("id", out var idElement)) continue;
+
+                    if (idElement.ValueKind == JsonValueKind.String &&
+                        Guid.TryParse(idElement.GetString(), out var id))
+                    {
+                        ids.Add(id);
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore old or malformed breakdown JSON.
+            }
+
+            return ids.Distinct().ToList();
+        }
         private static bool EvalBool(string expr, Dictionary<string, object?> vars)
         {
             var e = new Expression(expr);
@@ -1142,6 +1184,24 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 throw new BadRequestAppException("Invalid status for quote.");
         }
 
+        private static bool IsQuoteSignedOrAccepted(DocumentStatus status)
+    => status is DocumentStatus.Signed or DocumentStatus.Accepted;
+
+        private static ProjectStatus GetProjectStatusAfterQuoteState(DocumentStatus status)
+            => IsQuoteSignedOrAccepted(status) ? ProjectStatus.Active : ProjectStatus.Waiting;
+
+        private async Task SetProjectStatusAsync(Guid projectId, ProjectStatus status, CancellationToken ct)
+        {
+            var projectsRepo = _unitOfWork.Repo<Project>();
+
+            var project = await projectsRepo.Query(asNoTracking: false)
+                .FirstOrDefaultAsync(x => x.Id == projectId, ct);
+
+            if (project is null)
+                throw new NotFoundAppException("Project not found.");
+
+            project.Status = status;
+        }
         private async Task<string> GenerateQuoteNoAsync(IRepository<Quote> repo, CancellationToken ct)
         {
             var year = DateTime.UtcNow.Year;

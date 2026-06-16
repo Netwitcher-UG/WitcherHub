@@ -16,7 +16,7 @@ namespace WitcherHub.Application.Interfaces.ManageData
             CancellationToken ct = default);
 
         Task<ServiceViews.ServiceDetailsView?> GetServiceAsync(Guid id, CancellationToken ct = default);
-
+        Task<List<ServiceViews.ServiceListItemView>> GetServiceLookupAsync(CancellationToken ct = default);
         Task<Guid> CreateAsync(ServiceCatalogDTOs dto, CancellationToken ct = default);
         Task UpdateAsync(Guid id, UpdateServiceCatalogItemDto dto, CancellationToken ct = default);
         Task DeleteAsync(Guid id, CancellationToken ct = default);

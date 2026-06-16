@@ -95,6 +95,10 @@ namespace WitcherHub.Infrastructure
             services.AddScoped<ILexwareClient>(sp => sp.GetRequiredService<LexwareClient>());
             services.AddScoped<LexwareInvoiceSyncService>();
             services.AddScoped<InvoicePublicLinkService>();
+            services.Configure<LexwareWebhookOptions>(
+        configuration.GetSection(LexwareWebhookOptions.SectionName));
+
+            services.AddScoped<LexwareInvoiceStatusSyncService>();
             //======= OpenAI =======
             services.Configure<OpenAIOptions>(
                 configuration.GetSection(OpenAIOptions.SectionName));

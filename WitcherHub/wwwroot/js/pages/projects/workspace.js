@@ -64,11 +64,30 @@
     }
 
     function quoteStatusBadge(st) {
-        const s = (st ?? '').toString().toLowerCase();
-        if (s === 'accepted') return `<span class="badge bg-success bg-opacity-10 text-success">Accepted</span>`;
-        if (s === 'rejected') return `<span class="badge bg-danger bg-opacity-10 text-danger">Rejected</span>`;
-        if (s === 'sent') return `<span class="badge bg-info bg-opacity-10 text-info">Sent</span>`;
-        return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
+        const raw = (st ?? '').toString().trim();
+        const s = raw.toLowerCase();
+
+        if (s === 'signed') {
+            return `<span class="badge bg-success bg-opacity-10 text-success">Signed</span>`;
+        }
+
+        if (s === 'accepted') {
+            return `<span class="badge bg-success bg-opacity-10 text-success">Accepted</span>`;
+        }
+
+        if (s === 'rejected') {
+            return `<span class="badge bg-danger bg-opacity-10 text-danger">Rejected</span>`;
+        }
+
+        if (s === 'sent') {
+            return `<span class="badge bg-info bg-opacity-10 text-info">Sent</span>`;
+        }
+
+        if (s === 'draft' || !s) {
+            return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
+        }
+
+        return `<span class="badge bg-secondary bg-opacity-10 text-secondary">${esc(raw)}</span>`;
     }
 
     function invoiceStatusBadge(st) {
@@ -789,7 +808,19 @@
             const canUpdate = !!data.canUpdate && !isSigned;
 
             $('vpContractTitle').textContent = data.contractNo || 'Contract';
-            $('vpContractMeta').textContent = data.signedAt ? `Signed at: ${fmtDateTime(data.signedAt)}` : 'Not signed yet';
+            // $('vpContractMeta').textContent = data.signedAt ? `Signed at: ${fmtDateTime(data.signedAt)}` : 'Not signed yet';
+            const contractStatusText = (data.status || '').toString().toLowerCase();
+
+            $('vpContractMeta').textContent =
+                contractStatusText === 'signed' && data.signedAt
+                    ? `Signed at: ${fmtDateTime(data.signedAt)}`
+                    : contractStatusText === 'sent'
+                        ? 'Sent'
+                        : contractStatusText === 'draft'
+                            ? 'Draft'
+                            : data.signedAt
+                                ? `Signed at: ${fmtDateTime(data.signedAt)}`
+                                : (data.status || 'Draft');
             $('vpContractStatusBadge').innerHTML = badgeHtml(data.status);
 
             const cid = data.contractId || data.id || null;

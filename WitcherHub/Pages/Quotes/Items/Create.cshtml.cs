@@ -220,8 +220,7 @@ namespace WitcherHub.Pages.Quotes.Items
 
         private async Task LoadLookupsAsync(CancellationToken ct)
         {
-            var result = await _services.GetServicesAsync(page: 1, pageSize: 500, search: null, ct: ct);
-            var items = result.Items;
+            var items = await _services.GetServiceLookupAsync(ct);
 
             ServiceOptions = items
                 .OrderBy(s => s.Name)
