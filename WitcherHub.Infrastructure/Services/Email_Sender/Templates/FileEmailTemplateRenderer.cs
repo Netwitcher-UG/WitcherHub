@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -9,8 +9,17 @@ namespace WitcherHub.Infrastructure.Services.Email_Sender.EmailTemplates
 {
     public sealed class FileEmailTemplateRenderer : IEmailTemplateRenderer
     {
-        private static readonly Regex RawToken = new(@"\{\{\{\s*(?<key>[\w\.-]+)\s*\}\}\}", RegexOptions.Compiled);
-        private static readonly Regex EncToken = new(@"\{\{\s*(?<key>[\w\.-]+)\s*\}\}", RegexOptions.Compiled);
+        private static readonly Regex ConditionalBlock = new(
+            @"\{\{#\s*(?<key>[\w\.-]+)\s*\}\}(?<content>.*?)\{\{/\s*\k<key>\s*\}\}",
+            RegexOptions.Compiled | RegexOptions.Singleline);
+
+        private static readonly Regex RawToken = new(
+            @"\{\{\{\s*(?<key>[\w\.-]+)\s*\}\}\}",
+            RegexOptions.Compiled);
+
+        private static readonly Regex EncToken = new(
+            @"\{\{\s*(?<key>[\w\.-]+)\s*\}\}",
+            RegexOptions.Compiled);
 
         private readonly EmailTemplateOptions _opt;
         private readonly IConfiguration _cfg;
@@ -41,6 +50,12 @@ namespace WitcherHub.Infrastructure.Services.Email_Sender.EmailTemplates
 
             var tokens = BuildTokens(model);
 
+            // مهم جداً: لازم الشرط يشتغل قبل RawToken و EncToken
+            if (IsQuoteSignatureTemplate(templateName))
+            {
+                combined = RenderConditionalBlocks(combined, tokens);
+            }
+
             combined = RawToken.Replace(combined, m =>
             {
                 var key = m.Groups["key"].Value;
@@ -55,6 +70,35 @@ namespace WitcherHub.Infrastructure.Services.Email_Sender.EmailTemplates
             });
 
             return combined;
+        }
+
+        private static bool IsQuoteSignatureTemplate(string templateName)
+        {
+            return string.Equals(templateName, "QuoteSignatureRequest", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(templateName, "QuoteSignatureRequest.html", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string RenderConditionalBlocks(string template, Dictionary<string, string?> tokens)
+        {
+            if (string.IsNullOrWhiteSpace(template))
+            {
+                return template;
+            }
+
+            return ConditionalBlock.Replace(template, match =>
+            {
+                var key = match.Groups["key"].Value;
+                var content = match.Groups["content"].Value;
+
+                if (!tokens.TryGetValue(key, out var value))
+                {
+                    return string.Empty;
+                }
+
+                return string.IsNullOrWhiteSpace(value)
+                    ? string.Empty
+                    : content;
+            });
         }
 
         private Dictionary<string, string?> BuildTokens(object model)
@@ -75,7 +119,6 @@ namespace WitcherHub.Infrastructure.Services.Email_Sender.EmailTemplates
                 dict["LegalLine"] = legal;
             }
 
-            // ✅ اقرأ من appsettings أولاً ثم env
             var publicBaseUrl =
                 _cfg["WITCHERHUB_PUBLIC_BASE_URL"]
                 ?? Environment.GetEnvironmentVariable("WITCHERHUB_PUBLIC_BASE_URL")
@@ -83,7 +126,6 @@ namespace WitcherHub.Infrastructure.Services.Email_Sender.EmailTemplates
 
             publicBaseUrl = publicBaseUrl.Trim().TrimEnd('/');
 
-            // ✅ إذا بدون https/http ضيف https تلقائياً
             if (!string.IsNullOrWhiteSpace(publicBaseUrl) &&
                 !publicBaseUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
                 !publicBaseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
@@ -91,7 +133,6 @@ namespace WitcherHub.Infrastructure.Services.Email_Sender.EmailTemplates
                 publicBaseUrl = "https://" + publicBaseUrl;
             }
 
-            // ✅ Bust cache (اختياري لكنه مفيد جداً أثناء تعديل الصور)
             var v = _cfg["WITCHERHUB_ASSETS_VERSION"]
                     ?? Environment.GetEnvironmentVariable("WITCHERHUB_ASSETS_VERSION")
                     ?? DateTime.UtcNow.ToString("yyyyMMddHHmmss");

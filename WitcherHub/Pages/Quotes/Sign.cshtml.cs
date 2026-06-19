@@ -83,6 +83,8 @@ namespace WitcherHub.Pages.Quotes
         public string? SignerEmailPrefill { get; private set; }
         public string ProviderName { get; private set; } = string.Empty;
         public string ProviderAddress { get; private set; } = string.Empty;
+        public bool IsQuoteExpired { get; private set; }
+        public string? QuoteExpiresAtDisplay { get; private set; }
 
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
@@ -108,6 +110,14 @@ namespace WitcherHub.Pages.Quotes
             if (quote is null)
             {
                 return NotFound();
+            }
+
+            QuoteExpiresAtDisplay = FormatDate(quote.ExpiresAt);
+
+            if (CheckQuoteExpired(quote.ExpiresAt, DateTimeOffset.UtcNow))
+            {
+                IsQuoteExpired = true;
+                return Page();
             }
 
             var docModel = BuildQuotePdfModel(quote);
@@ -180,6 +190,7 @@ namespace WitcherHub.Pages.Quotes
             var logoUrl = $"{Request.Scheme}://{Request.Host}{logoPath}";
 
             fullHtml = fullHtml.Replace("__NETWITCHER_LOGO__", logoUrl, StringComparison.OrdinalIgnoreCase);
+            fullHtml = AddExpiresAtMetaRow(fullHtml, quote.ExpiresAt);
 
             QuoteHtml = ExtractRenderableHtml(fullHtml);
 
@@ -214,6 +225,25 @@ namespace WitcherHub.Pages.Quotes
                 return new JsonResult(new { ok = false, message = "Unauthorized." })
                 {
                     StatusCode = 401
+                };
+            }
+
+            var expiration = await _db.Quotes
+                .AsNoTracking()
+                .Where(q => q.Id == Id)
+                .Select(q => q.ExpiresAt)
+                .FirstOrDefaultAsync(ct);
+
+            if (CheckQuoteExpired(expiration, DateTimeOffset.UtcNow))
+            {
+                return new JsonResult(new
+                {
+                    ok = false,
+                    code = "QUOTE_EXPIRED",
+                    message = "تم انتهاء تاريخ العرض ويرجى مراجعة المسؤول."
+                })
+                {
+                    StatusCode = 410
                 };
             }
 
@@ -559,6 +589,7 @@ namespace WitcherHub.Pages.Quotes
     string signatureDataUrl)
         {
             var html = QuotePdfHtmlBuilder.Build(model);
+            html = AddExpiresAtMetaRow(html, model.ExpiresAt);
 
             var extraStyle = """
 <style>
@@ -973,6 +1004,73 @@ namespace WitcherHub.Pages.Quotes
                 _ => discountValue.Value.ToString("0.##", de)
             };
         }
+
+        private static bool CheckQuoteExpired(DateTimeOffset? expiresAt, DateTimeOffset now)
+        {
+            if (!expiresAt.HasValue)
+            {
+                return false;
+            }
+
+            var today = DateOnly.FromDateTime(now.UtcDateTime);
+            var expiryDate = DateOnly.FromDateTime(expiresAt.Value.UtcDateTime);
+
+            return today > expiryDate;
+        }
+
+        private static string? FormatDate(DateTimeOffset? value)
+        {
+            return value.HasValue
+                ? value.Value.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.GetCultureInfo("de-DE"))
+                : null;
+        }
+
+        private static string AddExpiresAtMetaRow(string html, DateTimeOffset? expiresAt)
+        {
+            var expiresAtText = FormatDate(expiresAt);
+
+            if (string.IsNullOrWhiteSpace(html) || string.IsNullOrWhiteSpace(expiresAtText))
+            {
+                return html;
+            }
+
+            if (Regex.IsMatch(
+                    html,
+                    @"<div\b[^>]*class\s*=\s*[""'][^""']*\bmeta-row\b[^""']*[""'][^>]*>.*?<span>\s*(Gültig\s+bis|Valid\s+until|Expires\s+at)\s*</span>",
+                    RegexOptions.IgnoreCase | RegexOptions.Singleline))
+            {
+                return html;
+            }
+
+            var expiresAtRow =
+                $"<div class=\"meta-row\"><span>Gültig bis</span><strong>{WebUtility.HtmlEncode(expiresAtText)}</strong></div>";
+
+            var createdAtPattern =
+                @"(<div\b[^>]*class\s*=\s*[""'][^""']*\bmeta-row\b[^""']*[""'][^>]*>\s*<span>\s*Erstellt\s+am\s*</span>\s*<strong>.*?</strong>\s*</div>)";
+
+            var withCreatedAt = Regex.Replace(
+                html,
+                createdAtPattern,
+                "$1" + Environment.NewLine + expiresAtRow,
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            if (!string.Equals(withCreatedAt, html, StringComparison.Ordinal))
+            {
+                return withCreatedAt;
+            }
+
+            var issuedAtPattern =
+                @"(<div\b[^>]*class\s*=\s*[""'][^""']*\bmeta-row\b[^""']*[""'][^>]*>\s*<span>\s*Ausgestellt\s+am\s*</span>)";
+
+            var withIssuedAt = Regex.Replace(
+                html,
+                issuedAtPattern,
+                expiresAtRow + Environment.NewLine + "$1",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            return withIssuedAt;
+        }
+
         private static string ExtractRenderableHtml(string html)
         {
             if (string.IsNullOrWhiteSpace(html))

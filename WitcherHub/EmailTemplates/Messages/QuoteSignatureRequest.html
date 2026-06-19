@@ -10,6 +10,12 @@
     Im Anhang finden Sie das Angebot als PDF. Über den folgenden Button können Sie das Angebot direkt online öffnen und unterschreiben.
 </p>
 
+{{#ExpiresAt}}
+<p style="margin:0 0 14px 0;color:#374151;font-size:14px;line-height:1.7;">
+    Dieses Angebot läuft am <strong>{{ExpiresAt}}</strong> ab.
+</p>
+{{/ExpiresAt}}
+
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:18px 0;">
     <tr>
         <td align="left">
@@ -64,6 +70,6 @@
 
 <p style="margin:0;color:#374151;font-size:13px;line-height:1.7;">
     Angebotsnummer: <strong>{{QuoteNo}}</strong><br />
-    Projekt: <strong>{{ProjectTitle}}</strong><br />
-    Gültig bis: <strong>{{ExpiresAt}}</strong>
+    Projekt: <strong>{{ProjectTitle}}</strong>{{#ExpiresAt}}<br />
+    Gültig bis: <strong>{{ExpiresAt}}</strong>{{/ExpiresAt}}
 </p>

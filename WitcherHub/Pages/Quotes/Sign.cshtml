@@ -1,4 +1,4 @@
-﻿@page "/quotes/sign/{id:guid?}"
+@page "/quotes/sign/{id:guid?}"
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.Extensions.Localization
 @using System.Text.Json
@@ -151,32 +151,79 @@
     color: #5b21b6;
 }
 
-.contractActions__text {
+        .contractActions__text {
     display: block;
     margin-top: 4px;
     color: #6b7280;
     font-size: 12px;
     line-height: 1.5;
 }
+
+.contractExpired {
+    min-height: 380px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 56px 24px;
+}
+
+.contractExpired__icon {
+    width: 74px;
+    height: 74px;
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 22px;
+    background: rgba(124, 58, 237, .12);
+    color: #6d28d9;
+    font-size: 38px;
+    font-weight: 900;
+}
+
+.contractExpired__title {
+    margin: 0 0 10px;
+    color: #1f1147;
+    font-size: 28px;
+    font-weight: 900;
+}
+
+.contractExpired__message {
+    margin: 0;
+    color: #6b7280;
+    font-size: 15px;
+    line-height: 1.8;
+}
+
+.contractExpired__date {
+    margin-top: 14px;
+    color: #4b5563;
+    font-size: 13px;
+}
     </style>
 }
 
-<form method="post" id="afForm">
-    @Html.AntiForgeryToken()
-</form>
+@if (!Model.IsQuoteExpired)
+{
+    <form method="post" id="afForm">
+        @Html.AntiForgeryToken()
+    </form>
 
-<input type="hidden" id="signEndpoint"
-       value="@Url.Page("/Quotes/Sign", "Sign", new { id = Model.Id, t = Model.Token })" />
+    <input type="hidden" id="signEndpoint"
+           value="@Url.Page("/Quotes/Sign", "Sign", new { id = Model.Id, t = Model.Token })" />
 
-<script>
-    window.contractServerState = @Html.Raw(JsonSerializer.Serialize(new {
-        isSigned = Model.IsSigned,
-        signedAtIso = Model.SignedAtIso ?? "",
-        signatureDataUrl = Model.SignatureDataUrl ?? "",
-        signerName = Model.SignerNamePrefill ?? "",
-        signerEmail = Model.SignerEmailPrefill ?? ""
-    }));
-</script>
+    <script>
+        window.contractServerState = @Html.Raw(JsonSerializer.Serialize(new {
+            isSigned = Model.IsSigned,
+            signedAtIso = Model.SignedAtIso ?? "",
+            signatureDataUrl = Model.SignatureDataUrl ?? "",
+            signerName = Model.SignerNamePrefill ?? "",
+            signerEmail = Model.SignerEmailPrefill ?? ""
+        }));
+    </script>
+}
 
 <div class="contractPage">
     <div class="contractPage__langFab" aria-label="@L("contractPage_LanguageSwitch", "Language switch")">
@@ -187,6 +234,20 @@
     <div class="contractPage__container">
         <div class="contractPage__paper" id="paper">
 
+            @if (Model.IsQuoteExpired)
+            {
+             <section class="contractExpired" aria-label="Quote expired">
+    <div class="contractExpired__icon">!</div>
+    <h1 class="contractExpired__title">Das Angebot ist abgelaufen</h1>
+    <p class="contractExpired__message">Bitte wenden Sie sich an den zuständigen Administrator.</p>
+    @if (!string.IsNullOrWhiteSpace(Model.QuoteExpiresAtDisplay))
+    {
+        <div class="contractExpired__date">Ablaufdatum: @Model.QuoteExpiresAtDisplay</div>
+    }
+</section>
+            }
+            else
+            {
             <div class="contractPage__contractHtml quotePdfScope">
                 @Html.Raw(Model.QuoteHtml)
             </div>
@@ -291,10 +352,13 @@
                     </div>
                 </div>
             </section>
+            }
 
         </div>
     </div>
 
+    @if (!Model.IsQuoteExpired)
+    {
     <div class="contractPage__toast" id="toast"></div>
 
     <div class="contractPage__modal" id="sigModal" aria-hidden="true">
@@ -323,9 +387,12 @@
             </div>
         </div>
     </div>
+    }
 </div>
 
 @section Scripts {
+    @if (!Model.IsQuoteExpired)
+    {
     <script>
         window.contractPageI18n = {
             fillName: "@L("contractPage_ErrFillName", "Please enter your name before signing.")",
@@ -347,4 +414,5 @@
     </script>
 
     <script src="~/js/pages/contracts/contract-sign.js" asp-append-version="true"></script>
+    }
 }
