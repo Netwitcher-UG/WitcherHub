@@ -7,6 +7,18 @@ using WitcherHub.Configuration.Extensions;
 using WitcherHub.Infrastructure.Services.Pdf;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders();
+
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
+builder.Logging.SetMinimumLevel(LogLevel.Information);
+
+builder.Logging.AddFilter("WitcherHub", LogLevel.Information);
+builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
+
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 builder.Services.AddAppExceptionHandling();
 builder.Host.UseSerilog((context, services, configuration) =>

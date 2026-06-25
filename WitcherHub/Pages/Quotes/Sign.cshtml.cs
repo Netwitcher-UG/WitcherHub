@@ -201,6 +201,10 @@ namespace WitcherHub.Pages.Quotes
             [FromQuery(Name = "t")] string? t,
             CancellationToken ct)
         {
+
+            _logger.LogWarning("TEST SIGN POST STARTED. QuoteId={QuoteId}", Id);
+
+            System.Diagnostics.Debug.WriteLine($"DEBUG TEST SIGN POST STARTED. QuoteId={Id}");
             if (Id == Guid.Empty)
             {
                 return new JsonResult(new { ok = false, message = "Invalid quote id." })
@@ -240,7 +244,7 @@ namespace WitcherHub.Pages.Quotes
                 {
                     ok = false,
                     code = "QUOTE_EXPIRED",
-                    message = "تم انتهاء تاريخ العرض ويرجى مراجعة المسؤول."
+                    message = "Die Gültigkeitsdauer des Angebots ist abgelaufen. Bitte wenden Sie sich an den Administrator.\n"
                 })
                 {
                     StatusCode = 410
@@ -533,14 +537,22 @@ namespace WitcherHub.Pages.Quotes
 
                         await db.SaveChangesAsync(token);
                     }
-
+                    _logger.LogInformation(
+    "Invoice debug QuoteId={QuoteId}, Mode={Mode}, OneTime={OneTime}, Recurring={Recurring}, Next={Next}, Today={Today}, ItemCycles={Cycles}",
+    quoteId,
+    quote.InvoiceSendMode,
+    hasOneTimeItems,
+    hasRecurringItems,
+    quote.NextRecurringInvoiceDate,
+    today,
+    string.Join(",", quote.Items.Select(i => i.BillingCycle.ToString())));
                     if (quote.InvoiceSendMode == InvoiceSendMode.Automatic)
                     {
                         if (hasOneTimeItems)
                         {
                             await lex.CreateOneTimeInvoiceFromQuoteAsync(quoteId, token);
-                        }
 
+                        }
                         if (hasRecurringItems &&
                             quote.NextRecurringInvoiceDate.HasValue &&
                             quote.NextRecurringInvoiceDate.Value <= today)
@@ -802,15 +814,20 @@ namespace WitcherHub.Pages.Quotes
         private static decimal? ResolveQuoteItemAgreedPrice(QuoteItem item)
         {
             var baseTotal = item.Quantity * item.UnitPrice;
-            var total = ReadDec(item.PriceBreakdown, "total", 0m);
 
-            if (total > 0m)
+            // For contract creation, pass the agreed net value only.
+            // VAT remains visible on the quote/signing page, but is not sent as part of the contract input.
+            var subTotal = ReadDec(item.PriceBreakdown, "subTotal", 0m);
+            if (subTotal > 0m)
             {
-                return total;
+                return subTotal;
             }
 
-            var subTotal = ReadDec(item.PriceBreakdown, "subTotal", baseTotal);
-            return subTotal > 0m ? subTotal : baseTotal;
+            var baseTotalFromBreakdown = ReadDec(item.PriceBreakdown, "baseTotal", baseTotal);
+            var discountAmount = ReadNestedDec(item.PriceBreakdown, "discount", "amount", 0m);
+            var netTotal = Math.Max(0m, baseTotalFromBreakdown - discountAmount);
+
+            return netTotal > 0m ? netTotal : baseTotal;
         }
 
         private static Dictionary<string, object> JsonDocumentToDictionary(JsonDocument? doc)
@@ -898,7 +915,10 @@ namespace WitcherHub.Pages.Quotes
                 pdfDisplayName = string.Empty;
             }
 
-            var vatPercent = q.ApplyVat ? 19m : 0m;
+            // The signing page and signed quote PDF must reflect the quote exactly as configured.
+            // Contract-specific VAT handling belongs only to the contract creation request.
+            var includeVatInQuotePdf = q.ApplyVat;
+            var vatPercent = includeVatInQuotePdf ? 19m : 0m;
 
             var lines = new List<QuotePdfHtmlBuilder.QuotePdfLine>();
 
@@ -939,7 +959,7 @@ namespace WitcherHub.Pages.Quotes
                 sumNet += total;
             }
 
-            var sumTax = q.ApplyVat ? Math.Max(0m, sumNet * 0.19m) : 0m;
+            var sumTax = includeVatInQuotePdf ? Math.Max(0m, sumNet * 0.19m) : 0m;
             var sumTotal = sumNet + sumTax;
 
             return new QuotePdfHtmlBuilder.QuotePdfDocumentModel
