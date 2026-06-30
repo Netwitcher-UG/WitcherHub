@@ -8,7 +8,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace WitcherHub.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class DBTables : Migration
+    public partial class NewMigrationForNewDB : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -59,35 +59,25 @@ namespace WitcherHub.Infrastructure.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Type = table.Column<string>(type: "text", nullable: false),
                     Name = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: false),
-                    Email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: true),
+                    FirstName = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: true),
+                    LastName = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: true),
                     Phone = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
                     TaxId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     Notes = table.Column<string>(type: "text", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    LexwareType = table.Column<string>(type: "text", nullable: false),
+                    LexwareContactId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    LexwareOrganizationId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    LexwareCustomerNumber = table.Column<int>(type: "integer", nullable: true),
+                    LexwareVersion = table.Column<int>(type: "integer", nullable: true),
+                    LexwareArchived = table.Column<bool>(type: "boolean", nullable: true),
+                    LexwareAllowTaxFreeInvoices = table.Column<bool>(type: "boolean", nullable: true),
+                    LexwareSyncedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Customers", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "DiscountCodes",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Code = table.Column<string>(type: "character varying(60)", maxLength: 60, nullable: false),
-                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
-                    DiscountType = table.Column<string>(type: "text", nullable: false),
-                    Value = table.Column<decimal>(type: "numeric(12,2)", nullable: false),
-                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
-                    ValidFrom = table.Column<DateOnly>(type: "date", nullable: true),
-                    ValidTo = table.Column<DateOnly>(type: "date", nullable: true),
-                    MaxUses = table.Column<int>(type: "integer", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_DiscountCodes", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -98,33 +88,19 @@ namespace WitcherHub.Infrastructure.Migrations
                     Name = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: false),
                     ServiceType = table.Column<string>(type: "text", nullable: false),
                     PricingModel = table.Column<string>(type: "text", nullable: false),
+                    UnitType = table.Column<string>(type: "text", nullable: false),
+                    UnitName = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
                     BasePrice = table.Column<decimal>(type: "numeric(12,2)", nullable: false),
                     DefaultCurrency = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    Description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     ConfigSchema = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Services", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "TaxRates",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    RatePercent = table.Column<decimal>(type: "numeric(6,3)", nullable: false),
-                    Country = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
-                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
-                    ValidFrom = table.Column<DateOnly>(type: "date", nullable: true),
-                    ValidTo = table.Column<DateOnly>(type: "date", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_TaxRates", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -247,7 +223,8 @@ namespace WitcherHub.Infrastructure.Migrations
                     Checksum = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     CreatedById = table.Column<Guid>(type: "uuid", nullable: true),
                     Meta = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -272,7 +249,8 @@ namespace WitcherHub.Infrastructure.Migrations
                     BeforeData = table.Column<JsonDocument>(type: "jsonb", nullable: true),
                     AfterData = table.Column<JsonDocument>(type: "jsonb", nullable: true),
                     IpAddress = table.Column<string>(type: "character varying(60)", maxLength: 60, nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -291,16 +269,18 @@ namespace WitcherHub.Infrastructure.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     CustomerId = table.Column<Guid>(type: "uuid", nullable: false),
-                    FullNameOrCompany = table.Column<string>(type: "text", nullable: false),
-                    Street = table.Column<string>(type: "text", nullable: false),
-                    StreetNr = table.Column<string>(type: "text", nullable: false),
+                    FullNameOrCompany = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: false),
+                    StreetRaw = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: true),
                     Label = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
                     Country = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    CountryCode = table.Column<string>(type: "character varying(2)", maxLength: 2, nullable: true),
                     City = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     AddressLine2 = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: true),
                     PostalCode = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: true),
                     IsDefault = table.Column<bool>(type: "boolean", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    IsLexware = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -323,14 +303,41 @@ namespace WitcherHub.Infrastructure.Migrations
                     Email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: true),
                     Phone = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
                     Position = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    Salutation = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    FirstName = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: true),
+                    LastName = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: true),
                     IsPrimary = table.Column<bool>(type: "boolean", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    IsLexware = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_CustomerContacts", x => x.Id);
                     table.ForeignKey(
                         name: "FK_CustomerContacts_Customers_CustomerId",
+                        column: x => x.CustomerId,
+                        principalTable: "Customers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CustomerEmailAddresses",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CustomerId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Kind = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
+                    Email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CustomerEmailAddresses", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_CustomerEmailAddresses_Customers_CustomerId",
                         column: x => x.CustomerId,
                         principalTable: "Customers",
                         principalColumn: "Id",
@@ -349,7 +356,8 @@ namespace WitcherHub.Infrastructure.Migrations
                     StartDate = table.Column<DateOnly>(type: "date", nullable: true),
                     EndDate = table.Column<DateOnly>(type: "date", nullable: true),
                     CreatedById = table.Column<Guid>(type: "uuid", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -383,7 +391,8 @@ namespace WitcherHub.Infrastructure.Migrations
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     ValidFrom = table.Column<DateOnly>(type: "date", nullable: true),
                     ValidTo = table.Column<DateOnly>(type: "date", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -407,10 +416,21 @@ namespace WitcherHub.Infrastructure.Migrations
                     StartDate = table.Column<DateOnly>(type: "date", nullable: true),
                     EndDate = table.Column<DateOnly>(type: "date", nullable: true),
                     Currency = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    ApplyVat = table.Column<bool>(type: "boolean", nullable: false),
                     Terms = table.Column<string>(type: "text", nullable: true),
+                    FromQuote = table.Column<bool>(type: "boolean", nullable: true),
                     CreatedById = table.Column<Guid>(type: "uuid", nullable: true),
+                    TermsStructured = table.Column<JsonDocument>(type: "jsonb", nullable: true),
                     SignedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    InvoiceSendMode = table.Column<string>(type: "text", nullable: false),
+                    RecurringEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    RecurringIsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    RecurringStartDate = table.Column<DateOnly>(type: "date", nullable: true),
+                    RecurringEndDate = table.Column<DateOnly>(type: "date", nullable: true),
+                    NextRecurringInvoiceDate = table.Column<DateOnly>(type: "date", nullable: true),
+                    LastRecurringInvoiceRunAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -438,10 +458,21 @@ namespace WitcherHub.Infrastructure.Migrations
                     Status = table.Column<string>(type: "text", nullable: false),
                     Currency = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     Notes = table.Column<string>(type: "text", nullable: true),
+                    AfterCustomerSignAction = table.Column<string>(type: "text", nullable: false),
+                    InvoiceSendMode = table.Column<string>(type: "text", nullable: false),
+                    RecurringEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    RecurringIsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    RecurringStartDate = table.Column<DateOnly>(type: "date", nullable: true),
+                    RecurringEndDate = table.Column<DateOnly>(type: "date", nullable: true),
+                    NextRecurringInvoiceDate = table.Column<DateOnly>(type: "date", nullable: true),
+                    LastRecurringInvoiceRunAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     IssuedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    ApplyVat = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedById = table.Column<Guid>(type: "uuid", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    SignedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -460,6 +491,32 @@ namespace WitcherHub.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ContractAccessLinks",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    ContractId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    RecipientEmail = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
+                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    CreatedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    LastOpenedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    RevokedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ContractAccessLinks", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ContractAccessLinks_Contracts_ContractId",
+                        column: x => x.ContractId,
+                        principalTable: "Contracts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ContractItems",
                 columns: table => new
                 {
@@ -469,8 +526,18 @@ namespace WitcherHub.Infrastructure.Migrations
                     Title = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: false),
                     Config = table.Column<JsonDocument>(type: "jsonb", nullable: false),
                     AgreedPrice = table.Column<decimal>(type: "numeric(12,2)", nullable: true),
+                    Description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    UnitType = table.Column<string>(type: "text", nullable: false),
+                    UnitName = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
+                    Quantity = table.Column<decimal>(type: "numeric", nullable: false),
+                    UnitPrice = table.Column<decimal>(type: "numeric", nullable: false),
+                    BillingCycle = table.Column<string>(type: "text", nullable: false),
+                    DiscountType = table.Column<int>(type: "integer", nullable: true),
+                    DiscountValue = table.Column<decimal>(type: "numeric", nullable: true),
+                    PriceBreakdown = table.Column<JsonDocument>(type: "jsonb", nullable: true),
                     Position = table.Column<int>(type: "integer", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -499,7 +566,8 @@ namespace WitcherHub.Infrastructure.Migrations
                     SignerEmail = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: true),
                     SignedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     SignatureData = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -513,12 +581,47 @@ namespace WitcherHub.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Milestones",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    ProjectId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ContractId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Title = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: true),
+                    Status = table.Column<string>(type: "text", nullable: false),
+                    DueDate = table.Column<DateOnly>(type: "date", nullable: true),
+                    CompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    TargetAmount = table.Column<decimal>(type: "numeric(12,2)", nullable: true),
+                    Currency = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Milestones", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Milestones_Contracts_ContractId",
+                        column: x => x.ContractId,
+                        principalTable: "Contracts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_Milestones_Projects_ProjectId",
+                        column: x => x.ProjectId,
+                        principalTable: "Projects",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Invoices",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     ProjectId = table.Column<Guid>(type: "uuid", nullable: false),
                     ContractId = table.Column<Guid>(type: "uuid", nullable: true),
+                    QuoteId = table.Column<Guid>(type: "uuid", nullable: true),
                     InvoiceNo = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     Status = table.Column<string>(type: "text", nullable: false),
                     Currency = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
@@ -526,12 +629,27 @@ namespace WitcherHub.Infrastructure.Migrations
                     DueDate = table.Column<DateOnly>(type: "date", nullable: true),
                     InvoiceDiscountType = table.Column<int>(type: "integer", nullable: true),
                     InvoiceDiscountValue = table.Column<decimal>(type: "numeric(12,2)", nullable: true),
-                    TaxRateId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ApplyVat = table.Column<bool>(type: "boolean", nullable: false),
                     Notes = table.Column<string>(type: "text", nullable: true),
                     CreatedById = table.Column<Guid>(type: "uuid", nullable: true),
                     IssuedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     PaidAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    OriginType = table.Column<string>(type: "text", nullable: false),
+                    IsRecurringInvoice = table.Column<bool>(type: "boolean", nullable: false),
+                    RecurringCycleDate = table.Column<DateOnly>(type: "date", nullable: true),
+                    RecurringCycleKey = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    DispatchStatus = table.Column<string>(type: "text", nullable: false),
+                    SentAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    LexwareInvoiceId = table.Column<string>(type: "character varying(80)", maxLength: 80, nullable: true),
+                    LexwareVoucherNumber = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    LexwareVoucherStatus = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    LexwareResourceUri = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: true),
+                    LexwareVersion = table.Column<int>(type: "integer", nullable: true),
+                    LexwareSyncedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    LexwarePdfPath = table.Column<string>(type: "character varying(400)", maxLength: 400, nullable: true),
+                    LexwareSnapshot = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -554,41 +672,34 @@ namespace WitcherHub.Infrastructure.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_Invoices_TaxRates_TaxRateId",
-                        column: x => x.TaxRateId,
-                        principalTable: "TaxRates",
+                        name: "FK_Invoices_Quotes_QuoteId",
+                        column: x => x.QuoteId,
+                        principalTable: "Quotes",
                         principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
-                name: "Milestones",
+                name: "QuoteAccessLinks",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    ProjectId = table.Column<Guid>(type: "uuid", nullable: false),
-                    ContractId = table.Column<Guid>(type: "uuid", nullable: true),
-                    Title = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: false),
-                    Description = table.Column<string>(type: "text", nullable: true),
-                    Status = table.Column<string>(type: "text", nullable: false),
-                    DueDate = table.Column<DateOnly>(type: "date", nullable: true),
-                    CompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    TargetAmount = table.Column<decimal>(type: "numeric(12,2)", nullable: true),
-                    Currency = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    QuoteId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    RecipientEmail = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
+                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    CreatedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    LastOpenedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    RevokedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Milestones", x => x.Id);
+                    table.PrimaryKey("PK_QuoteAccessLinks", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Milestones_Contracts_ContractId",
-                        column: x => x.ContractId,
-                        principalTable: "Contracts",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_Milestones_Projects_ProjectId",
-                        column: x => x.ProjectId,
-                        principalTable: "Projects",
+                        name: "FK_QuoteAccessLinks_Quotes_QuoteId",
+                        column: x => x.QuoteId,
+                        principalTable: "Quotes",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -599,17 +710,21 @@ namespace WitcherHub.Infrastructure.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     QuoteId = table.Column<Guid>(type: "uuid", nullable: false),
-                    ServiceId = table.Column<Guid>(type: "uuid", maxLength: 80, nullable: true),
+                    ServiceId = table.Column<Guid>(type: "uuid", nullable: true),
                     Title = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: false),
+                    UnitType = table.Column<string>(type: "text", nullable: false),
+                    UnitName = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
                     Quantity = table.Column<decimal>(type: "numeric(12,2)", nullable: false),
                     UnitPrice = table.Column<decimal>(type: "numeric(12,2)", nullable: false),
                     Config = table.Column<JsonDocument>(type: "jsonb", nullable: false),
                     PriceBreakdown = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    TaxRateId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    BillingCycle = table.Column<string>(type: "text", nullable: false),
                     DiscountType = table.Column<int>(type: "integer", nullable: true),
                     DiscountValue = table.Column<decimal>(type: "numeric(12,2)", nullable: true),
                     Position = table.Column<int>(type: "integer", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -626,11 +741,57 @@ namespace WitcherHub.Infrastructure.Migrations
                         principalTable: "Services",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "QuoteSignatures",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    QuoteId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SignerName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    SignerEmail = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
+                    SignedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    SignatureData = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_QuoteSignatures", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_QuoteItems_TaxRates_TaxRateId",
-                        column: x => x.TaxRateId,
-                        principalTable: "TaxRates",
-                        principalColumn: "Id");
+                        name: "FK_QuoteSignatures_Quotes_QuoteId",
+                        column: x => x.QuoteId,
+                        principalTable: "Quotes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "InvoiceAccessLinks",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    InvoiceId = table.Column<Guid>(type: "uuid", nullable: false),
+                    RecipientEmail = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: true),
+                    TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    CreatedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    OneTimeUse = table.Column<bool>(type: "boolean", nullable: false),
+                    FirstOpenedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    LastOpenedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    OpenCount = table.Column<int>(type: "integer", nullable: false),
+                    RevokedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_InvoiceAccessLinks", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_InvoiceAccessLinks_Invoices_InvoiceId",
+                        column: x => x.InvoiceId,
+                        principalTable: "Invoices",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -641,15 +802,19 @@ namespace WitcherHub.Infrastructure.Migrations
                     InvoiceId = table.Column<Guid>(type: "uuid", nullable: false),
                     ServiceId = table.Column<Guid>(type: "uuid", maxLength: 80, nullable: true),
                     Title = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: false),
+                    UnitType = table.Column<string>(type: "text", nullable: false),
+                    UnitName = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
                     Quantity = table.Column<decimal>(type: "numeric(12,2)", nullable: false),
                     UnitPrice = table.Column<decimal>(type: "numeric(12,2)", nullable: false),
                     Config = table.Column<JsonDocument>(type: "jsonb", nullable: false),
                     PriceBreakdown = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    TaxRateId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    BillingCycle = table.Column<string>(type: "text", nullable: false),
                     DiscountType = table.Column<int>(type: "integer", nullable: true),
                     DiscountValue = table.Column<decimal>(type: "numeric(12,2)", nullable: true),
                     Position = table.Column<int>(type: "integer", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -666,11 +831,6 @@ namespace WitcherHub.Infrastructure.Migrations
                         principalTable: "Services",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_InvoiceItems_TaxRates_TaxRateId",
-                        column: x => x.TaxRateId,
-                        principalTable: "TaxRates",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -698,32 +858,6 @@ namespace WitcherHub.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Payments",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    InvoiceId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Amount = table.Column<decimal>(type: "numeric(12,2)", nullable: false),
-                    Currency = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    Method = table.Column<string>(type: "text", nullable: false),
-                    Status = table.Column<string>(type: "text", nullable: false),
-                    ProviderRef = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
-                    PaidAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    Meta = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Payments", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Payments_Invoices_InvoiceId",
-                        column: x => x.InvoiceId,
-                        principalTable: "Invoices",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "MilestoneInvoices",
                 columns: table => new
                 {
@@ -743,6 +877,33 @@ namespace WitcherHub.Infrastructure.Migrations
                         name: "FK_MilestoneInvoices_Milestones_MilestoneId",
                         column: x => x.MilestoneId,
                         principalTable: "Milestones",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Payments",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    InvoiceId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Amount = table.Column<decimal>(type: "numeric(12,2)", nullable: false),
+                    Currency = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    Method = table.Column<string>(type: "text", nullable: false),
+                    Status = table.Column<string>(type: "text", nullable: false),
+                    ProviderRef = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    PaidAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    Meta = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Payments", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Payments_Invoices_InvoiceId",
+                        column: x => x.InvoiceId,
+                        principalTable: "Invoices",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -805,6 +966,17 @@ namespace WitcherHub.Infrastructure.Migrations
                 columns: new[] { "EntityType", "EntityId" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_ContractAccessLinks_ContractId_RecipientEmail",
+                table: "ContractAccessLinks",
+                columns: new[] { "ContractId", "RecipientEmail" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ContractAccessLinks_TokenHash",
+                table: "ContractAccessLinks",
+                column: "TokenHash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ContractItems_ContractId",
                 table: "ContractItems",
                 column: "ContractId");
@@ -840,9 +1012,25 @@ namespace WitcherHub.Infrastructure.Migrations
                 column: "CustomerId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_CustomerEmailAddresses_CustomerId",
+                table: "CustomerEmailAddresses",
+                column: "CustomerId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Customers_Name",
                 table: "Customers",
                 column: "Name");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_InvoiceAccessLinks_InvoiceId_ExpiresAt",
+                table: "InvoiceAccessLinks",
+                columns: new[] { "InvoiceId", "ExpiresAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_InvoiceAccessLinks_TokenHash",
+                table: "InvoiceAccessLinks",
+                column: "TokenHash",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_InvoiceItems_InvoiceId",
@@ -853,11 +1041,6 @@ namespace WitcherHub.Infrastructure.Migrations
                 name: "IX_InvoiceItems_ServiceId",
                 table: "InvoiceItems",
                 column: "ServiceId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_InvoiceItems_TaxRateId",
-                table: "InvoiceItems",
-                column: "TaxRateId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Invoices_ContractId",
@@ -875,9 +1058,9 @@ namespace WitcherHub.Infrastructure.Migrations
                 column: "ProjectId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Invoices_TaxRateId",
+                name: "IX_Invoices_QuoteId",
                 table: "Invoices",
-                column: "TaxRateId");
+                column: "QuoteId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_MilestoneInvoices_InvoiceId",
@@ -902,7 +1085,8 @@ namespace WitcherHub.Infrastructure.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_PricingRules_ServiceId_Priority",
                 table: "PricingRules",
-                columns: new[] { "ServiceId", "Priority" });
+                columns: new[] { "ServiceId", "Priority" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Projects_CreatedById",
@@ -915,6 +1099,17 @@ namespace WitcherHub.Infrastructure.Migrations
                 column: "CustomerId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_QuoteAccessLinks_QuoteId_RecipientEmail",
+                table: "QuoteAccessLinks",
+                columns: new[] { "QuoteId", "RecipientEmail" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_QuoteAccessLinks_TokenHash",
+                table: "QuoteAccessLinks",
+                column: "TokenHash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_QuoteItems_QuoteId",
                 table: "QuoteItems",
                 column: "QuoteId");
@@ -925,11 +1120,6 @@ namespace WitcherHub.Infrastructure.Migrations
                 column: "ServiceId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_QuoteItems_TaxRateId",
-                table: "QuoteItems",
-                column: "TaxRateId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Quotes_CreatedById",
                 table: "Quotes",
                 column: "CreatedById");
@@ -938,6 +1128,11 @@ namespace WitcherHub.Infrastructure.Migrations
                 name: "IX_Quotes_ProjectId",
                 table: "Quotes",
                 column: "ProjectId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_QuoteSignatures_QuoteId",
+                table: "QuoteSignatures",
+                column: "QuoteId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Services_ServiceType",
@@ -970,6 +1165,9 @@ namespace WitcherHub.Infrastructure.Migrations
                 name: "AuditLogs");
 
             migrationBuilder.DropTable(
+                name: "ContractAccessLinks");
+
+            migrationBuilder.DropTable(
                 name: "ContractItems");
 
             migrationBuilder.DropTable(
@@ -982,7 +1180,10 @@ namespace WitcherHub.Infrastructure.Migrations
                 name: "CustomerContacts");
 
             migrationBuilder.DropTable(
-                name: "DiscountCodes");
+                name: "CustomerEmailAddresses");
+
+            migrationBuilder.DropTable(
+                name: "InvoiceAccessLinks");
 
             migrationBuilder.DropTable(
                 name: "InvoiceItems");
@@ -1000,7 +1201,13 @@ namespace WitcherHub.Infrastructure.Migrations
                 name: "PricingRules");
 
             migrationBuilder.DropTable(
+                name: "QuoteAccessLinks");
+
+            migrationBuilder.DropTable(
                 name: "QuoteItems");
+
+            migrationBuilder.DropTable(
+                name: "QuoteSignatures");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");
@@ -1012,16 +1219,13 @@ namespace WitcherHub.Infrastructure.Migrations
                 name: "Invoices");
 
             migrationBuilder.DropTable(
-                name: "Quotes");
-
-            migrationBuilder.DropTable(
                 name: "Services");
 
             migrationBuilder.DropTable(
                 name: "Contracts");
 
             migrationBuilder.DropTable(
-                name: "TaxRates");
+                name: "Quotes");
 
             migrationBuilder.DropTable(
                 name: "Projects");

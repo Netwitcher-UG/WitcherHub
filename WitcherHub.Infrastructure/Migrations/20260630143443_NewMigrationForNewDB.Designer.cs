@@ -13,8 +13,8 @@ using WitcherHub.Infrastructure.Data.Context;
 namespace WitcherHub.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260323073016_QuoteAccessLink")]
-    partial class QuoteAccessLink
+    [Migration("20260630143443_NewMigrationForNewDB")]
+    partial class NewMigrationForNewDB
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -350,6 +350,9 @@ namespace WitcherHub.Infrastructure.Migrations
 
                     b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date");
+
+                    b.Property<bool?>("FromQuote")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("InvoiceSendMode")
                         .IsRequired()
