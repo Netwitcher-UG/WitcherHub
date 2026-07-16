@@ -31,7 +31,15 @@ namespace WitcherHub.Infrastructure.Data.Models
             Contract = 0,
             Invoice = 1
         }
-        public enum ServiceType { Website, Design, Video, Editing, Other }
+        public enum ServiceType {
+            Website = 0,
+            Design = 1,
+            Video = 2,
+            Editing = 3,
+            Marketing = 4,
+            SEO = 5,
+            Other = 6
+        }
         public enum PricingModel { Fixed, Unit, Tiered, Hourly }
 
         public enum RuleAction { Add, Multiply, SetUnit, SetTotal, Discount }
