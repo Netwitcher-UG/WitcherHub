@@ -30,6 +30,14 @@ namespace WitcherHub.Pages
         private readonly IValidator<DeleteCustomerContactDto> _deleteContactValidator;
         private readonly IValidator<SetPrimaryCustomerContactDto> _setPrimaryContactValidator;
 
+        private const string DuplicateEmailMessagePrefix =
+            "Email address is already used by another client: ";
+
+        private const string DuplicateEmailInRequestMessagePrefix =
+            "Duplicate email in request: ";
+
+        private sealed record FieldValidationError(string Field, string Error);
+
         public IndexModel(
             ICustomer customers,
             ILexwareSyncService lexwareSync,
@@ -156,23 +164,81 @@ namespace WitcherHub.Pages
                 Contact = Contact
             };
 
-            var result = await _createValidator.ValidateAsync(dto, ct);
-
-            if (!result.IsValid)
+            // FullNameOrCompany is still required in the stored address, but for the
+            // first address it can be derived safely from the customer name.
+            if (string.IsNullOrWhiteSpace(Address.FullNameOrCompany))
             {
-                foreach (var err in result.Errors)
-                    ModelState.AddModelError(err.PropertyName, err.ErrorMessage);
+                Address.FullNameOrCompany = Customer.Type == CustomerType.Company
+                    ? (Customer.Name ?? string.Empty).Trim()
+                    : $"{Customer.FirstName} {Customer.LastName}".Trim();
+            }
+
+            var result = await _createValidator.ValidateAsync(dto, ct);
+            var requiredAddressErrors = GetRequiredAddressErrors(Address);
+            var requiredContactErrors = Customer.Type == CustomerType.Company
+                ? GetRequiredCompanyContactErrors(Contact)
+                : new List<FieldValidationError>();
+
+            foreach (var err in result.Errors)
+                ModelState.AddModelError(err.PropertyName, err.ErrorMessage);
+
+            foreach (var err in requiredAddressErrors)
+                ModelState.AddModelError(err.Field, err.Error);
+
+            foreach (var err in requiredContactErrors)
+                ModelState.AddModelError(err.Field, err.Error);
+
+            if (!result.IsValid
+                || requiredAddressErrors.Count > 0
+                || requiredContactErrors.Count > 0)
+            {
                 EnsureCountryOptions();
                 BuildCreateCustomerModal(autoOpen: true);
 
                 TempData["Toast.Type"] = "error";
                 TempData["Toast.Title"] = "Validation";
-                TempData["Toast.Message"] = "Please fix the highlighted fields.";
+                TempData["Toast.Message"] = requiredContactErrors.Count > 0
+                    ? "All company contact fields are required."
+                    : "All address fields are required.";
 
                 return Page();
             }
 
-            await _customers.CreateAsync(dto, ct);
+            try
+            {
+                await _customers.CreateAsync(dto, ct);
+            }
+            catch (BadRequestAppException ex)
+                when (TryGetDuplicateEmail(ex.Message, out var duplicateEmail))
+            {
+                AddCreateEmailError(
+                    duplicateEmail,
+                    "This email address is already used by another client.");
+                EnsureCountryOptions();
+                BuildCreateCustomerModal(autoOpen: true);
+
+                TempData["Toast.Type"] = "error";
+                TempData["Toast.Title"] = "Validation";
+                TempData["Toast.Message"] = "This email address is already used by another client.";
+
+                return Page();
+            }
+            catch (BadRequestAppException ex)
+                when (TryGetDuplicateEmailInRequest(ex.Message, out var duplicateEmail))
+            {
+                AddCreateEmailError(
+                    duplicateEmail,
+                    "The same email cannot be entered more than once.");
+                EnsureCountryOptions();
+                BuildCreateCustomerModal(autoOpen: true);
+
+                TempData["Toast.Type"] = "error";
+                TempData["Toast.Title"] = "Validation";
+                TempData["Toast.Message"] = "The same email cannot be entered more than once.";
+
+                return Page();
+            }
+
             TempData["Toast.Type"] = "success";
             TempData["Toast.Title"] = "Success";
             TempData["Toast.Message"] = "Client added successfully.";
@@ -188,11 +254,54 @@ namespace WitcherHub.Pages
             if (clientId == Guid.Empty)
                 throw new BadRequestAppException("Invalid client id.");
 
+            // Server-side protection: never rely only on the JavaScript check.
+            var projects = await _customers.GetCustomerProjectsAsync(clientId, ct);
+            if (projects.Count > 0)
+            {
+                TempData["Toast.Type"] = "error";
+                TempData["Toast.Title"] = "Delete not allowed";
+                TempData["Toast.Message"] =
+                    $"This client cannot be deleted because it is linked to {projects.Count} project(s) and related project data.";
+
+                return RedirectToPage("./Index", new { p = Page, pageSize = PageSize, q = Search });
+            }
+
             await _customers.DeleteAsync(clientId, ct);
             TempData["Toast.Type"] = "success";
             TempData["Toast.Title"] = "Deleted";
             TempData["Toast.Message"] = "Client deleted successfully.";
             return RedirectToPage("./Index", new { p = Page, pageSize = PageSize, q = Search });
+        }
+
+        // =========================
+        // GET: Delete information (Ajax JSON)
+        // =========================
+        public async Task<IActionResult> OnGetDeleteInfoAsync(Guid clientId, CancellationToken ct)
+        {
+            if (clientId == Guid.Empty)
+                return BadRequest(new { message = "Invalid client id." });
+
+            var client = await _customers.GetCustomerAsync(clientId, ct);
+            if (client is null)
+                return NotFound(new { message = "Client not found." });
+
+            var projects = await _customers.GetCustomerProjectsAsync(clientId, ct);
+            var projectNames = projects
+                .Select(x => x.Title)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Take(5)
+                .ToList();
+
+            return new JsonResult(new
+            {
+                canDelete = projects.Count == 0,
+                clientName = client.Name,
+                projectCount = projects.Count,
+                projectNames,
+                message = projects.Count == 0
+                    ? "Are you sure you want to delete this client?"
+                    : $"This client is linked to {projects.Count} project(s) and related project data, so it cannot be deleted. Remove or reassign the projects first."
+            });
         }
 
         // =========================
@@ -251,7 +360,26 @@ namespace WitcherHub.Pages
                 Customer = req.Customer
             };
 
-            await _customers.UpdateAsync(req.CustomerId, updateDto, ct);
+            try
+            {
+                await _customers.UpdateAsync(req.CustomerId, updateDto, ct);
+            }
+            catch (BadRequestAppException ex)
+                when (TryGetDuplicateEmail(ex.Message, out var duplicateEmail))
+            {
+                return BuildUpdateEmailValidationError(
+                    req.Customer?.EmailAddresses,
+                    duplicateEmail,
+                    "This email address is already used by another client.");
+            }
+            catch (BadRequestAppException ex)
+                when (TryGetDuplicateEmailInRequest(ex.Message, out var duplicateEmail))
+            {
+                return BuildUpdateEmailValidationError(
+                    req.Customer?.EmailAddresses,
+                    duplicateEmail,
+                    "The same email cannot be entered more than once.");
+            }
 
             var updated = await _customers.GetCustomerAsync(req.CustomerId, ct);
             return new JsonResult(updated);
@@ -264,11 +392,18 @@ namespace WitcherHub.Pages
                 return BadRequest(new { message = "Body is null." });
 
             var vr = await _createAddressValidator.ValidateAsync(req, ct);
-            if (!vr.IsValid)
+            var errors = vr.Errors
+                .Select(e => new FieldValidationError(e.PropertyName, e.ErrorMessage))
+                .Concat(GetRequiredAddressErrors(req.Address))
+                .GroupBy(e => e.Field, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+
+            if (errors.Count > 0)
                 return BadRequest(new
                 {
-                    message = "Validation failed",
-                    errors = vr.Errors.Select(e => new { field = e.PropertyName, error = e.ErrorMessage })
+                    message = "All address fields are required.",
+                    errors = errors.Select(e => new { field = e.Field, error = e.Error })
                 });
 
             await _customers.CreateAddressAsync(req, ct);
@@ -320,11 +455,18 @@ namespace WitcherHub.Pages
                 return BadRequest(new { message = "Body is null." });
 
             var vr = await _updateAddressValidator.ValidateAsync(req, ct);
-            if (!vr.IsValid)
+            var errors = vr.Errors
+                .Select(e => new FieldValidationError(e.PropertyName, e.ErrorMessage))
+                .Concat(GetRequiredAddressErrors(req.Address))
+                .GroupBy(e => e.Field, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+
+            if (errors.Count > 0)
                 return BadRequest(new
                 {
-                    message = "Validation failed",
-                    errors = vr.Errors.Select(e => new { field = e.PropertyName, error = e.ErrorMessage })
+                    message = "All address fields are required.",
+                    errors = errors.Select(e => new { field = e.Field, error = e.Error })
                 });
 
             await _customers.UpdateAddressAsync(req, ct);
@@ -341,11 +483,18 @@ namespace WitcherHub.Pages
                 return BadRequest(new { message = "Body is null." });
 
             var vr = await _createContactValidator.ValidateAsync(req, ct);
-            if (!vr.IsValid)
+            var errors = vr.Errors
+                .Select(e => new FieldValidationError(e.PropertyName, e.ErrorMessage))
+                .Concat(GetRequiredCompanyContactErrors(req.Contact))
+                .GroupBy(e => e.Field, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+
+            if (errors.Count > 0)
                 return BadRequest(new
                 {
-                    message = "Validation failed",
-                    errors = vr.Errors.Select(e => new { field = e.PropertyName, error = e.ErrorMessage })
+                    message = "All company contact fields are required.",
+                    errors = errors.Select(e => new { field = e.Field, error = e.Error })
                 });
 
             await _customers.CreateContactAsync(req, ct);
@@ -395,11 +544,18 @@ namespace WitcherHub.Pages
                 return BadRequest(new { message = "Body is null." });
 
             var vr = await _updateContactValidator.ValidateAsync(req, ct);
-            if (!vr.IsValid)
+            var errors = vr.Errors
+                .Select(e => new FieldValidationError(e.PropertyName, e.ErrorMessage))
+                .Concat(GetRequiredCompanyContactErrors(req.Contact))
+                .GroupBy(e => e.Field, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+
+            if (errors.Count > 0)
                 return BadRequest(new
                 {
-                    message = "Validation failed",
-                    errors = vr.Errors.Select(e => new { field = e.PropertyName, error = e.ErrorMessage })
+                    message = "All company contact fields are required.",
+                    errors = errors.Select(e => new { field = e.Field, error = e.Error })
                 });
 
             await _customers.UpdateContactAsync(req, ct);
@@ -477,6 +633,156 @@ namespace WitcherHub.Pages
         }
         
 
+
+        private static List<FieldValidationError> GetRequiredAddressErrors(AddressDto? address)
+        {
+            var errors = new List<FieldValidationError>();
+
+            if (address is null)
+            {
+                errors.Add(new FieldValidationError("Address", "Address is required."));
+                return errors;
+            }
+
+            AddIfMissing(address.FullNameOrCompany, "Address.FullNameOrCompany", "Full name or company is required.");
+            AddIfMissing(address.Label, "Address.Label", "Address label is required.");
+            AddIfMissing(address.StreetRaw, "Address.StreetRaw", "Street and house number are required.");
+            AddIfMissing(address.AddressLine2, "Address.AddressLine2", "Address line 2 is required.");
+            AddIfMissing(address.PostalCode, "Address.PostalCode", "Postal code is required.");
+            AddIfMissing(address.City, "Address.City", "City is required.");
+            AddIfMissing(address.Country, "Address.Country", "Country is required.");
+            AddIfMissing(address.CountryCode, "Address.CountryCode", "Country code is required.");
+
+            return errors;
+
+            void AddIfMissing(string? value, string field, string message)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    errors.Add(new FieldValidationError(field, message));
+            }
+        }
+
+        private static List<FieldValidationError> GetRequiredCompanyContactErrors(ContactDto? contact)
+        {
+            var errors = new List<FieldValidationError>();
+
+            if (contact is null)
+            {
+                errors.Add(new FieldValidationError("Contact", "Company contact is required."));
+                return errors;
+            }
+
+            AddIfMissing(contact.Salutation, "Contact.Salutation", "Salutation is required.");
+            AddIfMissing(contact.FirstName, "Contact.FirstName", "First name is required.");
+            AddIfMissing(contact.LastName, "Contact.LastName", "Last name is required.");
+            AddIfMissing(contact.Position, "Contact.Position", "Position is required.");
+            AddIfMissing(contact.Email, "Contact.Email", "Email is required.");
+            AddIfMissing(contact.Phone, "Contact.Phone", "Phone is required.");
+
+            return errors;
+
+            void AddIfMissing(string? value, string field, string message)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    errors.Add(new FieldValidationError(field, message));
+            }
+        }
+
+        private static string NormalizeEmail(string? email)
+            => (email ?? string.Empty).Trim().ToLowerInvariant();
+
+        private static bool TryGetDuplicateEmail(string? message, out string email)
+            => TryGetEmailFromPrefixedMessage(
+                message,
+                DuplicateEmailMessagePrefix,
+                out email);
+
+        private static bool TryGetDuplicateEmailInRequest(string? message, out string email)
+            => TryGetEmailFromPrefixedMessage(
+                message,
+                DuplicateEmailInRequestMessagePrefix,
+                out email);
+
+        private static bool TryGetEmailFromPrefixedMessage(
+            string? message,
+            string prefix,
+            out string email)
+        {
+            email = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(message)
+                || !message.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            email = NormalizeEmail(message[prefix.Length..]);
+            return !string.IsNullOrWhiteSpace(email);
+        }
+
+        private void AddCreateEmailError(string duplicateEmail, string errorMessage)
+        {
+            var normalizedDuplicate = NormalizeEmail(duplicateEmail);
+            var matched = false;
+
+            for (var i = 0; i < (Customer.EmailAddresses?.Count ?? 0); i++)
+            {
+                var email = NormalizeEmail(Customer.EmailAddresses![i].Email);
+                if (!string.Equals(
+                        email,
+                        normalizedDuplicate,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                ModelState.AddModelError(
+                    $"Customer.EmailAddresses[{i}].Email",
+                    errorMessage);
+                matched = true;
+            }
+
+            if (!matched)
+            {
+                ModelState.AddModelError(
+                    "Customer.EmailAddresses[0].Email",
+                    errorMessage);
+            }
+        }
+
+        private IActionResult BuildUpdateEmailValidationError(
+            IEnumerable<EmailAddressDto>? emailItems,
+            string duplicateEmail,
+            string errorMessage)
+        {
+            emailItems ??= Array.Empty<EmailAddressDto>();
+
+            var matchingIndexes = emailItems
+                .Select((item, index) => new
+                {
+                    Index = index,
+                    Email = NormalizeEmail(item.Email)
+                })
+                .Where(x => string.Equals(
+                    x.Email,
+                    NormalizeEmail(duplicateEmail),
+                    StringComparison.OrdinalIgnoreCase))
+                .Select(x => x.Index)
+                .ToList();
+
+            if (matchingIndexes.Count == 0)
+                matchingIndexes.Add(0);
+
+            return BadRequest(new
+            {
+                message = errorMessage,
+                errors = matchingIndexes.Select(index => new
+                {
+                    field = $"Customer.EmailAddresses[{index}].Email",
+                    error = errorMessage
+                })
+            });
+        }
 
         private void BuildCreateCustomerModal(bool autoOpen)
         {
