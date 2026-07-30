@@ -1,4 +1,4 @@
-using Mapster;
+﻿using Mapster;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using WitcherHub.Application.Common.CacheKeys;
@@ -23,6 +23,11 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
         private readonly IUnitOfWork _unitOfWork;
         private readonly IAppCache _cache;
         private readonly ILogger<ManageCustomer> _log;
+
+        // Kept as a stable prefix so the Razor Page can turn this service error
+        // into a field-level validation message.
+        private const string DuplicateEmailMessagePrefix =
+            "Email address is already used by another client: ";
 
         private static readonly AppCacheEntryOptions ListCacheOptions = new()
         {
@@ -289,12 +294,32 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             if (dto.Customer.EmailAddresses is null || dto.Customer.EmailAddresses.Count == 0)
                 throw new BadRequestAppException("At least one email address is required.");
 
-            var emails = DistinctEmails(
-                dto.Customer.EmailAddresses.Select(e => (e.Email ?? "", e.Kind ?? "business"))
-            );
+            var normalizedEmailEntries = dto.Customer.EmailAddresses
+                .Select(e => (
+                    Email: NormEmail(e.Email),
+                    Kind: NormKind(e.Kind)))
+                .Where(e => !string.IsNullOrWhiteSpace(e.Email))
+                .ToList();
 
-            if (emails.Count == 0)
+            if (normalizedEmailEntries.Count == 0)
                 throw new BadRequestAppException("At least one valid email address is required.");
+
+            // Reject duplicates inside the same form instead of silently removing them.
+            var duplicateInRequest = normalizedEmailEntries
+                .GroupBy(e => e.Email, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault(g => g.Count() > 1);
+
+            if (duplicateInRequest is not null)
+                throw new BadRequestAppException(
+                    $"Duplicate email in request: {duplicateInRequest.Key}");
+
+            // Global uniqueness: the email must not belong to any existing customer.
+            await EnsureEmailsAreUniqueAsync(
+                normalizedEmailEntries.Select(e => e.Email),
+                exceptCustomerId: null,
+                ct);
+
+            var emails = normalizedEmailEntries;
 
             foreach (var e in emails)
             {
@@ -306,30 +331,44 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             }
 
 
-            // ✅ Address required
+            // Address is mandatory for both Company and Individual customers.
             var address = dto.Address.Adapt<AddressEntity>();
-            if (string.IsNullOrWhiteSpace(address.FullNameOrCompany))
-                address.FullNameOrCompany = customer.Name;
+            NormalizeAndValidateAddress(address, customer.Name);
 
             address.IsDefault = true;
             address.IsLexware = false;
-            address.Label = string.IsNullOrWhiteSpace(address.Label) ? "Billing" : address.Label.Trim();
-            address.CountryCode = string.IsNullOrWhiteSpace(address.CountryCode) ? null : address.CountryCode.Trim();
-            address.StreetRaw = string.IsNullOrWhiteSpace(address.StreetRaw) ? "N/A" : address.StreetRaw.Trim();
-
             customer.Addresses.Add(address);
 
-            // ✅ Contact only for Company
+            // Company contact is mandatory, and every visible contact field is required.
             if (dto.Customer.Type == CustomerType.Company)
             {
+                if (dto.Contact is null)
+                    throw new BadRequestAppException("Company contact is required.");
+
                 var contact = dto.Contact.Adapt<ContactEntity>();
+                NormalizeAndValidateCompanyContact(contact);
                 contact.IsPrimary = true;
                 contact.IsLexware = false;
                 customer.Contacts.Add(contact);
             }
 
             await customerRepo.AddAsync(customer, ct);
-            await _unitOfWork.SaveChangesAsync(ct);
+
+            try
+            {
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex) when (IsUniqueEmailViolation(ex))
+            {
+                // Covers the race condition where two requests pass the pre-check
+                // at the same time. The unique database index remains authoritative.
+                var email = GetEmailFromUpdateException(ex)
+                            ?? emails.FirstOrDefault().Email
+                            ?? string.Empty;
+
+                _log.LogWarning(ex, "Duplicate customer email rejected: {Email}", email);
+                throw DuplicateEmailException(email);
+            }
 
             await InvalidateAfterCustomerChangeAsync(customer.Id, ct);
             return customer.Id;
@@ -387,6 +426,12 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                                  .FirstOrDefault(g => g.Count() > 1);
             if (dup != null)
                 throw new BadRequestAppException($"Duplicate email in request: {dup.Key}");
+
+            // Global uniqueness, excluding the current customer so unchanged emails remain valid.
+            await EnsureEmailsAreUniqueAsync(
+                incomingRaw.Select(x => x.Email),
+                exceptCustomerId: id,
+                ct);
 
             // ===== 3) فهارس من DB =====
             var dbEmails = customer.EmailAddresses.ToList(); // tracked
@@ -461,6 +506,18 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             {
                 await _unitOfWork.SaveChangesAsync(ct);
             }
+            catch (DbUpdateException ex) when (IsUniqueEmailViolation(ex))
+            {
+                var email = GetEmailFromUpdateException(ex)
+                            ?? incomingRaw.FirstOrDefault()?.Email
+                            ?? string.Empty;
+
+                _log.LogWarning(ex,
+                    "Duplicate customer email rejected while updating {CustomerId}: {Email}",
+                    id, email);
+
+                throw DuplicateEmailException(email);
+            }
             catch (DbUpdateConcurrencyException ex)
             {
                 foreach (var e in ex.Entries)
@@ -487,6 +544,18 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             if (id == Guid.Empty) throw new BadRequestAppException("Invalid customer id.");
 
             var repo = _unitOfWork.Repo<CustomerEntity>();
+            var projectsRepo = _unitOfWork.Repo<Project>();
+
+            // Final protection at the service layer. This also covers deletion calls
+            // coming from places other than the Clients Razor Page.
+            var projectCount = await projectsRepo.Query(asNoTracking: true)
+                .CountAsync(x => x.CustomerId == id, ct);
+
+            if (projectCount > 0)
+            {
+                throw new BadRequestAppException(
+                    $"This client cannot be deleted because it is linked to {projectCount} project(s) and related project data.");
+            }
 
             var entity = await repo.GetByIdAsync(id, ct: ct, asNoTracking: false);
             if (entity is null) return;
@@ -530,17 +599,20 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                 var address = dto.Address.Adapt<AddressEntity>();
                 address.CustomerId = dto.CustomerId;
                 address.IsDefault = hasAny ? dto.Address.IsDefault : true;
+
+                string? fallbackFullNameOrCompany = null;
                 if (string.IsNullOrWhiteSpace(address.FullNameOrCompany))
                 {
-                    var customer = await customersRepo.FirstOrDefaultAsync(x => x.Id == dto.CustomerId, ct, asNoTracking: true);
+                    var customer = await customersRepo.FirstOrDefaultAsync(
+                        x => x.Id == dto.CustomerId,
+                        ct,
+                        asNoTracking: true);
                     if (customer is null) throw new NotFoundAppException("Customer not found.");
-                    address.FullNameOrCompany = customer.Name;
+                    fallbackFullNameOrCompany = customer.Name;
                 }
 
+                NormalizeAndValidateAddress(address, fallbackFullNameOrCompany);
                 address.IsLexware = false;
-                address.CountryCode = string.IsNullOrWhiteSpace(address.CountryCode) ? null : address.CountryCode.Trim();
-                address.StreetRaw = string.IsNullOrWhiteSpace(address.StreetRaw) ? "N/A" : address.StreetRaw.Trim();
-                address.Label = string.IsNullOrWhiteSpace(address.Label) ? "Location" : address.Label.Trim();
 
                 await addressesRepo.AddAsync(address, ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
@@ -575,18 +647,17 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                 if (address is null) throw new NotFoundAppException("Address not found.");
 
 
-                address.FullNameOrCompany = string.IsNullOrWhiteSpace(dto.Address.FullNameOrCompany)
-                                        ? address.FullNameOrCompany
-                                        : dto.Address.FullNameOrCompany!.Trim();
+                var normalizedAddress = dto.Address.Adapt<AddressEntity>();
+                NormalizeAndValidateAddress(normalizedAddress);
 
-                address.Country = string.IsNullOrWhiteSpace(dto.Address.Country) ? null : dto.Address.Country.Trim();
-                address.City = string.IsNullOrWhiteSpace(dto.Address.City) ? null : dto.Address.City.Trim();
-                address.PostalCode = string.IsNullOrWhiteSpace(dto.Address.PostalCode) ? null : dto.Address.PostalCode.Trim();
-                address.AddressLine2 = string.IsNullOrWhiteSpace(dto.Address.AddressLine2) ? null : dto.Address.AddressLine2.Trim();
-                address.Label = string.IsNullOrWhiteSpace(dto.Address.Label) ? address.Label : dto.Address.Label.Trim();
-                address.CountryCode = string.IsNullOrWhiteSpace(dto.Address.CountryCode) ? null : dto.Address.CountryCode.Trim();
-                address.StreetRaw = string.IsNullOrWhiteSpace(dto.Address.StreetRaw) ? "N/A" : dto.Address.StreetRaw.Trim();
-
+                address.FullNameOrCompany = normalizedAddress.FullNameOrCompany;
+                address.Country = normalizedAddress.Country;
+                address.City = normalizedAddress.City;
+                address.PostalCode = normalizedAddress.PostalCode;
+                address.AddressLine2 = normalizedAddress.AddressLine2;
+                address.Label = normalizedAddress.Label;
+                address.CountryCode = normalizedAddress.CountryCode;
+                address.StreetRaw = normalizedAddress.StreetRaw;
 
                 if (dto.Address.IsDefault && !address.IsDefault)
                 {
@@ -700,11 +771,22 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
         {
             if (dto.CustomerId == Guid.Empty) throw new BadRequestAppException("Invalid customer id.");
 
+            if (dto.Contact is null)
+                throw new BadRequestAppException("Company contact is required.");
+
             var customersRepo = _unitOfWork.Repo<CustomerEntity>();
             var contactsRepo = _unitOfWork.Repo<ContactEntity>();
 
-            var exists = await customersRepo.AnyAsync(x => x.Id == dto.CustomerId, ct);
-            if (!exists) throw new NotFoundAppException("Customer not found.");
+            var customer = await customersRepo.FirstOrDefaultAsync(
+                x => x.Id == dto.CustomerId,
+                ct,
+                asNoTracking: true);
+
+            if (customer is null)
+                throw new NotFoundAppException("Customer not found.");
+
+            if (customer.Type != CustomerType.Company)
+                throw new BadRequestAppException("Contacts are available for company clients only.");
 
             await _unitOfWork.BeginTransactionAsync(ct);
             try
@@ -722,18 +804,7 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                 }
 
                 var contact = dto.Contact.Adapt<ContactEntity>();
-
-                var fn = (contact.FirstName ?? "").Trim();
-                var ln = (contact.LastName ?? "").Trim();
-                if (string.IsNullOrWhiteSpace(contact.Name))
-                {
-                    var full = $"{fn} {ln}".Trim();
-                    contact.Name = string.IsNullOrWhiteSpace(full) ? "N/A" : full;
-                }
-                else
-                {
-                    contact.Name = contact.Name.Trim();
-                }
+                NormalizeAndValidateCompanyContact(contact);
 
                 contact.CustomerId = dto.CustomerId;
                 contact.IsLexware = false;
@@ -758,8 +829,21 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
         {
             if (dto.CustomerId == Guid.Empty) throw new BadRequestAppException("Invalid customer id.");
             if (dto.ContactId == Guid.Empty) throw new BadRequestAppException("Invalid contact id.");
+            if (dto.Contact is null) throw new BadRequestAppException("Company contact is required.");
 
+            var customersRepo = _unitOfWork.Repo<CustomerEntity>();
             var contactsRepo = _unitOfWork.Repo<ContactEntity>();
+
+            var customer = await customersRepo.FirstOrDefaultAsync(
+                x => x.Id == dto.CustomerId,
+                ct,
+                asNoTracking: true);
+
+            if (customer is null)
+                throw new NotFoundAppException("Customer not found.");
+
+            if (customer.Type != CustomerType.Company)
+                throw new BadRequestAppException("Contacts are available for company clients only.");
 
             await _unitOfWork.BeginTransactionAsync(ct);
             try
@@ -771,25 +855,14 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
 
                 if (contact is null) throw new NotFoundAppException("Contact not found.");
 
-                if (!string.IsNullOrWhiteSpace(dto.Contact.Name))
-                {
-                    contact.Name = dto.Contact.Name.Trim();
-                }
-                else
-                {
-                    var fn = (dto.Contact.FirstName ?? "").Trim();
-                    var ln = (dto.Contact.LastName ?? "").Trim();
-                    var full = $"{fn} {ln}".Trim();
-                    if (!string.IsNullOrWhiteSpace(full))
-                        contact.Name = full; // keep entity happy
-                }
+                contact.Salutation = dto.Contact.Salutation;
+                contact.FirstName = dto.Contact.FirstName;
+                contact.LastName = dto.Contact.LastName;
+                contact.Position = dto.Contact.Position;
+                contact.Email = dto.Contact.Email;
+                contact.Phone = dto.Contact.Phone;
 
-                contact.Position = string.IsNullOrWhiteSpace(dto.Contact.Position) ? null : dto.Contact.Position.Trim();
-                contact.Email = string.IsNullOrWhiteSpace(dto.Contact.Email) ? null : dto.Contact.Email.Trim();
-                contact.Phone = string.IsNullOrWhiteSpace(dto.Contact.Phone) ? null : dto.Contact.Phone.Trim();
-                contact.Salutation = string.IsNullOrWhiteSpace(dto.Contact.Salutation) ? null : dto.Contact.Salutation.Trim();
-                contact.FirstName = string.IsNullOrWhiteSpace(dto.Contact.FirstName) ? null : dto.Contact.FirstName.Trim();
-                contact.LastName = string.IsNullOrWhiteSpace(dto.Contact.LastName) ? null : dto.Contact.LastName.Trim();
+                NormalizeAndValidateCompanyContact(contact);
 
                 if (dto.Contact.IsPrimary && !contact.IsPrimary)
                 {
@@ -902,6 +975,72 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             }
         }
 
+        private static void NormalizeAndValidateCompanyContact(ContactEntity contact)
+        {
+            if (contact is null)
+                throw new BadRequestAppException("Company contact is required.");
+
+            contact.Salutation = (contact.Salutation ?? string.Empty).Trim();
+            contact.FirstName = (contact.FirstName ?? string.Empty).Trim();
+            contact.LastName = (contact.LastName ?? string.Empty).Trim();
+            contact.Position = (contact.Position ?? string.Empty).Trim();
+            contact.Email = (contact.Email ?? string.Empty).Trim().ToLowerInvariant();
+            contact.Phone = (contact.Phone ?? string.Empty).Trim();
+
+            var missingFields = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(contact.Salutation)) missingFields.Add("Salutation");
+            if (string.IsNullOrWhiteSpace(contact.FirstName)) missingFields.Add("FirstName");
+            if (string.IsNullOrWhiteSpace(contact.LastName)) missingFields.Add("LastName");
+            if (string.IsNullOrWhiteSpace(contact.Position)) missingFields.Add("Position");
+            if (string.IsNullOrWhiteSpace(contact.Email)) missingFields.Add("Email");
+            if (string.IsNullOrWhiteSpace(contact.Phone)) missingFields.Add("Phone");
+
+            if (missingFields.Count > 0)
+            {
+                throw new BadRequestAppException(
+                    $"All company contact fields are required. Missing: {string.Join(", ", missingFields)}");
+            }
+
+            contact.Name = $"{contact.FirstName} {contact.LastName}".Trim();
+        }
+
+        private static void NormalizeAndValidateAddress(
+            AddressEntity address,
+            string? fallbackFullNameOrCompany = null)
+        {
+            if (address is null)
+                throw new BadRequestAppException("Address is required.");
+
+            address.FullNameOrCompany = string.IsNullOrWhiteSpace(address.FullNameOrCompany)
+                ? (fallbackFullNameOrCompany ?? string.Empty).Trim()
+                : address.FullNameOrCompany.Trim();
+            address.Label = (address.Label ?? string.Empty).Trim();
+            address.StreetRaw = (address.StreetRaw ?? string.Empty).Trim();
+            address.AddressLine2 = (address.AddressLine2 ?? string.Empty).Trim();
+            address.PostalCode = (address.PostalCode ?? string.Empty).Trim();
+            address.City = (address.City ?? string.Empty).Trim();
+            address.Country = (address.Country ?? string.Empty).Trim();
+            address.CountryCode = (address.CountryCode ?? string.Empty).Trim().ToUpperInvariant();
+
+            var missingFields = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(address.FullNameOrCompany)) missingFields.Add("FullNameOrCompany");
+            if (string.IsNullOrWhiteSpace(address.Label)) missingFields.Add("Label");
+            if (string.IsNullOrWhiteSpace(address.StreetRaw)) missingFields.Add("StreetRaw");
+            if (string.IsNullOrWhiteSpace(address.AddressLine2)) missingFields.Add("AddressLine2");
+            if (string.IsNullOrWhiteSpace(address.PostalCode)) missingFields.Add("PostalCode");
+            if (string.IsNullOrWhiteSpace(address.City)) missingFields.Add("City");
+            if (string.IsNullOrWhiteSpace(address.Country)) missingFields.Add("Country");
+            if (string.IsNullOrWhiteSpace(address.CountryCode)) missingFields.Add("CountryCode");
+
+            if (missingFields.Count > 0)
+            {
+                throw new BadRequestAppException(
+                    $"All address fields are required. Missing: {string.Join(", ", missingFields)}");
+            }
+        }
+
         // =========================
         // Cache helpers
         // =========================
@@ -912,6 +1051,62 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
         }
         static string NormEmail(string? e) => (e ?? "").Trim().ToLowerInvariant();
         static string NormKind(string? k) => string.IsNullOrWhiteSpace(k) ? "business" : k.Trim().ToLowerInvariant();
+
+        private async Task EnsureEmailsAreUniqueAsync(
+            IEnumerable<string> emails,
+            Guid? exceptCustomerId,
+            CancellationToken ct)
+        {
+            var normalized = emails
+                .Select(NormEmail)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (normalized.Count == 0)
+                return;
+
+            var emailRepo = _unitOfWork.Repo<EmailEntity>();
+            var query = emailRepo.Query(asNoTracking: true)
+                .Where(x => normalized.Contains(x.Email.Trim().ToLower()));
+
+            if (exceptCustomerId.HasValue)
+                query = query.Where(x => x.CustomerId != exceptCustomerId.Value);
+
+            var existingEmail = await query
+                .Select(x => x.Email)
+                .FirstOrDefaultAsync(ct);
+
+            if (!string.IsNullOrWhiteSpace(existingEmail))
+                throw DuplicateEmailException(existingEmail);
+        }
+
+        private static BadRequestAppException DuplicateEmailException(string? email)
+        {
+            return new BadRequestAppException(
+                $"{DuplicateEmailMessagePrefix}{NormEmail(email)}");
+        }
+
+        private static bool IsUniqueEmailViolation(DbUpdateException ex)
+        {
+            var text = ex.ToString();
+
+            return text.Contains(
+                       "UX_CustomerEmailAddresses_Email",
+                       StringComparison.OrdinalIgnoreCase)
+                   || (text.Contains("CustomerEmailAddresses", StringComparison.OrdinalIgnoreCase)
+                       && (text.Contains("unique", StringComparison.OrdinalIgnoreCase)
+                           || text.Contains("duplicate", StringComparison.OrdinalIgnoreCase)));
+        }
+
+        private static string? GetEmailFromUpdateException(DbUpdateException ex)
+        {
+            return ex.Entries
+                .Select(entry => entry.Entity)
+                .OfType<EmailEntity>()
+                .Select(entity => NormEmail(entity.Email))
+                .FirstOrDefault(email => !string.IsNullOrWhiteSpace(email));
+        }
 
         static int KindRank(string kind) => kind switch
         {

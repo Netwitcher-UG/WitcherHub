@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 using WitcherHub.Domain.Commen;
@@ -47,29 +47,38 @@ namespace WitcherHub.Infrastructure.Data.Models
     {
         public Guid CustomerId { get; set; }
         public Customer Customer { get; set; } = default!;
+
+        [Required]
         [MaxLength(250)]
         public string FullNameOrCompany { get; set; } = default!; // اسم صاحب العنوان
+
+        [Required]
         [MaxLength(300)]
-        public string? StreetRaw { get; set; }
+        public string StreetRaw { get; set; } = default!;
 
-
+        [Required]
         [MaxLength(50)]
-        public string? Label { get; set; } // Billing/Shipping
+        public string Label { get; set; } = default!; // Billing/Shipping
 
+        [Required]
         [MaxLength(100)]
-        public string? Country { get; set; }
+        public string Country { get; set; } = default!;
+
+        [Required]
         [MaxLength(2)]
-        public string? CountryCode { get; set; }
+        public string CountryCode { get; set; } = default!;
 
+        [Required]
         [MaxLength(100)]
-        public string? City { get; set; }
+        public string City { get; set; } = default!;
 
-
+        [Required]
         [MaxLength(250)]
-        public string? AddressLine2 { get; set; }
+        public string AddressLine2 { get; set; } = default!;
 
+        [Required]
         [MaxLength(30)]
-        public string? PostalCode { get; set; }
+        public string PostalCode { get; set; } = default!;
 
         public bool IsDefault { get; set; }
         public bool IsLexware { get; set; }

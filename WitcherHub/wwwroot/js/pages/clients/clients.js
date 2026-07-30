@@ -47,9 +47,93 @@
         "Contact.Phone": "vc-add-c-phone",
     };
 
+    const requiredCompanyContactFields = [
+        { property: 'Salutation', valueKey: 'salutation', message: 'Salutation is required.' },
+        { property: 'FirstName', valueKey: 'firstName', message: 'First name is required.' },
+        { property: 'LastName', valueKey: 'lastName', message: 'Last name is required.' },
+        { property: 'Position', valueKey: 'position', message: 'Position is required.' },
+        { property: 'Email', valueKey: 'email', message: 'Email is required.' },
+        { property: 'Phone', valueKey: 'phone', message: 'Phone is required.' }
+    ];
+
+    function validateRequiredCompanyContact(contact, map, prefixToClear) {
+        if (prefixToClear) clearErrors(prefixToClear);
+
+        let isValid = true;
+        requiredCompanyContactFields.forEach(field => {
+            const value = String(contact?.[field.valueKey] ?? '').trim();
+            if (value) return;
+
+            isValid = false;
+            const inputId = map[`Contact.${field.property}`];
+            if (inputId) setFieldError(inputId, field.message);
+        });
+
+        return isValid;
+    }
+
+    function setRequiredMarker(input, required) {
+        if (!input?.id) return;
+
+        const label = Array.from(document.querySelectorAll('label[for]'))
+            .find(x => x.htmlFor === input.id);
+        if (!label) return;
+
+        let marker = label.querySelector('.vc-required-marker');
+        if (required && !marker) {
+            marker = document.createElement('span');
+            marker.className = 'text-danger vc-required-marker ms-1';
+            marker.textContent = '*';
+            label.appendChild(marker);
+        }
+
+        if (marker) marker.classList.toggle('d-none', !required);
+    }
+
+    function setRequiredStateForContainer(container, required) {
+        if (!container) return;
+
+        const selector = [
+            'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"])',
+            'select',
+            'textarea'
+        ].join(',');
+
+        container.querySelectorAll(selector).forEach(input => {
+            if (required) {
+                input.setAttribute('required', 'required');
+                input.setAttribute('aria-required', 'true');
+            } else {
+                input.removeAttribute('required');
+                input.removeAttribute('aria-required');
+            }
+
+            setRequiredMarker(input, required);
+        });
+    }
+
+    function initAddCompanyContactRequiredFields() {
+        [
+            'vc-add-c-salutation',
+            'vc-add-c-firstName',
+            'vc-add-c-lastName',
+            'vc-add-c-position',
+            'vc-add-c-email',
+            'vc-add-c-phone'
+        ].forEach(id => {
+            const input = document.getElementById(id);
+            if (!input) return;
+
+            input.setAttribute('required', 'required');
+            input.setAttribute('aria-required', 'true');
+            setRequiredMarker(input, true);
+        });
+    }
+
     function mapUpdateLocation(idx) {
         return {
             "Address.Label": `vc-loc-${idx}-label`,
+            "Address.FullNameOrCompany": `vc-loc-${idx}-fullname`,
             "Address.CountryCode": `vc-loc-${idx}-country-select`,
             "Address.Country": `vc-loc-${idx}-country-select`,
             "Address.City": `vc-loc-${idx}-city`,
@@ -315,6 +399,24 @@
     function toastInfo(msg, title) { UI?.toast?.info ? UI.toast.info(msg, title) : alert((title ? title + ": " : "") + msg); }
     function toastError(msg, title) { UI?.toast?.error ? UI.toast.error(msg, title) : alert((title ? title + ": " : "") + msg); }
 
+    function normalizeEmail(email) {
+        return String(email ?? '').trim().toLowerCase();
+    }
+
+    function findDuplicateEmail(items) {
+        const seen = new Set();
+
+        for (const item of items || []) {
+            const email = normalizeEmail(item?.email);
+            if (!email) continue;
+
+            if (seen.has(email)) return email;
+            seen.add(email);
+        }
+
+        return null;
+    }
+
     function createDeleteModalHelper() {
         const modalEl = document.getElementById('DeleteClientConfirmModal');
         const titleEl = document.getElementById('DeleteClientConfirmModalLabel');
@@ -340,14 +442,18 @@
 
         modalEl.addEventListener('hidden.bs.modal', function () {
             onConfirm = null;
+            confirmBtn.classList.remove('d-none');
+            confirmBtn.disabled = false;
         });
 
         return {
-            open: function (title, message, confirmText, callback) {
+            open: function (title, message, confirmText, callback, options = {}) {
                 titleEl.textContent = title || 'Confirm';
                 messageEl.textContent = message || 'Are you sure?';
                 confirmBtn.textContent = confirmText || 'Delete';
-                onConfirm = callback;
+                confirmBtn.classList.toggle('d-none', options.hideConfirm === true);
+                confirmBtn.disabled = options.disableConfirm === true;
+                onConfirm = options.hideConfirm === true ? null : callback;
                 modal.show();
             }
         };
@@ -512,6 +618,7 @@
         wrap.innerHTML = list.map((a, idx) => {
             const isEditing = (editingLocationIndex === idx);
 
+            const fullNameOrCompany = a.fullNameOrCompany ?? a.FullNameOrCompany ?? currentClient?.name ?? '';
             const streetRaw = a.streetRaw ?? a.street ?? '';
             const addressLine2 = a.addressLine2 ?? a.AddressLine2 ?? '';
             const postalCode = a.postalCode ?? a.PostalCode ?? '';
@@ -555,6 +662,7 @@
                                     ${esc(label)}
                                     ${defaultBadge}
                                 </div>
+                                <div class="text-muted small">${esc(fullNameOrCompany || '—')}</div>
                                 <div class="text-muted small">${addressText}</div>
                                 <div class="text-muted small">${cityText}</div>
                             </div>
@@ -564,7 +672,7 @@
 
                                     <div class="col-12 col-md-4">
                                         <label class="form-label small mb-1" for="vc-loc-${idx}-label">
-                                            Label
+                                            Label <span class="text-danger">*</span>
                                             <span class="material-icons-outlined text-muted ms-1"
                                                   style="font-size:16px"
                                                   data-bs-toggle="tooltip"
@@ -573,13 +681,26 @@
                                         <input class="form-control form-control-sm"
                                                id="vc-loc-${idx}-label"
                                                value="${esc(label ?? '')}"
-                                               placeholder="Billing" />
+                                               placeholder="Billing"
+                                               required />
                                         <div class="text-danger small mt-1" id="err-vc-loc-${idx}-label"></div>
                                     </div>
 
                                     <div class="col-12 col-md-8">
+                                        <label class="form-label small mb-1" for="vc-loc-${idx}-fullname">
+                                            Full name / Company <span class="text-danger">*</span>
+                                        </label>
+                                        <input class="form-control form-control-sm"
+                                               id="vc-loc-${idx}-fullname"
+                                               value="${esc(fullNameOrCompany ?? '')}"
+                                               placeholder="Customer or company name"
+                                               required />
+                                        <div class="text-danger small mt-1" id="err-vc-loc-${idx}-fullname"></div>
+                                    </div>
+
+                                    <div class="col-12 col-md-8">
     <label class="form-label small mb-1" for="vc-loc-${idx}-country-combo">
-        Country
+        Country <span class="text-danger">*</span>
         <span class="material-icons-outlined text-muted ms-1"
               style="font-size:16px"
               data-bs-toggle="tooltip"
@@ -597,7 +718,8 @@
                aria-expanded="false"
                autocomplete="off"
                value="${esc(countryNameByCode(selectedCountryCode))}"
-               placeholder="Search & select country..." />
+               placeholder="Search & select country..."
+               required />
 
         <ul class="dropdown-menu w-100"
             id="vc-loc-${idx}-country-menu"
@@ -620,7 +742,7 @@
 
                                     <div class="col-12 col-md-8">
                                         <label class="form-label small mb-1" for="vc-loc-${idx}-streetRaw">
-                                            Street2222 (raw)
+                                            Street and house number <span class="text-danger">*</span>
                                             <span class="material-icons-outlined text-muted ms-1"
                                                   style="font-size:16px"
                                                   data-bs-toggle="tooltip"
@@ -629,31 +751,34 @@
                                         <input class="form-control form-control-sm"
                                                id="vc-loc-${idx}-streetRaw"
                                                value="${esc(streetRaw ?? '')}"
-                                               placeholder="Hauptstr. 12" />
+                                               placeholder="Hauptstr. 12"
+                                               required />
                                         <div class="text-danger small mt-1" id="err-vc-loc-${idx}-streetRaw"></div>
                                     </div>
 
                                     <div class="col-12 col-md-4">
-                                        <label class="form-label small mb-1" for="vc-loc-${idx}-city">City</label>
+                                        <label class="form-label small mb-1" for="vc-loc-${idx}-city">City <span class="text-danger">*</span></label>
                                         <input class="form-control form-control-sm"
                                                id="vc-loc-${idx}-city"
                                                value="${esc(city ?? '')}"
-                                               placeholder="Berlin" />
+                                               placeholder="Berlin"
+                                               required />
                                         <div class="text-danger small mt-1" id="err-vc-loc-${idx}-city"></div>
                                     </div>
 
                                     <div class="col-12 col-md-4">
-                                        <label class="form-label small mb-1" for="vc-loc-${idx}-postal">Postal Code</label>
+                                        <label class="form-label small mb-1" for="vc-loc-${idx}-postal">Postal Code <span class="text-danger">*</span></label>
                                         <input class="form-control form-control-sm"
                                                id="vc-loc-${idx}-postal"
                                                value="${esc(postalCode ?? '')}"
-                                               placeholder="10115" />
+                                               placeholder="10115"
+                                               required />
                                         <div class="text-danger small mt-1" id="err-vc-loc-${idx}-postal"></div>
                                     </div>
 
                                     <div class="col-12 col-md-8">
                                         <label class="form-label small mb-1" for="vc-loc-${idx}-line2">
-                                            Address Line 2
+                                            Address Line 2 <span class="text-danger">*</span>
                                             <span class="material-icons-outlined text-muted ms-1"
                                                   style="font-size:16px"
                                                   data-bs-toggle="tooltip"
@@ -662,7 +787,8 @@
                                         <input class="form-control form-control-sm"
                                                id="vc-loc-${idx}-line2"
                                                value="${esc(addressLine2 ?? '')}"
-                                               placeholder="Floor 2, Apt 5" />
+                                               placeholder="Floor 2, Apt 5"
+                                               required />
                                         <div class="text-danger small mt-1" id="err-vc-loc-${idx}-line2"></div>
                                     </div>
 
@@ -786,7 +912,7 @@
 
                                     <div class="col-12 col-md-3">
                                         <label class="form-label small mb-1" for="vc-c-${idx}-salutation">
-                                            Salutation
+                                            Salutation <span class="text-danger vc-required-marker">*</span>
                                             <span class="material-icons-outlined text-muted ms-1"
                                                   style="font-size:16px"
                                                   data-bs-toggle="tooltip"
@@ -794,24 +920,30 @@
                                         </label>
                                         <input class="form-control form-control-sm"
                                                id="vc-c-${idx}-salutation"
+                                               required
+                                               aria-required="true"
                                                value="${esc(salutation ?? '')}"
                                                placeholder="Herr" />
                                         <div class="text-danger small mt-1" id="err-vc-c-${idx}-salutation"></div>
                                     </div>
 
                                     <div class="col-12 col-md-4">
-                                        <label class="form-label small mb-1" for="vc-c-${idx}-firstName">First Name</label>
+                                        <label class="form-label small mb-1" for="vc-c-${idx}-firstName">First Name <span class="text-danger vc-required-marker">*</span></label>
                                         <input class="form-control form-control-sm"
                                                id="vc-c-${idx}-firstName"
+                                               required
+                                               aria-required="true"
                                                value="${esc(firstName ?? '')}"
                                                placeholder="John" />
                                         <div class="text-danger small mt-1" id="err-vc-c-${idx}-firstName"></div>
                                     </div>
 
                                     <div class="col-12 col-md-5">
-                                        <label class="form-label small mb-1" for="vc-c-${idx}-lastName">Last Name</label>
+                                        <label class="form-label small mb-1" for="vc-c-${idx}-lastName">Last Name <span class="text-danger vc-required-marker">*</span></label>
                                         <input class="form-control form-control-sm"
                                                id="vc-c-${idx}-lastName"
+                                               required
+                                               aria-required="true"
                                                value="${esc(lastName ?? '')}"
                                                placeholder="Doe" />
                                         <div class="text-danger small mt-1" id="err-vc-c-${idx}-lastName"></div>
@@ -819,7 +951,7 @@
 
                                     <div class="col-12 col-md-6">
                                         <label class="form-label small mb-1" for="vc-c-${idx}-position">
-                                            Position
+                                            Position <span class="text-danger vc-required-marker">*</span>
                                             <span class="material-icons-outlined text-muted ms-1"
                                                   style="font-size:16px"
                                                   data-bs-toggle="tooltip"
@@ -827,24 +959,31 @@
                                         </label>
                                         <input class="form-control form-control-sm"
                                                id="vc-c-${idx}-position"
+                                               required
+                                               aria-required="true"
                                                value="${esc(position ?? '')}"
                                                placeholder="Manager" />
                                         <div class="text-danger small mt-1" id="err-vc-c-${idx}-position"></div>
                                     </div>
 
                                     <div class="col-12 col-md-6">
-                                        <label class="form-label small mb-1" for="vc-c-${idx}-email">Email</label>
+                                        <label class="form-label small mb-1" for="vc-c-${idx}-email">Email <span class="text-danger vc-required-marker">*</span></label>
                                         <input class="form-control form-control-sm"
                                                id="vc-c-${idx}-email"
+                                               type="email"
+                                               required
+                                               aria-required="true"
                                                value="${esc(email ?? '')}"
                                                placeholder="name@domain.com" />
                                         <div class="text-danger small mt-1" id="err-vc-c-${idx}-email"></div>
                                     </div>
 
                                     <div class="col-12 col-md-6">
-                                        <label class="form-label small mb-1" for="vc-c-${idx}-phone">Phone</label>
+                                        <label class="form-label small mb-1" for="vc-c-${idx}-phone">Phone <span class="text-danger vc-required-marker">*</span></label>
                                         <input class="form-control form-control-sm"
                                                id="vc-c-${idx}-phone"
+                                               required
+                                               aria-required="true"
                                                value="${esc(phone ?? '')}"
                                                placeholder="+49 ..." />
                                         <div class="text-danger small mt-1" id="err-vc-c-${idx}-phone"></div>
@@ -1026,11 +1165,14 @@
     document.addEventListener('DOMContentLoaded', function () {
         initCountryCombo('vc-add-loc-country-combo', 'vc-add-loc-country-menu', 'vc-add-loc-country-select', 'DE');
         initCreateFormCountryCombo();
+        initAddCompanyContactRequiredFields();
+        markAddressInputsRequired(document);
 
         const formModal = document.getElementById('FormModal');
         if (formModal) {
             formModal.addEventListener('shown.bs.modal', function () {
                 initCreateFormCountryCombo();
+                markAddressInputsRequired(formModal);
             });
         }
 
@@ -1221,6 +1363,7 @@
             const isCompany = typeSelect.value === 'Company';
 
             contactSection.classList.toggle('d-none', !isCompany);
+            setRequiredStateForContainer(contactSection, isCompany);
 
             if (modalTitle) {
                 modalTitle.textContent = isCompany ? 'Add Company' : 'Add Individual';
@@ -1359,6 +1502,35 @@
             resetCreateCustomerModal();
         });
 
+        form.addEventListener('submit', function (e) {
+            const inputs = Array.from(
+                modalEl.querySelectorAll(
+                    '#create-email-list [data-email-row="create"] input[type="email"]'));
+
+            const items = inputs.map(input => ({ email: input.value }));
+            const duplicateEmail = findDuplicateEmail(items);
+            if (!duplicateEmail) return;
+
+            e.preventDefault();
+
+            inputs.forEach(input => {
+                if (normalizeEmail(input.value) !== duplicateEmail) return;
+
+                input.classList.add('input-validation-error');
+                input.setAttribute('aria-invalid', 'true');
+
+                const message = modalEl.querySelector(
+                    `[data-valmsg-for="${CSS.escape(input.name)}"]`);
+                if (message) {
+                    message.textContent = 'The same email cannot be entered more than once.';
+                    message.classList.remove('field-validation-valid');
+                    message.classList.add('field-validation-error');
+                }
+            });
+
+            toastError('The same email cannot be entered more than once.', 'Validation');
+        });
+
         updateCreateModalUI();
     });
     // ---------- Delegated actions (Basic + Locations + Contacts) ----------
@@ -1410,6 +1582,23 @@
             if (!url) { toastError('Update url not found.', 'Error'); return; }
 
             const emailItems = collectEmailEditRows();
+            const duplicateEmail = findDuplicateEmail(emailItems);
+
+            if (duplicateEmail) {
+                document
+                    .querySelectorAll('[data-email-row="basic"] input[type="email"]')
+                    .forEach(input => {
+                        if (normalizeEmail(input.value) === duplicateEmail) {
+                            setFieldError(
+                                input.id,
+                                'The same email cannot be entered more than once.');
+                        }
+                    });
+
+                toastError('The same email cannot be entered more than once.', 'Validation');
+                return;
+            }
+
             if (emailItems.length === 0) {
                 toastError('You must keep at least one email.', 'Validation');
                 const g = $('err-vc-basic-email-global');
@@ -1527,20 +1716,36 @@
             const addressId = client.addresses?.[idx]?.id;
             if (!addressId) return toastError('AddressId missing.', 'Error');
 
+            clearErrors(`vc-loc-${idx}`);
+            const requiredFields = [
+                { id: `vc-loc-${idx}-label`, message: 'Address label is required.' },
+                { id: `vc-loc-${idx}-fullname`, message: 'Full name or company is required.' },
+                { id: `vc-loc-${idx}-country-select`, message: 'Country is required.' },
+                { id: `vc-loc-${idx}-streetRaw`, message: 'Street and house number are required.' },
+                { id: `vc-loc-${idx}-city`, message: 'City is required.' },
+                { id: `vc-loc-${idx}-postal`, message: 'Postal code is required.' },
+                { id: `vc-loc-${idx}-line2`, message: 'Address line 2 is required.' }
+            ];
+
+            if (!validateRequiredAddressFields(requiredFields)) {
+                toastError('All address fields are required.', 'Validation');
+                return;
+            }
+
             const selectedCountry = getSelectedCountry(`vc-loc-${idx}-country-select`);
 
             const payload = {
                 customerId: client.id,
                 addressId: addressId,
                 address: {
-                    label: $('vc-loc-' + idx + '-label')?.value?.trim() || 'Location',
-                    countryCode: selectedCountry.code || 'DE',
-                    country: selectedCountry.name || 'Germany',
-                    city: $('vc-loc-' + idx + '-city')?.value?.trim() || '',
-                    postalCode: $('vc-loc-' + idx + '-postal')?.value?.trim() || '',
-                    streetRaw: $('vc-loc-' + idx + '-streetRaw')?.value?.trim() || 'N/A',
-                    addressLine2: $('vc-loc-' + idx + '-line2')?.value?.trim() || '',
-                    fullNameOrCompany: currentClient?.name ?? '',
+                    label: $('vc-loc-' + idx + '-label')?.value?.trim() ?? '',
+                    fullNameOrCompany: $('vc-loc-' + idx + '-fullname')?.value?.trim() ?? '',
+                    countryCode: selectedCountry.code ?? '',
+                    country: selectedCountry.name ?? '',
+                    city: $('vc-loc-' + idx + '-city')?.value?.trim() ?? '',
+                    postalCode: $('vc-loc-' + idx + '-postal')?.value?.trim() ?? '',
+                    streetRaw: $('vc-loc-' + idx + '-streetRaw')?.value?.trim() ?? '',
+                    addressLine2: $('vc-loc-' + idx + '-line2')?.value?.trim() ?? '',
                     isDefault: !!client.addresses?.[idx]?.isDefault
                 }
             };
@@ -1677,6 +1882,14 @@
 
             };
 
+            if (!validateRequiredCompanyContact(
+                payload.contact,
+                mapUpdateContact(idx),
+                `vc-c-${idx}`)) {
+                toastError('All company contact fields are required.', 'Validation');
+                return;
+            }
+
             try {
                 const updatedRaw = await postJson(url, payload);
                 currentClient = normalizeClient(updatedRaw);
@@ -1762,19 +1975,35 @@
             const url = document.getElementById('vcAddAddressUrl')?.value;
             if (!url) return toastError('vcAddAddressUrl not found', 'Error');
             clearErrors('vc-add-loc');
+
+            const requiredFields = [
+                { id: 'vc-add-loc-label', message: 'Address label is required.' },
+                { id: 'vc-add-loc-fullname', message: 'Full name or company is required.' },
+                { id: 'vc-add-loc-country-select', message: 'Country is required.' },
+                { id: 'vc-add-loc-streetRaw', message: 'Street and house number are required.' },
+                { id: 'vc-add-loc-city', message: 'City is required.' },
+                { id: 'vc-add-loc-postal', message: 'Postal code is required.' },
+                { id: 'vc-add-loc-line2', message: 'Address line 2 is required.' }
+            ];
+
+            if (!validateRequiredAddressFields(requiredFields)) {
+                toastError('All address fields are required.', 'Validation');
+                return;
+            }
+
             const selectedCountry = getSelectedCountry('vc-add-loc-country-select');
 
             const payload = {
                 customerId: currentClient.id,
                 address: {
-                    label: $('vc-add-loc-label')?.value?.trim() || 'Location',
-                    countryCode: selectedCountry.code || 'DE',
-                    country: selectedCountry.name || 'Germany',
-                    city: $('vc-add-loc-city')?.value?.trim() || '',
-                    postalCode: $('vc-add-loc-postal')?.value?.trim() || '',
-                    streetRaw: $('vc-add-loc-streetRaw')?.value?.trim() || 'N/A',
-                    addressLine2: $('vc-add-loc-line2')?.value?.trim() || '',
-                    fullNameOrCompany: $('vc-add-loc-fullname')?.value?.trim() || currentClient.name,
+                    label: $('vc-add-loc-label')?.value?.trim() ?? '',
+                    fullNameOrCompany: $('vc-add-loc-fullname')?.value?.trim() ?? '',
+                    countryCode: selectedCountry.code ?? '',
+                    country: selectedCountry.name ?? '',
+                    city: $('vc-add-loc-city')?.value?.trim() ?? '',
+                    postalCode: $('vc-add-loc-postal')?.value?.trim() ?? '',
+                    streetRaw: $('vc-add-loc-streetRaw')?.value?.trim() ?? '',
+                    addressLine2: $('vc-add-loc-line2')?.value?.trim() ?? '',
                     isDefault: !!$('vc-add-loc-default')?.checked
                 }
             };
@@ -1839,6 +2068,14 @@
 
             };
 
+            if (!validateRequiredCompanyContact(
+                payload.contact,
+                mapAddContact,
+                'vc-add-c')) {
+                toastError('All company contact fields are required.', 'Validation');
+                return;
+            }
+
             try {
                 const updatedRaw = await postJson(url, payload);
                 currentClient = normalizeClient(updatedRaw);
@@ -1867,7 +2104,7 @@
     
 
     // ---------- Table Delete (server) ----------
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', async function (e) {
         const btn = e.target.closest('[data-vc-action="table-delete"]');
         if (!btn) return;
 
@@ -1876,23 +2113,90 @@
         const id = btn.getAttribute('data-client-id');
         const hid = document.getElementById('tblDeleteClientId');
         const form = document.getElementById('tblDeleteForm');
+        const infoBaseUrl = document.getElementById('vcDeleteClientInfoUrl')?.value;
         if (!id || !hid || !form) return;
 
-        if (!deleteModalHelper) {
-            hid.value = id;
-            form.submit();
-            return;
-        }
+        btn.disabled = true;
 
-        deleteModalHelper.open(
-            'Delete client',
-            'Are you sure you want to delete this client?',
-            'Delete',
-            async function () {
+        try {
+            let info = null;
+
+            if (infoBaseUrl) {
+                const infoUrl = `${infoBaseUrl}${infoBaseUrl.includes('?') ? '&' : '?'}clientId=${encodeURIComponent(id)}`;
+                const response = await fetch(infoUrl, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin'
+                });
+
+                if (response.ok) {
+                    info = await response.json();
+                }
+            }
+
+            // The client has projects: explain why deletion is blocked and do not
+            // show a Delete confirmation button.
+            if (info && info.canDelete === false) {
+                const projectPreview = Array.isArray(info.projectNames) && info.projectNames.length
+                    ? ` Projects: ${info.projectNames.join(', ')}${info.projectCount > info.projectNames.length ? ', ...' : ''}`
+                    : '';
+
+                const blockedMessage = `${info.message || 'This client cannot be deleted because it has linked projects and related data.'}${projectPreview}`;
+
+                if (deleteModalHelper) {
+                    deleteModalHelper.open(
+                        'Delete not allowed',
+                        blockedMessage,
+                        'Delete',
+                        null,
+                        { hideConfirm: true }
+                    );
+                } else {
+                    toastError(blockedMessage, 'Delete not allowed');
+                }
+                return;
+            }
+
+            const customerName = info?.clientName ? ` "${info.clientName}"` : '';
+            const confirmMessage = info?.message || `Are you sure you want to delete this client${customerName}?`;
+
+            if (!deleteModalHelper) {
                 hid.value = id;
                 form.submit();
+                return;
             }
-        );
+
+            deleteModalHelper.open(
+                'Delete client',
+                confirmMessage,
+                'Delete',
+                async function () {
+                    hid.value = id;
+                    form.submit();
+                }
+            );
+        } catch (err) {
+            console.error('Delete client check failed:', err);
+
+            // Even when this preliminary check fails, the server-side handler and
+            // service still prevent deletion of a client that owns projects.
+            if (!deleteModalHelper) {
+                toastError('Unable to verify whether this client can be deleted.', 'Error');
+                return;
+            }
+
+            deleteModalHelper.open(
+                'Delete client',
+                'Could not verify linked projects. Continue with the delete request?',
+                'Delete',
+                async function () {
+                    hid.value = id;
+                    form.submit();
+                }
+            );
+        } finally {
+            btn.disabled = false;
+        }
     });
 
 
@@ -1955,6 +2259,71 @@
     function setFieldError(elId, message) {
         const el = document.getElementById(`err-${elId}`);
         if (el) el.textContent = message || '';
+    }
+
+    function validateRequiredAddressFields(fields) {
+        let firstInvalid = null;
+
+        (fields || []).forEach(field => {
+            const el = document.getElementById(field.id);
+            const value = (el?.value ?? '').toString().trim();
+            const isValid = value.length > 0;
+
+            setFieldError(field.id, isValid ? '' : field.message);
+
+            if (!isValid && !firstInvalid) {
+                firstInvalid = document.getElementById(field.focusId || field.id);
+            }
+        });
+
+        if (firstInvalid) {
+            firstInvalid.focus?.();
+            return false;
+        }
+
+        return true;
+    }
+
+    function markAddressInputsRequired(root = document) {
+        const ids = [
+            'vc-add-loc-label',
+            'vc-add-loc-fullname',
+            'vc-add-loc-country-combo',
+            'vc-add-loc-streetRaw',
+            'vc-add-loc-city',
+            'vc-add-loc-postal',
+            'vc-add-loc-line2'
+        ];
+
+        ids.forEach(id => {
+            const el = root.querySelector?.(`#${id}`) || document.getElementById(id);
+            if (!el) return;
+            el.required = true;
+            el.setAttribute('aria-required', 'true');
+        });
+
+        const createModal = document.getElementById('FormModal');
+        if (!createModal) return;
+
+        [
+            'Address.Label',
+            'Address.FullNameOrCompany',
+            'Address.StreetRaw',
+            'Address.AddressLine2',
+            'Address.PostalCode',
+            'Address.City'
+        ].forEach(name => {
+            const el = createModal.querySelector(`[name="${name}"]`);
+            if (!el || el.type === 'hidden') return;
+            el.required = true;
+            el.setAttribute('aria-required', 'true');
+        });
+
+        const createCountryCombo = createModal.querySelector('#create-country-combo');
+        if (createCountryCombo) {
+            createCountryCombo.required = true;
+            createCountryCombo.setAttribute('aria-required', 'true');
+        }
     }
 
     
@@ -2043,6 +2412,7 @@
             addresses: (rawAddresses || []).map(a => ({
                 id: a.id ?? a.Id,   // ✅
                 label: a.label ?? a.Label ?? 'Location',
+                fullNameOrCompany: a.fullNameOrCompany ?? a.FullNameOrCompany ?? '',
                 isDefault: a.isDefault ?? a.IsDefault ?? a.Default ?? false,
                 
                 city: a.city ?? a.City ?? '',
