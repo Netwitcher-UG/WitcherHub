@@ -154,8 +154,11 @@ namespace WitcherHub.Pages
         {
             EnsureEmailSlot();
             await LoadTableAsync(ct);
+            EnsureCountryOptions();
 
-            EnsureCountryOptions(); 
+            // Remove validation errors for fields that do not belong to the
+            // selected customer type and derive the first address display name.
+            NormalizeCreateModel();
 
             var dto = new CustomerDTOs
             {
@@ -164,42 +167,38 @@ namespace WitcherHub.Pages
                 Contact = Contact
             };
 
-            // FullNameOrCompany is still required in the stored address, but for the
-            // first address it can be derived safely from the customer name.
-            if (string.IsNullOrWhiteSpace(Address.FullNameOrCompany))
-            {
-                Address.FullNameOrCompany = Customer.Type == CustomerType.Company
-                    ? (Customer.Name ?? string.Empty).Trim()
-                    : $"{Customer.FirstName} {Customer.LastName}".Trim();
-            }
+            var validationResult = await _createValidator.ValidateAsync(dto, ct);
 
-            var result = await _createValidator.ValidateAsync(dto, ct);
+            // Some validators may still contain rules shared by both customer
+            // types. Ignore only fields that are not applicable to the selected type.
+            var createValidationErrors = validationResult.Errors
+                .Where(error => IsRelevantCreateValidationField(error.PropertyName))
+                .ToList();
+
             var requiredAddressErrors = GetRequiredAddressErrors(Address);
             var requiredContactErrors = Customer.Type == CustomerType.Company
-                ? GetRequiredCompanyContactErrors(Contact)
+                ? GetRequiredCreateCompanyContactErrors(Contact)
                 : new List<FieldValidationError>();
 
-            foreach (var err in result.Errors)
-                ModelState.AddModelError(err.PropertyName, err.ErrorMessage);
+            foreach (var error in createValidationErrors)
+                ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
 
-            foreach (var err in requiredAddressErrors)
-                ModelState.AddModelError(err.Field, err.Error);
+            foreach (var error in requiredAddressErrors)
+                ModelState.AddModelError(error.Field, error.Error);
 
-            foreach (var err in requiredContactErrors)
-                ModelState.AddModelError(err.Field, err.Error);
+            foreach (var error in requiredContactErrors)
+                ModelState.AddModelError(error.Field, error.Error);
 
-            if (!result.IsValid
+            if (!ModelState.IsValid
                 || requiredAddressErrors.Count > 0
                 || requiredContactErrors.Count > 0)
             {
                 EnsureCountryOptions();
                 BuildCreateCustomerModal(autoOpen: true);
 
-                TempData["Toast.Type"] = "error";
-                TempData["Toast.Title"] = "Validation";
-                TempData["Toast.Message"] = requiredContactErrors.Count > 0
-                    ? "All company contact fields are required."
-                    : "All address fields are required.";
+                SetValidationToast(
+                    GetFirstModelStateError()
+                    ?? "Please check the required fields.");
 
                 return Page();
             }
@@ -209,32 +208,38 @@ namespace WitcherHub.Pages
                 await _customers.CreateAsync(dto, ct);
             }
             catch (BadRequestAppException ex)
-                when (TryGetDuplicateEmail(ex.Message, out var duplicateEmail))
-            {
-                AddCreateEmailError(
-                    duplicateEmail,
-                    "This email address is already used by another client.");
-                EnsureCountryOptions();
-                BuildCreateCustomerModal(autoOpen: true);
-
-                TempData["Toast.Type"] = "error";
-                TempData["Toast.Title"] = "Validation";
-                TempData["Toast.Message"] = "This email address is already used by another client.";
-
-                return Page();
-            }
-            catch (BadRequestAppException ex)
                 when (TryGetDuplicateEmailInRequest(ex.Message, out var duplicateEmail))
             {
                 AddCreateEmailError(
                     duplicateEmail,
                     "The same email cannot be entered more than once.");
+
                 EnsureCountryOptions();
                 BuildCreateCustomerModal(autoOpen: true);
+                SetValidationToast("The same email cannot be entered more than once.");
 
-                TempData["Toast.Type"] = "error";
-                TempData["Toast.Title"] = "Validation";
-                TempData["Toast.Message"] = "The same email cannot be entered more than once.";
+                return Page();
+            }
+            catch (BadRequestAppException ex)
+                when (TryGetDuplicateEmail(ex.Message, out var duplicateEmail))
+            {
+                AddCreateEmailError(
+                    duplicateEmail,
+                    "This email address is already used by another client.");
+
+                EnsureCountryOptions();
+                BuildCreateCustomerModal(autoOpen: true);
+                SetValidationToast("This email address is already used by another client.");
+
+                return Page();
+            }
+            catch (BadRequestAppException ex)
+            {
+                ModelState.AddModelError(string.Empty, ex.Message);
+
+                EnsureCountryOptions();
+                BuildCreateCustomerModal(autoOpen: true);
+                SetValidationToast(ex.Message);
 
                 return Page();
             }
@@ -242,8 +247,106 @@ namespace WitcherHub.Pages
             TempData["Toast.Type"] = "success";
             TempData["Toast.Title"] = "Success";
             TempData["Toast.Message"] = "Client added successfully.";
-            return RedirectToPage("./Index", new { p = Page, pageSize = PageSize, q = Search });
 
+            return RedirectToPage(
+                "./Index",
+                new { p = Page, pageSize = PageSize, q = Search });
+        }
+
+        private void NormalizeCreateModel()
+        {
+            if (Customer.Type == CustomerType.Company)
+            {
+                // A company has a company name. Customer first/last name fields
+                // belong only to an individual customer.
+                Customer.FirstName = null;
+                Customer.LastName = null;
+
+                ModelState.Remove("Customer.FirstName");
+                ModelState.Remove("Customer.LastName");
+
+                // The create modal uses one full contact-name field. Structured
+                // contact fields belong to the separate contact editor and must not
+                // invalidate company creation.
+                ModelState.Remove("Contact.Salutation");
+                ModelState.Remove("Contact.FirstName");
+                ModelState.Remove("Contact.LastName");
+            }
+            else
+            {
+                // An individual has first/last name. Customer.Name belongs only
+                // to a company; the persisted display name is derived in the service.
+                Customer.Name = null;
+                ModelState.Remove("Customer.Name");
+
+                // Company contacts are not part of an individual customer create.
+                var contactKeys = ModelState.Keys
+                    .Where(key => key.Equals("Contact", StringComparison.OrdinalIgnoreCase)
+                                  || key.StartsWith("Contact.", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                foreach (var key in contactKeys)
+                    ModelState.Remove(key);
+            }
+
+            // Country is derived from CountryCode by EnsureCountryOptions().
+            // It is not a separate user input, so discard any binder error for it.
+            ModelState.Remove("Address.Country");
+
+            if (string.IsNullOrWhiteSpace(Address.FullNameOrCompany))
+            {
+                Address.FullNameOrCompany = Customer.Type == CustomerType.Company
+                    ? (Customer.Name ?? string.Empty).Trim()
+                    : $"{Customer.FirstName} {Customer.LastName}".Trim();
+
+                // ModelState takes precedence over the model when the page is
+                // rendered again, so remove the originally posted empty value.
+                ModelState.Remove("Address.FullNameOrCompany");
+            }
+        }
+
+        private bool IsRelevantCreateValidationField(string? propertyName)
+        {
+            if (string.IsNullOrWhiteSpace(propertyName))
+                return true;
+
+            if (Customer.Type == CustomerType.Company)
+            {
+                return !propertyName.Equals("Customer.FirstName", StringComparison.OrdinalIgnoreCase)
+                       && !propertyName.Equals("Customer.LastName", StringComparison.OrdinalIgnoreCase)
+                       && !propertyName.Equals("Contact.Salutation", StringComparison.OrdinalIgnoreCase)
+                       && !propertyName.Equals("Contact.FirstName", StringComparison.OrdinalIgnoreCase)
+                       && !propertyName.Equals("Contact.LastName", StringComparison.OrdinalIgnoreCase);
+            }
+
+            return !propertyName.Equals("Customer.Name", StringComparison.OrdinalIgnoreCase)
+                   && !propertyName.Equals("Contact", StringComparison.OrdinalIgnoreCase)
+                   && !propertyName.StartsWith("Contact.", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string? GetFirstModelStateError()
+        {
+            foreach (var value in ModelState.Values)
+            {
+                foreach (var error in value.Errors)
+                {
+                    if (!string.IsNullOrWhiteSpace(error.ErrorMessage))
+                        return error.ErrorMessage;
+
+                    var exceptionMessage = error.Exception?.GetBaseException().Message;
+                    if (!string.IsNullOrWhiteSpace(exceptionMessage))
+                        return exceptionMessage;
+                }
+            }
+
+            return null;
+        }
+
+        private void SetValidationToast(string message)
+        {
+            TempData["Toast.Type"] = "error";
+            TempData["Toast.Title"] = "Validation";
+            TempData["Toast.Message"] = message;
         }
 
         // =========================
@@ -485,7 +588,7 @@ namespace WitcherHub.Pages
             var vr = await _createContactValidator.ValidateAsync(req, ct);
             var errors = vr.Errors
                 .Select(e => new FieldValidationError(e.PropertyName, e.ErrorMessage))
-                .Concat(GetRequiredCompanyContactErrors(req.Contact))
+                .Concat(GetRequiredStructuredCompanyContactErrors(req.Contact))
                 .GroupBy(e => e.Field, StringComparer.OrdinalIgnoreCase)
                 .Select(g => g.First())
                 .ToList();
@@ -546,7 +649,7 @@ namespace WitcherHub.Pages
             var vr = await _updateContactValidator.ValidateAsync(req, ct);
             var errors = vr.Errors
                 .Select(e => new FieldValidationError(e.PropertyName, e.ErrorMessage))
-                .Concat(GetRequiredCompanyContactErrors(req.Contact))
+                .Concat(GetRequiredStructuredCompanyContactErrors(req.Contact))
                 .GroupBy(e => e.Field, StringComparer.OrdinalIgnoreCase)
                 .Select(g => g.First())
                 .ToList();
@@ -662,7 +765,7 @@ namespace WitcherHub.Pages
             }
         }
 
-        private static List<FieldValidationError> GetRequiredCompanyContactErrors(ContactDto? contact)
+        private static List<FieldValidationError> GetRequiredCreateCompanyContactErrors(ContactDto? contact)
         {
             var errors = new List<FieldValidationError>();
 
@@ -672,7 +775,33 @@ namespace WitcherHub.Pages
                 return errors;
             }
 
-            AddIfMissing(contact.Salutation, "Contact.Salutation", "Salutation is required.");
+            // The create modal has one full-name input for the company contact.
+            AddIfMissing(contact.Name, "Contact.Name", "Contact name is required.");
+            AddIfMissing(contact.Position, "Contact.Position", "Position is required.");
+            AddIfMissing(contact.Email, "Contact.Email", "Email is required.");
+            AddIfMissing(contact.Phone, "Contact.Phone", "Phone is required.");
+
+            return errors;
+
+            void AddIfMissing(string? value, string field, string message)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    errors.Add(new FieldValidationError(field, message));
+            }
+        }
+
+        private static List<FieldValidationError> GetRequiredStructuredCompanyContactErrors(ContactDto? contact)
+        {
+            var errors = new List<FieldValidationError>();
+
+            if (contact is null)
+            {
+                errors.Add(new FieldValidationError("Contact", "Company contact is required."));
+                return errors;
+            }
+
+            // The add/edit contact UI uses separate first-name and last-name fields.
+            // Salutation is optional.
             AddIfMissing(contact.FirstName, "Contact.FirstName", "First name is required.");
             AddIfMissing(contact.LastName, "Contact.LastName", "Last name is required.");
             AddIfMissing(contact.Position, "Contact.Position", "Position is required.");

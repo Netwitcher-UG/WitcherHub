@@ -279,16 +279,16 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             var customer = new CustomerEntity
             {
                 Type = dto.Customer.Type,
-                FirstName = dto.Customer.FirstName?.Trim(),
-                LastName = dto.Customer.LastName?.Trim(),
-                Name = dto.Customer.Type == CustomerType.Individual
-        ? $"{dto.Customer.FirstName} {dto.Customer.LastName}".Trim()
-        : (dto.Customer.Name ?? "").Trim(),
+                FirstName = dto.Customer.FirstName,
+                LastName = dto.Customer.LastName,
+                Name = dto.Customer.Name ?? string.Empty,
                 Phone = string.IsNullOrWhiteSpace(dto.Customer.Phone) ? null : dto.Customer.Phone.Trim(),
                 TaxId = string.IsNullOrWhiteSpace(dto.Customer.TaxId) ? null : dto.Customer.TaxId.Trim(),
                 Notes = string.IsNullOrWhiteSpace(dto.Customer.Notes) ? null : dto.Customer.Notes.Trim(),
                 LexwareType = LexwareType.NotExported
             };
+
+            NormalizeAndValidateCustomer(customer);
 
             // ✅ EmailAddresses required
             if (dto.Customer.EmailAddresses is null || dto.Customer.EmailAddresses.Count == 0)
@@ -339,7 +339,8 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             address.IsLexware = false;
             customer.Addresses.Add(address);
 
-            // Company contact is mandatory, and every visible contact field is required.
+            // Company contact is mandatory. The create modal posts a full contact name;
+            // the contact editor may post separate first/last names.
             if (dto.Customer.Type == CustomerType.Company)
             {
                 if (dto.Contact is null)
@@ -396,16 +397,14 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             var basic = dto.Customer ?? throw new BadRequestAppException("Missing customer data.");
 
             customer.Type = basic.Type;
-            customer.FirstName = basic.FirstName?.Trim();
-            customer.LastName = basic.LastName?.Trim();
-
-            customer.Name = customer.Type == CustomerType.Individual
-                ? $"{customer.FirstName} {customer.LastName}".Trim()
-                : (basic.Name ?? "").Trim();
-
+            customer.FirstName = basic.FirstName;
+            customer.LastName = basic.LastName;
+            customer.Name = basic.Name ?? string.Empty;
             customer.Phone = string.IsNullOrWhiteSpace(basic.Phone) ? null : basic.Phone.Trim();
             customer.TaxId = string.IsNullOrWhiteSpace(basic.TaxId) ? null : basic.TaxId.Trim();
             customer.Notes = string.IsNullOrWhiteSpace(basic.Notes) ? null : basic.Notes.Trim();
+
+            NormalizeAndValidateCustomer(customer);
 
             // ===== 2) incoming emails (مع Id اختياري) =====
             var incomingRaw = (basic.EmailAddresses ?? new List<EmailAddressDto>())
@@ -855,6 +854,7 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
 
                 if (contact is null) throw new NotFoundAppException("Contact not found.");
 
+                contact.Name = dto.Contact.Name;
                 contact.Salutation = dto.Contact.Salutation;
                 contact.FirstName = dto.Contact.FirstName;
                 contact.LastName = dto.Contact.LastName;
@@ -975,11 +975,53 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             }
         }
 
+        private static void NormalizeAndValidateCustomer(CustomerEntity customer)
+        {
+            if (customer is null)
+                throw new BadRequestAppException("Customer is required.");
+
+            customer.FirstName = string.IsNullOrWhiteSpace(customer.FirstName)
+                ? null
+                : customer.FirstName.Trim();
+
+            customer.LastName = string.IsNullOrWhiteSpace(customer.LastName)
+                ? null
+                : customer.LastName.Trim();
+
+            customer.Name = (customer.Name ?? string.Empty).Trim();
+
+            switch (customer.Type)
+            {
+                case CustomerType.Individual:
+                    if (string.IsNullOrWhiteSpace(customer.FirstName))
+                        throw new BadRequestAppException("First name is required.");
+
+                    if (string.IsNullOrWhiteSpace(customer.LastName))
+                        throw new BadRequestAppException("Last name is required.");
+
+                    customer.Name = $"{customer.FirstName} {customer.LastName}".Trim();
+                    break;
+
+                case CustomerType.Company:
+                    if (string.IsNullOrWhiteSpace(customer.Name))
+                        throw new BadRequestAppException("Company name is required.");
+
+                    // Never persist stale individual-name values on a company.
+                    customer.FirstName = null;
+                    customer.LastName = null;
+                    break;
+
+                default:
+                    throw new BadRequestAppException("Invalid customer type.");
+            }
+        }
+
         private static void NormalizeAndValidateCompanyContact(ContactEntity contact)
         {
             if (contact is null)
                 throw new BadRequestAppException("Company contact is required.");
 
+            contact.Name = (contact.Name ?? string.Empty).Trim();
             contact.Salutation = (contact.Salutation ?? string.Empty).Trim();
             contact.FirstName = (contact.FirstName ?? string.Empty).Trim();
             contact.LastName = (contact.LastName ?? string.Empty).Trim();
@@ -987,11 +1029,17 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
             contact.Email = (contact.Email ?? string.Empty).Trim().ToLowerInvariant();
             contact.Phone = (contact.Phone ?? string.Empty).Trim();
 
+            // The create modal has one Contact.Name field, while the separate
+            // contact editor has FirstName and LastName fields. Support both shapes.
+            if (!string.IsNullOrWhiteSpace(contact.FirstName)
+                && !string.IsNullOrWhiteSpace(contact.LastName))
+            {
+                contact.Name = $"{contact.FirstName} {contact.LastName}".Trim();
+            }
+
             var missingFields = new List<string>();
 
-            if (string.IsNullOrWhiteSpace(contact.Salutation)) missingFields.Add("Salutation");
-            if (string.IsNullOrWhiteSpace(contact.FirstName)) missingFields.Add("FirstName");
-            if (string.IsNullOrWhiteSpace(contact.LastName)) missingFields.Add("LastName");
+            if (string.IsNullOrWhiteSpace(contact.Name)) missingFields.Add("Name");
             if (string.IsNullOrWhiteSpace(contact.Position)) missingFields.Add("Position");
             if (string.IsNullOrWhiteSpace(contact.Email)) missingFields.Add("Email");
             if (string.IsNullOrWhiteSpace(contact.Phone)) missingFields.Add("Phone");
@@ -1002,7 +1050,8 @@ namespace WitcherHub.Infrastructure.ManageData.Customers
                     $"All company contact fields are required. Missing: {string.Join(", ", missingFields)}");
             }
 
-            contact.Name = $"{contact.FirstName} {contact.LastName}".Trim();
+            // Salutation is optional. FirstName/LastName may remain empty when the
+            // create modal supplies the contact's full name in Contact.Name.
         }
 
         private static void NormalizeAndValidateAddress(

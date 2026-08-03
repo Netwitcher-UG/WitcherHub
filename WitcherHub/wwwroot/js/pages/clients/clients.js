@@ -48,7 +48,6 @@
     };
 
     const requiredCompanyContactFields = [
-        { property: 'Salutation', valueKey: 'salutation', message: 'Salutation is required.' },
         { property: 'FirstName', valueKey: 'firstName', message: 'First name is required.' },
         { property: 'LastName', valueKey: 'lastName', message: 'Last name is required.' },
         { property: 'Position', valueKey: 'position', message: 'Position is required.' },
@@ -114,7 +113,6 @@
 
     function initAddCompanyContactRequiredFields() {
         [
-            'vc-add-c-salutation',
             'vc-add-c-firstName',
             'vc-add-c-lastName',
             'vc-add-c-position',
@@ -912,7 +910,7 @@
 
                                     <div class="col-12 col-md-3">
                                         <label class="form-label small mb-1" for="vc-c-${idx}-salutation">
-                                            Salutation <span class="text-danger vc-required-marker">*</span>
+                                            Salutation <small class="text-muted">(optional)</small>
                                             <span class="material-icons-outlined text-muted ms-1"
                                                   style="font-size:16px"
                                                   data-bs-toggle="tooltip"
@@ -920,8 +918,6 @@
                                         </label>
                                         <input class="form-control form-control-sm"
                                                id="vc-c-${idx}-salutation"
-                                               required
-                                               aria-required="true"
                                                value="${esc(salutation ?? '')}"
                                                placeholder="Herr" />
                                         <div class="text-danger small mt-1" id="err-vc-c-${idx}-salutation"></div>
@@ -1380,20 +1376,25 @@
             const firstName = modalEl.querySelector('#firstName');
             const lastName = modalEl.querySelector('#lastName');
             const companyName = modalEl.querySelector('#companyName');
-            const hiddenName = modalEl.querySelector('#hiddenName');
 
-            if (!isCompany) {
-                companyName?.removeAttribute("required");
-                firstName?.setAttribute("required", "required");
-                lastName?.setAttribute("required", "required");
+            // Only submit and validate the fields that belong to the selected type.
+            // Company does not have Customer.FirstName/Customer.LastName.
+            if (companyName) {
+                companyName.disabled = !isCompany;
+                companyName.toggleAttribute('required', isCompany);
+                companyName.setAttribute('aria-required', isCompany ? 'true' : 'false');
+            }
 
-                if (hiddenName) {
-                    hiddenName.value = `${firstName?.value ?? ''} ${lastName?.value ?? ''}`.trim();
-                }
-            } else {
-                companyName?.setAttribute("required", "required");
-                firstName?.removeAttribute("required");
-                lastName?.removeAttribute("required");
+            if (firstName) {
+                firstName.disabled = isCompany;
+                firstName.toggleAttribute('required', !isCompany);
+                firstName.setAttribute('aria-required', !isCompany ? 'true' : 'false');
+            }
+
+            if (lastName) {
+                lastName.disabled = isCompany;
+                lastName.toggleAttribute('required', !isCompany);
+                lastName.setAttribute('aria-required', !isCompany ? 'true' : 'false');
             }
         }
 
@@ -1460,10 +1461,7 @@
                 }
             });
 
-            // 4) hidden fields الخاصة
-            const hiddenName = modalEl.querySelector('#hiddenName');
-            if (hiddenName) hiddenName.value = '';
-
+            // 4) hidden country name
             const hiddenCountry = modalEl.querySelector('#Address_Country');
             if (hiddenCountry) hiddenCountry.value = 'Germany';
 
