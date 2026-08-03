@@ -65,6 +65,108 @@
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/pages/clients/clients.js" asp-append-version="true"></script>
 
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const typeInput = document.getElementById("Customer_Type");
+            const companyValue = "@((int)WitcherHub.Infrastructure.Data.Models.Enums.CustomerType.Company)";
+
+            function removeOptionalText(label) {
+                if (!label) return;
+
+                const walker = document.createTreeWalker(
+                    label,
+                    NodeFilter.SHOW_TEXT
+                );
+
+                const textNodes = [];
+                while (walker.nextNode()) {
+                    textNodes.push(walker.currentNode);
+                }
+
+                textNodes.forEach(function (node) {
+                    node.nodeValue = node.nodeValue
+                        .replace(/\s*\(\s*optional\s*\)/gi, "")
+                        .replace(/\s*-\s*optional\b/gi, "")
+                        .replace(/\s+optional\b/gi, "");
+                });
+
+                label.querySelectorAll(".optional, [data-optional]").forEach(function (node) {
+                    node.remove();
+                });
+            }
+
+            function setRequiredByElement(element, required) {
+                if (!element) return;
+
+                if (required) {
+                    element.setAttribute("required", "required");
+                    element.setAttribute("aria-required", "true");
+                } else {
+                    element.removeAttribute("required");
+                    element.removeAttribute("aria-required");
+                }
+
+                const label = element.id
+                    ? Array.from(document.getElementsByTagName("label")).find(function (item) { return item.htmlFor === element.id; })
+                    : null;
+
+                if (required) {
+                    removeOptionalText(label);
+                }
+            }
+
+            function setRequired(id, required) {
+                setRequiredByElement(document.getElementById(id), required);
+            }
+
+            function updateRequiredFields() {
+                const isCompany = typeInput &&
+                    (typeInput.value === companyValue || typeInput.value === "Company");
+
+                // Customer fields depend on the selected customer type.
+                setRequired("Customer_Name", isCompany);
+                setRequired("Customer_FirstName", !isCompany);
+                setRequired("Customer_LastName", !isCompany);
+
+                // These address inputs are required by both the PageModel and service.
+                [
+                    "Address_Label",
+                    "Address_StreetRaw",
+                    "Address_AddressLine2",
+                    "Address_PostalCode",
+                    "Address_City",
+                    "Address_CountryCode"
+                ].forEach(function (id) {
+                    setRequired(id, true);
+                });
+
+                // Every visible company-contact field is required.
+                [
+                    "Contact_Salutation",
+                    "Contact_FirstName",
+                    "Contact_LastName",
+                    "Contact_Position",
+                    "Contact_Email",
+                    "Contact_Phone"
+                ].forEach(function (id) {
+                    setRequired(id, isCompany);
+                });
+
+                // At least one customer email is required.
+                document.querySelectorAll(
+                    'input[name^="Customer.EmailAddresses"][name$=".Email"]'
+                ).forEach(function (element) {
+                    setRequiredByElement(element, true);
+                });
+            }
+
+            if (typeInput) {
+                typeInput.addEventListener("change", updateRequiredFields);
+            }
+
+            updateRequiredFields();
+        });
+    </script>
 }
 @if (Model.CreateCustomerModal?.AutoOpen == true)
 {

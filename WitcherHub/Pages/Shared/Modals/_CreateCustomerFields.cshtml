@@ -33,7 +33,8 @@
                    asp-for="Customer.FirstName"
                    id="firstName"
                    placeholder="e.g. Anas"
-                   required />
+                   required
+                   aria-required="true" />
             <span class="text-danger" asp-validation-for="Customer.FirstName"></span>
         </div>
 
@@ -45,7 +46,8 @@
                    asp-for="Customer.LastName"
                    id="lastName"
                    placeholder="e.g. Sadek"
-                   required />
+                   required
+                   aria-required="true" />
             <span class="text-danger" asp-validation-for="Customer.LastName"></span>
         </div>
 
@@ -58,13 +60,10 @@
                    asp-for="Customer.Name"
                    id="companyName"
                    placeholder="e.g. ACME LLC"
-                   required />
+                   required
+                   aria-required="true" />
             <span class="text-danger" asp-validation-for="Customer.Name"></span>
         </div>
-
-        <!-- ✅ Hidden Name always exists (for Individual only) -->
-        <input type="hidden" asp-for="Customer.Name" id="hiddenName" />
-
 
         @* Emails (multi) - nicer UI *@
         <div class="col-12">
@@ -176,8 +175,10 @@
 
     <div class="row g-3 mt-0">
         <div class="col-md-4">
-            <label class="form-label text-light">Label</label>
-            <select class="form-select" asp-for="Address.Label">
+            <label class="form-label text-light">
+                Label <span class="text-danger">*</span>
+            </label>
+            <select class="form-select" asp-for="Address.Label" required aria-required="true">
                 <option>Billing</option>
                 <option>Shipping</option>
                 <option>Office</option>
@@ -186,8 +187,10 @@
             <span class="text-danger" asp-validation-for="Address.Label"></span>
         </div>
         <div class="col-md-8">
-            <label class="form-label text-light opacity-75">Full Name / Company <small>(optional)</small></label>
-            <input class="form-control" asp-for="Address.FullNameOrCompany" />
+            <label class="form-label text-light">
+                Full Name / Company <span class="text-danger">*</span>
+            </label>
+            <input class="form-control" asp-for="Address.FullNameOrCompany" required aria-required="true" />
             <span class="text-danger" asp-validation-for="Address.FullNameOrCompany"></span>
         </div>
         <div class="col-md-4">
@@ -205,7 +208,9 @@
                        data-bs-toggle="dropdown"
                        aria-expanded="false"
                        autocomplete="off"
-                       placeholder="Search & select country..." />
+                       placeholder="Search & select country..."
+                       required
+                       aria-required="true" />
 
                 <ul class="dropdown-menu w-100"
                     id="create-country-menu"
@@ -231,30 +236,38 @@
         </div>
 
         <div class="col-md-4">
-            <label class="form-label text-light opacity-75">City <small>(optional)</small></label>
-            <input class="form-control" asp-for="Address.City" />
+            <label class="form-label text-light">
+                City <span class="text-danger">*</span>
+            </label>
+            <input class="form-control" asp-for="Address.City" required aria-required="true" />
             <span class="text-danger" asp-validation-for="Address.City"></span>
         </div>
 
         
 
         <div class="col-md-4">
-            <label class="form-label text-light opacity-75">Postal Code <small>(optional)</small></label>
-            <input class="form-control" asp-for="Address.PostalCode" />
+            <label class="form-label text-light">
+                Postal Code <span class="text-danger">*</span>
+            </label>
+            <input class="form-control" asp-for="Address.PostalCode" required aria-required="true" />
             <span class="text-danger" asp-validation-for="Address.PostalCode"></span>
         </div>
 
         
 
         <div class="col-md-6">
-            <label class="form-label text-light opacity-75">Street / Nr <small>(optional)</small></label>
-            <input class="form-control" asp-for="Address.StreetRaw" placeholder="streetName Nr" />
+            <label class="form-label text-light">
+                Street / Nr <span class="text-danger">*</span>
+            </label>
+            <input class="form-control" asp-for="Address.StreetRaw" placeholder="streetName Nr" required aria-required="true" />
             <span class="text-danger" asp-validation-for="Address.StreetRaw"></span>
         </div>
 
         <div class="col-md-6">
-            <label class="form-label text-light opacity-75">Address Line 2 <small>(optional)</small></label>
-            <input class="form-control" asp-for="Address.AddressLine2" />
+            <label class="form-label text-light">
+                Address Line 2 <span class="text-danger">*</span>
+            </label>
+            <input class="form-control" asp-for="Address.AddressLine2" required aria-required="true" />
             <span class="text-danger" asp-validation-for="Address.AddressLine2"></span>
         </div>
 
@@ -272,18 +285,18 @@
 
     <div class="row g-3 mt-0">
         <div class="col-md-6">
-            <label class="form-label text-light opacity-75">
-                Contact Name <small>(optional)</small>
+            <label class="form-label text-light">
+                Contact Name <span class="text-danger">*</span>
             </label>
-            <input class="form-control" asp-for="Contact.Name" placeholder="e.g. Sara Ahmed" />
+            <input class="form-control" asp-for="Contact.Name" placeholder="e.g. Sara Ahmed" required aria-required="true" />
             <span class="text-danger" asp-validation-for="Contact.Name"></span>
         </div>
 
         <div class="col-md-6">
-            <label class="form-label text-light opacity-75">
-                Position <small>(optional)</small>
+            <label class="form-label text-light">
+                Position <span class="text-danger">*</span>
             </label>
-            <input class="form-control" asp-for="Contact.Position" placeholder="e.g. Manager" />
+            <input class="form-control" asp-for="Contact.Position" placeholder="e.g. Manager" required aria-required="true" />
             <span class="text-danger" asp-validation-for="Contact.Position"></span>
         </div>
 
@@ -292,15 +305,15 @@
             <label class="form-label text-light">
                 Contact Email <span class="text-danger">*</span>
             </label>
-            <input class="form-control" asp-for="Contact.Email" type="email" placeholder="e.g. sara@company.com" />
+            <input class="form-control" asp-for="Contact.Email" type="email" placeholder="e.g. sara@company.com" required aria-required="true" />
             <span class="text-danger" asp-validation-for="Contact.Email"></span>
         </div>
 
         <div class="col-md-6">
-            <label class="form-label text-light opacity-75">
-                Contact Phone <small>(optional)</small>
+            <label class="form-label text-light">
+                Contact Phone <span class="text-danger">*</span>
             </label>
-            <input class="form-control" asp-for="Contact.Phone" placeholder="e.g. 49174..." />
+            <input class="form-control" asp-for="Contact.Phone" placeholder="e.g. 49174..." required aria-required="true" />
             <span class="text-danger" asp-validation-for="Contact.Phone"></span>
         </div>
     </div>
