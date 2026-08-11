@@ -8,7 +8,9 @@ using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Pages.Invoices
 {
-    [AllowAnonymous]
+    // Internal page: exposes invoice data and the Lexware PDF by id with no
+    // access token, so it must be authenticated. The customer-facing route is
+    // /Invoices/View, which validates an expiring token.
     public class DetailsModel : PageModel
     {
         private readonly IInvoice _invoices;

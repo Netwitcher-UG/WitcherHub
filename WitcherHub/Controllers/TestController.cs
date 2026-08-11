@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Localization;
 using System.Globalization;
@@ -7,6 +8,7 @@ using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Models.DTO.Customers;
 using WitcherHub.Application.Models.Email;
 using WitcherHub.Application.Services.Email;
+using WitcherHub.Configuration.Filters;
 using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Resources;
 
@@ -16,6 +18,10 @@ namespace WitcherHub.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    // Diagnostics only. These endpoints send mail, spend OpenAI credits and can
+    // delete Lexware customers, so they are unreachable outside Development and
+    // still require an authenticated user there (via the global fallback policy).
+    [DevelopmentOnly]
     public class TestController : ControllerBase
     {
         //for railway
@@ -225,6 +231,7 @@ namespace WitcherHub.Controllers
 
 
         [HttpPost("login")]
+        [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct)
         {
             var result = await _auth.LoginAsync(request, ct);
@@ -241,6 +248,7 @@ namespace WitcherHub.Controllers
         }
 
         [HttpPost("logout")]
+        [AllowAnonymous]
         public IActionResult Logout()
         {
             Response.Cookies.Delete("access_token");

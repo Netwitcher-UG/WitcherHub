@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 using WitcherHub.Application.Interfaces;
@@ -13,15 +15,21 @@ namespace WitcherHub.Infrastructure.Seeding
         private readonly RoleManager<IdentityRole<Guid>> _roleManager;
         private readonly UserManager<AppUser> _userManager;
         private readonly ILogger<IdentityDataSeeder> _logger;
+        private readonly IConfiguration _configuration;
+        private readonly IHostEnvironment _environment;
 
         public IdentityDataSeeder(
             RoleManager<IdentityRole<Guid>> roleManager,
             UserManager<AppUser> userManager,
-            ILogger<IdentityDataSeeder> logger)
+            ILogger<IdentityDataSeeder> logger,
+            IConfiguration configuration,
+            IHostEnvironment environment)
         {
             _roleManager = roleManager;
             _userManager = userManager;
             _logger = logger;
+            _configuration = configuration;
+            _environment = environment;
         }
 
         public async Task SeedAsync(CancellationToken ct = default)
@@ -101,8 +109,30 @@ namespace WitcherHub.Infrastructure.Seeding
                 return;
             }
 
-            const string email = "basel.slaby@gmail.com";
-            const string password = "Ww@12345";
+            // Credentials come from configuration (SeedAdmin__Email /
+            // SeedAdmin__Password). They used to be hard-coded here, which meant
+            // the first account of every deployment shipped with a password that
+            // is readable in the repository.
+            var email = _configuration["SeedAdmin:Email"];
+            var password = _configuration["SeedAdmin:Password"];
+
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            {
+                if (!_environment.IsDevelopment())
+                {
+                    _logger.LogError(
+                        "No users exist and no seed administrator is configured. Set SeedAdmin__Email and " +
+                        "SeedAdmin__Password, then restart, otherwise nobody can sign in.");
+                    return;
+                }
+
+                email = "admin@witcherhub.local";
+                password = "Dev@12345";
+
+                _logger.LogWarning(
+                    "Seeding a development administrator with a well-known password ({Email}). " +
+                    "Set SeedAdmin__Email and SeedAdmin__Password to override.", email);
+            }
 
             var user = new AppUser
             {
