@@ -82,7 +82,12 @@ if (enableSwagger)
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapStaticAssets();
+// Static assets must stay anonymous. MapStaticAssets registers an endpoint per
+// asset, and the global fallback authorization policy would otherwise apply to
+// them: the fingerprinted URLs the tag helpers emit (main.r2zts9daby.css) exist
+// only as endpoints, never on disk, so UseStaticFiles cannot serve them and the
+// browser got a redirect to the login page instead of every stylesheet.
+app.MapStaticAssets().AllowAnonymous();
 app.MapRazorPages().WithStaticAssets();
 app.MapControllers();
 
