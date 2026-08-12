@@ -45,6 +45,8 @@ features are configured and which are off; values are never logged.
 | `OpenAI__Model` | Model id used for contract drafting. |
 | `Swagger__Enabled` | Exposes Swagger outside Development. Leave off in production. |
 | `SeedAdmin__Email`, `SeedAdmin__Password` | Used only when the users table is empty, to create the first administrator. Outside Development the seeder refuses to invent credentials and logs an error instead. |
+| `BootstrapAdmin__Email` | Address guaranteed to hold the `Admin` role. Defaults to `info@netwitcher.com` in `appsettings.json`. See "Administrator accounts" below. |
+| `BootstrapAdmin__Password` | Optional. When omitted, the account is created with a random password and activated through password reset. |
 
 ## Local setup
 
@@ -57,6 +59,42 @@ dotnet user-secrets set "OpenAI:ApiKey" "..."
 ```
 
 User secrets live outside the repository, so they cannot be committed by accident.
+
+## Administrator accounts
+
+There is one role, `Admin`, and it is granted **every** permission in
+`AppPermissions` automatically. It is therefore the highest privilege level the
+application has — there is no separate "super admin" tier above it, and adding a
+new role would give that role *fewer* rights, not more, until it is listed in
+`AppRolePermissions.Map`.
+
+Two mechanisms create administrators:
+
+| | `SeedAdmin__*` | `BootstrapAdmin__*` |
+| --- | --- | --- |
+| Runs | Only when the users table is empty | Every start-up |
+| Works on a populated database | No | Yes |
+| Existing account | n/a | Keeps its password, gains the role if missing |
+| Purpose | First account of a brand-new environment | Guarantee a nominated address stays an administrator |
+
+`BootstrapAdmin` is idempotent and safe to leave configured permanently. It logs
+at warning level whenever it grants the role to an account that already existed,
+so an unexpected promotion is visible.
+
+### First sign-in without putting a password in configuration
+
+Leave `BootstrapAdmin__Password` unset. The account is then created with a random
+password that is never logged or stored anywhere, and the start-up log says:
+
+```
+Bootstrap administrator info@netwitcher.com created with the Admin role and an
+unknown random password. Use 'Forgot password?' on the login page to set one.
+```
+
+Go to the login page, use **Forgot password?**, and set the password from the
+email. This needs `Smtp__*` configured on that environment — without working
+email there is no way to activate the account, in which case set
+`BootstrapAdmin__Password` instead and change it after signing in.
 
 ## Password reset
 
