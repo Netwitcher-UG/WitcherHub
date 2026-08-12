@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -6,6 +7,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using WitcherHub.Application.Interfaces;
+using WitcherHub.Application.Models.Email;
+using WitcherHub.Application.Services.Email;
 using WitcherHub.Domain.SeedData;
 using WitcherHub.Infrastructure.Data.Models;
 
@@ -18,17 +21,23 @@ namespace WitcherHub.Infrastructure.Authentication
         private readonly RoleManager<IdentityRole<Guid>> _roleManager;
         private readonly JwtOptions _jwt;
         private readonly ILogger<AuthService> _logger;
+        private readonly IEmailService _email;
+        private readonly IConfiguration _configuration;
 
         public AuthService(
             UserManager<AppUser> userManager,
             RoleManager<IdentityRole<Guid>> roleManager,
             IOptions<JwtOptions> jwtOptions,
-            ILogger<AuthService> logger)
+            ILogger<AuthService> logger,
+            IEmailService email,
+            IConfiguration configuration)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _jwt = jwtOptions.Value;
             _logger = logger;
+            _email = email;
+            _configuration = configuration;
         }
 
         public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
@@ -83,6 +92,103 @@ namespace WitcherHub.Infrastructure.Authentication
 
             var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
             return new AuthResponse(tokenString, expires);
+        }
+
+        public async Task RequestPasswordResetAsync(string email, CancellationToken ct = default)
+        {
+            var normalized = (email ?? "").Trim();
+            if (normalized.Length == 0)
+                return;
+
+            var user = await _userManager.FindByEmailAsync(normalized);
+
+            if (user is null || string.IsNullOrWhiteSpace(user.Email))
+            {
+                // No such account. Return quietly: the page shows the same message
+                // either way so this cannot be used to enumerate addresses.
+                _logger.LogInformation("Password reset requested for an address with no account.");
+                return;
+            }
+
+            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var resetUrl = BuildResetUrl(user.Email, PasswordResetTokenEncoder.Encode(resetToken));
+
+            await _email.QueueTemplateAsync(
+                templateName: "PasswordReset",
+                model: new
+                {
+                    UserName = string.IsNullOrWhiteSpace(user.UserName) ? user.Email : user.UserName,
+                    ActionUrl = resetUrl,
+                    ExpiryHours = 2
+                },
+                to: new EmailAddress(user.Email, user.UserName),
+                subject: "WitcherHub — Passwort zurücksetzen",
+                ct: ct);
+
+            // The URL embeds the token, so it is never written to the log.
+            _logger.LogInformation("Password reset email queued for user {UserId}.", user.Id);
+        }
+
+        public async Task<PasswordResetResult> ResetPasswordAsync(
+            string email,
+            string encodedToken,
+            string newPassword,
+            CancellationToken ct = default)
+        {
+            const string InvalidLinkMessage =
+                "This reset link is invalid or has expired. Please request a new one.";
+
+            if (!PasswordResetTokenEncoder.TryDecode(encodedToken, out var resetToken))
+                return PasswordResetResult.Failure(InvalidLinkMessage);
+
+            var user = await _userManager.FindByEmailAsync((email ?? "").Trim());
+            if (user is null)
+            {
+                // Same message as an expired token: do not confirm the address exists.
+                return PasswordResetResult.Failure(InvalidLinkMessage);
+            }
+
+            var result = await _userManager.ResetPasswordAsync(user, resetToken, newPassword);
+
+            if (result.Succeeded)
+            {
+                _logger.LogInformation("Password reset completed for user {UserId}.", user.Id);
+                return PasswordResetResult.Success();
+            }
+
+            // Identity reports an unusable token as "InvalidToken"; translate that
+            // into something a person can act on, and surface password-policy
+            // failures as they are.
+            var errors = result.Errors
+                .Select(e => e.Code == "InvalidToken" ? InvalidLinkMessage : e.Description)
+                .Distinct()
+                .ToList();
+
+            _logger.LogWarning(
+                "Password reset failed for user {UserId}: {Codes}",
+                user.Id,
+                string.Join(", ", result.Errors.Select(e => e.Code)));
+
+            return new PasswordResetResult(false, errors);
+        }
+
+        private string BuildResetUrl(string email, string encodedToken)
+        {
+            var baseUrl = (_configuration["WITCHERHUB_PUBLIC_BASE_URL"]
+                           ?? Environment.GetEnvironmentVariable("WITCHERHUB_PUBLIC_BASE_URL")
+                           ?? "").TrimEnd('/');
+
+            if (baseUrl.Length == 0)
+            {
+                // A relative link is useless in an email, so make the
+                // misconfiguration visible instead of sending a broken message.
+                throw new InvalidOperationException(
+                    "WITCHERHUB_PUBLIC_BASE_URL is not configured, so a password reset link cannot be built.");
+            }
+
+            return $"{baseUrl}/Auth/ResetPassword" +
+                   $"?email={Uri.EscapeDataString(email)}" +
+                   $"&token={Uri.EscapeDataString(encodedToken)}";
         }
     }
 }

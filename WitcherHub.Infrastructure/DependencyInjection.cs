@@ -72,7 +72,17 @@ namespace WitcherHub.Infrastructure
                 options.Password.RequiredLength = 6;
             })
             .AddRoles<IdentityRole<Guid>>()
-            .AddEntityFrameworkStores<AppDbContext>();
+            .AddEntityFrameworkStores<AppDbContext>()
+            // Required for password-reset tokens. Without it,
+            // GeneratePasswordResetTokenAsync throws "No IUserTwoFactorTokenProvider
+            // named 'Default' is registered".
+            .AddDefaultTokenProviders();
+
+            // Password reset links expire well before Identity's one-day default.
+            services.Configure<DataProtectionTokenProviderOptions>(options =>
+            {
+                options.TokenLifespan = TimeSpan.FromHours(2);
+            });
 
             //======= Lexware =======
       
