@@ -41,7 +41,7 @@ features are configured and which are off; values are never logged.
 | Variable | Notes |
 | --- | --- |
 | `Jwt__AccessTokenMinutes` | Session lifetime. Defaults to 480 (8 hours). |
-| `WITCHERHUB_PUBLIC_BASE_URL` | Absolute base URL used to build customer-facing signing and invoice links. Must match the deployed host or the links in emails will point at the wrong environment. |
+| `WITCHERHUB_PUBLIC_BASE_URL` | Absolute base URL used to build customer-facing signing and invoice links, and password reset links. Must match the deployed host or the links in emails will point at the wrong environment. Password reset fails with a clear message when it is unset. |
 | `OpenAI__Model` | Model id used for contract drafting. |
 | `Swagger__Enabled` | Exposes Swagger outside Development. Leave off in production. |
 | `SeedAdmin__Email`, `SeedAdmin__Password` | Used only when the users table is empty, to create the first administrator. Outside Development the seeder refuses to invent credentials and logs an error instead. |
@@ -57,6 +57,26 @@ dotnet user-secrets set "OpenAI:ApiKey" "..."
 ```
 
 User secrets live outside the repository, so they cannot be committed by accident.
+
+## Password reset
+
+Self-service reset lives at `/Auth/ForgotPassword`, linked from the login page.
+It works for any account, including administrators.
+
+It depends on two things being configured:
+
+- **`Smtp__*`** — the link is delivered by email, so nothing arrives without a
+  working mail sender.
+- **`WITCHERHUB_PUBLIC_BASE_URL`** — used to build an absolute link. If it is
+  unset, the page reports that reset is not configured rather than sending an
+  email containing a broken link. If it points at the wrong host, the email will
+  send users to the wrong environment.
+
+Reset links are valid for **2 hours** and can be used **once**. The lifetime is
+set via `DataProtectionTokenProviderOptions` in `AddInfrastructure`.
+
+The form deliberately shows the same confirmation whether or not the address has
+an account, so it cannot be used to discover which addresses are registered.
 
 ## Health endpoints
 
