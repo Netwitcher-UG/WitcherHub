@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using WitcherHub.Application.Interfaces;
 
 namespace WitcherHub.Pages.Auth
 {
+    [AllowAnonymous]
     public class LoginModel : PageModel
     {
         private readonly IAuthService _auth;

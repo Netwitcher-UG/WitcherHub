@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using WitcherHub.Application.Interfaces.Email;
 using WitcherHub.Application.Models.Email;
+using WitcherHub.Configuration.Filters;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Services.Lexware;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
@@ -9,6 +10,7 @@ using static WitcherHub.Infrastructure.Data.Models.Enums;
 namespace WitcherHub.Controllers
 {
     [Route("invoices/test-notifications")]
+    [DevelopmentOnly]
     public sealed class InvoiceTestNotificationsController : Controller
     {
         private readonly AppDbContext _db;

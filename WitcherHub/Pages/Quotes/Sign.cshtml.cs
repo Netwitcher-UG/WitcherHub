@@ -705,7 +705,7 @@ namespace WitcherHub.Pages.Quotes
         {
             var model = BuildQuotePdfModel(quote);
             var html = BuildSignedQuotePdfHtml(model, signerName, signerEmail, signedAt, signatureDataUrl);
-            var pdfBytes = _pdf.FromHtml(html, $"Angebot {model.QuoteNo} - signed");
+            var pdfBytes = await _pdf.FromHtmlAsync(html, $"Angebot {model.QuoteNo} - signed", ct);
 
             var subject = $"Ihr unterschriebenes Angebot {model.QuoteNo}";
 

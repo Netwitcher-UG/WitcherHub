@@ -135,8 +135,8 @@ public class PricingEngine : IPricingEngine
         // discount percent if action contains PERCENT
         if (a.Contains("DISCOUNT") && a.Contains("PERCENT"))
         {
-            var pct = value > 1m ? (value / 100m) : value;
-            var disc = Round(currentSubtotal * pct);
+            var disc = Round(currentSubtotal * (value / 100m));
+            disc = Clamp(disc, currentSubtotal - discounts);
             discounts += disc;
             lines.Add(new("discount", rule.Label ?? rule.Name, -disc));
             return;
@@ -145,7 +145,7 @@ public class PricingEngine : IPricingEngine
         // discount amount
         if (a.Contains("DISCOUNT"))
         {
-            var disc = Round(value);
+            var disc = Clamp(Round(value), currentSubtotal - discounts);
             discounts += disc;
             lines.Add(new("discount", rule.Label ?? rule.Name, -disc));
             return;
@@ -163,14 +163,25 @@ public class PricingEngine : IPricingEngine
 
         var type = (d.Type ?? "").ToUpperInvariant();
 
-        return type switch
+        // Percent values are stored as 0-100, the same convention the quote and
+        // contract calculators use. The previous "value <= 1 is already a
+        // fraction" heuristic silently turned a 0.5% discount into 50%.
+        var raw = type switch
         {
-            "PERCENT" => amount * (d.Value > 1m ? d.Value / 100m : d.Value),
+            "PERCENT" => amount * (d.Value / 100m),
             "AMOUNT" => d.Value,
             "FIXED" => d.Value,
             _ => 0m
         };
+
+        return Clamp(raw, amount);
     }
+
+    /// <summary>
+    /// A discount can never be negative, nor larger than the amount it applies to.
+    /// </summary>
+    private static decimal Clamp(decimal discount, decimal maximum) =>
+        Math.Min(Math.Max(0m, maximum), Math.Max(0m, discount));
 
     private static decimal CalcTax(TaxRateDto? taxRate, decimal taxable, List<PriceLineDto> lines)
     {

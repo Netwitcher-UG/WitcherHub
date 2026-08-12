@@ -278,7 +278,7 @@ namespace WitcherHub.Pages.Quotes
                     sig.SignedAt ?? DateTimeOffset.UtcNow,
                     signatureDataUrl);
 
-                var bytes = _pdf.FromHtml(html, $"Angebot {model.QuoteNo} - signed");
+                var bytes = await _pdf.FromHtmlAsync(html, $"Angebot {model.QuoteNo} - signed", ct);
 
                 return File(bytes, "application/pdf", $"{model.QuoteNo}-signed.pdf");
             }
@@ -302,7 +302,7 @@ namespace WitcherHub.Pages.Quotes
                 var model = await LoadPdfModelAsync(ct);
 
                 var html = QuotePdfHtmlBuilder.Build(model);
-                var bytes = _pdf.FromHtml(html, $"Angebot {model.QuoteNo}");
+                var bytes = await _pdf.FromHtmlAsync(html, $"Angebot {model.QuoteNo}", ct);
 
                 var fileName = $"{model.QuoteNo}.pdf";
                 return File(bytes, "application/pdf", fileName);
@@ -333,7 +333,7 @@ namespace WitcherHub.Pages.Quotes
 
                 // PDF attachment (unsigned)
                 var pdfHtml = QuotePdfHtmlBuilder.Build(model);
-                var pdfBytes = _pdf.FromHtml(pdfHtml, $"Angebot {model.QuoteNo}");
+                var pdfBytes = await _pdf.FromHtmlAsync(pdfHtml, $"Angebot {model.QuoteNo}", ct);
 
                 // Create public signing link
                 var rawToken = await _quotePublicLinkService.CreateAsync(

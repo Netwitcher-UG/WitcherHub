@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Localization;
 using Serilog;
 using System.Globalization;
@@ -7,6 +8,10 @@ using WitcherHub.Configuration.Extensions;
 using WitcherHub.Infrastructure.Services.Pdf;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Fail fast with an actionable message when a required secret is missing,
+// instead of surfacing a null reference later inside a request.
+builder.Configuration.ValidateRequiredConfiguration();
 
 builder.Logging.ClearProviders();
 
@@ -32,6 +37,9 @@ builder.Services.AddPresentation(builder.Configuration);
 
     
 var app = builder.Build();
+
+app.LogConfigurationReport();
+
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var playwrightBrowserInstaller = scope.ServiceProvider.GetRequiredService<PlaywrightBrowserInstaller>();
@@ -77,5 +85,14 @@ app.UseAuthorization();
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
 app.MapControllers();
+
+// Liveness: the process is up. Readiness: PostgreSQL is reachable.
+// Both are anonymous so the platform can probe them without a token.
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = _ => false
+}).AllowAnonymous();
+
+app.MapHealthChecks("/health/ready").AllowAnonymous();
 
 app.Run();

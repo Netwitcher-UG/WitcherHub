@@ -89,6 +89,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="WitcherHub.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="Resources\Pages\" />
   </ItemGroup>
 	<ItemGroup>

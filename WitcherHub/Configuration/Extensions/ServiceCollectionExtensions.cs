@@ -7,6 +7,8 @@ using System.Text;
 using System.Text.Json.Serialization;
 using WitcherHub.Application;
 using WitcherHub.Configuration.Authorization;
+using WitcherHub.Configuration.HealthChecks;
+using WitcherHub.Configuration.ModelBinding;
 using WitcherHub.Infrastructure;
 using WitcherHub.Infrastructure.Authentication;
 using WitcherHub.Resources;
@@ -24,6 +26,12 @@ namespace WitcherHub.Configuration.Extensions
             services.AddLocalization();
 
             services.AddRazorPages()
+                .AddMvcOptions(options =>
+                {
+                    // Ahead of the built-in simple-type binder, so German decimal
+                    // input ("0,00") is accepted regardless of request culture.
+                    options.ModelBinderProviders.Insert(0, new FlexibleDecimalModelBinderProvider());
+                })
                 .AddViewLocalization(LanguageViewLocationExpanderFormat.Suffix)
                 .AddDataAnnotationsLocalization(options =>
                 {
@@ -43,7 +51,20 @@ namespace WitcherHub.Configuration.Extensions
                         factory.Create(typeof(SharedResource));
                 });
 
-            services.AddAuthorization();
+            // Secure by default: every Razor Page and controller requires an
+            // authenticated user unless it opts out with [AllowAnonymous].
+            // Without this fallback the Clients, Projects, Services and Project
+            // Workspace pages were reachable without logging in.
+            services.AddAuthorization(options =>
+            {
+                options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .Build();
+            });
+
+            services.AddHealthChecks()
+                .AddCheck<DatabaseHealthCheck>("database", tags: new[] { "ready" });
+
             services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
 
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

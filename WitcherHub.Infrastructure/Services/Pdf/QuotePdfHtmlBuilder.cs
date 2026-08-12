@@ -89,23 +89,6 @@ namespace WitcherHub.Infrastructure.Services.Pdf
             string D(DateTimeOffset? d) => d.HasValue ? d.Value.ToString("dd.MM.yyyy", de) : "—";
             string E(string? s) => WebUtility.HtmlEncode(s ?? "");
 
-            string BuildBadgeText(string? text)
-            {
-                var parts = (text ?? string.Empty)
-                    .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-                if (parts.Length == 0)
-                    return "WH";
-
-                if (parts.Length == 1)
-                {
-                    var one = parts[0];
-                    return (one.Length >= 2 ? one[..2] : one).ToUpperInvariant();
-                }
-
-                return string.Concat(parts.Take(2).Select(x => x[0])).ToUpperInvariant();
-            }
-
             var customerTitle = !string.IsNullOrWhiteSpace(m.Customer.CompanyName)
                 ? m.Customer.CompanyName!
                 : m.Customer.DisplayName;
@@ -741,6 +724,49 @@ break-inside: avoid;
       .summary-banner,
       .logo-box {
         box-shadow: none !important;
+      }
+
+      /* Screen spacing pushed short quotes just past the bottom of page 1,
+         producing a second page holding only the notes/totals block. Tighten
+         the vertical rhythm for print, and let the bottom grid break so a
+         single overflowing card no longer drags its neighbour with it.
+         A three-position quote now fits on one page; longer ones still flow. */
+      .summary-banner {
+        padding: 12px 16px;
+        margin-bottom: 14px;
+      }
+
+      .party-grid {
+        margin: 14px 0;
+      }
+
+      .section {
+        margin-top: 14px;
+      }
+
+      .card {
+        padding: 12px;
+      }
+
+      .layout-bottom {
+        margin-top: 12px;
+        page-break-inside: auto;
+        break-inside: auto;
+      }
+
+      .notes,
+      .totals {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+
+      .total-line {
+        padding: 6px 0;
+      }
+
+      .grand-total {
+        margin-top: 8px;
+        padding-top: 10px;
       }
     }
   </style>

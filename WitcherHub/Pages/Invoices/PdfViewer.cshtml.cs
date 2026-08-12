@@ -7,7 +7,9 @@ using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Pages.Invoices
 {
-    [AllowAnonymous]
+    // Internal viewer: streams the invoice PDF for any invoice id, so it must be
+    // authenticated. The customer-facing route is /Invoices/View, which requires
+    // a signed, expiring access token.
     public class PdfViewerModel : PageModel
     {
         private readonly IInvoice _invoices;
