@@ -87,6 +87,24 @@ namespace WitcherHub.Configuration.Extensions
 
                     options.Events = new JwtBearerEvents
                     {
+                        // A rejected token used to fail silently: the browser was sent
+                        // back to the login page with nothing written anywhere saying
+                        // why, which made a signing or issuer mismatch look like the
+                        // password being wrong.
+                        OnAuthenticationFailed = context =>
+                        {
+                            var logger = context.HttpContext.RequestServices
+                                .GetRequiredService<ILoggerFactory>()
+                                .CreateLogger("WitcherHub.Authentication");
+
+                            logger.LogWarning(
+                                context.Exception,
+                                "Rejected the access token for {Path}. The session will be treated as signed out.",
+                                context.Request.Path);
+
+                            return Task.CompletedTask;
+                        },
+
                         OnMessageReceived = context =>
                         {
                             if (context.Request.Headers.ContainsKey("Authorization"))
