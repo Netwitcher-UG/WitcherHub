@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.IdentityModel.Tokens;
@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using WitcherHub.Application;
 using WitcherHub.Configuration.Authorization;
+using WitcherHub.Configuration.Filters;
 using WitcherHub.Configuration.HealthChecks;
 using WitcherHub.Configuration.ModelBinding;
 using WitcherHub.Infrastructure;
@@ -28,6 +29,9 @@ namespace WitcherHub.Configuration.Extensions
             services.AddRazorPages()
                 .AddMvcOptions(options =>
                 {
+                    // A stale antiforgery token becomes a retry, not a bare 400.
+                    options.Filters.Add<AntiforgeryFailureResultFilter>();
+
                     // Ahead of the built-in simple-type binder, so German decimal
                     // input ("0,00") is accepted regardless of request culture.
                     options.ModelBinderProviders.Insert(0, new FlexibleDecimalModelBinderProvider());
