@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Domain.SeedData;
 using WitcherHub.Infrastructure.Data.Models;
@@ -37,7 +38,115 @@ namespace WitcherHub.Infrastructure.Seeding
             await EnsureRolesAsync();
             await EnsureRolePermissionsAsync();
             await EnsureDefaultAdminUserIfUsersEmptyAsync(ct);
+            await EnsureBootstrapAdminAsync(ct);
         }
+
+        /// <summary>
+        /// Guarantees that a nominated address holds the Admin role, which carries
+        /// every permission in the system.
+        ///
+        /// Unlike <see cref="EnsureDefaultAdminUserIfUsersEmptyAsync"/> this runs on
+        /// every start-up and works against a populated database, so an
+        /// administrator can be provisioned on an environment that already has
+        /// users. It is idempotent: an existing account keeps its password and only
+        /// gains the role if it is missing.
+        /// </summary>
+        private async Task EnsureBootstrapAdminAsync(CancellationToken ct)
+        {
+            var email = _configuration["BootstrapAdmin:Email"]?.Trim();
+
+            if (string.IsNullOrWhiteSpace(email))
+                return;
+
+            var existing = await _userManager.FindByEmailAsync(email);
+
+            if (existing is not null)
+            {
+                if (await _userManager.IsInRoleAsync(existing, AppRoles.Admin))
+                {
+                    _logger.LogInformation(
+                        "Bootstrap administrator {Email} already exists with the {Role} role.",
+                        email, AppRoles.Admin);
+                    return;
+                }
+
+                var promote = await _userManager.AddToRoleAsync(existing, AppRoles.Admin);
+
+                if (promote.Succeeded)
+                {
+                    _logger.LogWarning(
+                        "Existing user {Email} was granted the {Role} role via BootstrapAdmin configuration.",
+                        email, AppRoles.Admin);
+                }
+                else
+                {
+                    _logger.LogError(
+                        "Failed to grant {Role} to {Email}. Errors: {Errors}",
+                        AppRoles.Admin, email,
+                        string.Join(" | ", promote.Errors.Select(e => e.Description)));
+                }
+
+                return;
+            }
+
+            // A password may be supplied for the first sign-in. When it is not, the
+            // account is created with a random one that is never recorded anywhere,
+            // and access is obtained through the password reset flow instead — that
+            // way no administrator credential has to be typed into configuration.
+            var configuredPassword = _configuration["BootstrapAdmin:Password"];
+            var usingRandomPassword = string.IsNullOrWhiteSpace(configuredPassword);
+            var password = usingRandomPassword ? GenerateUnknowablePassword() : configuredPassword!;
+
+            var user = new AppUser
+            {
+                Id = Guid.NewGuid(),
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true
+            };
+
+            var create = await _userManager.CreateAsync(user, password);
+            if (!create.Succeeded)
+            {
+                _logger.LogError(
+                    "Failed to create bootstrap administrator {Email}. Errors: {Errors}",
+                    email, string.Join(" | ", create.Errors.Select(e => e.Description)));
+                return;
+            }
+
+            var addToRole = await _userManager.AddToRoleAsync(user, AppRoles.Admin);
+            if (!addToRole.Succeeded)
+            {
+                _logger.LogError(
+                    "Created {Email} but failed to assign the {Role} role. Errors: {Errors}",
+                    email, AppRoles.Admin,
+                    string.Join(" | ", addToRole.Errors.Select(e => e.Description)));
+                return;
+            }
+
+            if (usingRandomPassword)
+            {
+                _logger.LogWarning(
+                    "Bootstrap administrator {Email} created with the {Role} role and an unknown random " +
+                    "password. Use 'Forgot password?' on the login page to set one. Requires a working " +
+                    "SMTP configuration.",
+                    email, AppRoles.Admin);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Bootstrap administrator {Email} created with the {Role} role using the configured password.",
+                    email, AppRoles.Admin);
+            }
+        }
+
+        /// <summary>
+        /// A password nobody knows, so the account can only be reached through a
+        /// password reset. The leading characters keep it valid against a stricter
+        /// password policy than the current one.
+        /// </summary>
+        private static string GenerateUnknowablePassword() =>
+            "Aa1!" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
         private async Task EnsureRolesAsync()
         {
