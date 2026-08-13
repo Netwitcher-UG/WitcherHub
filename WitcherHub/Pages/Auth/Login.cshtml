@@ -22,7 +22,15 @@
 
                         @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
                         {
-                            <div class="alert alert-danger mt-3">@Model.ErrorMessage</div>
+                            <div class="alert @(Model.IsSystemError ? "alert-warning" : "alert-danger") mt-3 mb-0">
+                                @Model.ErrorMessage
+
+                                @if (!string.IsNullOrWhiteSpace(Model.Diagnostic))
+                                {
+                                    <hr />
+                                    <small class="d-block" style="word-break:break-word;">@Model.Diagnostic</small>
+                                }
+                            </div>
                         }
 
                         <div class="form-body my-5">

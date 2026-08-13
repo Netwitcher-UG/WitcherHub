@@ -36,6 +36,23 @@ namespace WitcherHub.Application.Common.Exceptions
         public override string Title => "Conflict";
     }
 
+    /// <summary>
+    /// The supplied credentials did not match an account.
+    ///
+    /// Distinct from every other failure so a sign-in page can tell "wrong
+    /// password" apart from "the database is unreachable" — previously both
+    /// produced the same "check email/password" message, which sent people to
+    /// retype a password that was never the problem.
+    /// </summary>
+    public sealed class AuthenticationFailedAppException : AppException
+    {
+        public AuthenticationFailedAppException(string message = "Invalid credentials.", Exception? inner = null)
+            : base(message, inner) { }
+
+        public override int StatusCode => (int)HttpStatusCode.Unauthorized;
+        public override string Title => "Sign-in failed";
+    }
+
     public sealed class ForbiddenAppException : AppException
     {
         public ForbiddenAppException(string message = "Forbidden.", Exception? inner = null)
