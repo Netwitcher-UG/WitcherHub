@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -6,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Models.Email;
 using WitcherHub.Application.Services.Email;
@@ -42,9 +44,31 @@ namespace WitcherHub.Infrastructure.Authentication
 
         public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
         {
-            var user = await _userManager.FindByEmailAsync(request.Email);
-            if (user is null || !await _userManager.CheckPasswordAsync(user, request.Password))
-                throw new InvalidOperationException("Invalid credentials.");
+            var email = (request.Email ?? "").Trim();
+
+            var user = await _userManager.FindByEmailAsync(email);
+
+            // The caller receives one indistinguishable failure either way, but the
+            // log records which it was — without that, "wrong password" and "no such
+            // account in this database" look identical while debugging.
+            if (user is null)
+            {
+                _logger.LogWarning(
+                    "Sign-in failed: no account with email {Email} exists in this database. " +
+                    "Total accounts: {UserCount}.",
+                    email, await _userManager.Users.CountAsync(ct));
+
+                throw new AuthenticationFailedAppException();
+            }
+
+            if (!await _userManager.CheckPasswordAsync(user, request.Password))
+            {
+                _logger.LogWarning(
+                    "Sign-in failed: the account {Email} exists (id {UserId}) but the password did not match.",
+                    email, user.Id);
+
+                throw new AuthenticationFailedAppException();
+            }
 
             var roles = await _userManager.GetRolesAsync(user);
 

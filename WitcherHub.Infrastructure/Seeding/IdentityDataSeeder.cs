@@ -39,6 +39,49 @@ namespace WitcherHub.Infrastructure.Seeding
             await EnsureRolePermissionsAsync();
             await EnsureDefaultAdminUserIfUsersEmptyAsync(ct);
             await EnsureBootstrapAdminAsync(ct);
+            await LogSignInInventoryAsync(ct);
+        }
+
+        /// <summary>
+        /// Lists the accounts that can sign in to the database this instance is
+        /// actually connected to.
+        ///
+        /// With two environments pointing at two databases, "the login says my
+        /// details are wrong" is usually "that account is in the other database",
+        /// and there was no way to tell from the outside.
+        /// </summary>
+        private async Task LogSignInInventoryAsync(CancellationToken ct)
+        {
+            try
+            {
+                var accounts = await _userManager.Users
+                    .Select(u => new { u.Email, u.EmailConfirmed })
+                    .OrderBy(u => u.Email)
+                    .ToListAsync(ct);
+
+                if (accounts.Count == 0)
+                {
+                    _logger.LogWarning("This database contains no user accounts, so nobody can sign in.");
+                    return;
+                }
+
+                var adminEmails = (await _userManager.GetUsersInRoleAsync(AppRoles.Admin))
+                    .Select(u => u.Email)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                var summary = accounts.Select(a =>
+                    $"{a.Email}{(adminEmails.Contains(a.Email ?? "") ? " [Admin]" : "")}" +
+                    $"{(a.EmailConfirmed ? "" : " [email unconfirmed]")}");
+
+                _logger.LogInformation(
+                    "Accounts that can sign in to this database ({Count}): {Accounts}",
+                    accounts.Count, string.Join(", ", summary));
+            }
+            catch (Exception ex)
+            {
+                // Diagnostics must never be the reason start-up fails.
+                _logger.LogWarning(ex, "Could not list user accounts.");
+            }
         }
 
         /// <summary>
@@ -62,6 +105,8 @@ namespace WitcherHub.Infrastructure.Seeding
 
             if (existing is not null)
             {
+                await ApplyBreakGlassPasswordAsync(existing, email);
+
                 if (await _userManager.IsInRoleAsync(existing, AppRoles.Admin))
                 {
                     _logger.LogInformation(
@@ -137,6 +182,52 @@ namespace WitcherHub.Infrastructure.Seeding
                 _logger.LogInformation(
                     "Bootstrap administrator {Email} created with the {Role} role using the configured password.",
                     email, AppRoles.Admin);
+            }
+        }
+
+        /// <summary>
+        /// Break-glass recovery: sets the password of an account that already exists.
+        ///
+        /// Needed because the bootstrap step deliberately never touches an existing
+        /// password, which leaves no way back in when the reset email cannot be
+        /// delivered — the situation on an environment with no SMTP configured.
+        ///
+        /// Requires both BootstrapAdmin__Password and an explicit
+        /// BootstrapAdmin__ResetPasswordOnStartup=true, so it cannot happen by
+        /// accident, and it announces itself in the log every time it runs.
+        /// </summary>
+        private async Task ApplyBreakGlassPasswordAsync(AppUser user, string email)
+        {
+            if (!_configuration.GetValue<bool>("BootstrapAdmin:ResetPasswordOnStartup"))
+                return;
+
+            var password = _configuration["BootstrapAdmin:Password"];
+
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                _logger.LogError(
+                    "BootstrapAdmin__ResetPasswordOnStartup is set but BootstrapAdmin__Password is empty, " +
+                    "so the password for {Email} was left unchanged.", email);
+                return;
+            }
+
+            // Go through Identity's own reset so the hash and security stamp are
+            // written exactly as a normal password change would write them.
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var result = await _userManager.ResetPasswordAsync(user, token, password);
+
+            if (result.Succeeded)
+            {
+                _logger.LogWarning(
+                    "The password for {Email} was overwritten from configuration on start-up. " +
+                    "Remove BootstrapAdmin__ResetPasswordOnStartup and BootstrapAdmin__Password now, " +
+                    "otherwise the password is reset on every deploy.", email);
+            }
+            else
+            {
+                _logger.LogError(
+                    "Failed to overwrite the password for {Email}. Errors: {Errors}",
+                    email, string.Join(" | ", result.Errors.Select(e => e.Description)));
             }
         }
 

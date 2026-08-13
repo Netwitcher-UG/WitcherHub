@@ -109,6 +109,48 @@ Two mechanisms create administrators:
 at warning level whenever it grants the role to an account that already existed,
 so an unexpected promotion is visible.
 
+### "Login failed. Check email/password." when the password is right
+
+Each environment has its own database, so an account created or reset on dev does
+not exist on production and vice versa. The start-up log lists what is actually in
+the database the instance is connected to:
+
+```
+Accounts that can sign in to this database (2): admin@netwitcher.test [Admin], info@netwitcher.com [Admin]
+```
+
+If the address is missing from that line, sign-in cannot succeed there no matter
+what password is used.
+
+The sign-in page distinguishes two kinds of failure:
+
+| Message | Meaning |
+| --- | --- |
+| "Login failed. Check email/password." | The credentials did not match. The log says which — unknown account, or wrong password — while the page stays generic so it cannot be used to discover registered addresses. |
+| "Sign-in is currently unavailable… a server problem, not your password." | Something other than the credentials failed: database unreachable, token signing rejected, role lookup failing. The cause is logged as an error, and shown on the page in Development. |
+
+### Break-glass: setting the password of an account that already exists
+
+Normal bootstrapping never touches an existing password, which leaves no way in
+when reset email cannot be delivered. To force one:
+
+```
+BootstrapAdmin__Password=<new password>
+BootstrapAdmin__ResetPasswordOnStartup=true
+```
+
+On the next start the password is overwritten through Identity's own reset, and
+the log says so:
+
+```
+The password for info@netwitcher.com was overwritten from configuration on start-up.
+Remove BootstrapAdmin__ResetPasswordOnStartup and BootstrapAdmin__Password now,
+otherwise the password is reset on every deploy.
+```
+
+**Remove both variables once you are in.** While they remain set, every deploy
+resets that password, and the password is sitting in the environment.
+
 ### First sign-in without putting a password in configuration
 
 Leave `BootstrapAdmin__Password` unset. The account is then created with a random
