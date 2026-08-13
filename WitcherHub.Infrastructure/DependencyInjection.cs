@@ -1,4 +1,5 @@
 
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -57,6 +58,23 @@ namespace WitcherHub.Infrastructure
             {
                 options.UseNpgsql(connectionString);
             });
+
+            // =========================================================
+            // Data Protection
+            //
+            // Antiforgery tokens, password reset links and every other protected
+            // payload are encrypted with this key ring. By default it is written to
+            // the container filesystem, which a hosted deploy replaces on every
+            // release — so a form loaded before a deploy failed with HTTP 400 after
+            // it, and a reset link emailed before a deploy stopped working.
+            //
+            // Persisting to PostgreSQL keeps the keys across deploys and shares them
+            // between instances. The application name is fixed so a rename cannot
+            // silently start a new key ring.
+            // =========================================================
+            services.AddDataProtection()
+                .PersistKeysToDbContext<AppDbContext>()
+                .SetApplicationName("WitcherHub");
 
             // Memory cache (in-process)
             services.AddMemoryCache();

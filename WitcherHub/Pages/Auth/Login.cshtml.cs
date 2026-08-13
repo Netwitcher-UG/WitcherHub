@@ -35,7 +35,22 @@ namespace WitcherHub.Pages.Auth
         /// </summary>
         public string? Diagnostic { get; private set; }
 
-        public void OnGet() { }
+        /// <summary>
+        /// Set when the visitor was bounced here by an antiforgery failure — a page
+        /// left open across a deploy, or a form restored by the browser.
+        /// </summary>
+        [BindProperty(SupportsGet = true, Name = "expired")]
+        public bool SessionExpired { get; set; }
+
+        public void OnGet()
+        {
+            if (SessionExpired)
+            {
+                IsSystemError = true;
+                ErrorMessage = "That page had been open for a while and the form expired. " +
+                               "Please enter your details again.";
+            }
+        }
 
         [BindProperty(SupportsGet = true)]
         public string? ReturnUrl { get; set; }

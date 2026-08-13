@@ -1,4 +1,5 @@
 
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -7,9 +8,19 @@ using WitcherHub.Infrastructure.Data.Models;
 
 namespace WitcherHub.Infrastructure.Data.Context
 {
-    public class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>
+    public class AppDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>, IDataProtectionKeyContext
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+
+        /// <summary>
+        /// The keys that encrypt antiforgery tokens, password reset tokens and
+        /// anything else protected by the Data Protection stack.
+        ///
+        /// They live in the database because the container filesystem does not
+        /// survive a deploy. Without this, every release generated a fresh key ring
+        /// and invalidated tokens that were already in the wild.
+        /// </summary>
+        public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
         // -------- Customers --------
         public DbSet<Customer> Customers => Set<Customer>(); 
