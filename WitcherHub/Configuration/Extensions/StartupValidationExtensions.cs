@@ -31,6 +31,20 @@ namespace WitcherHub.Configuration.Extensions
             else if (jwtKey.Length < MinimumJwtKeyLength)
                 missing.Add($"Jwt__Key (must be at least {MinimumJwtKeyLength} characters, got {jwtKey.Length})");
 
+            // Issued tokens carry these and validation demands them. If either is
+            // absent, sign-in accepts the password and then rejects its own cookie
+            // on the next request, which presents as an unexplained bounce back to
+            // the login page. Refuse to start rather than ship that behaviour.
+            if (string.IsNullOrWhiteSpace(configuration["Jwt:Issuer"]))
+                missing.Add("Jwt__Issuer");
+
+            if (string.IsNullOrWhiteSpace(configuration["Jwt:Audience"]))
+                missing.Add("Jwt__Audience");
+
+            var accessTokenMinutes = configuration.GetValue<int?>("Jwt:AccessTokenMinutes");
+            if (accessTokenMinutes is <= 0)
+                missing.Add("Jwt__AccessTokenMinutes (must be greater than zero)");
+
             if (missing.Count > 0)
             {
                 throw new InvalidOperationException(

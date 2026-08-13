@@ -109,6 +109,23 @@ Two mechanisms create administrators:
 at warning level whenever it grants the role to an account that already existed,
 so an unexpected promotion is visible.
 
+### Signing in bounces straight back to the login page
+
+If the password is accepted but every page afterwards returns you to the login
+form, the issued token is being rejected by the same application that issued it.
+
+The usual cause is a missing `Jwt:Issuer` or `Jwt:Audience`: tokens are created
+carrying them and validation requires them, so when they are absent sign-in
+succeeds, sets a cookie, and then refuses that cookie on the next request. Both
+now live in `appsettings.json` so every environment has them, and start-up fails
+if either is empty.
+
+Token rejections are logged:
+
+```
+Rejected the access token for /Index. The session will be treated as signed out.
+```
+
 ### "Login failed. Check email/password." when the password is right
 
 Each environment has its own database, so an account created or reset on dev does
