@@ -38,6 +38,7 @@ namespace WitcherHub.Infrastructure.Data.Context
         public DbSet<Contract> Contracts => Set<Contract>();
         public DbSet<ContractItem> ContractItems => Set<ContractItem>();
         public DbSet<ContractSignature> ContractSignatures => Set<ContractSignature>();
+        public DbSet<ContractDraft> ContractDrafts => Set<ContractDraft>();
 
         // -------- Invoices --------
         public DbSet<Invoice> Invoices => Set<Invoice>();
@@ -158,6 +159,19 @@ namespace WitcherHub.Infrastructure.Data.Context
                 .WithMany()
                 .HasForeignKey(x => x.ServiceId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // ContractDraft -> Contract
+            b.Entity<ContractDraft>()
+                .HasOne(x => x.Contract)
+                .WithMany(x => x.Drafts)
+                .HasForeignKey(x => x.ContractId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // One draft per version number, so a concurrent regeneration cannot
+            // quietly produce two "version 3" documents.
+            b.Entity<ContractDraft>()
+                .HasIndex(x => new { x.ContractId, x.Version })
+                .IsUnique();
 
             // ContractSignature -> Contract
             b.Entity<ContractSignature>()

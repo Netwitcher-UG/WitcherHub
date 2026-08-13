@@ -42,6 +42,30 @@ namespace WitcherHub.Infrastructure.Data.Models
         }
         public enum PricingModel { Fixed, Unit, Tiered, Hourly }
 
+        /// <summary>
+        /// Where a contract position came from. Manual positions carry no
+        /// ServiceCatalogItem reference at all — the link stays null rather than
+        /// pointing at a placeholder catalog record.
+        /// </summary>
+        public enum ContractItemSource
+        {
+            Catalog = 0,
+            Manual = 1,
+            Quote = 2
+        }
+
+        /// <summary>
+        /// When the agreed service starts running for the customer.
+        /// </summary>
+        public enum ActivationMethod
+        {
+            NotApplicable = 0,
+            AfterSignature = 1,
+            AfterInitialPayment = 2,
+            OnSpecifiedDate = 3,
+            ManualActivation = 4
+        }
+
         public enum RuleAction { Add, Multiply, SetUnit, SetTotal, Discount }
 
         public enum DiscountType { Percent, Amount,Fixed}

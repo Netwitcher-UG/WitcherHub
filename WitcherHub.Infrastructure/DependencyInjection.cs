@@ -135,6 +135,7 @@ namespace WitcherHub.Infrastructure
 
             // ===== Services =====
             services.AddScoped<IAiTextGenerator, OpenAiTextGenerator>();
+            services.AddScoped<IAiPositionOrganizer, AiPositionOrganizer>();
             services.AddScoped<IDataSeeder, IdentityDataSeeder>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<ICustomer, ManageCustomer>();
@@ -144,6 +145,7 @@ namespace WitcherHub.Infrastructure
             services.AddScoped<IQuote, ManageQuote>();
             services.AddScoped<IInvoice, ManageInvoice>();
             services.AddScoped<IContract, ManageContract>();
+            services.AddScoped<IContractPositions, ManageContractPositions>();
             // UnitOfWork
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
@@ -174,6 +176,7 @@ namespace WitcherHub.Infrastructure
     configuration.GetSection(ContractTemplateOptions.SectionName));
 
             services.AddScoped<IContractDocumentGenerator, ContractDocumentGenerator>();
+            services.AddScoped<IContractDraftService, ContractDraftService>();
             
             services.AddSingleton<IPdfGenerator, PlaywrightPdfGenerator>();
             services.AddSingleton<PlaywrightBrowserInstaller>();
