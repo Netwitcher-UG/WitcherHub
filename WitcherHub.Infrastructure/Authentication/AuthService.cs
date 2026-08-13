@@ -174,17 +174,21 @@ namespace WitcherHub.Infrastructure.Authentication
 
         private string BuildResetUrl(string email, string encodedToken)
         {
-            var baseUrl = (_configuration["WITCHERHUB_PUBLIC_BASE_URL"]
-                           ?? Environment.GetEnvironmentVariable("WITCHERHUB_PUBLIC_BASE_URL")
-                           ?? "").TrimEnd('/');
+            var baseUrl = PublicBaseUrl.Resolve(_configuration);
 
-            if (baseUrl.Length == 0)
+            if (baseUrl is null)
             {
                 // A relative link is useless in an email, so make the
                 // misconfiguration visible instead of sending a broken message.
                 throw new InvalidOperationException(
                     "WITCHERHUB_PUBLIC_BASE_URL is not configured, so a password reset link cannot be built.");
             }
+
+            // The host in the link comes from configuration, never from the request,
+            // so a forged Host header cannot redirect a reset link to another site.
+            // The cost is that a wrong value silently sends users to the wrong
+            // environment, which is why it is logged here and at start-up.
+            _logger.LogInformation("Building a password reset link against {BaseUrl}.", baseUrl);
 
             return $"{baseUrl}/Auth/ResetPassword" +
                    $"?email={Uri.EscapeDataString(email)}" +
