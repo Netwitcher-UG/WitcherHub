@@ -41,7 +41,7 @@ features are configured and which are off; values are never logged.
 | Variable | Notes |
 | --- | --- |
 | `Jwt__AccessTokenMinutes` | Session lifetime. Defaults to 480 (8 hours). |
-| `WITCHERHUB_PUBLIC_BASE_URL` | Absolute base URL used to build customer-facing signing and invoice links, and password reset links. Must match the deployed host or the links in emails will point at the wrong environment. Password reset fails with a clear message when it is unset. |
+| `WITCHERHUB_PUBLIC_BASE_URL` | Absolute base URL for every link this environment emails. **Must differ per environment** — see "Links point at the wrong environment" below. A missing scheme is promoted to `https://`. Password reset fails with a clear message when it is unset. |
 | `OpenAI__Model` | Model id used for contract drafting. |
 | `Swagger__Enabled` | Exposes Swagger outside Development. Leave off in production. |
 | `SeedAdmin__Email`, `SeedAdmin__Password` | Used only when the users table is empty, to create the first administrator. Outside Development the seeder refuses to invent credentials and logs an error instead. |
@@ -59,6 +59,34 @@ dotnet user-secrets set "OpenAI:ApiKey" "..."
 ```
 
 User secrets live outside the repository, so they cannot be committed by accident.
+
+## Links point at the wrong environment
+
+Every link the application emails — password resets, quote and contract signing,
+invoices — is built from `WITCHERHUB_PUBLIC_BASE_URL` on the environment that
+**sends** the mail. Each environment needs its own value:
+
+| Environment | Value |
+| --- | --- |
+| Dev | `https://witcherhubdev-dev.up.railway.app` |
+| Production | `https://hub.netwitcher.com` |
+
+If dev carries the production URL, a reset requested on dev emails a link to
+production. Following it lands on whatever production is running — a 404 if
+production has not yet been updated with the page being linked to.
+
+The host is taken from configuration and never from the request `Host` header:
+building it from the request would let a forged header send a reset link, token
+included, to an attacker's site. The cost of that choice is that a wrong value
+has no visible symptom, so it is reported in two places:
+
+- **At start-up**, naming the environment:
+  `Links emailed by this environment will point at https://hub.netwitcher.com (Development)`
+  — production URL next to `Development` means the value is wrong.
+- **Per request**, when the host a reset is requested on differs from the host
+  the link will use:
+  `Password reset requested on witcherhubdev-dev.up.railway.app but the emailed
+  link points at hub.netwitcher.com`.
 
 ## Administrator accounts
 

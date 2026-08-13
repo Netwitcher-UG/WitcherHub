@@ -1,3 +1,5 @@
+using WitcherHub.Infrastructure.Authentication;
+
 namespace WitcherHub.Configuration.Extensions
 {
     /// <summary>
@@ -59,6 +61,25 @@ namespace WitcherHub.Configuration.Extensions
             Report("Lexware integration", "Lexware__AccessToken", configuration["Lexware:AccessToken"]);
             Report("AI contract drafting", "OpenAI__ApiKey", configuration["OpenAI:ApiKey"]);
             Report("Outgoing email", "Smtp__Password", configuration["Smtp:Password"]);
+
+            // Not a secret, and worth stating plainly: every link this environment
+            // emails — password resets, quote and contract signing, invoices — is
+            // built from this value. A dev environment carrying the production URL
+            // sends users to production, which is easy to miss otherwise.
+            var publicBaseUrl = PublicBaseUrl.Resolve(configuration);
+
+            if (publicBaseUrl is null)
+            {
+                logger.LogWarning(
+                    "{Variable} is not configured. Password reset will refuse to send, and links in " +
+                    "other emails may be unusable.", PublicBaseUrl.ConfigurationKey);
+            }
+            else
+            {
+                logger.LogInformation(
+                    "Links emailed by this environment will point at {PublicBaseUrl} ({Environment}).",
+                    publicBaseUrl, app.Environment.EnvironmentName);
+            }
 
             var verifyWebhooks = configuration.GetValue<bool>("LexwareWebhooks:VerifySignature");
             var webhookKey = configuration["LexwareWebhooks:PublicKeyPem"];
