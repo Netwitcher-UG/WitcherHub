@@ -109,9 +109,12 @@ namespace WitcherHub.Pages.Auth
 
                 _logger.LogInformation("Sign-in succeeded for {Email}.", Email.Trim());
 
-                var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "/Index" : ReturnUrl;
-                if (!Url.IsLocalUrl(target)) target = "/Index";
-                return LocalRedirect(target);
+                if (!string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl))
+                    return LocalRedirect(ReturnUrl);
+
+                // The overview, not the client list: after signing in the first
+                // question is what needs doing today.
+                return RedirectToPage("/Dashboard");
             }
             catch (AuthenticationFailedAppException ex)
             {

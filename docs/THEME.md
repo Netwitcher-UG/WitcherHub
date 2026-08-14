@@ -86,3 +86,21 @@ on seven pages, each hard-coding the old purple.
   in dark mode.
 - `style.css` imports the Inter font from Google Fonts. It is the only external
   request any page makes.
+
+## Shared components
+
+Built on top of the theme, in `WitcherHub/Pages/Shared` and
+`WitcherHub/Pages/Models/UI`:
+
+| Component | What it is |
+| --- | --- |
+| `_StatusBadge.cshtml` + `StatusPresentation.cs` | The single place that decides how a status looks. `DocumentStatus` is shared by quotes, contracts and invoices but means different things on each — "Sent" is awaiting a decision on a quote and awaiting a signature on a contract — so wording and colour are chosen per document kind. |
+| `_StatCard.cshtml` + `StatCardVm` | A headline figure on the dashboard. |
+| `_AttentionList.cshtml` + `AttentionListVm` | A "needs attention" panel. Words a day count in the right direction: the same 12 days is "12 days late" for an overdue invoice and "in 12 days" for a contract about to end. |
+| `_EmptyState.cshtml` + `EmptyStateVm` | Shown instead of an empty table. Distinguishes "nothing here yet" from "nothing matches the filter", because an empty grid otherwise reads as a failure. |
+| `_RegisterFilters.cshtml` + `RegisterFilterVm` | The filter bar above the quote, contract and invoice registers. A plain GET form, so a filtered view can be bookmarked. |
+| `_RegisterPager.cshtml` + `PagerVm` | Paging that rebuilds its links from the live query string, so a new filter is never dropped on page two. |
+| `Format.cs` | Money and dates. Amounts always use German separators, whatever culture the request ran under, because the figure on screen has to match the figure on the invoice. |
+
+`ApexCharts` (`wowdash/js/lib/apexcharts.min.js`) is loaded by the dashboard only —
+it is half a megabyte and nothing else charts anything.

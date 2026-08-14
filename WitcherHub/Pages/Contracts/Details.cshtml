@@ -6,10 +6,11 @@
 
 @{
     ViewData["Title"] = T["contractPage_Title"];
-    Layout = "_ContractsLayout";
+    Layout = "_Layout";
 }
 
 @section Styles {
+    <link rel="stylesheet" href="~/css/contracts/contract-sign.css" asp-append-version="true" />
     <style>
         .contractTopbar {
             position: sticky;
@@ -45,22 +46,71 @@
         }
     </style>
 }
+@*
+    Everything that can be done with this contract, in one bar.
+
+    The positions builder in particular was reachable only by typing
+    /Contracts/Positions/{id} into the address bar — nothing anywhere linked to
+    it, so the manual-position editor was effectively invisible.
+*@
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-24">
+    <div>
+        <nav class="mb-8">
+            <a asp-page="/Contracts/Index" class="text-secondary-light text-sm hover-text-primary d-inline-flex align-items-center gap-1">
+                <i class="ri-arrow-left-line"></i> All contracts
+            </a>
+        </nav>
+
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <h3 class="mb-0 fw-semibold">@(Model.Contract?.ContractNo ?? "Contract")</h3>
+
+            @if (Model.Contract is not null)
+            {
+                <partial name="_StatusBadge"
+                         model="WitcherHub.Pages.Models.UI.DocumentStatusPresentation.ForContract(Model.Contract.Status)" />
+            }
+        </div>
+
+        @if (Model.Contract?.Project?.Customer is not null)
+        {
+            <p class="text-secondary-light mb-0 mt-8 text-sm">
+                <a asp-page="/Clients/Details" asp-route-id="@Model.Contract.Project.CustomerId" class="text-primary-600 fw-medium">
+                    @Model.Contract.Project.Customer.Name
+                </a>
+                ·
+                <a asp-page="/Projects/Workspace" asp-route-id="@Model.ProjectId" asp-route-tab="contracts" class="hover-text-primary">
+                    @Model.Contract.Project.Title
+                </a>
+            </p>
+        }
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-page="/Contracts/Positions" asp-route-contractId="@Model.ContractId"
+           class="btn btn-outline-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2">
+            <i class="ri-list-check-2"></i> Positions
+        </a>
+
+        <a asp-page="/Contracts/Edit" asp-route-id="@Model.ContractId"
+           class="btn btn-outline-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2">
+            <i class="ri-edit-line"></i> Edit
+        </a>
+
+        <button class="btn btn-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2"
+                type="button" id="btnPrint">
+            <i class="ri-printer-line"></i> @T["contractPage_Print"]
+        </button>
+    </div>
+</div>
+
 <div class="contractPage">
 
     <div class="contractTopbar">
-        <!-- ✅ Left side: badge + print -->
         <div class="contractTopbar__leftActions">
-            <button class="btn btn-outline-secondary btn-sm" type="button" id="btnPrint">
-                @T["contractPage_Print"]
-            </button>
             <span class="contractTopbar__badge" id="signedBadge">
                 @(Model.IsSigned? T["contractPage_Signed"] : T["contractPage_Unsigned"])
             </span>
-
-            
         </div>
-
-        
     </div>
 
     <div class="contractPage__container">

@@ -7,13 +7,16 @@
    overlay is now defined once, in site.css.
    ========================================================================== */
 
+/* Bottom right, not top right. Anchored at the top it sat exactly over the
+   action buttons in every page header — opening a contract covered its
+   Positions, Edit and Print buttons for as long as the toast was on screen. */
 .ui-notify-container {
     position: fixed;
-    top: 90px;
+    bottom: 24px;
     right: 20px;
-    z-index: 2000;
+    z-index: 3000;
     display: flex;
-    flex-direction: column;
+    flex-direction: column-reverse;
     gap: 12px;
     width: min(420px, calc(100vw - 40px));
 }
@@ -22,7 +25,9 @@
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 14px 40px rgba(4, 6, 15, .35);
-    transform: translateY(-6px);
+
+    /* Slides up into place, matching the new bottom anchor. */
+    transform: translateY(6px);
     opacity: 0;
     transition: all .18s ease;
 }

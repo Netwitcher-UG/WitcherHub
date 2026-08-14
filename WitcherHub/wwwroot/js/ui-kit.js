@@ -47,75 +47,14 @@
         default: { cls: 'bg-primary-600', icon: 'ri-notification-3-line', text: 'text-white', close: 'text-white' }
     };
 
-    function ensureNotifyCss() {
-        if (document.getElementById('uiNotifyCss')) return;
-        const style = document.createElement('style');
-        style.id = 'uiNotifyCss';
-        style.textContent = `
-/* Rounded Corners Notifications (Injected) */
-.ui-notify-container{
-  position: fixed;
-  top: 90px;
-  right: 20px;
-  z-index: 3000;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: min(420px, calc(100vw - 40px));
-}
-.ui-notify{
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 14px 40px rgba(0,0,0,.35);
-  transform: translateY(-6px);
-  opacity: 0;
-  transition: all .18s ease;
-}
-.ui-notify.show{
-  transform: translateY(0);
-  opacity: 1;
-}
-.ui-notify-body{
-  padding: 14px 16px;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-.ui-notify-icon{
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background: rgba(255,255,255,.18);
-  flex: 0 0 auto;
-}
-.ui-notify-title{
-  font-weight: 700;
-  margin: 0 0 2px 0;
-  line-height: 1.2;
-}
-.ui-notify-text{
-  margin: 0;
-  opacity: .95;
-  line-height: 1.35;
-}
-.ui-notify-close{
-  margin-left: auto;
-  background: transparent;
-  border: 0;
-  padding: 0;
-  line-height: 1;
-  opacity: .9;
-  cursor: pointer;
-}
-        `;
-        document.head.appendChild(style);
-    }
+    // Toast styling lives in wwwroot/css/ui-kit.css.
+    //
+    // A second copy of the same rules used to be injected here at runtime.
+    // Being injected after the linked stylesheet, it won the cascade — so
+    // editing ui-kit.css changed nothing, and the toast stayed anchored at the
+    // top right where it covered the action buttons in every page header.
 
     function ensureNotifyContainer() {
-        ensureNotifyCss();
         let el = byId('uiNotifyContainer');
         if (!el) {
             el = document.createElement('div');

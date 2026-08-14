@@ -21,7 +21,9 @@ using WitcherHub.Infrastructure.Data.Models;
 using WitcherHub.Infrastructure.ManageData.Contracts;
 using WitcherHub.Infrastructure.ManageData.Customers;
 using WitcherHub.Infrastructure.ManageData.Invoices;
+using WitcherHub.Infrastructure.ManageData.Payments;
 using WitcherHub.Infrastructure.ManageData.Projects;
+using WitcherHub.Infrastructure.ManageData.Registers;
 using WitcherHub.Infrastructure.ManageData.Quotes;
 using WitcherHub.Infrastructure.ManageData.Services;
 using WitcherHub.Infrastructure.Repositories.Implementations;
@@ -164,6 +166,11 @@ namespace WitcherHub.Infrastructure
             services.AddScoped<IQuote, ManageQuote>();
             services.AddScoped<IInvoice, ManageInvoice>();
             services.AddScoped<IContract, ManageContract>();
+
+            // Reads across every project, and the money side the per-project
+            // services never covered.
+            services.AddScoped<IDocumentRegister, DocumentRegister>();
+            services.AddScoped<IPayments, ManagePayments>();
             services.AddScoped<IContractPositions, ManageContractPositions>();
             // UnitOfWork
             services.AddScoped<IUnitOfWork, UnitOfWork>();

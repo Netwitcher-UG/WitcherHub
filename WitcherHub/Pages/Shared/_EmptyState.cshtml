@@ -1,0 +1,25 @@
+@model WitcherHub.Pages.Models.UI.EmptyStateVm
+
+@*
+    Shown where a list has nothing in it. An empty table with only a header row
+    reads as "something failed"; this says which of the two it is — nothing here
+    yet, or nothing matching the filter — and offers the next step.
+*@
+<div class="text-center py-48 px-24">
+    <span class="w-64-px h-64-px bg-primary-50 text-primary-600 rounded-circle d-inline-flex justify-content-center align-items-center mb-16"
+          style="font-size: 28px;">
+        <i class="@Model.Icon"></i>
+    </span>
+
+    <h6 class="mb-8 fw-semibold">@Model.Title</h6>
+    <p class="text-secondary-light mb-0 mx-auto" style="max-width: 30rem;">@Model.Message</p>
+
+    @if (!string.IsNullOrWhiteSpace(Model.ActionText) && !string.IsNullOrWhiteSpace(Model.ActionUrl))
+    {
+        <a href="@Model.ActionUrl"
+           class="btn btn-primary text-sm px-20 py-11 radius-8 mt-24 d-inline-flex align-items-center gap-2">
+            <i class="@Model.ActionIcon"></i>
+            @Model.ActionText
+        </a>
+    }
+</div>

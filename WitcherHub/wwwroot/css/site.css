@@ -44,6 +44,32 @@
 }
 
 /* ==========================================================================
+   Dashboard and register helpers
+   ========================================================================== */
+
+/* A flex child that must be allowed to shrink so its text can ellipsise. */
+.wh-min-w-0 {
+    min-width: 0;
+}
+
+/* A whole list row that is a link. The theme has no hover background utility
+   beyond white and transparent, neither of which works on both palettes. */
+.wh-row-link {
+    border-radius: 8px;
+    padding-inline: .5rem;
+    margin-inline: -.5rem;
+    transition: background-color .14s ease;
+}
+
+.wh-row-link:hover {
+    background: var(--primary-50);
+}
+
+.wh-row-link:last-child {
+    border-bottom: 0 !important;
+}
+
+/* ==========================================================================
    Disclosure widgets
 
    The theme opens with `all: unset` on almost every element, which strips the
@@ -199,6 +225,25 @@ details[open] > summary::before {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+
+/* ==========================================================================
+   Register tables
+
+   Given a narrow viewport, a table with no floor squeezes its columns until
+   words break mid-syllable — "Sternwer / k Logistik AG". A minimum width makes
+   the row keep its shape and the container scroll instead, which is the whole
+   point of .table-responsive.
+   ========================================================================== */
+
+.wh-register-table {
+    min-width: 52rem;
+}
+
+@media (min-width: 1200px) {
+    .wh-register-table {
+        min-width: 0;
+    }
 }
 
 /* Wide tables scroll inside the card instead of stretching the page. */

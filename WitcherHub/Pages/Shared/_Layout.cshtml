@@ -96,13 +96,20 @@
 
     @if (!string.IsNullOrWhiteSpace(toastType) && !string.IsNullOrWhiteSpace(toastMessage))
     {
+        @*
+            Serialised as JSON rather than interpolated into a JavaScript string
+            literal. Razor HTML-encodes an interpolated value, which is the wrong
+            encoding inside a <script> block: a toast saying "1.558,80 €" arrived
+            in the browser as "1.558,80 &#x20AC;". JSON gives correct JavaScript
+            escaping and closes the injection hole that quoting by hand leaves open.
+        *@
         <script>
             document.addEventListener("DOMContentLoaded", function () {
                 if (window.UI?.toast?.show) {
                     UI.toast.show({
-                        type: "@toastType",
-                        title: "@(toastTitle ?? "")",
-                        msg: "@toastMessage",
+                        type: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(toastType)),
+                        title: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(toastTitle ?? "")),
+                        msg: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(toastMessage)),
                         timeout: 3500
                     });
                 }

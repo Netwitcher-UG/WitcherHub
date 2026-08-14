@@ -1,0 +1,52 @@
+@model WitcherHub.Pages.Models.UI.PagerVm
+
+@*
+    Paging that keeps the current filter. Building the links from the request's own
+    query string means a new filter never has to be threaded through here by hand.
+*@
+@if (Model.TotalPages > 1)
+{
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mt-24">
+        <span class="text-secondary-light text-sm">
+            Showing @Model.FromItem–@Model.ToItem of @Model.TotalItems
+        </span>
+
+        <nav aria-label="Pages">
+            <ul class="pagination mb-0">
+                <li class="page-item @(Model.HasPrevious ? "" : "disabled")">
+                    <a class="page-link" aria-label="Previous"
+                       href="@(Model.HasPrevious ? Model.UrlForPage(Model.Page - 1) : "javascript:;")">
+                        <i class="ri-arrow-left-s-line"></i>
+                    </a>
+                </li>
+
+                @foreach (var pageNumber in Model.PageNumbers())
+                {
+                    if (pageNumber is null)
+                    {
+                        <li class="page-item disabled"><span class="page-link">…</span></li>
+                    }
+                    else
+                    {
+                        <li class="page-item @(pageNumber == Model.Page ? "active" : "")">
+                            <a class="page-link" href="@Model.UrlForPage(pageNumber.Value)">@pageNumber</a>
+                        </li>
+                    }
+                }
+
+                <li class="page-item @(Model.HasNext ? "" : "disabled")">
+                    <a class="page-link" aria-label="Next"
+                       href="@(Model.HasNext ? Model.UrlForPage(Model.Page + 1) : "javascript:;")">
+                        <i class="ri-arrow-right-s-line"></i>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+}
+else if (Model.TotalItems > 0)
+{
+    <div class="mt-16">
+        <span class="text-secondary-light text-sm">@Model.TotalItems @(Model.TotalItems == 1 ? "entry" : "entries")</span>
+    </div>
+}
