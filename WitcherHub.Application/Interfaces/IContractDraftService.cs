@@ -21,6 +21,20 @@ namespace WitcherHub.Application.Interfaces
         Task<ContractDraftSummary?> GetDraftAsync(Guid contractId, int version, CancellationToken ct = default);
 
         /// <summary>
+        /// Stores contract text that came from outside the system — pasted in, or
+        /// lifted from a document the customer supplied — as a new version.
+        ///
+        /// The text is stored exactly as given. Nothing rewrites it, and a
+        /// contract built this way needs no positions at all: the wording is what
+        /// was agreed. Improving or restructuring it is a separate, explicit act.
+        /// </summary>
+        Task<ContractDraftResult> ImportTextAsync(
+            Guid contractId,
+            string documentText,
+            string source,
+            CancellationToken ct = default);
+
+        /// <summary>
         /// Replaces a draft's text with wording a person edited by hand.
         /// </summary>
         Task<ContractDraftResult> SaveEditedAsync(

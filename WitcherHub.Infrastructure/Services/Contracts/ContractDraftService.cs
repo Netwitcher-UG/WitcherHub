@@ -141,6 +141,39 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             return draft is null ? null : ToSummary(draft, null);
         }
 
+        public async Task<ContractDraftResult> ImportTextAsync(
+            Guid contractId, string documentText, string source, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(documentText))
+                return ContractDraftResult.Failed("The contract text cannot be empty.");
+
+            // Loaded to prove the contract exists and to place the version.
+            await LoadAsync(contractId, ct);
+
+            var draft = new ContractDraft
+            {
+                Id = Guid.NewGuid(),
+                ContractId = contractId,
+                Version = await NextVersionAsync(contractId, ct),
+                DocumentMarkdown = documentText.Trim(),
+
+                // No prompt, no template, no model: this text was not generated.
+                // Recording that plainly is what lets a later reader tell supplied
+                // wording from wording the assistant produced.
+                GeneratedBy = source,
+                GeneratedAt = DateTimeOffset.UtcNow
+            };
+
+            _db.Add(draft);
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Contract {ContractId} received supplied text as version {Version} ({Source}).",
+                contractId, draft.Version, source);
+
+            return new ContractDraftResult { Succeeded = true, Draft = ToSummary(draft, null) };
+        }
+
         public async Task<ContractDraftResult> SaveEditedAsync(
             Guid contractId, int version, string documentMarkdown, CancellationToken ct = default)
         {

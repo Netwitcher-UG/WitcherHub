@@ -32,6 +32,12 @@ namespace WitcherHub.Application.Models.View.Contracts
             public DocumentStatus Status { get; set; }
             public string Currency { get; set; } = "EUR";
 
+            // Who the contract is with. The builder has to show the parties, and
+            // without these it could only show a contract number.
+            public Guid CustomerId { get; set; }
+            public string CustomerName { get; set; } = "";
+            public string ProjectTitle { get; set; } = "";
+
             public string? Terms { get; set; }
             public JsonDocument? TermsStructured { get; set; }
             public DateTimeOffset CreatedAt { get; set; }
