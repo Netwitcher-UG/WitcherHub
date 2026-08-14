@@ -1,0 +1,112 @@
+@page
+@using WitcherHub.Pages.Models.UI
+@model WitcherHub.Pages.Quotes.IndexModel
+@{
+    ViewData["Title"] = "Quotes";
+    var noMatches = EmptyStateVm.NoMatches("quotes");
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+    <div>
+        <h3 class="mb-4 fw-semibold">Quotes</h3>
+        <p class="text-secondary-light mb-0 text-sm">Every quote, across all customers and projects.</p>
+    </div>
+
+    @if (Model.AwaitingCount > 0)
+    {
+        <span class="badge bg-warning-focus text-warning-main border border-warning-main px-16 py-8 radius-8 text-sm">
+            @Model.AwaitingCount awaiting a decision · @Format.Money(Model.AwaitingValue)
+        </span>
+    }
+</div>
+
+<div class="card radius-12 border">
+    <div class="card-body p-24">
+        <partial name="_RegisterFilters" model="Model.Filters" />
+
+        @if (Model.Results.TotalItems == 0)
+        {
+            @if (Model.Filters.AnyApplied)
+            {
+                                <partial name="_EmptyState" model="noMatches" />
+            }
+            else
+            {
+                <partial name="_EmptyState" model="@(new EmptyStateVm
+                       {
+                           Title = "No quotes yet",
+                           Message = "Quotes are created inside a project. Open a project and use the Quotes tab to write the first one.",
+                           Icon = "ri-file-text-line",
+                           ActionText = "Go to projects",
+                           ActionUrl = Url.Page("/Projects"),
+                           ActionIcon = "ri-briefcase-line"
+                       })" />
+            }
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle mb-0 wh-register-table">
+                    <thead>
+                        <tr>
+                            <th class="text-sm">Quote</th>
+                            <th class="text-sm">Customer</th>
+                            <th class="text-sm">Project</th>
+                            <th class="text-sm">Status</th>
+                            <th class="text-sm text-end">Value</th>
+                            <th class="text-sm">Sent</th>
+                            <th class="text-sm text-end">Open</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Model.Results.Items)
+                        {
+                            <tr>
+                                <td>
+                                    <a asp-page="/Quotes/Details" asp-route-id="@row.Id" class="fw-semibold text-primary-600">
+                                        @row.QuoteNo
+                                    </a>
+                                    <span class="d-block text-secondary-light text-sm">
+                                        @row.ItemCount @(row.ItemCount == 1 ? "position" : "positions")
+                                    </span>
+                                </td>
+                                <td class="text-break">@row.CustomerName</td>
+                                <td class="text-break text-secondary-light">@row.ProjectTitle</td>
+                                <td>
+                                    <partial name="_StatusBadge" model="DocumentStatusPresentation.ForQuote(row.Status)" />
+                                </td>
+                                <td class="text-end fw-semibold text-nowrap">
+                                    @Format.Money(row.ItemsTotal, row.Currency)
+                                </td>
+                                <td class="text-nowrap">
+                                    @if (row.IssuedAt is not null)
+                                    {
+                                        <span>@Format.Date(row.IssuedAt)</span>
+                                        <span class="d-block text-secondary-light text-sm">@Format.Relative(row.IssuedAt)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-secondary-light">Not sent</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <a asp-page="/Quotes/Details" asp-route-id="@row.Id"
+                                       class="btn btn-sm btn-outline-primary radius-8 px-12"
+                                       title="Open quote">
+                                        <i class="ri-arrow-right-line"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <p class="text-secondary-light text-sm mt-16 mb-0">
+                Value is the sum of quantity × unit price across the positions, before position discounts and VAT.
+            </p>
+
+            <partial name="_RegisterPager" model="Model.Pager" />
+        }
+    </div>
+</div>

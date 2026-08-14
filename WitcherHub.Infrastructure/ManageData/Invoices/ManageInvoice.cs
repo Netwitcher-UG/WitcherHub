@@ -157,6 +157,10 @@ namespace WitcherHub.Infrastructure.ManageData.Invoices
                             Status = x.Status,
                             Currency = x.Currency,
 
+                            CustomerId = x.Project.CustomerId,
+                            CustomerName = x.Project.Customer.Name,
+                            ProjectTitle = x.Project.Title,
+
                             Notes = x.Notes,
                             CreatedAt = x.CreatedAt,
 
@@ -798,7 +802,13 @@ private async Task RecalculateInvoiceTotalsAsync(Guid invoiceId, CancellationTok
     var discountTotal = itemDiscountTotal + invoiceDiscountAmount;
     var total = netSubtotal + taxTotal;
 
-    var paidTotal = invoice.Payments.Sum(p => p.Amount);
+    // Only settled money counts. Summing every payment row regardless of status
+    // meant a pending or failed payment reduced the balance and could mark the
+    // invoice paid. ManagePayments applies the same rule.
+    var paidTotal = invoice.Payments
+        .Where(p => p.Status == PaymentStatus.Success)
+        .Sum(p => p.Amount);
+
     var balanceDue = Math.Max(0m, total - paidTotal);
 
     if (invoice.Totals is null)

@@ -888,7 +888,7 @@
                         title="Edit"
                         data-vc-action="edit-rule"
                         data-index="${idx}">
-                  <i class="material-icons-outlined">edit</i>
+                  <i class="ri-edit-line"></i>
                 </button>
 
                 <button type="button"
@@ -896,7 +896,7 @@
                         title="Save"
                         data-vc-action="save-rule"
                         data-index="${idx}">
-                  <i class="material-icons-outlined">check</i>
+                  <i class="ri-check-line"></i>
                 </button>
 
                 <button type="button"
@@ -904,7 +904,7 @@
                         title="Cancel"
                         data-vc-action="cancel-rule"
                         data-index="${idx}">
-                  <i class="material-icons-outlined">close</i>
+                  <i class="ri-close-line"></i>
                 </button>
 
                 <button type="button"
@@ -912,7 +912,7 @@
                         title="Delete"
                         data-vc-action="delete-rule"
                         data-index="${idx}">
-                  <i class="material-icons-outlined">delete</i>
+                  <i class="ri-delete-bin-line"></i>
                 </button>
               </div>
 

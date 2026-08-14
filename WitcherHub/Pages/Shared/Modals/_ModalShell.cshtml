@@ -4,8 +4,8 @@
     <div class="modal-dialog modal-dialog-centered @Model.SizeClass">
         <div class="modal-content">
 
-            <div class="modal-header bg-grd-info border-0">
-                <h5 class="modal-title text-light">@Model.Title</h5>
+            <div class="modal-header bg-primary-600 text-white border-0">
+                <h5 class="modal-title text-white">@Model.Title</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
 
@@ -20,8 +20,8 @@
                         <partial name="@Model.BodyPartialPath" model="Model.BodyModel" />
 
                         <div class="d-flex justify-content-end gap-2 mt-5">
-                            <button type="button" class="btn btn-grd-info px-4" data-bs-dismiss="modal">@Model.CancelText</button>
-                            <button type="submit" class="btn btn-grd-primary px-4">@Model.SubmitText</button>
+                            <button type="button" class="btn btn-info px-4" data-bs-dismiss="modal">@Model.CancelText</button>
+                            <button type="submit" class="btn btn-primary px-4">@Model.SubmitText</button>
                         </div>
                     </form>
                 }
@@ -36,7 +36,7 @@
 
                         <div class="d-flex justify-content-end gap-2 mt-5">
                             <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">@Model.CancelText</button>
-                            <button type="submit" class="btn btn-grd btn-grd-primary px-4">@Model.SubmitText</button>
+                            <button type="submit" class="btn btn-primary px-4">@Model.SubmitText</button>
                         </div>
                     </form>
                 }

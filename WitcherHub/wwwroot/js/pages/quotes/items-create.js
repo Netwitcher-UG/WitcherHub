@@ -161,7 +161,7 @@
         badge.innerHTML = `
           <span>${escapeHtml(r.name)}</span>
           <button type="button" class="btn btn-sm p-0 border-0 text-primary" aria-label="Remove">
-            <i class="material-icons-outlined" style="font-size:18px; line-height:1;">close</i>
+            <i class="ri-close-line" style="font-size:18px; line-height:1;"></i>
           </button>
         `;
 

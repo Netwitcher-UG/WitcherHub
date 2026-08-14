@@ -1,0 +1,58 @@
+@using WitcherHub.Pages.Models.UI
+@model AttentionListVm
+
+<div class="card radius-12 border h-100">
+    <div class="card-body p-24">
+        <div class="d-flex align-items-center justify-content-between gap-3 mb-16">
+            <div class="d-flex align-items-center gap-3">
+                <span class="w-40-px h-40-px @Model.HeaderIconClass rounded-circle d-flex justify-content-center align-items-center"
+                      style="font-size: 18px;">
+                    <i class="@Model.Icon"></i>
+                </span>
+                <h6 class="fw-semibold mb-0">@Model.Title</h6>
+            </div>
+
+            @if (Model.Items.Count > 0)
+            {
+                <span class="badge bg-neutral-200 text-neutral-600 px-12 py-4 radius-4">@Model.BadgeCount</span>
+            }
+        </div>
+
+        @if (Model.Items.Count == 0)
+        {
+            <p class="text-secondary-light mb-0 d-flex align-items-center gap-2">
+                <i class="ri-check-line text-success-main"></i> @Model.EmptyMessage
+            </p>
+        }
+        else
+        {
+            <div class="d-flex flex-column">
+                @foreach (var item in Model.Items)
+                {
+                    <a asp-page="@Model.LinkPage" asp-route-id="@item.Id"
+                       class="d-flex flex-wrap align-items-center justify-content-between gap-2 py-12 border-bottom wh-row-link">
+                        <div class="wh-min-w-0">
+                            <span class="fw-medium d-block text-primary-light">@item.Reference</span>
+                            <span class="text-secondary-light text-sm d-block text-break">@item.CustomerName</span>
+                        </div>
+
+                        <div class="text-end">
+                            <span class="fw-semibold d-block text-nowrap">@Format.Money(item.Amount, item.Currency)</span>
+                            <span class="text-sm d-block text-nowrap @(Model.IsUrgent(item) ? "text-danger-main fw-medium" : "text-secondary-light")">
+                                @Model.DescribeAge(item)
+                            </span>
+                        </div>
+                    </a>
+                }
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(Model.SeeAllUrl))
+            {
+                <a href="@Model.SeeAllUrl" class="text-primary-600 fw-medium text-sm d-inline-flex align-items-center gap-1 mt-16">
+                    @(Model.IsTruncated ? $"See all {Model.BadgeCount}" : "See all")
+                    <i class="ri-arrow-right-line"></i>
+                </a>
+            }
+        }
+    </div>
+</div>

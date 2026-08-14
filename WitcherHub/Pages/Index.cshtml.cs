@@ -973,7 +973,7 @@ namespace WitcherHub.Pages
         title="Export to Lexware"
         data-vc-action="table-export"
         data-client-id="{{Enc(customerId)}}">
-    <i class="material-icons-outlined">upload</i>
+    <i class="ri-upload-2-line"></i>
 </button>
 """
                 : "";
@@ -985,7 +985,7 @@ namespace WitcherHub.Pages
     <a class="btn vc-icon-btn text-secondary"
    title="View"
    href="/Clients/Details/{{Enc(customerId)}}">
-    <i class="material-icons-outlined">visibility</i>
+    <i class="ri-eye-line"></i>
 </a>
 
     <button type="button"
@@ -993,7 +993,7 @@ namespace WitcherHub.Pages
             title="Delete"
             data-vc-action="table-delete"
             data-client-id="{{Enc(customerId)}}">
-        <i class="material-icons-outlined">delete</i>
+        <i class="ri-delete-bin-line"></i>
     </button>
 </div>
 """);

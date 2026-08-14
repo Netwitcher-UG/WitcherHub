@@ -1,36 +1,40 @@
-﻿<!doctype html>
-<html lang="en" data-bs-theme="blue-theme">
+@*
+    Shell for the pages a visitor can reach without signing in: login, forgot
+    password, reset password. No sidebar, no top bar, nothing that assumes an
+    identity.
+*@
+<!doctype html>
+<html lang="en" data-theme="light">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@ViewData["Title"] - WitcherHub</title>
-
-    <link rel="icon" href="~/theme/assets/images/favicon-32x32.png" type="image/png">
-
-    <link href="~/theme/assets/css/pace.min.css" rel="stylesheet" asp-append-version="true">
-    <script src="~/theme/assets/js/pace.min.js" asp-append-version="true"></script>
-
-    <link href="~/theme/assets/plugins/perfect-scrollbar/css/perfect-scrollbar.css" rel="stylesheet" asp-append-version="true">
-    <link href="~/theme/assets/plugins/metismenu/metisMenu.min.css" rel="stylesheet" asp-append-version="true">
-    <link href="~/theme/assets/plugins/metismenu/mm-vertical.css" rel="stylesheet" asp-append-version="true">
-
-    <link href="~/theme/assets/css/bootstrap.min.css" rel="stylesheet" asp-append-version="true">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css?family=Material+Icons+Outlined" rel="stylesheet">
-
-    <link href="~/theme/assets/css/bootstrap-extended.css" rel="stylesheet" asp-append-version="true">
-    <link href="~/theme/sass/main.css" rel="stylesheet" asp-append-version="true">
-    <link href="~/theme/sass/dark-theme.css" rel="stylesheet" asp-append-version="true">
-    <link href="~/theme/sass/blue-theme.css" rel="stylesheet" asp-append-version="true">
-    <link href="~/theme/sass/responsive.css" rel="stylesheet" asp-append-version="true">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-
+    <partial name="_ThemeHead" />
+    @await RenderSectionAsync("Styles", required: false)
 </head>
-
 <body>
-    @RenderBody()
+    <section class="auth bg-base d-flex flex-wrap">
+    @*
+        The theme fills this panel with a stock illustration. Shipping a purchased
+        template's placeholder art on the front door of a company's own system is
+        worse than shipping nothing, so it carries the mark and the product name
+        instead.
+    *@
+        <div class="auth-left d-lg-block d-none">
+            <div class="d-flex align-items-center flex-column h-100 justify-content-center text-center px-24">
+                <img src="~/img/netwitcher-logo.png" alt="" class="wh-auth-mark mb-32">
+                <h4 class="mb-12">WitcherHub</h4>
+                <p class="text-secondary-light text-lg mb-0" style="max-width: 24rem;">
+                    Customers, projects, quotes, contracts and invoices, in one place.
+                </p>
+            </div>
+        </div>
 
-    <script src="~/theme/assets/js/jquery.min.js" asp-append-version="true"></script>
-    @RenderSection("Scripts", required: false)
+        <div class="auth-right py-32 px-24 d-flex flex-column justify-content-center">
+            <div class="max-w-464-px mx-auto w-100">
+                @RenderBody()
+            </div>
+        </div>
+    </section>
+
+    <partial name="_ThemeScripts" />
+    @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

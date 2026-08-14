@@ -48,26 +48,53 @@ namespace WitcherHub.Infrastructure.Authentication
 
             var user = await _userManager.FindByEmailAsync(email);
 
-            // The caller receives one indistinguishable failure either way, but the
-            // log records which it was — without that, "wrong password" and "no such
-            // account in this database" look identical while debugging.
+            // The caller receives one indistinguishable sentence either way, but the
+            // reason travels on the exception and into the log — without that,
+            // "wrong password" and "no such account in this database" look
+            // identical while debugging.
             if (user is null)
             {
-                _logger.LogWarning(
-                    "Sign-in failed: no account with email {Email} exists in this database. " +
-                    "Total accounts: {UserCount}.",
-                    email, await _userManager.Users.CountAsync(ct));
+                var totalAccounts = await _userManager.Users.CountAsync(ct);
 
-                throw new AuthenticationFailedAppException();
+                var reason = totalAccounts == 0
+                    ? SignInFailureReason.NoAccountsExist
+                    : SignInFailureReason.UnknownEmail;
+
+                _logger.LogWarning(
+                    "Sign-in failed [{Code}]: no account with email {Email} exists in this database. " +
+                    "Total accounts: {UserCount}.",
+                    reason.ToCode(), email, totalAccounts);
+
+                throw new AuthenticationFailedAppException(reason);
+            }
+
+            if (await _userManager.IsLockedOutAsync(user))
+            {
+                _logger.LogWarning(
+                    "Sign-in failed [{Code}]: the account {Email} (id {UserId}) is locked out until {LockoutEnd}.",
+                    SignInFailureReason.AccountLockedOut.ToCode(), email, user.Id, user.LockoutEnd);
+
+                throw new AuthenticationFailedAppException(SignInFailureReason.AccountLockedOut);
+            }
+
+            // No stored hash is not the same as a wrong password: no password can
+            // ever match, so retyping it is wasted effort.
+            if (!await _userManager.HasPasswordAsync(user))
+            {
+                _logger.LogWarning(
+                    "Sign-in failed [{Code}]: the account {Email} (id {UserId}) has no password set.",
+                    SignInFailureReason.NoPasswordSet.ToCode(), email, user.Id);
+
+                throw new AuthenticationFailedAppException(SignInFailureReason.NoPasswordSet);
             }
 
             if (!await _userManager.CheckPasswordAsync(user, request.Password))
             {
                 _logger.LogWarning(
-                    "Sign-in failed: the account {Email} exists (id {UserId}) but the password did not match.",
-                    email, user.Id);
+                    "Sign-in failed [{Code}]: the account {Email} exists (id {UserId}) but the password did not match.",
+                    SignInFailureReason.IncorrectPassword.ToCode(), email, user.Id);
 
-                throw new AuthenticationFailedAppException();
+                throw new AuthenticationFailedAppException(SignInFailureReason.IncorrectPassword);
             }
 
             var roles = await _userManager.GetRolesAsync(user);

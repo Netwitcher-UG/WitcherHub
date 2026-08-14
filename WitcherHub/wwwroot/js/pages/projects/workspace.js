@@ -704,7 +704,7 @@
             data-status="${esc(status ?? '')}"
             title="Change Status"
             aria-label="Change Status">
-        <i class="material-icons-outlined">edit</i>
+        <i class="ri-edit-line"></i>
     </button>
 
     <a class="btn text-primary wh-icon-btn-plain"
@@ -713,7 +713,7 @@
        rel="noopener"
        title="Details"
        aria-label="Details">
-        <i class="material-icons-outlined">description</i>
+        <i class="ri-file-list-3-line"></i>
     </a>
 </td>
                 `;

@@ -531,7 +531,7 @@ namespace WitcherHub.Pages
   <a class="btn vc-icon-btn text-primary"
      title="Quotes"
      href="{{Enc(quotesUrl)}}">
-      <i class="material-icons-outlined">request_quote</i>
+      <i class="ri-file-text-line"></i>
   </a>
 
   <button type="button"
@@ -539,7 +539,7 @@ namespace WitcherHub.Pages
           title="Delete"
           data-vc-action="table-delete-project"
           data-project-id="{{Enc(projectId)}}">
-      <i class="material-icons-outlined">delete</i>
+      <i class="ri-delete-bin-line"></i>
   </button>
 </div>
 """);

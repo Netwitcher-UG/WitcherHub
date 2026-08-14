@@ -1,0 +1,282 @@
+@page "/"
+@using WitcherHub.Pages.Models.UI
+@model WitcherHub.Pages.DashboardModel
+@{
+    ViewData["Title"] = "Overview";
+    var money = Model.Overview.Money;
+    var pipeline = Model.Overview.Pipeline;
+}
+
+@section Styles {
+    @* Loaded only here: the chart library is half a megabyte and no other page uses it. *@
+    <link rel="stylesheet" href="~/wowdash/css/lib/apexcharts.css">
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+    <div>
+        <h3 class="mb-4 fw-semibold">Overview</h3>
+        <p class="text-secondary-light mb-0 text-sm">
+            @pipeline.CustomerCount @(pipeline.CustomerCount == 1 ? "customer" : "customers") ·
+            @pipeline.ActiveProjectCount active @(pipeline.ActiveProjectCount == 1 ? "project" : "projects") ·
+            @pipeline.LiveContractCount live @(pipeline.LiveContractCount == 1 ? "contract" : "contracts")
+        </p>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-page="/Index" class="btn btn-outline-primary text-sm px-16 py-8 radius-8 d-inline-flex align-items-center gap-2">
+            <i class="ri-group-line"></i> Clients
+        </a>
+        <a asp-page="/Projects" class="btn btn-primary text-sm px-16 py-8 radius-8 d-inline-flex align-items-center gap-2">
+            <i class="ri-briefcase-line"></i> Projects
+        </a>
+    </div>
+</div>
+
+@if (Model.Overview.IsEmpty)
+{
+    <div class="card radius-12 border">
+        <div class="card-body">
+            <partial name="_EmptyState" model="@(new EmptyStateVm
+                   {
+                       Title = "Nothing to show yet",
+                       Message = "Once there are quotes, contracts and invoices in the system, this page shows what is owed, what is waiting on a customer, and what is about to expire.",
+                       Icon = "ri-dashboard-line",
+                       ActionText = "Add your first client",
+                       ActionUrl = Url.Page("/Index"),
+                       ActionIcon = "ri-user-add-line"
+                   })" />
+        </div>
+    </div>
+    return;
+}
+
+@* ---------------- headline figures ---------------- *@
+<div class="row gy-4 mb-24">
+    @foreach (var card in Model.Cards())
+    {
+        <div class="col-12 col-sm-6 col-xxl-3">
+            <partial name="_StatCard" model="card" />
+        </div>
+    }
+</div>
+
+<div class="row gy-4">
+    @* ---------------- invoiced vs collected ---------------- *@
+    <div class="col-12 col-xxl-8">
+        <div class="card radius-12 border h-100">
+            <div class="card-body p-24">
+                <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-16">
+                    <div>
+                        <h6 class="fw-semibold mb-4">Invoiced and collected</h6>
+                        <p class="text-secondary-light text-sm mb-0">The last twelve months.</p>
+                    </div>
+                    <div class="text-end">
+                        <span class="text-secondary-light text-sm d-block">Collected, all time</span>
+                        <span class="fw-semibold">@Format.Money(money.CollectedAllTime, money.Currency)</span>
+                    </div>
+                </div>
+
+                <div id="revenueChart"></div>
+            </div>
+        </div>
+    </div>
+
+    @* ---------------- pipeline ---------------- *@
+    <div class="col-12 col-xxl-4">
+        <div class="card radius-12 border h-100">
+            <div class="card-body p-24">
+                <h6 class="fw-semibold mb-16">Pipeline</h6>
+
+                <dl class="row mb-0">
+                    <dt class="col-8 text-secondary-light fw-medium py-8">Quotes written</dt>
+                    <dd class="col-4 text-end fw-semibold py-8 mb-0">@pipeline.QuoteCount</dd>
+
+                    <dt class="col-8 text-secondary-light fw-medium py-8">Awaiting a decision</dt>
+                    <dd class="col-4 text-end fw-semibold py-8 mb-0">@pipeline.QuotesAwaitingDecisionCount</dd>
+
+                    <dt class="col-8 text-secondary-light fw-medium py-8">Win rate</dt>
+                    <dd class="col-4 text-end fw-semibold py-8 mb-0">
+                        @(pipeline.WinRatePercent is null ? "—" : $"{pipeline.WinRatePercent:0.#}%")
+                    </dd>
+
+                    <dd class="col-12 p-0"><hr class="my-8"></dd>
+
+                    <dt class="col-8 text-secondary-light fw-medium py-8">Live contracts</dt>
+                    <dd class="col-4 text-end fw-semibold py-8 mb-0">@pipeline.LiveContractCount</dd>
+
+                    <dt class="col-8 text-secondary-light fw-medium py-8">Contracted value</dt>
+                    <dd class="col-4 text-end fw-semibold py-8 mb-0">
+                        @Format.MoneyCompact(pipeline.LiveContractValue, money.Currency)
+                    </dd>
+
+                    <dt class="col-8 text-secondary-light fw-medium py-8">Invoices raised</dt>
+                    <dd class="col-4 text-end fw-semibold py-8 mb-0">@pipeline.InvoiceCount</dd>
+                </dl>
+
+                @if (pipeline.WinRatePercent is null)
+                {
+                    <p class="text-secondary-light text-sm mb-0 mt-16">
+                        A win rate appears once quotes have been accepted or rejected.
+                    </p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ---------------- needs attention ---------------- *@
+<h5 class="fw-semibold mt-32 mb-16">Needs attention</h5>
+
+<div class="row gy-4">
+    <div class="col-12 col-xl-6">
+        <partial name="_AttentionList" model="@(new AttentionListVm
+               {
+                   Title = "Overdue invoices",
+                   Icon = "ri-alarm-warning-line",
+                   Tone = "danger",
+                   Items = Model.Overview.OverdueInvoices,
+                   TotalCount = money.OverdueInvoiceCount,
+                   EmptyMessage = "Nothing is past its due date.",
+                   AmountLabel = "outstanding",
+                   DateNoun = "late",
+                   LinkPage = "/Invoices/Details",
+                   SeeAllUrl = Url.Page("/Invoices/Index", new { overdueOnly = true }),
+                   Kind = AttentionKind.Invoice
+               })" />
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <partial name="_AttentionList" model="@(new AttentionListVm
+               {
+                   Title = "Quotes waiting on a customer",
+                   Icon = "ri-send-plane-line",
+                   Tone = "warning",
+                   Items = Model.Overview.QuotesAwaitingDecision,
+                   TotalCount = pipeline.QuotesAwaitingDecisionCount,
+                   EmptyMessage = "No quotes are waiting for an answer.",
+                   AmountLabel = "value",
+                   DateNoun = "sent",
+                   LinkPage = "/Quotes/Details",
+                   SeeAllUrl = Url.Page("/Quotes/Index", new { status = 1 }),
+                   Kind = AttentionKind.Quote
+               })" />
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <partial name="_AttentionList" model="@(new AttentionListVm
+               {
+                   Title = "Contracts waiting for a signature",
+                   Icon = "ri-quill-pen-line",
+                   Tone = "warning",
+                   Items = Model.Overview.ContractsAwaitingSignature,
+                   TotalCount = pipeline.ContractsAwaitingSignatureCount,
+                   EmptyMessage = "No contracts are waiting to be signed.",
+                   AmountLabel = "value",
+                   DateNoun = "waiting",
+                   LinkPage = "/Contracts/Details",
+                   SeeAllUrl = Url.Page("/Contracts/Index", new { status = 1 }),
+                   Kind = AttentionKind.Contract
+               })" />
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <partial name="_AttentionList" model="@(new AttentionListVm
+               {
+                   Title = "Contracts ending within 60 days",
+                   Icon = "ri-calendar-close-line",
+                   Tone = "info",
+                   Items = Model.Overview.ContractsEndingSoon,
+                   TotalCount = pipeline.ContractsEndingSoonCount,
+                   EmptyMessage = "No contracts end in the next two months.",
+                   AmountLabel = "value",
+                   DateNoun = "ends",
+                   LinkPage = "/Contracts/Details",
+                   SeeAllUrl = Url.Page("/Contracts/Index"),
+                   Kind = AttentionKind.Contract
+               })" />
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/wowdash/js/lib/apexcharts.min.js"></script>
+    <script>
+        (function () {
+            var element = document.querySelector('#revenueChart');
+            if (!element || typeof ApexCharts === 'undefined') return;
+
+            // The theme switches palette on the html element, so the chart's own
+            // label colour has to be read from it rather than hard-coded, or the
+            // axes disappear in dark mode.
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            var labelColour = isDark ? '#D1D5DB' : '#6B7280';
+
+            var chart = new ApexCharts(element, {
+                chart: {
+                    type: 'area',
+                    height: 320,
+                    toolbar: { show: false },
+                    fontFamily: 'inherit'
+                },
+                colors: ['#487FFF', '#45B369'],
+                series: [
+                    { name: 'Invoiced', data: @Html.Raw(Model.ChartInvoicedJson) },
+                    { name: 'Collected', data: @Html.Raw(Model.ChartCollectedJson) }
+                ],
+                xaxis: {
+                    categories: @Html.Raw(Model.ChartLabelsJson),
+                    labels: { style: { colors: labelColour } },
+                    axisBorder: { show: false },
+                    axisTicks: { show: false }
+                },
+                yaxis: {
+                    // Labels are drawn in thousands, and the unit is stated once on
+                    // the axis title. Full amounts overflowed the label gutter and
+                    // were clipped at the left edge — "12.000 €" arrived as
+                    // ".2.000 €", which is not a number at all. Two or three
+                    // characters cannot clip.
+                    labels: {
+                        style: { colors: labelColour },
+                        formatter: function (value) {
+                            return new Intl.NumberFormat('de-DE', {
+                                maximumFractionDigits: 1
+                            }).format(value / 1000);
+                        }
+                    },
+                    title: {
+                        text: 'Tsd. EUR',
+                        style: { color: labelColour, fontWeight: 500 }
+                    }
+                },
+                dataLabels: { enabled: false },
+                stroke: { curve: 'smooth', width: 2 },
+                fill: {
+                    type: 'gradient',
+                    gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 90, 100] }
+                },
+                grid: {
+                    borderColor: isDark ? '#323D4E' : '#F3F4F6',
+                    strokeDashArray: 4,
+                    padding: { left: 12, right: 12 }
+                },
+                legend: { position: 'top', horizontalAlign: 'right', labels: { colors: labelColour } },
+                tooltip: {
+                    theme: isDark ? 'dark' : 'light',
+                    y: {
+                        formatter: function (value) {
+                            return new Intl.NumberFormat('de-DE', {
+                                style: 'currency', currency: 'EUR'
+                            }).format(value);
+                        }
+                    }
+                }
+            });
+
+            chart.render();
+
+            // Redraw on a palette change so the axes stay legible.
+            document.querySelector('[data-theme-toggle]')?.addEventListener('click', function () {
+                setTimeout(function () { window.location.reload(); }, 50);
+            });
+        })();
+    </script>
+}

@@ -1,89 +1,148 @@
-﻿@page
+@page
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
 @model WitcherHub.Pages.Auth.LoginModel
 @{
-    ViewData["Title"] = "Login";
+    ViewData["Title"] = "Sign in";
     Layout = "_AuthLayout";
 }
 
-
-
-<div class="auth-basic-wrapper d-flex align-items-center justify-content-center">
-    <div class="container-fluid my-5 my-lg-0">
-        <div class="row">
-            <div class="col-12 col-md-8 col-lg-6 col-xl-5 col-xxl-4 mx-auto">
-                <div class="card rounded-4 mb-0 border-top border-4 border-primary border-gradient-1">
-                    <div class="card-body p-5">
-                        <img src="~/theme/assets/images/logo1.png" class="mb-4" width="145" alt="">
-
-                        <h4 class="fw-bold">Get Started Now</h4>
-                        <p class="mb-0">Enter your credentials to login your account</p>
-
-                        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
-                        {
-                            <div class="alert @(Model.IsSystemError ? "alert-warning" : "alert-danger") mt-3 mb-0">
-                                @Model.ErrorMessage
-
-                                @if (!string.IsNullOrWhiteSpace(Model.Diagnostic))
-                                {
-                                    <hr />
-                                    <small class="d-block" style="word-break:break-word;">@Model.Diagnostic</small>
-                                }
-                            </div>
-                        }
-
-                        <div class="form-body my-5">
-                            <form method="post" class="row g-3">
-                                <input type="hidden" asp-for="ReturnUrl" />
-                                <div class="col-12">
-                                    <label class="form-label" asp-for="Email"></label>
-                                    <input asp-for="Email" type="email" class="form-control" placeholder="jhon@example.com">
-                                </div>
-
-                                <div class="col-12">
-                                    <label class="form-label" asp-for="Password"></label>
-                                    <div class="input-group" id="show_hide_password">
-                                        <input asp-for="Password" type="password" class="form-control border-end-0" placeholder="Enter Password">
-                                        <a href="javascript:;" class="input-group-text bg-transparent"><i class="bi bi-eye-slash-fill"></i></a>
-                                    </div>
-                                </div>
-
-                                <div class="col-12 text-end">
-                                    <a asp-page="/Auth/ForgotPassword">Forgot password?</a>
-                                </div>
-
-                                <div class="col-12">
-                                    <div class="d-grid">
-                                        <button type="submit" class="btn btn-grd-primary">Login</button>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<div>
+    <a asp-page="/Auth/Login" class="d-inline-flex align-items-center gap-2 mb-40 text-decoration-none">
+        <img src="~/img/netwitcher-logo.png" alt="" width="40" height="40">
+        <span class="fw-bold text-primary-light" style="font-size: 1.35rem;">WitcherHub</span>
+    </a>
+    <h4 class="mb-12">Sign in to WitcherHub</h4>
+    <p class="mb-32 text-secondary-light text-lg">Enter your credentials to continue.</p>
 </div>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert @(Model.IsSystemError ? "alert-warning" : "alert-danger") radius-8 mb-24" role="alert">
+        <p class="mb-0 fw-semibold">@Model.ErrorMessage</p>
+
+        @*
+            The reference block below exists because "Login failed. Check
+            email/password." is the same sentence whether the account lives in
+            another database, has no password at all, or is locked out — and there
+            was no way to tell which from the screen. The code is stable and gives
+            nothing away; the detail behind it is switched on separately.
+        *@
+        @if (!string.IsNullOrWhiteSpace(Model.FailureCode))
+        {
+            <hr class="my-12">
+
+            <div class="d-flex flex-wrap align-items-center gap-2 text-sm">
+                <span class="badge bg-neutral-200 text-primary-light">@Model.FailureCode</span>
+                <span class="text-secondary-light">Reference</span>
+                <code class="text-primary-light">@Model.Reference</code>
+                <span class="text-secondary-light">@Model.FailedAtUtc?.ToString("yyyy-MM-dd HH:mm:ss") UTC</span>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(Model.DiagnosticExplanation))
+            {
+                <p class="mt-12 mb-0 text-sm" style="word-break: break-word;">@Model.DiagnosticExplanation</p>
+            }
+
+            @if (Model.DiagnosticFacts.Count > 0)
+            {
+                <details class="mt-12">
+                    <summary class="fw-semibold text-sm" style="cursor: pointer;">Show sign-in diagnostics</summary>
+                    <dl class="row mb-0 mt-12 text-sm">
+                        @foreach (var fact in Model.DiagnosticFacts)
+                        {
+                            <dt class="col-sm-5 text-secondary-light fw-medium">@fact.Label</dt>
+                            <dd class="col-sm-7 mb-8" style="word-break: break-word;">@fact.Value</dd>
+                        }
+                    </dl>
+                </details>
+            }
+            else if (!Model.DiagnosticsAvailable)
+            {
+                <p class="mt-12 mb-0 text-sm text-secondary-light">
+                    Set <code>Auth__ShowSignInDiagnostics=true</code> on this environment to show the full
+                    reason here instead of only the code.
+                </p>
+            }
+
+            <button type="button" class="btn btn-sm btn-outline-primary mt-16 radius-8"
+                    id="copyFailureReport"
+                    data-report="@Model.CopyableReport">
+                <i class="ri-file-copy-line me-1"></i> Copy details
+            </button>
+        }
+    </div>
+}
+
+<form method="post">
+    <input type="hidden" asp-for="ReturnUrl" />
+
+    <div class="icon-field mb-16">
+        <span class="icon top-50 translate-middle-y">
+            <i class="ri-mail-line"></i>
+        </span>
+        <input asp-for="Email" type="email" class="form-control h-56-px bg-neutral-50 radius-12"
+               placeholder="Email" autocomplete="username" required>
+    </div>
+
+    <div class="position-relative mb-20">
+        <div class="icon-field">
+            <span class="icon top-50 translate-middle-y">
+                <i class="ri-lock-password-line"></i>
+            </span>
+            <input asp-for="Password" type="password" class="form-control h-56-px bg-neutral-50 radius-12"
+                   id="loginPassword" placeholder="Password" autocomplete="current-password" required>
+        </div>
+        <span class="toggle-password ri-eye-line cursor-pointer position-absolute end-0 top-50 translate-middle-y me-16 text-secondary-light"
+              data-toggle="#loginPassword" role="button" aria-label="Show password"></span>
+    </div>
+
+    <div class="d-flex justify-content-end">
+        <a asp-page="/Auth/ForgotPassword" class="text-primary-600 fw-medium">Forgot password?</a>
+    </div>
+
+    <button type="submit" class="btn btn-primary text-sm btn-sm px-12 py-16 w-100 radius-12 mt-32">
+        Sign in
+    </button>
+</form>
 
 @section Scripts {
     <script>
-        $(document).ready(function () {
-          $("#show_hide_password a").on('click', function (event) {
-            event.preventDefault();
-            if ($('#show_hide_password input').attr("type") == "text") {
-              $('#show_hide_password input').attr('type', 'password');
-              $('#show_hide_password i').addClass("bi-eye-slash-fill");
-              $('#show_hide_password i').removeClass("bi-eye-fill");
-            } else if ($('#show_hide_password input').attr("type") == "password") {
-              $('#show_hide_password input').attr('type', 'text');
-              $('#show_hide_password i').removeClass("bi-eye-slash-fill");
-              $('#show_hide_password i').addClass("bi-eye-fill");
+        // Password visibility toggle, wired the way the theme does it.
+        $('.toggle-password').on('click', function () {
+            $(this).toggleClass('ri-eye-off-line');
+            var input = $($(this).attr('data-toggle'));
+            input.attr('type', input.attr('type') === 'password' ? 'text' : 'password');
+        });
+
+        // The failure report exists to be handed to whoever can act on it, so
+        // getting it out of the browser has to be one click. navigator.clipboard
+        // is unavailable over plain HTTP, hence the textarea fallback.
+        $('#copyFailureReport').on('click', function () {
+            var button = $(this);
+            var report = button.attr('data-report') || '';
+
+            var done = function () {
+                var original = button.html();
+                button.html('<i class="ri-check-line me-1"></i> Copied');
+                setTimeout(function () { button.html(original); }, 2000);
+            };
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(report).then(done);
+                return;
             }
-          });
+
+            var area = document.createElement('textarea');
+            area.value = report;
+            area.setAttribute('readonly', '');
+            area.style.position = 'absolute';
+            area.style.left = '-9999px';
+            document.body.appendChild(area);
+            area.select();
+            document.execCommand('copy');
+            document.body.removeChild(area);
+            done();
         });
     </script>
 }
-

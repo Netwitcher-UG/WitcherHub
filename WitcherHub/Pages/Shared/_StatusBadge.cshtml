@@ -1,0 +1,12 @@
+@using WitcherHub.Pages.Models.UI
+@model StatusPresentation
+
+@*
+    One badge, used for every status on every page. Colours come from
+    StatusPresentation, so a status cannot look green on one screen and grey on
+    the next.
+*@
+<span class="badge @Model.BadgeClass px-16 py-4 radius-4 fw-medium text-sm d-inline-flex align-items-center gap-1">
+    <i class="@Model.Icon"></i>
+    @Model.Label
+</span>

@@ -40,6 +40,13 @@ namespace WitcherHub.Application.Models.View.Invoices
             public DocumentStatus Status { get; set; }
             public string Currency { get; set; } = "EUR";
 
+            // Who the invoice is for. Without these an invoice page could show the
+            // amount but not the customer, and the only way to find out was to
+            // navigate back up through the project.
+            public Guid CustomerId { get; set; }
+            public string CustomerName { get; set; } = "";
+            public string ProjectTitle { get; set; } = "";
+
             public string? Notes { get; set; }
 
             public DateTimeOffset CreatedAt { get; set; }

@@ -197,8 +197,8 @@ namespace WitcherHub.Pages.Contracts
 
             var fullHtml = ContractPdfHtmlBuilder.Build(model);
 
-            var logoPath = Url.Content("~/theme/assets/images/netwitcher-logo.png")
-                          ?? "/theme/assets/images/netwitcher-logo.png";
+            var logoPath = Url.Content("~/img/netwitcher-logo.png")
+                          ?? "/img/netwitcher-logo.png";
 
             var logoUrl = $"{Request.Scheme}://{Request.Host}{logoPath}";
 
@@ -429,7 +429,7 @@ namespace WitcherHub.Pages.Contracts
                             showSignaturePlaceholder: false,
                             notesText: "");
 
-                        var logoUrl = $"{baseUrl}/theme/assets/images/netwitcher-logo.png";
+                        var logoUrl = $"{baseUrl}/img/netwitcher-logo.png";
 
                         var pdfHtml = BuildSignedContractPdfHtml(
                             pdfModel,

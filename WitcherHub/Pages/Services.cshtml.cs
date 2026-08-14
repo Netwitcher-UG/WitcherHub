@@ -348,7 +348,7 @@ namespace WitcherHub.Pages
           data-bs-toggle="modal"
           data-bs-target="#ViewServiceModal"
           data-service-id="{{Enc(serviceId)}}">
-      <i class="material-icons-outlined">visibility</i>
+      <i class="ri-eye-line"></i>
   </button>
 
   <button type="button"
@@ -356,7 +356,7 @@ namespace WitcherHub.Pages
           title="Delete"
           data-vc-action="table-delete-service"
           data-service-id="{{Enc(serviceId)}}">
-      <i class="material-icons-outlined">delete</i>
+      <i class="ri-delete-bin-line"></i>
   </button>
 </div>
 """);

@@ -1,0 +1,134 @@
+@page
+@using WitcherHub.Pages.Models.UI
+@model WitcherHub.Pages.Invoices.IndexModel
+@{
+    ViewData["Title"] = "Invoices";
+    var noMatches = EmptyStateVm.NoMatches("invoices");
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+    <div>
+        <h3 class="mb-4 fw-semibold">Invoices</h3>
+        <p class="text-secondary-light mb-0 text-sm">Every invoice, and what is still owed on it.</p>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-page="/Invoices/Index" asp-route-outstandingOnly="true"
+           class="btn btn-outline-primary text-sm px-16 py-8 radius-8 d-inline-flex align-items-center gap-2">
+            <i class="ri-time-line"></i> Unpaid
+        </a>
+        <a asp-page="/Invoices/Index" asp-route-overdueOnly="true"
+           class="btn btn-outline-danger text-sm px-16 py-8 radius-8 d-inline-flex align-items-center gap-2">
+            <i class="ri-alarm-warning-line"></i> Overdue
+        </a>
+    </div>
+</div>
+
+<div class="card radius-12 border">
+    <div class="card-body p-24">
+        <partial name="_RegisterFilters" model="Model.Filters" />
+
+        @if (Model.Results.TotalItems == 0)
+        {
+            @if (Model.Filters.AnyApplied)
+            {
+                                <partial name="_EmptyState" model="noMatches" />
+            }
+            else
+            {
+                <partial name="_EmptyState" model="@(new EmptyStateVm
+                       {
+                           Title = "No invoices yet",
+                           Message = "Invoices are raised from a project, a signed contract or an accepted quote.",
+                           Icon = "ri-bill-line",
+                           ActionText = "Go to projects",
+                           ActionUrl = Url.Page("/Projects"),
+                           ActionIcon = "ri-briefcase-line"
+                       })" />
+            }
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle mb-0 wh-register-table">
+                    <thead>
+                        <tr>
+                            <th class="text-sm">Invoice</th>
+                            <th class="text-sm">Customer</th>
+                            <th class="text-sm">Status</th>
+                            <th class="text-sm">Due</th>
+                            <th class="text-sm text-end">Total</th>
+                            <th class="text-sm text-end">Received</th>
+                            <th class="text-sm text-end">Outstanding</th>
+                            <th class="text-sm text-end">Open</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Model.Results.Items)
+                        {
+                            <tr>
+                                <td>
+                                    <a asp-page="/Invoices/Details" asp-route-id="@row.Id" class="fw-semibold text-primary-600">
+                                        @row.InvoiceNo
+                                    </a>
+                                    <span class="d-block text-secondary-light text-sm">@Format.Date(row.IssueDate)</span>
+                                </td>
+                                <td class="text-break">
+                                    @row.CustomerName
+                                    <span class="d-block text-secondary-light text-sm">@row.ProjectTitle</span>
+                                </td>
+                                <td>
+                                    <partial name="_StatusBadge" model="DocumentStatusPresentation.ForInvoice(row.Status)" />
+                                </td>
+                                <td class="text-nowrap">
+                                    @Format.Date(row.DueDate)
+                                    @if (row.IsOverdue)
+                                    {
+                                        <span class="d-block text-danger-main text-sm fw-medium">
+                                            @Format.DaysOverdue(row.DueDate) days late
+                                        </span>
+                                    }
+                                    else if (row.DueDate is not null)
+                                    {
+                                        <span class="d-block text-secondary-light text-sm">@Format.Relative(row.DueDate)</span>
+                                    }
+                                </td>
+                                <td class="text-end text-nowrap">@Format.Money(row.Total, row.Currency)</td>
+                                <td class="text-end text-nowrap @(row.PaidTotal > 0m ? "text-success-main" : "text-secondary-light")">
+                                    @Format.Money(row.PaidTotal, row.Currency)
+                                </td>
+                                <td class="text-end text-nowrap fw-semibold @(row.BalanceDue > 0m ? (row.IsOverdue ? "text-danger-main" : "") : "text-success-main")">
+                                    @Format.Money(row.BalanceDue, row.Currency)
+                                </td>
+                                <td class="text-end">
+                                    <a asp-page="/Invoices/Details" asp-route-id="@row.Id"
+                                       class="btn btn-sm btn-outline-primary radius-8 px-12"
+                                       title="Open invoice">
+                                        <i class="ri-arrow-right-line"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="border-top">
+                            <th colspan="4" class="text-sm text-secondary-light fw-medium">
+                                This page (@Model.Results.Items.Count of @Model.Results.TotalItems)
+                                @if (Model.PageOverdueCount > 0)
+                                {
+                                    <span class="text-danger-main">· @Model.PageOverdueCount overdue</span>
+                                }
+                            </th>
+                            <th class="text-end text-nowrap">@Format.Money(Model.PageBilled)</th>
+                            <th></th>
+                            <th class="text-end text-nowrap">@Format.Money(Model.PageOutstanding)</th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <partial name="_RegisterPager" model="Model.Pager" />
+        }
+    </div>
+</div>

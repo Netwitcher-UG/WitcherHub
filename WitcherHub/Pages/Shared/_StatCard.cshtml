@@ -1,0 +1,30 @@
+@model WitcherHub.Pages.Models.UI.StatCardVm
+
+<div class="card h-100 radius-12 border">
+    <div class="card-body p-20">
+        <div class="d-flex align-items-start justify-content-between gap-3">
+            <div class="wh-min-w-0">
+                <span class="text-secondary-light text-sm fw-medium d-block mb-8">@Model.Label</span>
+                <h6 class="fw-semibold mb-0 text-break">@Model.Value</h6>
+
+                @if (!string.IsNullOrWhiteSpace(Model.Detail))
+                {
+                    <span class="text-secondary-light text-sm d-block mt-8">@Model.Detail</span>
+                }
+            </div>
+
+            <span class="w-48-px h-48-px @Model.IconWrapClass rounded-circle d-flex justify-content-center align-items-center flex-shrink-0"
+                  style="font-size: 22px;">
+                <i class="@Model.Icon"></i>
+            </span>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.LinkUrl) && !string.IsNullOrWhiteSpace(Model.LinkText))
+        {
+            <a href="@Model.LinkUrl" class="text-primary-600 fw-medium text-sm d-inline-flex align-items-center gap-1 mt-16">
+                @Model.LinkText
+                <i class="ri-arrow-right-line"></i>
+            </a>
+        }
+    </div>
+</div>

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using System.Security.Cryptography;
+using System.Text;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Interfaces;
 
@@ -10,19 +12,20 @@ namespace WitcherHub.Pages.Auth
     public class LoginModel : PageModel
     {
         private readonly IAuthService _auth;
+        private readonly ISignInDiagnostics _diagnostics;
         private readonly ILogger<LoginModel> _logger;
-        private readonly IWebHostEnvironment _env;
 
-        public LoginModel(IAuthService auth, ILogger<LoginModel> logger, IWebHostEnvironment env)
+        public LoginModel(IAuthService auth, ISignInDiagnostics diagnostics, ILogger<LoginModel> logger)
         {
             _auth = auth;
+            _diagnostics = diagnostics;
             _logger = logger;
-            _env = env;
         }
 
         [BindProperty] public string Email { get; set; } = "";
         [BindProperty] public string Password { get; set; } = "";
-        public string? ErrorMessage { get; set; }
+
+        public string? ErrorMessage { get; private set; }
 
         /// <summary>
         /// True when sign-in failed for a reason other than the credentials, so the
@@ -31,9 +34,36 @@ namespace WitcherHub.Pages.Auth
         public bool IsSystemError { get; private set; }
 
         /// <summary>
-        /// Exception detail, populated in Development only.
+        /// Short stable code for what went wrong (AUTH-02, AUTH-03, …). Always
+        /// rendered, because it is the one thing a person can read off the screen
+        /// and quote without knowing anything about the system, and it gives away
+        /// nothing to a stranger.
         /// </summary>
-        public string? Diagnostic { get; private set; }
+        public string? FailureCode { get; private set; }
+
+        /// <summary>
+        /// Random per-attempt identifier, printed on the page and written to the
+        /// log, so a screenshot can be matched to the exact log entry.
+        /// </summary>
+        public string? Reference { get; private set; }
+
+        public DateTime? FailedAtUtc { get; private set; }
+
+        /// <summary>
+        /// The administrator-facing explanation and the environment facts behind
+        /// it. Populated only when sign-in diagnostics are switched on.
+        /// </summary>
+        public string? DiagnosticExplanation { get; private set; }
+        public IReadOnlyList<SignInDiagnosticFact> DiagnosticFacts { get; private set; } = [];
+
+        /// <summary>
+        /// True when diagnostics are switched off, so the page can say how to turn
+        /// them on rather than leaving the reader with a bare code.
+        /// </summary>
+        public bool DiagnosticsAvailable => _diagnostics.IsEnabled;
+
+        /// <summary>Everything above as one block, ready for the copy button.</summary>
+        public string CopyableReport { get; private set; } = "";
 
         /// <summary>
         /// Set when the visitor was bounced here by an antiforgery failure — a page
@@ -41,6 +71,9 @@ namespace WitcherHub.Pages.Auth
         /// </summary>
         [BindProperty(SupportsGet = true, Name = "expired")]
         public bool SessionExpired { get; set; }
+
+        [BindProperty(SupportsGet = true)]
+        public string? ReturnUrl { get; set; }
 
         public void OnGet()
         {
@@ -52,9 +85,6 @@ namespace WitcherHub.Pages.Auth
             }
         }
 
-        [BindProperty(SupportsGet = true)]
-        public string? ReturnUrl { get; set; }
-
         public async Task<IActionResult> OnPostAsync(CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
@@ -62,6 +92,8 @@ namespace WitcherHub.Pages.Auth
                 ErrorMessage = "Enter both an email address and a password.";
                 return Page();
             }
+
+            var reference = NewReference();
 
             try
             {
@@ -77,16 +109,30 @@ namespace WitcherHub.Pages.Auth
 
                 _logger.LogInformation("Sign-in succeeded for {Email}.", Email.Trim());
 
-                var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "/Index" : ReturnUrl;
-                if (!Url.IsLocalUrl(target)) target = "/Index";
-                return LocalRedirect(target);
+                if (!string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl))
+                    return LocalRedirect(ReturnUrl);
+
+                // The overview, not the client list: after signing in the first
+                // question is what needs doing today.
+                return RedirectToPage("/Dashboard");
             }
-            catch (AuthenticationFailedAppException)
+            catch (AuthenticationFailedAppException ex)
             {
-                // A genuine credential mismatch. The reason (unknown account versus
-                // wrong password) is in the log, not here, so this page cannot be
-                // used to discover which addresses have accounts.
+                // A credential check failed. Which one is on the exception, so the
+                // page can print a code; the prose stays identical for everybody,
+                // so this page cannot be used to discover which addresses exist.
+                _logger.LogWarning(
+                    "Sign-in failed for {Email}. Code {Code}, reference {Reference}.",
+                    Email.Trim(), ex.Reason.ToCode(), reference);
+
                 ErrorMessage = "Login failed. Check email/password.";
+
+                await DescribeFailureAsync(
+                    reference,
+                    ex.Reason.ToCode(),
+                    ex.Reason.ToAdministratorExplanation(),
+                    ct);
+
                 return Page();
             }
             catch (Exception ex)
@@ -95,17 +141,68 @@ namespace WitcherHub.Pages.Auth
                 // lookup failing — used to be swallowed by a bare catch and reported
                 // as bad credentials, which sent people to retype a password that was
                 // never the problem. Say so plainly and record the cause.
-                _logger.LogError(ex, "Sign-in could not be completed for {Email} due to a system error.", Email.Trim());
+                _logger.LogError(
+                    ex,
+                    "Sign-in could not be completed for {Email} due to a system error. Reference {Reference}.",
+                    Email.Trim(), reference);
 
                 IsSystemError = true;
-                ErrorMessage = "Sign-in is currently unavailable. This is a server problem, not your password. " +
-                               "The details are in the application log.";
+                ErrorMessage = "Sign-in is currently unavailable. This is a server problem, not your password.";
 
-                if (_env.IsDevelopment())
-                    Diagnostic = $"{ex.GetType().Name}: {ex.GetBaseException().Message}";
+                await DescribeFailureAsync(
+                    reference,
+                    "AUTH-500",
+                    $"{ex.GetType().Name}: {ex.GetBaseException().Message}",
+                    ct);
 
                 return Page();
             }
         }
+
+        /// <summary>
+        /// Fills in everything the page renders below the error message, and builds
+        /// the copyable block in the same shape whether diagnostics are on or off.
+        /// </summary>
+        private async Task DescribeFailureAsync(
+            string reference,
+            string code,
+            string explanation,
+            CancellationToken ct)
+        {
+            FailureCode = code;
+            Reference = reference;
+            FailedAtUtc = DateTime.UtcNow;
+
+            var report = new StringBuilder();
+            report.AppendLine("WitcherHub sign-in failure");
+            report.AppendLine($"Code: {code}");
+            report.AppendLine($"Reference: {reference}");
+            report.AppendLine($"Time (UTC): {FailedAtUtc:yyyy-MM-dd HH:mm:ss}");
+            report.AppendLine($"Email: {Email.Trim()}");
+
+            if (_diagnostics.IsEnabled)
+            {
+                DiagnosticExplanation = explanation;
+                report.AppendLine($"Explanation: {explanation}");
+
+                var facts = await _diagnostics.DescribeAsync(Email, ct);
+                DiagnosticFacts = facts.Facts;
+
+                if (facts.Facts.Count > 0)
+                {
+                    report.AppendLine();
+                    report.AppendLine(facts.ToPlainText());
+                }
+            }
+
+            CopyableReport = report.ToString();
+        }
+
+        /// <summary>
+        /// Short, unambiguous and case-insensitive to read aloud. Not a secret —
+        /// it only has to be unique enough to find one line in a day of logs.
+        /// </summary>
+        private static string NewReference() =>
+            Convert.ToHexString(RandomNumberGenerator.GetBytes(4));
     }
 }

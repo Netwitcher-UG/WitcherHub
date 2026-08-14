@@ -5,14 +5,14 @@
 <!-- Customer Information -->
 <div class="form-section">
     <div class="form-section-header">
-        <i class="material-icons-outlined">person</i>
+        <i class="ri-user-line"></i>
         <span>Customer Information</span>
     </div>
     <div class="form-section-divider"></div>
 
     <div class="row g-3 mt-0">
         <div class="col-md-4">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 Customer Type <span class="text-danger">*</span>
             </label>
 
@@ -26,7 +26,7 @@
 
         <!-- ✅ Individual First/Last -->
         <div class="col-md-4 individual-only">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 First Name <span class="text-danger">*</span>
             </label>
             <input class="form-control"
@@ -39,7 +39,7 @@
         </div>
 
         <div class="col-md-4 individual-only">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 Last Name <span class="text-danger">*</span>
             </label>
             <input class="form-control"
@@ -53,7 +53,7 @@
 
         <!-- ✅ Company Name -->
         <div class="col-md-8 company-only">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 Company Name <span class="text-danger">*</span>
             </label>
             <input class="form-control"
@@ -72,7 +72,7 @@
 
                     <div class="d-flex align-items-center justify-content-between gap-2">
                         <div>
-                            <div class="fw-semibold text-light">
+                            <div class="fw-semibold text-primary-light">
                                 Emails <span class="text-danger">*</span>
                             </div>
                             <div class="small text-muted">Add one or more email addresses for this customer.</div>
@@ -82,7 +82,7 @@
                                 class="btn btn-sm btn-outline-primary"
                                 id="create-email-add"
                                 title="Add email">
-                            <i class="material-icons-outlined align-middle" style="font-size:18px">add</i>
+                            <i class="ri-add-line align-middle" style="font-size:18px"></i>
                             <span class="ms-1">Add</span>
                         </button>
                     </div>
@@ -116,7 +116,7 @@
                                     <button type="button"
                                             class="btn btn-outline-danger create-email-remove"
                                             title="Remove email">
-                                        <i class="material-icons-outlined align-middle" style="font-size:18px">delete</i>
+                                        <i class="ri-delete-bin-line align-middle" style="font-size:18px"></i>
                                     </button>
                                 </div>
 
@@ -140,7 +140,7 @@
 
 
         <div class="col-md-6">
-            <label class="form-label text-light opacity-75">
+            <label class="form-label text-secondary-light">
                 Phone <small>(optional)</small>
             </label>
             <input class="form-control" asp-for="Customer.Phone" />
@@ -148,7 +148,7 @@
         </div>
 
         <div class="col-md-6">
-            <label class="form-label text-light opacity-75">
+            <label class="form-label text-secondary-light">
                 Tax ID <small>(optional)</small>
             </label>
             <input class="form-control" asp-for="Customer.TaxId" />
@@ -156,7 +156,7 @@
         </div>
 
         <div class="col-md-12">
-            <label class="form-label text-light opacity-75">
+            <label class="form-label text-secondary-light">
                 Notes <small>(optional)</small>
             </label>
             <input class="form-control" asp-for="Customer.Notes" />
@@ -168,14 +168,14 @@
 <!-- Address -->
 <div class="form-section">
     <div class="form-section-header">
-        <i class="material-icons-outlined">location_on</i>
+        <i class="ri-map-pin-line"></i>
         <span>Address</span>
     </div>
     <div class="form-section-divider"></div>
 
     <div class="row g-3 mt-0">
         <div class="col-md-4">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 Label <span class="text-danger">*</span>
             </label>
             <select class="form-select" asp-for="Address.Label" required aria-required="true">
@@ -187,14 +187,14 @@
             <span class="text-danger" asp-validation-for="Address.Label"></span>
         </div>
         <div class="col-md-8">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 Full Name / Company <span class="text-danger">*</span>
             </label>
             <input class="form-control" asp-for="Address.FullNameOrCompany" required aria-required="true" />
             <span class="text-danger" asp-validation-for="Address.FullNameOrCompany"></span>
         </div>
         <div class="col-md-4">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 Country <span class="text-danger">*</span>
             </label>
 
@@ -236,7 +236,7 @@
         </div>
 
         <div class="col-md-4">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 City <span class="text-danger">*</span>
             </label>
             <input class="form-control" asp-for="Address.City" required aria-required="true" />
@@ -246,7 +246,7 @@
         
 
         <div class="col-md-4">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 Postal Code <span class="text-danger">*</span>
             </label>
             <input class="form-control" asp-for="Address.PostalCode" required aria-required="true" />
@@ -256,7 +256,7 @@
         
 
         <div class="col-md-6">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 Street / Nr <span class="text-danger">*</span>
             </label>
             <input class="form-control" asp-for="Address.StreetRaw" placeholder="streetName Nr" required aria-required="true" />
@@ -264,7 +264,7 @@
         </div>
 
         <div class="col-md-6">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 Address Line 2 <span class="text-danger">*</span>
             </label>
             <input class="form-control" asp-for="Address.AddressLine2" required aria-required="true" />
@@ -278,14 +278,14 @@
 <!-- Primary Contact -->
 <div id="contactSection" class="form-section">
     <div class="form-section-header">
-        <i class="material-icons-outlined">contacts</i>
+        <i class="ri-contacts-line"></i>
         <span>Primary Contact</span>
     </div>
     <div class="form-section-divider"></div>
 
     <div class="row g-3 mt-0">
         <div class="col-md-6">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 Contact Name <span class="text-danger">*</span>
             </label>
             <input class="form-control" asp-for="Contact.Name" placeholder="e.g. Sara Ahmed" required aria-required="true" />
@@ -293,7 +293,7 @@
         </div>
 
         <div class="col-md-6">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 Position <span class="text-danger">*</span>
             </label>
             <input class="form-control" asp-for="Contact.Position" placeholder="e.g. Manager" required aria-required="true" />
@@ -302,7 +302,7 @@
 
         <div class="col-md-6">
             
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 Contact Email <span class="text-danger">*</span>
             </label>
             <input class="form-control" asp-for="Contact.Email" type="email" placeholder="e.g. sara@company.com" required aria-required="true" />
@@ -310,7 +310,7 @@
         </div>
 
         <div class="col-md-6">
-            <label class="form-label text-light">
+            <label class="form-label text-primary-light">
                 Contact Phone <span class="text-danger">*</span>
             </label>
             <input class="form-control" asp-for="Contact.Phone" placeholder="e.g. 49174..." required aria-required="true" />

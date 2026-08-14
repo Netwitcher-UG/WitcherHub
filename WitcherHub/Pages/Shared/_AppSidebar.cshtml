@@ -1,0 +1,104 @@
+@using System.Security.Claims
+@using WitcherHub.Domain.SeedData
+
+@functions {
+    bool HasPerm(string perm) =>
+        User.Identity?.IsAuthenticated == true &&
+        User.HasClaim("permission", perm);
+
+    // The theme's own script marks the active entry by comparing the anchor's
+    // href to window.location, which stops matching the moment a page carries a
+    // query string — and every register page carries filter and paging
+    // parameters. Deciding it from the route is exact and needs no JavaScript.
+    string CurrentPage => ViewContext.RouteData.Values["page"]?.ToString() ?? "";
+
+    string ActiveIf(params string[] pages) =>
+        pages.Any(p => string.Equals(CurrentPage, p, StringComparison.OrdinalIgnoreCase))
+            ? "active-page"
+            : "";
+
+    /// Marks a section active for every page inside it, so opening one quote
+    /// still highlights Quotes rather than nothing.
+    string ActiveInSection(string prefix) =>
+        CurrentPage.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            ? "active-page"
+            : "";
+}
+
+<aside class="sidebar">
+    <button type="button" class="sidebar-close-btn" aria-label="Close navigation">
+        <i class="ri-close-line"></i>
+    </button>
+
+    @*
+        The theme expects three logo images and swaps them for light, dark and
+        collapsed states. There is no WitcherHub wordmark image, only the star
+        mark — which reads correctly on both palettes — so the name is set as text
+        beside it and hidden with the same rule that hides the menu labels.
+    *@
+    <div>
+        <a asp-page="/Dashboard" class="sidebar-logo">
+            <img src="~/img/netwitcher-logo.png" alt="" class="wh-mark">
+            <span class="wh-wordmark">WitcherHub</span>
+        </a>
+    </div>
+
+    <div class="sidebar-menu-area">
+        <ul class="sidebar-menu" id="sidebar-menu">
+            @if (HasPerm(AppPermissions.ManageNetwitcher))
+            {
+                <li>
+                    <a asp-page="/Dashboard" class="@ActiveIf("/Dashboard")">
+                        <i class="ri-dashboard-line menu-icon"></i>
+                        <span>Overview</span>
+                    </a>
+                </li>
+
+                <li class="sidebar-menu-group-title">Customers</li>
+
+                <li>
+                    <a asp-page="/Index" class="@ActiveIf("/Index")@ActiveInSection("/Clients")">
+                        <i class="ri-group-line menu-icon"></i>
+                        <span>Clients</span>
+                    </a>
+                </li>
+                <li>
+                    <a asp-page="/Projects" class="@ActiveIf("/Projects")@ActiveInSection("/Projects/")">
+                        <i class="ri-briefcase-line menu-icon"></i>
+                        <span>Projects</span>
+                    </a>
+                </li>
+
+                <li class="sidebar-menu-group-title">Documents</li>
+
+                <li>
+                    <a asp-page="/Quotes/Index" class="@ActiveInSection("/Quotes")">
+                        <i class="ri-file-text-line menu-icon"></i>
+                        <span>Quotes</span>
+                    </a>
+                </li>
+                <li>
+                    <a asp-page="/Contracts/Index" class="@ActiveInSection("/Contracts")">
+                        <i class="ri-file-paper-2-line menu-icon"></i>
+                        <span>Contracts</span>
+                    </a>
+                </li>
+                <li>
+                    <a asp-page="/Invoices/Index" class="@ActiveInSection("/Invoices")">
+                        <i class="ri-bill-line menu-icon"></i>
+                        <span>Invoices</span>
+                    </a>
+                </li>
+
+                <li class="sidebar-menu-group-title">Setup</li>
+
+                <li>
+                    <a asp-page="/Services" class="@ActiveIf("/Services")">
+                        <i class="ri-shopping-bag-3-line menu-icon"></i>
+                        <span>Services</span>
+                    </a>
+                </li>
+            }
+        </ul>
+    </div>
+</aside>
