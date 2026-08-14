@@ -53,6 +53,10 @@ app.UseRequestLocalization(new RequestLocalizationOptions
     SupportedCultures = supportedCultures,
     SupportedUICultures = supportedCultures
 });
+// Schema first: seeding and Data Protection both read tables that a pending
+// migration may not have created yet.
+await app.MigrateDatabaseAsync();
+
 await app.SeedAsync();
 if (app.Environment.IsDevelopment())
 {

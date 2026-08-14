@@ -211,23 +211,47 @@ namespace WitcherHub.Infrastructure.Seeding
                 return;
             }
 
-            // Go through Identity's own reset so the hash and security stamp are
-            // written exactly as a normal password change would write them.
-            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-            var result = await _userManager.ResetPasswordAsync(user, token, password);
+            try
+            {
+                // Set the hash directly rather than going through a reset token.
+                //
+                // A token would be encrypted by the Data Protection stack, which
+                // reads its key ring from the database — so a break-glass intended
+                // to restore access could instead crash start-up before the schema
+                // was ready. This path depends on nothing but the user store.
+                var remove = await _userManager.RemovePasswordAsync(user);
+                if (!remove.Succeeded && !remove.Errors.Any(e => e.Code == "PasswordMismatch"))
+                {
+                    // A user with no password yet is fine; anything else is not.
+                    _logger.LogWarning(
+                        "Could not clear the existing password for {Email}: {Errors}",
+                        email, string.Join(" | ", remove.Errors.Select(e => e.Description)));
+                }
 
-            if (result.Succeeded)
-            {
-                _logger.LogWarning(
-                    "The password for {Email} was overwritten from configuration on start-up. " +
-                    "Remove BootstrapAdmin__ResetPasswordOnStartup and BootstrapAdmin__Password now, " +
-                    "otherwise the password is reset on every deploy.", email);
+                var result = await _userManager.AddPasswordAsync(user, password);
+
+                if (result.Succeeded)
+                {
+                    _logger.LogWarning(
+                        "The password for {Email} was overwritten from configuration on start-up. " +
+                        "Remove BootstrapAdmin__ResetPasswordOnStartup and BootstrapAdmin__Password now, " +
+                        "otherwise the password is reset on every deploy.", email);
+                }
+                else
+                {
+                    _logger.LogError(
+                        "Failed to overwrite the password for {Email}. Errors: {Errors}",
+                        email, string.Join(" | ", result.Errors.Select(e => e.Description)));
+                }
             }
-            else
+            catch (Exception ex)
             {
+                // Losing the break-glass is inconvenient. Refusing to start because
+                // of it is worse, so this never propagates.
                 _logger.LogError(
-                    "Failed to overwrite the password for {Email}. Errors: {Errors}",
-                    email, string.Join(" | ", result.Errors.Select(e => e.Description)));
+                    ex,
+                    "The break-glass password could not be applied for {Email}. " +
+                    "Start-up continues; the existing password is unchanged.", email);
             }
         }
 
@@ -320,9 +344,24 @@ namespace WitcherHub.Infrastructure.Seeding
             {
                 if (!_environment.IsDevelopment())
                 {
-                    _logger.LogError(
-                        "No users exist and no seed administrator is configured. Set SeedAdmin__Email and " +
-                        "SeedAdmin__Password, then restart, otherwise nobody can sign in.");
+                    // BootstrapAdmin runs immediately after this and creates an
+                    // administrator of its own, so this is only a real problem when
+                    // neither is configured. Reporting an error for a situation the
+                    // next step resolves trains people to ignore the log.
+                    var bootstrapConfigured = !string.IsNullOrWhiteSpace(_configuration["BootstrapAdmin:Email"]);
+
+                    if (bootstrapConfigured)
+                    {
+                        _logger.LogInformation(
+                            "No SeedAdmin is configured; the bootstrap administrator will be used instead.");
+                    }
+                    else
+                    {
+                        _logger.LogError(
+                            "No users exist and no administrator is configured. Set SeedAdmin__Email and " +
+                            "SeedAdmin__Password, or BootstrapAdmin__Email, then restart — otherwise nobody can sign in.");
+                    }
+
                     return;
                 }
 
