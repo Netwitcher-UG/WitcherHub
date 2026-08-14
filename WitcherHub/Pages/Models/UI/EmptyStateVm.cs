@@ -1,6 +1,25 @@
 namespace WitcherHub.Pages.Models.UI
 {
     /// <summary>
+    /// One thing the reader can do from an empty state.
+    ///
+    /// <see cref="IsButton"/> distinguishes a link to another page from a control
+    /// the page's own script handles — an empty contract offers both: "upload a
+    /// contract" opens a panel here, "go to projects" leaves.
+    /// </summary>
+    public sealed class EmptyStateAction
+    {
+        public required string Text { get; init; }
+
+        /// <summary>A URL when <see cref="IsButton"/> is false, a data-action name when it is true.</summary>
+        public required string Url { get; init; }
+
+        public string Icon { get; init; } = "ri-add-line";
+        public bool IsPrimary { get; init; }
+        public bool IsButton { get; init; }
+    }
+
+    /// <summary>
     /// The message shown in place of an empty list.
     /// </summary>
     public sealed class EmptyStateVm
@@ -9,9 +28,50 @@ namespace WitcherHub.Pages.Models.UI
         public string Message { get; init; } = "";
         public string Icon { get; init; } = "ri-inbox-line";
 
-        public string? ActionText { get; init; }
-        public string? ActionUrl { get; init; }
-        public string ActionIcon { get; init; } = "ri-add-line";
+        public IReadOnlyList<EmptyStateAction> Actions { get; init; } = [];
+
+        /// <summary>
+        /// Convenience for the common case of a single link out.
+        /// </summary>
+        public string? ActionText
+        {
+            init
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    _singleActionText = value;
+            }
+        }
+
+        public string? ActionUrl
+        {
+            init
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    _singleActionUrl = value;
+            }
+        }
+
+        public string ActionIcon { init => _singleActionIcon = value; }
+
+        private readonly string? _singleActionText;
+        private readonly string? _singleActionUrl;
+        private readonly string _singleActionIcon = "ri-add-line";
+
+        /// <summary>
+        /// The declared actions, plus the single-action shorthand if one was used.
+        /// </summary>
+        public IReadOnlyList<EmptyStateAction> AllActions =>
+            Actions.Count > 0
+                ? Actions
+                : _singleActionText is not null && _singleActionUrl is not null
+                    ? [new EmptyStateAction
+                        {
+                            Text = _singleActionText,
+                            Url = _singleActionUrl,
+                            Icon = _singleActionIcon,
+                            IsPrimary = true
+                        }]
+                    : [];
 
         /// <summary>
         /// The distinction that matters to the reader: an empty register and a

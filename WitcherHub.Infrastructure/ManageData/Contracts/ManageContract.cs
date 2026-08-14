@@ -222,6 +222,11 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                             Status = x.Status,
                             Currency = x.Currency,
                             InvoiceSendMode = x.InvoiceSendMode,
+
+                            CustomerId = x.Project.CustomerId,
+                            CustomerName = x.Project.Customer.Name,
+                            ProjectTitle = x.Project.Title,
+
                             Terms = x.Terms,
                             TermsStructured = x.TermsStructured,
                             CreatedAt = x.CreatedAt,

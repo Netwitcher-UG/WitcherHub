@@ -683,7 +683,7 @@ namespace WitcherHub.Pages
                         },
                         data = new
                         {
-                            redirectUrl = $"/Contracts/Items/Manage?contractId={details.Id}&returnTo=items&toast=noItems",
+                            redirectUrl = $"/Contracts/Positions/{details.Id}",
                             contractId = details.Id
                         }
                     });
@@ -849,7 +849,7 @@ namespace WitcherHub.Pages
                         data = new
                         {
                             contractId = latest.Id,
-                            redirectUrl = $"/Contracts/Items/Manage?contractId={latest.Id}&returnTo=items&toast=noItems"
+                            redirectUrl = $"/Contracts/Positions/{latest.Id}"
                         },
                         toast = new { type = "warning", title = "Positions required", message = "You were redirected to add line items first." }
                     });
@@ -879,7 +879,7 @@ namespace WitcherHub.Pages
                     data = new
                     {
                         contractId = newContractId,
-                        redirectUrl = $"/Contracts/Items/Manage?contractId={newContractId}&returnTo=items&toast=noItems"
+                        redirectUrl = $"/Contracts/Positions/{newContractId}"
                     },
                     toast = new { type = "success", title = "Created", message = "Contract header created. Add Positions now." }
                 });

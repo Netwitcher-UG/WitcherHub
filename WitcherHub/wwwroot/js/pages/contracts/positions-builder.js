@@ -150,15 +150,15 @@
 
             <div class="col-12">
               <label class="form-label small">Description</label>
-              <textarea class="form-control form-control-sm" rows="2" data-f="description">${esc(p.description)}</textarea>
+              <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="description">${esc(p.description)}</textarea>
             </div>
             <div class="col-12">
               <label class="form-label small">Scope of work</label>
-              <textarea class="form-control form-control-sm" rows="2" data-f="scope">${esc(p.scope)}</textarea>
+              <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="scope">${esc(p.scope)}</textarea>
             </div>
             <div class="col-12">
               <label class="form-label small">Deliverables <span class="text-secondary">(one per line)</span></label>
-              <textarea class="form-control form-control-sm" rows="2" data-f="deliverables">${esc((p.deliverables || []).join("\n"))}</textarea>
+              <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="deliverables">${esc((p.deliverables || []).join("\n"))}</textarea>
             </div>
 
             <div class="col-6 col-md-2">
@@ -231,23 +231,23 @@
                 <div class="row g-2 mt-1">
                   <div class="col-12 col-md-6">
                     <label class="form-label small">Acceptance criteria</label>
-                    <textarea class="form-control form-control-sm" rows="2" data-f="acceptanceCriteria">${esc((p.acceptanceCriteria || []).join("\n"))}</textarea>
+                    <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="acceptanceCriteria">${esc((p.acceptanceCriteria || []).join("\n"))}</textarea>
                   </div>
                   <div class="col-12 col-md-6">
                     <label class="form-label small">Customer responsibilities</label>
-                    <textarea class="form-control form-control-sm" rows="2" data-f="customerResponsibilities">${esc((p.customerResponsibilities || []).join("\n"))}</textarea>
+                    <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="customerResponsibilities">${esc((p.customerResponsibilities || []).join("\n"))}</textarea>
                   </div>
                   <div class="col-12 col-md-6">
                     <label class="form-label small">Assumptions</label>
-                    <textarea class="form-control form-control-sm" rows="2" data-f="assumptions">${esc((p.assumptions || []).join("\n"))}</textarea>
+                    <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="assumptions">${esc((p.assumptions || []).join("\n"))}</textarea>
                   </div>
                   <div class="col-12 col-md-6">
                     <label class="form-label small">Exclusions</label>
-                    <textarea class="form-control form-control-sm" rows="2" data-f="exclusions">${esc((p.exclusions || []).join("\n"))}</textarea>
+                    <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="exclusions">${esc((p.exclusions || []).join("\n"))}</textarea>
                   </div>
                   <div class="col-12">
                     <label class="form-label small">Notes</label>
-                    <textarea class="form-control form-control-sm" rows="2" data-f="notes">${esc(p.notes)}</textarea>
+                    <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="notes">${esc(p.notes)}</textarea>
                   </div>
                 </div>
               </details>
@@ -393,6 +393,88 @@
         }
     }
 
+    // ------------------------------------------------------------------
+    // Saved-service picker
+    //
+    // Shows what a person needs to choose with: the name, what kind of service it
+    // is, and what it normally costs. The chosen service is copied into a
+    // position and can then be edited freely — the catalog entry is not changed,
+    // and a later change to it does not reach back into this contract.
+    // ------------------------------------------------------------------
+
+    function addCatalogPosition(service) {
+        positions.push(normalise({
+            clientId: cryptoId(),
+            sourceType: "Catalog",
+            catalogServiceId: service.id,
+            title: service.name,
+            description: service.description || "",
+            unit: service.unit || "",
+            unitPrice: service.basePrice,
+            pricingModel: "Fixed"
+        }));
+
+        dirty = true;
+        render();
+    }
+
+    function catalogRow(service) {
+        const price = money.format(service.basePrice || 0);
+
+        return `
+          <button type="button"
+                  class="list-group-item list-group-item-action d-flex flex-wrap align-items-center justify-content-between gap-2 px-16 py-12"
+                  data-action="pick-service" data-service-id="${escapeAttr(service.id)}">
+            <span class="text-start">
+              <span class="fw-medium d-block">${escapeHtml(service.name)}</span>
+              ${service.description
+                ? `<span class="text-secondary-light text-sm">${escapeHtml(service.description)}</span>`
+                : ""}
+            </span>
+            <span class="fw-semibold text-nowrap">${escapeHtml(price)}</span>
+          </button>`;
+    }
+
+    function openCatalogPicker() {
+        const listHost = document.getElementById("catalogPickerList");
+        const search = document.getElementById("catalogSearch");
+        if (!listHost) return;
+
+        const paint = function (term) {
+            const needle = (term || "").trim().toLowerCase();
+            const shown = needle
+                ? catalog.filter(c =>
+                    (c.name || "").toLowerCase().includes(needle) ||
+                    (c.description || "").toLowerCase().includes(needle))
+                : catalog;
+
+            listHost.innerHTML = shown.length
+                ? shown.map(catalogRow).join("")
+                : '<p class="text-secondary-light text-sm mb-0 p-16">No saved service matches that.</p>';
+        };
+
+        paint("");
+
+        if (search && !search.dataset.bound) {
+            search.dataset.bound = "1";
+            search.addEventListener("input", () => paint(search.value));
+        }
+        if (search) search.value = "";
+
+        const modalEl = document.getElementById("catalogModal");
+        if (modalEl && window.bootstrap?.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+    }
+
+    function escapeAttr(value) { return escapeHtml(value); }
+
     document.addEventListener("click", async function (event) {
         const action = event.target.closest("[data-action]")?.dataset.action;
         if (!action) return;
@@ -406,24 +488,50 @@
         }
 
         if (action === "add-catalog") {
-            if (!catalog.length) { toast("info", "The service catalog is empty."); return; }
-            const name = window.prompt("Service name:\n" + catalog.map(c => "• " + c.name).join("\n"));
-            if (!name) return;
-            const match = catalog.find(c => c.name.toLowerCase() === name.trim().toLowerCase());
-            if (!match) { toast("error", "No service with that name."); return; }
+            // Was a window.prompt listing every service name and asking the user to
+            // type one back exactly. A list you can search and click is the same
+            // feature without the memory test.
+            if (!catalog.length) { toast("info", "No saved services yet. Add a manual position instead."); return; }
+            openCatalogPicker();
+        }
 
-            positions.push(normalise({
-                clientId: cryptoId(),
-                sourceType: "Catalog",
-                catalogServiceId: match.id,
-                title: match.name,
-                description: match.description || "",
-                unit: match.unit || "",
-                unitPrice: match.basePrice,
-                pricingModel: "Fixed"
-            }));
-            dirty = true;
-            render();
+        if (action === "pick-service") {
+            const id = button.dataset.serviceId;
+            const match = catalog.find(c => String(c.id) === String(id));
+            if (!match) return;
+
+            addCatalogPosition(match);
+            toast("success", match.name + " added.");
+        }
+
+        if (action === "toggle-paste" || action === "focus-paste") {
+            const panel = document.getElementById("pastePanel");
+            if (!panel) return;
+
+            const opening = action === "focus-paste" || panel.classList.contains("d-none");
+            panel.classList.toggle("d-none", !opening);
+
+            if (opening) {
+                document.getElementById("contractTextSection")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                setTimeout(() => document.getElementById("pastedText")?.focus(), 250);
+            }
+        }
+
+        if (action === "import-text") {
+            const area = document.getElementById("pastedText");
+            const text = (area?.value || "").trim();
+
+            if (!text) { toast("error", "Paste the contract text first."); return; }
+
+            await guard(button, async () => {
+                const result = await post("ImportText", { text: text });
+
+                if (!result.ok) { toast("error", result.message || "Could not store the text."); return; }
+
+                toast("success", result.message || "Contract text stored.");
+                window.location.reload();
+            });
         }
 
         if (action === "save") {

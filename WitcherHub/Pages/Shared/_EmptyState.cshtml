@@ -4,22 +4,41 @@
     Shown where a list has nothing in it. An empty table with only a header row
     reads as "something failed"; this says which of the two it is — nothing here
     yet, or nothing matching the filter — and offers the next step.
+
+    Several actions may be offered: an empty contract does not have one obvious
+    next move, it has three.
 *@
-<div class="text-center py-48 px-24">
-    <span class="w-64-px h-64-px bg-primary-50 text-primary-600 rounded-circle d-inline-flex justify-content-center align-items-center mb-16"
-          style="font-size: 28px;">
+<div class="wh-empty">
+    <span class="wh-empty__icon bg-primary-50 text-primary-600">
         <i class="@Model.Icon"></i>
     </span>
 
     <h6 class="mb-8 fw-semibold">@Model.Title</h6>
-    <p class="text-secondary-light mb-0 mx-auto" style="max-width: 30rem;">@Model.Message</p>
+    <p class="text-secondary-light mb-0 mx-auto" style="max-width: 34rem;">@Model.Message</p>
 
-    @if (!string.IsNullOrWhiteSpace(Model.ActionText) && !string.IsNullOrWhiteSpace(Model.ActionUrl))
+    @if (Model.AllActions.Count > 0)
     {
-        <a href="@Model.ActionUrl"
-           class="btn btn-primary text-sm px-20 py-11 radius-8 mt-24 d-inline-flex align-items-center gap-2">
-            <i class="@Model.ActionIcon"></i>
-            @Model.ActionText
-        </a>
+        <div class="wh-actions justify-content-center mt-16">
+            @foreach (var action in Model.AllActions)
+            {
+                if (action.IsButton)
+                {
+                    <button type="button"
+                            class="btn @(action.IsPrimary ? "btn-primary" : "btn-outline-primary") text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2"
+                            data-action="@action.Url">
+                        <i class="@action.Icon"></i>
+                        @action.Text
+                    </button>
+                }
+                else
+                {
+                    <a href="@action.Url"
+                       class="btn @(action.IsPrimary ? "btn-primary" : "btn-outline-primary") text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2">
+                        <i class="@action.Icon"></i>
+                        @action.Text
+                    </a>
+                }
+            }
+        </div>
     }
 </div>

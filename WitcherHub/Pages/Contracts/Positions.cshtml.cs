@@ -59,12 +59,57 @@ namespace WitcherHub.Pages.Contracts
 
         public sealed record CatalogOption(Guid Id, string Name, decimal BasePrice, string? Unit, string? Description);
 
+        // ---- contract basics, previously on the retired Items/Manage page -----
+        [BindProperty] public DocumentStatus BasicsStatus { get; set; }
+        [BindProperty] public DateOnly? BasicsStartDate { get; set; }
+        [BindProperty] public DateOnly? BasicsEndDate { get; set; }
+        [BindProperty] public InvoiceSendMode BasicsInvoiceSendMode { get; set; }
+
+        /// <summary>
+        /// Free text that goes into the contract ahead of the positions. This was
+        /// an unlabelled textarea above a button called "Save header"; it is the
+        /// contract's introduction and is now named as such.
+        /// </summary>
+        [BindProperty] public string? BasicsIntroduction { get; set; }
+
+        /// <summary>
+        /// True once the contract is signed, when the terms must not move.
+        /// </summary>
+        public bool IsLocked => Contract?.Status is DocumentStatus.Signed or DocumentStatus.Terminated;
+
+        /// <summary>
+        /// A contract may proceed on positions, or on accepted contract text, or
+        /// both. It does not require a Service Catalog entry.
+        /// </summary>
+        public bool HasPositions => Positions.Count > 0;
+        public bool HasContractText => Drafts.Count > 0;
+        public bool CanGenerate => HasPositions || HasContractText;
+
+        /// <summary>Which step the builder opens on, from what is already filled in.</summary>
+        public int CurrentStep =>
+            !CanGenerate ? 2
+            : !HasContractText ? 3
+            : 4;
+
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             if (ContractId == Guid.Empty) return NotFound();
 
+            if (!await LoadAsync(ct)) return NotFound();
+
+            BasicsStatus = Contract!.Status;
+            BasicsStartDate = Contract.StartDate;
+            BasicsEndDate = Contract.EndDate;
+            BasicsInvoiceSendMode = Contract.InvoiceSendMode;
+            BasicsIntroduction = Contract.Terms;
+
+            return Page();
+        }
+
+        private async Task<bool> LoadAsync(CancellationToken ct)
+        {
             Contract = await _contracts.GetContractAsync(ContractId, ct);
-            if (Contract is null) return NotFound();
+            if (Contract is null) return false;
 
             Positions = await _positions.GetPositionsAsync(ContractId, ct);
             Totals = _positions.CalculateTotals(Positions, Contract.Currency ?? "EUR");
@@ -77,7 +122,75 @@ namespace WitcherHub.Pages.Contracts
                 .Select(s => new CatalogOption(s.Id, s.Name ?? "", s.BasePrice, null, s.ServiceType.ToString()))
                 .ToList();
 
-            return Page();
+            return true;
+        }
+
+        // ------------------------------------------------------------------
+        // Contract basics
+        // ------------------------------------------------------------------
+
+        public async Task<IActionResult> OnPostBasicsAsync(CancellationToken ct)
+        {
+            if (ContractId == Guid.Empty) return NotFound();
+
+            try
+            {
+                await _contracts.UpdateHeaderAsync(
+                    ContractId,
+                    BasicsStatus,
+                    BasicsStartDate,
+                    BasicsEndDate,
+                    BasicsIntroduction,
+                    BasicsInvoiceSendMode,
+                    ct);
+
+                TempData["Toast.Type"] = "success";
+                TempData["Toast.Title"] = "Contract updated";
+                TempData["Toast.Message"] = "The contract details were saved.";
+            }
+            catch (AppException ex)
+            {
+                TempData["Toast.Type"] = "error";
+                TempData["Toast.Title"] = "Could not save";
+                TempData["Toast.Message"] = ex.Message;
+            }
+
+            return RedirectToPage(new { contractId = ContractId });
+        }
+
+        // ------------------------------------------------------------------
+        // Contract text pasted or written by hand
+        //
+        // A contract can be built entirely from text the customer or a lawyer
+        // supplied, with no positions at all. It is stored as a draft version so
+        // it sits alongside generated wording, can be compared against later
+        // versions, and goes through the same approval gate.
+        // ------------------------------------------------------------------
+
+        public async Task<IActionResult> OnPostImportTextAsync(
+            [FromBody] ImportTextRequest? request, CancellationToken ct)
+        {
+            if (request is null || string.IsNullOrWhiteSpace(request.Text))
+                return BadRequestJson("Paste the contract text first.");
+
+            // Kept exactly as supplied. Nothing rewrites it, and the user chooses
+            // separately whether to have it improved.
+            var result = await _drafts.ImportTextAsync(ContractId, request.Text, "pasted", ct);
+
+            if (!result.Succeeded)
+                return new JsonResult(new { ok = false, message = result.FailureReason });
+
+            return new JsonResult(new
+            {
+                ok = true,
+                draft = result.Draft,
+                message = $"Contract text stored as version {result.Draft!.Version}."
+            });
+        }
+
+        public sealed class ImportTextRequest
+        {
+            public string? Text { get; set; }
         }
 
         // ------------------------------------------------------------------

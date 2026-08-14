@@ -66,11 +66,7 @@ namespace WitcherHub.Pages.Contracts
                 TempData["Toast.Title"] = "Positions required";
                 TempData["Toast.Message"] = "Please add at least one Position first.";
 
-                return RedirectToPage("/Contracts/Items/Create", new
-                {
-                    contractId = contract.Id,
-                    returnTo = "items"
-                });
+                return RedirectToPage("/Contracts/Positions", new { contractId = contract.Id });
 
             }
 

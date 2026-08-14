@@ -13,6 +13,319 @@
    ========================================================================== */
 
 /* ==========================================================================
+   Spacing system
+
+   One scale, used everywhere. Pages had been spacing themselves with whatever
+   Bootstrap utility looked right at the time — mb-2 here, mb-5 there, py-3 on
+   one card and p-24 on the next — so no two screens had the same rhythm and
+   nothing could be adjusted centrally.
+
+   Steps are 4px apart at the bottom, where the difference is visible, and grow
+   from there. Anything not on the scale is a mistake, not a decision.
+   ========================================================================== */
+
+:root {
+    --wh-space-1: 0.25rem;   /*  4px — inside a control            */
+    --wh-space-2: 0.5rem;    /*  8px — label to input, icon to text */
+    --wh-space-3: 0.75rem;   /* 12px — between related fields       */
+    --wh-space-4: 1rem;      /* 16px — form row gutter              */
+    --wh-space-5: 1.5rem;    /* 24px — card padding, gap between cards */
+    --wh-space-6: 2rem;      /* 32px — between sections             */
+    --wh-space-7: 3rem;      /* 48px — page section break           */
+
+    /* Beyond this a form stops being readable and starts being a spreadsheet:
+       the eye cannot track a label on the left to its input on the right. */
+    --wh-content-max: 90rem;   /* 1440px */
+    --wh-reading-max: 56rem;   /*  896px — prose and single-column forms */
+}
+
+/* ==========================================================================
+   Page frame
+
+   The theme gives the content area 15px of padding and no maximum width, so on
+   a wide monitor every input stretched the full span of the screen and the page
+   read as a few controls marooned in grey.
+   ========================================================================== */
+
+.dashboard-main-body {
+    padding: var(--wh-space-5) var(--wh-space-4);
+    width: 100%;
+    max-width: var(--wh-content-max);
+    margin-inline: auto;
+}
+
+@media (min-width: 768px) {
+    .dashboard-main-body {
+        padding: var(--wh-space-6) var(--wh-space-5);
+    }
+}
+
+/* Sections within a page. Two cards that belong together get space-5 between
+   them; a new part of the page gets space-6. */
+.dashboard-main-body > * + * {
+    margin-block-start: 0;
+}
+
+.wh-section + .wh-section {
+    margin-block-start: var(--wh-space-6);
+}
+
+.d-footer {
+    padding: var(--wh-space-4) var(--wh-space-5);
+}
+
+/* ==========================================================================
+   Cards
+   ========================================================================== */
+
+.dashboard-main-body .card > .card-body {
+    padding: var(--wh-space-5);
+}
+
+@media (max-width: 575.98px) {
+    .dashboard-main-body .card > .card-body {
+        padding: var(--wh-space-4);
+    }
+}
+
+/* A card that is only a header plus a short list should not be as tall as one
+   holding a form. Nothing needs a floor. */
+.dashboard-main-body .card {
+    min-height: 0;
+}
+
+/* ==========================================================================
+   Forms
+
+   Label to input is space-2; fields in a row are space-4 apart. Bootstrap's
+   default label margin is 8px, which is right, but pages were overriding it in
+   both directions.
+   ========================================================================== */
+
+.dashboard-main-body .form-label {
+    margin-block-end: var(--wh-space-2);
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: var(--text-primary-light);
+}
+
+/* The hint under a field belongs to that field, not to the next one. */
+.wh-hint {
+    display: block;
+    margin-block-start: var(--wh-space-1);
+    font-size: 0.8125rem;
+    color: var(--text-secondary-light);
+}
+
+/* A form grid that keeps fields at a sane width instead of stretching each one
+   across the monitor. Fields declare how much room they actually need. */
+.wh-form-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: var(--wh-space-4);
+}
+
+.wh-form-grid > .wh-col-full { grid-column: span 12; }
+.wh-form-grid > .wh-col-half { grid-column: span 12; }
+.wh-form-grid > .wh-col-third { grid-column: span 12; }
+.wh-form-grid > .wh-col-quarter { grid-column: span 12; }
+
+@media (min-width: 576px) {
+    .wh-form-grid > .wh-col-half { grid-column: span 6; }
+    .wh-form-grid > .wh-col-third { grid-column: span 6; }
+    .wh-form-grid > .wh-col-quarter { grid-column: span 6; }
+}
+
+@media (min-width: 992px) {
+    .wh-form-grid > .wh-col-third { grid-column: span 4; }
+    .wh-form-grid > .wh-col-quarter { grid-column: span 3; }
+}
+
+/* Short values get short fields. A date input 900px wide tells the reader the
+   date might be 900px long. */
+.wh-field-xs { max-width: 8rem; }
+.wh-field-sm { max-width: 12rem; }
+.wh-field-md { max-width: 20rem; }
+.wh-field-lg { max-width: 32rem; }
+
+/* Prose fields grow with their content instead of sitting at a fixed height
+   that is wrong in both directions. */
+.dashboard-main-body textarea.form-control {
+    min-height: 6rem;
+    resize: vertical;
+}
+
+.dashboard-main-body textarea.form-control.wh-textarea-sm {
+    min-height: 4rem;
+}
+
+.dashboard-main-body textarea.form-control.wh-textarea-lg {
+    min-height: 16rem;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.wh-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wh-space-2);
+    align-items: center;
+}
+
+.wh-actions--end {
+    justify-content: flex-end;
+}
+
+/* ==========================================================================
+   Progress stepper
+
+   Shows which parts of a multi-part task are done. Horizontal on a desktop,
+   stacked on a phone where four labels side by side become four broken words.
+   ========================================================================== */
+
+.wh-stepper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wh-space-3);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: wh-step;
+}
+
+.wh-stepper__step {
+    display: flex;
+    align-items: center;
+    gap: var(--wh-space-2);
+    flex: 1 1 12rem;
+    padding: var(--wh-space-3) var(--wh-space-4);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--white);
+    color: var(--text-secondary-light);
+    font-size: 0.875rem;
+}
+
+.wh-stepper__mark {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--neutral-200);
+    color: var(--text-secondary-light);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.wh-stepper__step.is-current {
+    border-color: var(--brand);
+    color: var(--text-primary-light);
+    font-weight: 500;
+}
+
+.wh-stepper__step.is-current .wh-stepper__mark {
+    background: var(--brand);
+    color: #fff;
+}
+
+.wh-stepper__step.is-done .wh-stepper__mark {
+    background: var(--success-main, #45b369);
+    color: #fff;
+}
+
+.wh-stepper__step.is-done .wh-stepper__mark::before {
+    content: "\eb7b"; /* ri-check-line */
+    font-family: remixicon;
+    font-style: normal;
+}
+
+/* The number is replaced by the tick, not shown alongside it. */
+.wh-stepper__step.is-done .wh-stepper__mark {
+    font-size: 0;
+}
+
+.wh-stepper__step.is-done .wh-stepper__mark::before {
+    font-size: 0.875rem;
+}
+
+/* ==========================================================================
+   Parties to a contract
+   ========================================================================== */
+
+.wh-party {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wh-space-1);
+    height: 100%;
+    padding: var(--wh-space-4);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--neutral-50);
+}
+
+.wh-party__role {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-secondary-light);
+}
+
+.wh-party__name {
+    font-weight: 600;
+    color: var(--text-primary-light);
+}
+
+.wh-party__detail {
+    font-size: 0.8125rem;
+    color: var(--text-secondary-light);
+}
+
+/* ==========================================================================
+   Sticky action panel
+
+   The primary action belongs beside the data it acts on, not at the far end of
+   a long page. Sticky on a desktop; on a phone it simply flows in place,
+   because a sticky panel on a small screen is a panel covering the content.
+   ========================================================================== */
+
+@media (min-width: 1200px) {
+    .wh-sticky-panel {
+        position: sticky;
+        top: var(--wh-space-5);
+    }
+}
+
+/* ==========================================================================
+   Empty states
+
+   py-48 on a card that holds nothing produced a 300px void. Enough room to
+   read the message, no more.
+   ========================================================================== */
+
+.wh-empty {
+    padding-block: var(--wh-space-6);
+    padding-inline: var(--wh-space-4);
+    text-align: center;
+}
+
+.wh-empty__icon {
+    width: 3rem;
+    height: 3rem;
+    font-size: 1.375rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    margin-block-end: var(--wh-space-3);
+}
+
+/* ==========================================================================
    Heading scale inside the application shell
 
    The theme sizes headings with clamp() against the viewport, for marketing-style
