@@ -3,17 +3,24 @@
 <div class="row">
     <div class="col-12 col-xl-11 col-xxl-10 mx-auto">
 
+        @*
+            h3 to match every other page title in the application. The theme sizes
+            headings with clamp() against the viewport; site.css pins them to a
+            fixed scale inside the dashboard body so this and "Create Quote" and
+            "Client Details" all come out the same size.
+        *@
         <!-- Toolbar -->
-        <div class="d-flex align-items-center justify-content-between mb-3">
-            <h4 class="mb-0 fw-semibold text-light">@Model.Title</h4>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+            <h3 class="mb-0 fw-semibold">@Model.Title</h3>
 
             @if (!string.IsNullOrWhiteSpace(Model.PrimaryButtonText) &&
                         !string.IsNullOrWhiteSpace(Model.PrimaryButtonTarget))
             {
                 <button type="button"
-                        class="btn btn-grd-primary px-4"
+                        class="btn btn-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2"
                         data-bs-toggle="modal"
                         data-bs-target="@Model.PrimaryButtonTarget">
+                    <i class="ri-add-line text-lg"></i>
                     @Model.PrimaryButtonText
                 </button>
             }
@@ -40,7 +47,7 @@
                             <input type="hidden" name="@p.PageParam" value="1" />
                             <input type="hidden" name="@p.PageSizeParam" value="@p.PageSize" />
 
-                            <span class="material-icons-outlined position-absolute ms-3 translate-middle-y start-0 top-50">search</span>
+                            <i class="ri-search-line position-absolute ms-3 translate-middle-y start-0 top-50"></i>
 
                             <button type="button"
                                     class="btn p-0 border-0 bg-transparent position-absolute end-0 top-50 translate-middle-y me-3 text-muted d-none"
@@ -48,17 +55,17 @@
                                     data-search-clear
                                     title="Clear search"
                                     aria-label="Clear search">
-                                <i class="material-icons-outlined" style="font-size:18px;">close</i>
+                                <i class="ri-close-line" style="font-size:18px;"></i>
                             </button>
                         </form>
 
                         @if (!string.IsNullOrWhiteSpace(lexUrl))
                         {
                             <button type="button"
-                                    class="btn btn-outline-secondary rounded-5 px-3 d-inline-flex align-items-center gap-2"
+                                    class="btn btn-outline-primary rounded-5 px-3 d-inline-flex align-items-center gap-2"
                                     title="Refresh from Lexware"
                                     data-vc-action="lexware-refresh">
-                                <i class="material-icons-outlined">sync</i>
+                                <i class="ri-refresh-line"></i>
                                 <span class="d-none d-md-inline">Lexware</span>
                             </button>
                         }
@@ -70,8 +77,8 @@
 
                     
 
-                <div class="table-responsive maxton-table-wrap mt-2">
-                    <table class="table align-middle w-100 maxton-table mb-0">
+                <div class="table-responsive wh-table-wrap mt-2">
+                    <table class="table align-middle w-100 wh-table mb-0">
                         <thead>
                             <tr>
                                 @foreach (var col in Model.Columns)

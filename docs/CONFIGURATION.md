@@ -47,6 +47,7 @@ features are configured and which are off; values are never logged.
 | `SeedAdmin__Email`, `SeedAdmin__Password` | Used only when the users table is empty, to create the first administrator. Outside Development the seeder refuses to invent credentials and logs an error instead. |
 | `BootstrapAdmin__Email` | Address guaranteed to hold the `Admin` role. Defaults to `info@netwitcher.com` in `appsettings.json`. See "Administrator accounts" below. |
 | `BootstrapAdmin__Password` | Optional. When omitted, the account is created with a random password and activated through password reset. |
+| `Auth__ShowSignInDiagnostics` | Shows the real reason a sign-in failed on the login page. Off outside Development. See "Reading a sign-in failure" below. |
 
 ## Local setup
 
@@ -139,12 +140,45 @@ Accounts that can sign in to this database (2): admin@netwitcher.test [Admin], i
 If the address is missing from that line, sign-in cannot succeed there no matter
 what password is used.
 
-The sign-in page distinguishes two kinds of failure:
+### Reading a sign-in failure
 
-| Message | Meaning |
-| --- | --- |
-| "Login failed. Check email/password." | The credentials did not match. The log says which — unknown account, or wrong password — while the page stays generic so it cannot be used to discover registered addresses. |
-| "Sign-in is currently unavailable… a server problem, not your password." | Something other than the credentials failed: database unreachable, token signing rejected, role lookup failing. The cause is logged as an error, and shown on the page in Development. |
+Every failed sign-in prints a code, a reference and a timestamp under the error
+message:
+
+```
+Login failed. Check email/password.
+AUTH-02   Reference C02D228D   2026-08-14 06:46:13 UTC
+```
+
+The sentence is identical for every cause, so the page cannot be used to discover
+which addresses have accounts. The code identifies the cause exactly:
+
+| Code | Cause | What to do |
+| --- | --- | --- |
+| `AUTH-01` | This database holds no user accounts at all. | Check `ConnectionStrings__DefaultConnection` — the instance is almost certainly pointed at the wrong database. Otherwise seeding never ran. |
+| `AUTH-02` | Accounts exist, but none with that address. | The account is in the other environment's database. Compare against the start-up inventory line below. |
+| `AUTH-03` | The account exists; the password did not match. | If a password set through "Forgot password?" stopped working after a deploy, check whether `BootstrapAdmin__ResetPasswordOnStartup` is still set — it overwrites the password on every start. |
+| `AUTH-04` | The account is locked out. | Wait for the lockout to expire, or clear `LockoutEnd` on the account. |
+| `AUTH-05` | The account exists but has no password stored. | Use "Forgot password?", or the break-glass procedure below. |
+| `AUTH-500` | Not a credential problem: database unreachable, token signing rejected, a role lookup failing. | Read the log; the reference appears on the same line. |
+
+The reference is random per attempt and written to the log with the code, so a
+screenshot can be matched to the exact entry:
+
+```
+Sign-in failed for info@netwitcher.com. Code AUTH-02, reference C02D228D.
+```
+
+**To see the full reason on the page**, set `Auth__ShowSignInDiagnostics=true` on
+that environment and try again. The page then adds the plain-English cause and the
+facts behind it — which database host and name this instance is connected to, how
+many accounts it holds, whether the address exists, whether it has a password,
+whether it is locked out, its roles, and whether a start-up password override is
+active for it — plus a **Copy details** button that puts the whole report on the
+clipboard. It is on by default in Development.
+
+Switch it off again afterwards. The report names the addresses that exist, which
+is the one thing the generic message is there to withhold.
 
 ### Break-glass: setting the password of an account that already exists
 

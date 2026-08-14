@@ -1,0 +1,64 @@
+@using System.Security.Claims
+@using WitcherHub.Domain.SeedData
+
+@functions {
+    bool HasPerm(string perm) =>
+        User.Identity?.IsAuthenticated == true &&
+        User.HasClaim("permission", perm);
+
+    // The theme's own script marks the active entry by comparing the anchor's
+    // href to window.location, which stops matching the moment a page carries a
+    // query string — and most list pages here carry paging parameters. Deciding
+    // it from the route is exact and needs no JavaScript at all.
+    string ActiveIf(string page) =>
+        string.Equals(ViewContext.RouteData.Values["page"]?.ToString(), page, StringComparison.OrdinalIgnoreCase)
+            ? "active-page"
+            : "";
+}
+
+<aside class="sidebar">
+    <button type="button" class="sidebar-close-btn" aria-label="Close navigation">
+        <i class="ri-close-line"></i>
+    </button>
+
+    @*
+        The theme expects three logo images and swaps them for light, dark and
+        collapsed states. There is no WitcherHub wordmark image, only the star
+        mark — which reads correctly on both palettes — so the name is set as text
+        beside it and hidden with the same rule that hides the menu labels.
+    *@
+    <div>
+        <a asp-page="/Index" class="sidebar-logo">
+            <img src="~/img/netwitcher-logo.png" alt="" class="wh-mark">
+            <span class="wh-wordmark">WitcherHub</span>
+        </a>
+    </div>
+
+    <div class="sidebar-menu-area">
+        <ul class="sidebar-menu" id="sidebar-menu">
+            @if (HasPerm(AppPermissions.ManageNetwitcher))
+            {
+                <li class="sidebar-menu-group-title">Workspace</li>
+
+                <li>
+                    <a asp-page="/Index" class="@ActiveIf("/Index")">
+                        <i class="ri-group-line menu-icon"></i>
+                        <span>Clients</span>
+                    </a>
+                </li>
+                <li>
+                    <a asp-page="/Projects" class="@ActiveIf("/Projects")">
+                        <i class="ri-briefcase-line menu-icon"></i>
+                        <span>Projects</span>
+                    </a>
+                </li>
+                <li>
+                    <a asp-page="/Services" class="@ActiveIf("/Services")">
+                        <i class="ri-shopping-bag-3-line menu-icon"></i>
+                        <span>Services</span>
+                    </a>
+                </li>
+            }
+        </ul>
+    </div>
+</aside>

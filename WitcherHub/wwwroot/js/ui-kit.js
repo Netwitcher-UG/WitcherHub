@@ -40,11 +40,11 @@
 
     // ---------- 1) Notifications / Toasts (Rounded Corners + Icon) ----------
     const notifyTypeMap = {
-        success: { cls: 'bg-grd-success', icon: 'check_circle', text: 'text-white', close: 'text-white' },
-        error: { cls: 'bg-grd-danger', icon: 'report_gmailerrorred', text: 'text-white', close: 'text-white' },
-        warning: { cls: 'bg-grd-warning', icon: 'warning', text: 'text-dark', close: 'text-dark' },
-        info: { cls: 'bg-grd-info', icon: 'info', text: 'text-white', close: 'text-white' },
-        default: { cls: 'bg-grd-primary', icon: 'notifications', text: 'text-white', close: 'text-white' }
+        success: { cls: 'bg-success-main', icon: 'ri-checkbox-circle-line', text: 'text-white', close: 'text-white' },
+        error: { cls: 'bg-danger-main', icon: 'ri-close-circle-line', text: 'text-white', close: 'text-white' },
+        warning: { cls: 'bg-warning-main', icon: 'ri-error-warning-line', text: 'text-dark', close: 'text-dark' },
+        info: { cls: 'bg-info-main', icon: 'ri-information-line', text: 'text-white', close: 'text-white' },
+        default: { cls: 'bg-primary-600', icon: 'ri-notification-3-line', text: 'text-white', close: 'text-white' }
     };
 
     function ensureNotifyCss() {
@@ -136,14 +136,14 @@
         item.innerHTML = `
           <div class="ui-notify-body">
             <div class="ui-notify-icon">
-              <span class="material-icons-outlined">${conf.icon}</span>
+              <i class="${conf.icon}"></i>
             </div>
             <div class="ui-notify-content">
               ${title ? `<div class="ui-notify-title">${escapeHtml(title)}</div>` : ''}
               <p class="ui-notify-text">${escapeHtml(msg ?? '')}</p>
             </div>
             <button class="ui-notify-close ${conf.close}" type="button" aria-label="Close">
-              <span class="material-icons-outlined">close</span>
+              <i class="ri-close-line"></i>
             </button>
           </div>
         `;

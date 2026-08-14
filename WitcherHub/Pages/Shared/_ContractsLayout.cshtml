@@ -1,55 +1,24 @@
-﻿@* Pages/Shared/_ContractsLayout.cshtml *@
+@*
+    Shell for the pages a customer opens from a link in an email — contract and
+    quote signing. Deliberately bare: no navigation, nothing that hints at an
+    application behind it, and nothing that needs a session.
+*@
 @using System.Globalization
 <!doctype html>
-<html lang="@CultureInfo.CurrentUICulture.Name" data-bs-theme="light-theme">
+<html lang="@CultureInfo.CurrentUICulture.Name" data-theme="light">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@ViewData["Title"]</title>
+    <partial name="_ThemeHead" />
+    <link rel="stylesheet" href="~/css/contracts/contract-sign.css" asp-append-version="true">
 
-    <link rel="shortcut icon" href="~/theme/assets/images/netwitcher-logo.png" asp-append-version="true">
-    <link rel="icon" type="image/png" href="~/theme/assets/images/netwitcher-logo.png" asp-append-version="true">
-
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css?family=Material+Icons+Outlined" rel="stylesheet">
-    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-
-    <link href="~/theme/assets/css/bootstrap.min.css" rel="stylesheet">
-    <link href="~/theme/assets/css/bootstrap-extended.css" rel="stylesheet">
-
-    <link href="~/theme/sass/main.css" rel="stylesheet">
-    <link href="~/theme/sass/dark-theme.css" rel="stylesheet">
-    <link href="~/theme/sass/blue-theme.css" rel="stylesheet">
-    <link href="~/theme/sass/semi-dark.css" rel="stylesheet">
-    <link href="~/theme/sass/bordered-theme.css" rel="stylesheet">
-    <link href="~/theme/sass/responsive.css" rel="stylesheet">
-
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link href="~/css/theme-overrides.css" rel="stylesheet" asp-append-version="true">
-    <link href="~/css/ui-kit.css" rel="stylesheet" asp-append-version="true">
-
-    @RenderSection("Head", required: false)
-    @RenderSection("Styles", required: false)
-
-    <style>
-        body {
-            margin: 0;
-            min-height: 100vh;
-            background: #f6f7fb;
-            padding-top: 20px;
-        }
-
-        main {
-            padding: 0;
-        }
-    </style>
+    @await RenderSectionAsync("Head", required: false)
+    @await RenderSectionAsync("Styles", required: false)
 </head>
-<body>
-    <main>
+<body class="bg-neutral-50">
+    <main class="py-24 px-16">
         @RenderBody()
     </main>
 
-    <script src="~/theme/assets/js/bootstrap.bundle.min.js"></script>
-    @RenderSection("Scripts", required: false)
+    <partial name="_ThemeScripts" />
+    @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

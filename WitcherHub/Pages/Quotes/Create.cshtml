@@ -10,35 +10,7 @@
     string FmtDate(DateTimeOffset? d) => d?.ToString("yyyy-MM-dd") ?? "";
 
 }
-<style>
-    .wh-btn-primary {
-        background-color: rgb(107 76 230);
-        border-color: rgb(107 76 230);
-        color: #fff;
-    }
 
-        .wh-btn-primary:hover,
-        .wh-btn-primary:focus,
-        .wh-btn-primary:active,
-        .wh-btn-primary.active,
-        .show > .wh-btn-primary.dropdown-toggle {
-            background-color: rgb(95 66 214);
-            border-color: rgb(95 66 214);
-            color: #fff;
-        }
-
-        .wh-btn-primary:focus {
-            box-shadow: 0 0 0 .25rem rgba(107, 76, 230, .25);
-        }
-
-        .wh-btn-primary:disabled,
-        .wh-btn-primary.disabled {
-            background-color: rgb(107 76 230);
-            border-color: rgb(107 76 230);
-            color: #fff;
-            opacity: .65;
-        }
-</style>
 <div class="mb-3">
     <div class="mb-1">
         <a class="text-decoration-none text-muted small"
@@ -134,15 +106,14 @@
 </form>
 
 @section Scripts {
+    @*
+        A date-input-theme.js was loaded here and has never existed in this
+        repository — every visit to this page fetched it and got a 404, and the
+        guarded call below it could never fire. Date inputs are styled in
+        site.css instead.
+    *@
     <partial name="_ValidationScriptsPartial" />
-    <script src="~/js/pages/quotes/date-input-theme.js" asp-append-version="true"></script>
     <script>
-        (function () {
-            if (window.quoteDateTheme) {
-                window.quoteDateTheme.init(document);
-            }
-        })();
-
         (function () {
             const actionEl = document.getElementById('createQuoteAfterSignAction');
             const modeWrapEl = document.getElementById('createQuoteInvoiceSendModeWrap');

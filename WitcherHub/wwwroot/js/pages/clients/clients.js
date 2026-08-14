@@ -581,7 +581,7 @@
                         <a class="btn vc-icon-btn text-primary"
                            href="${openUrl}"
                            title="Open project">
-                            <i class="material-icons-outlined">visibility</i>
+                            <i class="ri-eye-line"></i>
                         </a>`
                     : `<span class="text-muted">—</span>`}
                 </td>
@@ -636,7 +636,7 @@
 
             const isDefault = !!(a.isDefault ?? a.IsDefault ?? a.Default);
             const defaultBadge = isDefault ? `<span class="badge bg-primary bg-opacity-10 text-primary ms-2">Default</span>` : '';
-            const starIcon = isDefault ? 'star' : 'star_border';
+            const starIcon = isDefault ? 'ri-star-fill' : 'ri-star-line';
 
             const canDelete = !isDefault && totalCount > 1;
             const deleteTitle = totalCount <= 1
@@ -671,10 +671,10 @@
                                     <div class="col-12 col-md-4">
                                         <label class="form-label small mb-1" for="vc-loc-${idx}-label">
                                             Label <span class="text-danger">*</span>
-                                            <span class="material-icons-outlined text-muted ms-1"
+                                            <i class="ri-information-line text-muted ms-1"
                                                   style="font-size:16px"
                                                   data-bs-toggle="tooltip"
-                                                  title="Example: Billing / Shipping / Home">info</span>
+                                                  title="Example: Billing / Shipping / Home"></i>
                                         </label>
                                         <input class="form-control form-control-sm"
                                                id="vc-loc-${idx}-label"
@@ -699,10 +699,10 @@
                                     <div class="col-12 col-md-8">
     <label class="form-label small mb-1" for="vc-loc-${idx}-country-combo">
         Country <span class="text-danger">*</span>
-        <span class="material-icons-outlined text-muted ms-1"
+        <i class="ri-information-line text-muted ms-1"
               style="font-size:16px"
               data-bs-toggle="tooltip"
-              title="Search & select country">info</span>
+              title="Search & select country"></i>
     </label>
 
     <div class="dropdown">
@@ -741,10 +741,10 @@
                                     <div class="col-12 col-md-8">
                                         <label class="form-label small mb-1" for="vc-loc-${idx}-streetRaw">
                                             Street and house number <span class="text-danger">*</span>
-                                            <span class="material-icons-outlined text-muted ms-1"
+                                            <i class="ri-information-line text-muted ms-1"
                                                   style="font-size:16px"
                                                   data-bs-toggle="tooltip"
-                                                  title="Street and number. Example: Hauptstr. 12">info</span>
+                                                  title="Street and number. Example: Hauptstr. 12"></i>
                                         </label>
                                         <input class="form-control form-control-sm"
                                                id="vc-loc-${idx}-streetRaw"
@@ -777,10 +777,10 @@
                                     <div class="col-12 col-md-8">
                                         <label class="form-label small mb-1" for="vc-loc-${idx}-line2">
                                             Address Line 2 <span class="text-danger">*</span>
-                                            <span class="material-icons-outlined text-muted ms-1"
+                                            <i class="ri-information-line text-muted ms-1"
                                                   style="font-size:16px"
                                                   data-bs-toggle="tooltip"
-                                                  title="Supplement, floor, apartment, etc.">info</span>
+                                                  title="Supplement, floor, apartment, etc."></i>
                                         </label>
                                         <input class="form-control form-control-sm"
                                                id="vc-loc-${idx}-line2"
@@ -802,7 +802,7 @@
                                     title="Set default"
                                     data-vc-action="set-default-location"
                                     data-index="${idx}">
-                                <i class="material-icons-outlined">${starIcon}</i>
+                                <i class="${starIcon}"></i>
                             </button>
 
                             <button type="button"
@@ -810,7 +810,7 @@
                                     title="Edit"
                                     data-vc-action="edit-location"
                                     data-index="${idx}">
-                                <i class="material-icons-outlined">edit</i>
+                                <i class="ri-edit-line"></i>
                             </button>
 
                             <button type="button"
@@ -818,7 +818,7 @@
                                     title="Save"
                                     data-vc-action="save-location"
                                     data-index="${idx}">
-                                <i class="material-icons-outlined">check</i>
+                                <i class="ri-check-line"></i>
                             </button>
 
                             <button type="button"
@@ -826,7 +826,7 @@
                                     title="Cancel"
                                     data-vc-action="cancel-location"
                                     data-index="${idx}">
-                                <i class="material-icons-outlined">close</i>
+                                <i class="ri-close-line"></i>
                             </button>
 
                             <button type="button"
@@ -835,7 +835,7 @@
                                     data-vc-action="delete-location"
                                     data-index="${idx}"
                                     ${deleteDisabledAttr}>
-                                <i class="material-icons-outlined">delete</i>
+                                <i class="ri-delete-bin-line"></i>
                             </button>
 
                         </div>
@@ -867,7 +867,7 @@
 
             const isPrimary = !!(c.isPrimary ?? c.IsPrimary ?? c.Primary);
             const primaryBadge = isPrimary ? `<span class="badge bg-warning bg-opacity-10 text-warning ms-2">Primary</span>` : '';
-            const starIcon = isPrimary ? 'star' : 'star_border';
+            const starIcon = isPrimary ? 'ri-star-fill' : 'ri-star-line';
 
             const salutation = c.salutation ?? c.Salutation ?? '';
             const firstName = c.firstName ?? c.FirstName ?? '';
@@ -897,10 +897,10 @@
                                 </div>
                                 <div class="text-muted small">${esc(position ?? '')}</div>
                                 <div class="text-muted small">
-                                    <span class="material-icons-outlined align-middle me-1" style="font-size:18px">send</span>${esc(email || '—')}
+                                    <i class="ri-send-plane-line align-middle me-1" style="font-size:18px"></i>${esc(email || '—')}
                                 </div>
                                 <div class="text-muted small">
-                                    <span class="material-icons-outlined align-middle me-1" style="font-size:18px">call</span>${esc(phone || '—')}
+                                    <i class="ri-phone-line align-middle me-1" style="font-size:18px"></i>${esc(phone || '—')}
                                 </div>
                             </div>
 
@@ -911,10 +911,10 @@
                                     <div class="col-12 col-md-3">
                                         <label class="form-label small mb-1" for="vc-c-${idx}-salutation">
                                             Salutation <small class="text-muted">(optional)</small>
-                                            <span class="material-icons-outlined text-muted ms-1"
+                                            <i class="ri-information-line text-muted ms-1"
                                                   style="font-size:16px"
                                                   data-bs-toggle="tooltip"
-                                                  title="Example: Herr / Frau / Mr / Ms">info</span>
+                                                  title="Example: Herr / Frau / Mr / Ms"></i>
                                         </label>
                                         <input class="form-control form-control-sm"
                                                id="vc-c-${idx}-salutation"
@@ -948,10 +948,10 @@
                                     <div class="col-12 col-md-6">
                                         <label class="form-label small mb-1" for="vc-c-${idx}-position">
                                             Position <span class="text-danger vc-required-marker">*</span>
-                                            <span class="material-icons-outlined text-muted ms-1"
+                                            <i class="ri-information-line text-muted ms-1"
                                                   style="font-size:16px"
                                                   data-bs-toggle="tooltip"
-                                                  title="Job title inside the company">info</span>
+                                                  title="Job title inside the company"></i>
                                         </label>
                                         <input class="form-control form-control-sm"
                                                id="vc-c-${idx}-position"
@@ -998,7 +998,7 @@
                                     title="Set primary"
                                     data-vc-action="set-primary-contact"
                                     data-index="${idx}">
-                                <i class="material-icons-outlined">${starIcon}</i>
+                                <i class="${starIcon}"></i>
                             </button>
 
                             <button type="button"
@@ -1006,7 +1006,7 @@
                                     title="Edit"
                                     data-vc-action="edit-contact"
                                     data-index="${idx}">
-                                <i class="material-icons-outlined">edit</i>
+                                <i class="ri-edit-line"></i>
                             </button>
 
                             <button type="button"
@@ -1014,7 +1014,7 @@
                                     title="Save"
                                     data-vc-action="save-contact"
                                     data-index="${idx}">
-                                <i class="material-icons-outlined">check</i>
+                                <i class="ri-check-line"></i>
                             </button>
 
                             <button type="button"
@@ -1022,7 +1022,7 @@
                                     title="Cancel"
                                     data-vc-action="cancel-contact"
                                     data-index="${idx}">
-                                <i class="material-icons-outlined">close</i>
+                                <i class="ri-close-line"></i>
                             </button>
 
                             <button type="button"
@@ -1030,7 +1030,7 @@
                                     title="Delete"
                                     data-vc-action="delete-contact"
                                     data-index="${idx}">
-                                <i class="material-icons-outlined">delete</i>
+                                <i class="ri-delete-bin-line"></i>
                             </button>
 
                         </div>
@@ -1303,7 +1303,7 @@
                         class="btn p-0 border-0 bg-transparent text-danger vc-basic-email-remove"
                         title="Remove"
                         ${emails.length === 1 ? 'disabled' : ''}>
-                    <i class="material-icons-outlined">delete</i>
+                    <i class="ri-delete-bin-line"></i>
                 </button>
             </div>
         </div>
@@ -2521,7 +2521,7 @@
             <button type="button"
                     class="btn btn-outline-danger create-email-remove"
                     title="Remove email">
-                <i class="material-icons-outlined align-middle" style="font-size:18px">delete</i>
+                <i class="ri-delete-bin-line align-middle" style="font-size:18px"></i>
             </button>
         </div>
 

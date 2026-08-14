@@ -294,7 +294,7 @@
             this.el.innerHTML = `
         <div class="d-flex flex-wrap gap-2 align-items-end mb-3">
           <div style="min-width: 240px" class="flex-grow-1">
-            <label class="form-label text-light opacity-75 mb-1">Template</label>
+            <label class="form-label text-secondary-light mb-1">Template</label>
             <select class="form-select form-select-sm" data-sb="template"></select>
           </div>
 
@@ -317,7 +317,7 @@
 
         <div class="form-check form-switch mb-2">
           <input class="form-check-input" type="checkbox" id="${this._uid("allowAdd")}" data-sb="allowAdditional">
-          <label class="form-check-label text-light" for="${this._uid("allowAdd")}">
+          <label class="form-check-label text-primary-light" for="${this._uid("allowAdd")}">
             Allow extra fields (additionalProperties)
           </label>
         </div>

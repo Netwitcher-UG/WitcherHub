@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using WitcherHub.Application.Interfaces;
 
 namespace WitcherHub.Application.Common.Exceptions
 {
@@ -48,6 +49,22 @@ namespace WitcherHub.Application.Common.Exceptions
     {
         public AuthenticationFailedAppException(string message = "Invalid credentials.", Exception? inner = null)
             : base(message, inner) { }
+
+        public AuthenticationFailedAppException(
+            SignInFailureReason reason,
+            string message = "Invalid credentials.",
+            Exception? inner = null)
+            : base(message, inner)
+        {
+            Reason = reason;
+        }
+
+        /// <summary>
+        /// Which credential check failed. Carried on the exception so the login
+        /// page can print a reference code without the caller having to re-run the
+        /// lookups the service already performed.
+        /// </summary>
+        public SignInFailureReason Reason { get; } = SignInFailureReason.Unknown;
 
         public override int StatusCode => (int)HttpStatusCode.Unauthorized;
         public override string Title => "Sign-in failed";

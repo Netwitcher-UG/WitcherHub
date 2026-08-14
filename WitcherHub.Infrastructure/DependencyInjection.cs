@@ -156,6 +156,7 @@ namespace WitcherHub.Infrastructure
             services.AddScoped<IAiPositionOrganizer, AiPositionOrganizer>();
             services.AddScoped<IDataSeeder, IdentityDataSeeder>();
             services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<ISignInDiagnostics, SignInDiagnostics>();
             services.AddScoped<ICustomer, ManageCustomer>();
             services.AddScoped<ILexwareSyncService, LexwareSyncService>();
             services.AddScoped<IServiceCatalog, ManageServiceCatalog>();

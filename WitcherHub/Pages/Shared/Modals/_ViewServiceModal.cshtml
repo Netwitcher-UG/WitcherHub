@@ -43,7 +43,7 @@
                     <!-- BASIC -->
                     <div class="form-section">
                         <div class="form-section-header">
-                            <i class="material-icons-outlined">tune</i>
+                            <i class="ri-equalizer-line"></i>
                             <span>Basic</span>
                         </div>
                         <div class="form-section-divider"></div>
@@ -90,7 +90,7 @@
                                     <button type="button"
                                             class="btn btn-outline-info"
                                             data-vc-action="edit-basic">
-                                        <i class="material-icons-outlined align-middle">edit</i>
+                                        <i class="ri-edit-line align-middle"></i>
                                         <span class="align-middle">Edit</span>
                                     </button>
                                 </div>
@@ -102,19 +102,19 @@
                             <div class="row g-3">
 
                                 <div class="col-md-8">
-                                    <label class="form-label text-light">Name</label>
+                                    <label class="form-label text-primary-light">Name</label>
                                     <input class="form-control" id="vs-basic-name" />
                                     <div class="text-danger small mt-1" id="err-vs-basic-name"></div>
                                 </div>
 
                                 <div class="col-md-4">
-                                    <label class="form-label text-light">Currency</label>
+                                    <label class="form-label text-primary-light">Currency</label>
                                     <input class="form-control" id="vs-basic-currency" placeholder="EUR" />
                                     <div class="text-danger small mt-1" id="err-vs-basic-currency"></div>
                                 </div>
 
                                 <div class="col-md-6">
-                                    <label class="form-label text-light">Service Type</label>
+                                    <label class="form-label text-primary-light">Service Type</label>
                                     <select class="form-select" id="vs-basic-serviceType">
                                         @foreach (var opt in Html.GetEnumSelectList<ServiceType>())
                                         {
@@ -125,7 +125,7 @@
                                 </div>
 
                                 <div class="col-md-6">
-                                    <label class="form-label text-light">Pricing Model</label>
+                                    <label class="form-label text-primary-light">Pricing Model</label>
                                     <select class="form-select" id="vs-basic-pricingModel">
                                         @foreach (var opt in Html.GetEnumSelectList<PricingModel>())
                                         {
@@ -136,12 +136,12 @@
                                 </div>
 
                                 <div class="col-md-6">
-                                    <label class="form-label text-light">Base Price</label>
+                                    <label class="form-label text-primary-light">Base Price</label>
                                     <input class="form-control" id="vs-basic-basePrice" />
                                     <div class="text-danger small mt-1" id="err-vs-basic-basePrice"></div>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label text-light">Default Unit</label>
+                                    <label class="form-label text-primary-light">Default Unit</label>
                                     <input class="form-control"
                                            id="vs-basic-defaultUnitName"
                                            placeholder="e.g. Piece / Hour / Month" />
@@ -149,7 +149,7 @@
                                 </div>
 
                                 <div class="col-12">
-                                    <label class="form-label text-light">Default Description</label>
+                                    <label class="form-label text-primary-light">Default Description</label>
                                     <textarea class="form-control"
                                               id="vs-basic-defaultDescription"
                                               rows="3"
@@ -159,13 +159,13 @@
                                 <div class="col-md-6 d-flex align-items-end">
                                     <div class="form-check form-switch">
                                         <input class="form-check-input" type="checkbox" id="vs-basic-active" />
-                                        <label class="form-check-label text-light" for="vs-basic-active">Active</label>
+                                        <label class="form-check-label text-primary-light" for="vs-basic-active">Active</label>
                                     </div>
                                     <div class="text-danger small mt-1 ms-3" id="err-vs-basic-active"></div>
                                 </div>
 
                            @*      <div class="col-12">
-                                    <label class="form-label text-light opacity-75">Config Schema JSON</label>
+                                    <label class="form-label text-secondary-light">Config Schema JSON</label>
                                     <textarea class="form-control" rows="6" id="vs-basic-config"
                                               placeholder='{"example": true}'></textarea>
                                     <div class="text-danger small mt-1" id="err-vs-basic-config"></div>
@@ -175,7 +175,7 @@
                                     </div>
                                 </div> *@
                                 <div class="col-12">
-                                    <label class="form-label text-light opacity-75">Config Schema</label>
+                                    <label class="form-label text-secondary-light">Config Schema</label>
 
                                     <ul class="nav nav-tabs mt-1" id="vs-config-tabs" role="tablist">
                                         <li class="nav-item" role="presentation">
@@ -228,7 +228,7 @@
 
                                 <div class="col-12 d-flex justify-content-end gap-2 mt-2">
                                     <button type="button"
-                                            class="btn btn-grd btn-grd-primary px-4"
+                                            class="btn btn-primary px-4"
                                             data-vc-action="save-basic">
                                         Save
                                     </button>
@@ -248,7 +248,7 @@
                     <!-- PRICING RULES -->
                     <div class="form-section mt-3">
                         <div class="form-section-header">
-                            <i class="material-icons-outlined">rule</i>
+                            <i class="ri-list-check-2"></i>
                             <span>Pricing Rules</span>
                             <span class="ms-2 badge bg-secondary bg-opacity-10 text-secondary" id="vs-ruleCount">0</span>
                         </div>
@@ -259,7 +259,7 @@
                                     type="button"
                                     data-bs-toggle="collapse"
                                     data-bs-target="#vs-addRuleCollapse">
-                                <i class="material-icons-outlined align-middle">add</i>
+                                <i class="ri-add-line align-middle"></i>
                                 <span class="align-middle">Add Rule</span>
                             </button>
                         </div>
@@ -270,19 +270,19 @@
                                     <div class="row g-2">
 
                                         <div class="col-md-6">
-                                            <label class="form-label text-light">Name</label>
+                                            <label class="form-label text-primary-light">Name</label>
                                             <input class="form-control form-control-sm" id="vs-add-rule-name" />
                                             <div class="text-danger small mt-1" id="err-vs-add-rule-name"></div>
                                         </div>
 
                                         <div class="col-md-3">
-                                            <label class="form-label text-light">Priority</label>
+                                            <label class="form-label text-primary-light">Priority</label>
                                             <input class="form-control form-control-sm" id="vs-add-rule-priority" value="100" />
                                             <div class="text-danger small mt-1" id="err-vs-add-rule-priority"></div>
                                         </div>
 
                                         <div class="col-md-3">
-                                            <label class="form-label text-light">Scope</label>
+                                            <label class="form-label text-primary-light">Scope</label>
                                             <select class="form-select form-select-sm" id="vs-add-rule-scope">
                                                 <option value="LINE_ITEM">This Service</option>
                                                 <option value="INVOICE">Overall Total</option>
@@ -291,7 +291,7 @@
                                         </div>
 
                                         <div class="col-md-4">
-                                            <label class="form-label text-light">Action</label>
+                                            <label class="form-label text-primary-light">Action</label>
                                             <select class="form-select form-select-sm" id="vs-add-rule-action">
                                                 @foreach (var opt in Html.GetEnumSelectList<RuleAction>())
                                                 {
@@ -302,31 +302,31 @@
                                         </div>
 
                                         <div class="col-12">
-                                            <label class="form-label text-light">Value Expr</label>
+                                            <label class="form-label text-primary-light">Value Expr</label>
                                             <input class="form-control form-control-sm" id="vs-add-rule-valueExpr" value="0" />
                                             <div class="text-danger small mt-1" id="err-vs-add-rule-valueExpr"></div>
                                         </div>
 
                                         <div class="col-12">
-                                            <label class="form-label text-light">Condition Expr</label>
+                                            <label class="form-label text-primary-light">Condition Expr</label>
                                             <input class="form-control form-control-sm" id="vs-add-rule-conditionExpr" value="true" />
                                             <div class="text-danger small mt-1" id="err-vs-add-rule-conditionExpr"></div>
                                         </div>
 
                                         <div class="col-md-6">
-                                            <label class="form-label text-light opacity-75">Label (optional)</label>
+                                            <label class="form-label text-secondary-light">Label (optional)</label>
                                             <input class="form-control form-control-sm" id="vs-add-rule-label" />
                                             <div class="text-danger small mt-1" id="err-vs-add-rule-label"></div>
                                         </div>
 
                                         <div class="col-md-3">
-                                            <label class="form-label text-light opacity-75">Valid From</label>
+                                            <label class="form-label text-secondary-light">Valid From</label>
                                             <input type="date" class="form-control form-control-sm" id="vs-add-rule-validFrom" />
                                             <div class="text-danger small mt-1" id="err-vs-add-rule-validFrom"></div>
                                         </div>
 
                                         <div class="col-md-3">
-                                            <label class="form-label text-light opacity-75">Valid To</label>
+                                            <label class="form-label text-secondary-light">Valid To</label>
                                             <input type="date" class="form-control form-control-sm" id="vs-add-rule-validTo" />
                                             <div class="text-danger small mt-1" id="err-vs-add-rule-validTo"></div>
                                         </div>
@@ -334,13 +334,13 @@
                                         <div class="col-md-6 d-flex align-items-end">
                                             <div class="form-check form-switch">
                                                 <input class="form-check-input" type="checkbox" id="vs-add-rule-active" checked />
-                                                <label class="form-check-label text-light" for="vs-add-rule-active">Active</label>
+                                                <label class="form-check-label text-primary-light" for="vs-add-rule-active">Active</label>
                                             </div>
                                             <div class="text-danger small mt-1 ms-3" id="err-vs-add-rule-active"></div>
                                         </div>
 
                                         <div class="col-12 d-flex justify-content-end gap-2 mt-2">
-                                            <button type="submit" class="btn btn-grd-primary btn-sm">
+                                            <button type="submit" class="btn btn-primary btn-sm">
                                                 Save Rule
                                             </button>
 
@@ -364,7 +364,7 @@
                     <!-- Schema preview -->
                     <div class="form-section mt-3">
                         <div class="form-section-header">
-                            <i class="material-icons-outlined">data_object</i>
+                            <i class="ri-braces-line"></i>
                             <span>Config Schema</span>
                         </div>
                         <div class="form-section-divider"></div>

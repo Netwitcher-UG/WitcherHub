@@ -1,357 +1,71 @@
-﻿@using System.Security.Claims
-@using WitcherHub.Domain.SeedData
-
-
+@*
+    The signed-in application shell: WowDash sidebar, top bar and content area.
+*@
 @{
-    var tType = TempData["Toast.Type"]?.ToString();
-    var tTitle = TempData["Toast.Title"]?.ToString();
-    var tMsg = TempData["Toast.Message"]?.ToString();
-}
-@functions {
-    bool HasPerm(string perm) =>
-        User.Identity?.IsAuthenticated == true &&
-        User.HasClaim("permission", perm);
+    var toastType = TempData["Toast.Type"]?.ToString();
+    var toastTitle = TempData["Toast.Title"]?.ToString();
+    var toastMessage = TempData["Toast.Message"]?.ToString();
+
+    // Only pages that ask for it get a heading row. Every list page already
+    // renders its own title next to its primary action button, so rendering
+    // ViewData["Title"] here as well printed the word twice.
+    var heading = ViewData["Heading"]?.ToString();
+    var subheading = ViewData["Subtitle"]?.ToString();
 }
 
 <!doctype html>
-<html lang="en" data-bs-theme="blue-theme">
+<html lang="en" data-theme="light">
 <head>
-    <meta charset="utf-8">
-    <script>
-        (function () {
-          const KEY = "wh_theme";
-          const DEFAULT_THEME = "blue-theme";
-
-          try {
-            const saved = localStorage.getItem(KEY);
-            const theme = saved || DEFAULT_THEME;
-            document.documentElement.setAttribute("data-bs-theme", theme);
-          } catch (e) {
-            document.documentElement.setAttribute("data-bs-theme", DEFAULT_THEME);
-          }
-        })();
-    </script>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@ViewData["Title"] - WitcherHub</title>
-
-    <!--favicon-->
-    <link rel="icon" href="~/theme/assets/images/netwitcher-logo.png" type="image/png">
-    <script>
-        window.paceOptions = {
-            ajax: {
-                trackWebSockets: false,
-                ignoreURLs: [
-                    "browserLink",
-                    "aspnetcore-browser-refresh",
-                    "/_vs/",
-                    "/hubs"
-                ]
-            },
-            restartOnRequestAfter: false,
-            eventLag: false
-        };
-    </script>
-
-    <!-- loader -->
-    <link href="~/theme/assets/css/pace.min.css" rel="stylesheet">
-    <script src="~/theme/assets/js/pace.min.js"></script>
-
-    <!-- plugins -->
-    <link href="~/theme/assets/plugins/perfect-scrollbar/css/perfect-scrollbar.css" rel="stylesheet">
-    <link rel="stylesheet" type="text/css" href="~/theme/assets/plugins/metismenu/metisMenu.min.css">
-    <link rel="stylesheet" type="text/css" href="~/theme/assets/plugins/metismenu/mm-vertical.css">
-    <link rel="stylesheet" type="text/css" href="~/theme/assets/plugins/simplebar/css/simplebar.css">
-
-    <!-- bootstrap css -->
-    <link href="~/theme/assets/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- fonts / icons -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css?family=Material+Icons+Outlined" rel="stylesheet">
-    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
-
-    <!-- main css -->
-    <link href="~/theme/assets/css/bootstrap-extended.css" rel="stylesheet">
-    <link href="~/theme/sass/main.css" rel="stylesheet">
-    <link href="~/theme/sass/dark-theme.css" rel="stylesheet">
-    <link href="~/theme/sass/blue-theme.css" rel="stylesheet">
-    <link href="~/theme/sass/semi-dark.css" rel="stylesheet">
-    <link href="~/theme/sass/bordered-theme.css" rel="stylesheet">
-    <link href="~/theme/sass/responsive.css" rel="stylesheet">
-
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link href="~/css/theme-overrides.css" rel="stylesheet" asp-append-version="true">
-    <link href="~/css/ui-kit.css" rel="stylesheet" asp-append-version="true">
+    <partial name="_ThemeHead" />
+    @await RenderSectionAsync("Styles", required: false)
 </head>
-
 <body>
+    <partial name="_AppSidebar" />
 
-    <!--start header-->
-    <header class="top-header">
-        <nav class="navbar navbar-expand align-items-center gap-4 justify-content-between">
+    <main class="dashboard-main">
+        <partial name="_AppNavbar" />
 
-            <div class="btn-toggle">
-                <a href="javascript:;"><i class="material-icons-outlined">menu</i></a>
-            </div>
-
-            
-            <ul class="navbar-nav gap-1 nav-right-links align-items-center ms-auto">
-
-                @* <li class="nav-item d-lg-none mobile-search-btn">
-                    <a class="nav-link" href="javascript:;"><i class="material-icons-outlined">search</i></a>
-                </li> *@
-
-                @* <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle dropdown-toggle-nocaret" href="javascript:;" data-bs-toggle="dropdown">
-                        <img src="~/theme/assets/images/county/02.png" width="22" alt="">
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img src="~/theme/assets/images/county/01.png" width="20" alt=""><span class="ms-2">English</span></a></li>
-                        <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img src="~/theme/assets/images/county/02.png" width="20" alt=""><span class="ms-2">Catalan</span></a></li>
-                        <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img src="~/theme/assets/images/county/03.png" width="20" alt=""><span class="ms-2">French</span></a></li>
-                        <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img src="~/theme/assets/images/county/04.png" width="20" alt=""><span class="ms-2">Belize</span></a></li>
-                        <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img src="~/theme/assets/images/county/05.png" width="20" alt=""><span class="ms-2">Colombia</span></a></li>
-                        <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img src="~/theme/assets/images/county/06.png" width="20" alt=""><span class="ms-2">Spanish</span></a></li>
-                        <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img src="~/theme/assets/images/county/07.png" width="20" alt=""><span class="ms-2">Georgian</span></a></li>
-                        <li><a class="dropdown-item d-flex align-items-center py-2" href="javascript:;"><img src="~/theme/assets/images/county/08.png" width="20" alt=""><span class="ms-2">Hindi</span></a></li>
-                    </ul>
-                </li> *@
-
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle dropdown-toggle-nocaret position-relative" data-bs-auto-close="outside"
-                       data-bs-toggle="dropdown" href="javascript:;">
-                        <i class="material-icons-outlined">notifications</i>
-                        <span class="badge-notify">5</span>
-                    </a>
-                    <div class="dropdown-menu dropdown-notify dropdown-menu-end shadow">
-                        <div class="px-3 py-1 d-flex align-items-center justify-content-between border-bottom">
-                            <h5 class="notiy-title mb-0">Notifications</h5>
-                            <div class="dropdown">
-                                <button class="btn btn-secondary dropdown-toggle dropdown-toggle-nocaret option" type="button"
-                                        data-bs-toggle="dropdown" aria-expanded="false">
-                                    <span class="material-icons-outlined">more_vert</span>
-                                </button>
-                                <div class="dropdown-menu dropdown-option dropdown-menu-end shadow">
-                                    <div><a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined fs-6">inventory_2</i>Archive All</a></div>
-                                    <div><a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined fs-6">done_all</i>Mark all as read</a></div>
-                                    <div><a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined fs-6">mic_off</i>Disable Notifications</a></div>
-                                    <div><a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined fs-6">grade</i>What's new ?</a></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="notify-list">
-                            <div>
-                                <a class="dropdown-item border-bottom py-2" href="javascript:;">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <div><img src="~/theme/assets/images/avatars/01.png" class="rounded-circle" width="45" height="45" alt=""></div>
-                                        <div>
-                                            <h5 class="notify-title">Congratulations Jhon</h5>
-                                            <p class="mb-0 notify-desc">Many congtars jhon. You have won the gifts.</p>
-                                            <p class="mb-0 notify-time">Today</p>
-                                        </div>
-                                    </div>
+        <div class="dashboard-main-body">
+            @if (!string.IsNullOrWhiteSpace(heading))
+            {
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+                    <h6 class="fw-semibold mb-0">@heading</h6>
+                    @if (!string.IsNullOrWhiteSpace(subheading))
+                    {
+                        <ul class="d-flex align-items-center gap-2">
+                            <li class="fw-medium">
+                                <a asp-page="/Index" class="d-flex align-items-center gap-1 hover-text-primary">
+                                    <i class="ri-home-smile-line text-lg"></i>
+                                    Home
                                 </a>
-                            </div>
-                        </div>
-                    </div>
-                </li>
+                            </li>
+                            <li>-</li>
+                            <li class="fw-medium">@subheading</li>
+                        </ul>
+                    }
+                </div>
+            }
 
-                @* <li class="nav-item d-md-flex d-none">
-                    <a class="nav-link position-relative" data-bs-toggle="offcanvas" href="#offcanvasCart">
-                        <i class="material-icons-outlined">shopping_cart</i>
-                        <span class="badge-notify">8</span>
-                    </a>
-                </li> *@
-
-                <li class="nav-item dropdown">
-                    <a href="javascript:;" class="dropdown-toggle dropdown-toggle-nocaret" data-bs-toggle="dropdown" aria-expanded="false">
-                        <img src="~/theme/assets/images/netwitcher-logo.png" class="rounded-circle p-1 border" width="45" height="45" alt="">
-                    </a>
-
-                    <div class="dropdown-menu dropdown-user dropdown-menu-end shadow">
-                        @* <a class="dropdown-item gap-2 py-2" href="javascript:;">
-            <div class="text-center">
-                <img src="~/theme/assets/images/avatars/01.png" class="rounded-circle p-1 shadow mb-3" width="90" height="90" alt="">
-                <h5 class="user-name mb-0 fw-bold">Hello, Jhon</h5>
-            </div>
-        </a>
-        <hr class="dropdown-divider">
-        <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined">person_outline</i>Profile</a>
-        <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined">local_bar</i>Setting</a>
-        <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;"><i class="material-icons-outlined">dashboard</i>Dashboard</a>
-        <hr class="dropdown-divider"> *@
-
-                        <form method="post" asp-page="/Auth/Logout" class="m-0">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="dropdown-item d-flex align-items-center gap-2 py-2">
-                                <i class="material-icons-outlined">power_settings_new</i>
-                                Logout
-                            </button>
-                        </form>
-                    </div>
-                </li>
-
-            </ul>
-        </nav>
-    </header>
-    <!--end top header-->
-
-    <!--start sidebar-->
-    <aside class="sidebar-wrapper" data-simplebar="true">
-        <div class="sidebar-header">
-            <div class="logo-icon">
-                <img src="~/theme/assets/images/netwitcher-logo.png" class="logo-img" alt="">
-            </div>
-            <div class="logo-name flex-grow-1">
-                <h5 class="mb-0">WitcherHub</h5>
-            </div>
-            <div class="sidebar-close">
-                <span class="material-icons-outlined">close</span>
-            </div>
-        </div>
-
-        <div class="sidebar-nav">
-            <ul class="metismenu" id="sidenav">
-
-                
-
-                <li class="menu-label">Pages</li>
-
-                @if (HasPerm(AppPermissions.ManageNetwitcher))
-                {
-                    <li>
-                        <a asp-area="" asp-page="/Index">
-
-                            <div class="parent-icon"><i class="material-icons-outlined">groups</i></div>
-                            <div class="menu-title">Clients</div>
-                        </a>
-                    </li>
-                    <li>
-                        <a asp-area="" asp-page="/Projects">
-                            <div class="parent-icon"><i class="material-icons-outlined">calendar_today</i></div>
-                            <div class="menu-title">Project</div>
-                        </a>
-                    </li>
-                    <li>
-                        <a asp-area="" asp-page="/Services">
-                            <div class="parent-icon"><i class="material-icons-outlined">local_mall</i></div>
-                            <div class="menu-title">Services</div>
-                        </a>
-                    </li>
-                    @* <li>
-                        <a href="/contracts/sign" target="_blank">
-                            <div class="parent-icon"><i class="material-icons-outlined">api</i></div>
-                            <div class="menu-title">Contract Page</div>
-                        </a>
-                    </li>
-
-                
-                    <li>
-                        <a href="/swagger/index.html" target="_blank">
-                            <div class="parent-icon"><i class="material-icons-outlined">api</i></div>
-                            <div class="menu-title">Swagger</div>
-                        </a>
-                    </li> *@
-                }
-
-
-
-
-            </ul>
-        </div>
-    </aside>
-    <!--end sidebar-->
-    <!--start main wrapper-->
-    <main class="main-wrapper">
-        <div class="main-content">
             @RenderBody()
         </div>
+
+        <footer class="d-footer">
+            <div class="row align-items-center justify-content-between">
+                <div class="col-auto">
+                    <p class="mb-0">© @DateTime.UtcNow.Year Netwitcher UG. All rights reserved.</p>
+                </div>
+                <div class="col-auto">
+                    <p class="mb-0">WitcherHub</p>
+                </div>
+            </div>
+        </footer>
     </main>
-    <!--end main wrapper-->
-    <!--start overlay-->
-    <div class="overlay btn-toggle"></div>
-    <!--end overlay-->
-    <!--start cart-->
-    <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasCart">
-        <div class="offcanvas-header border-bottom h-70">
-            <h5 class="mb-0">Cart</h5>
-            <a href="javascript:;" class="primaery-menu-close" data-bs-dismiss="offcanvas">
-                <i class="material-icons-outlined">close</i>
-            </a>
-        </div>
-        <div class="offcanvas-body p-0">
-            <div class="p-3">
-                <p class="mb-0">Cart content here...</p>
-            </div>
-        </div>
-    </div>
-    <!--end cart-->
-    <!--start switcher-->
-    <button class="btn btn-grd btn-grd-primary position-fixed bottom-0 end-0 m-3 d-flex align-items-center gap-2"
-            type="button" data-bs-toggle="offcanvas" data-bs-target="#staticBackdrop">
-        <i class="material-icons-outlined">tune</i>Customize
-    </button>
-
-    <div class="offcanvas offcanvas-end" data-bs-scroll="true" tabindex="-1" id="staticBackdrop">
-        <div class="offcanvas-header border-bottom h-70">
-            <div>
-                <h5 class="mb-0">Theme Customizer</h5>
-                <p class="mb-0">Customize your theme</p>
-            </div>
-            <a href="javascript:;" class="primaery-menu-close" data-bs-dismiss="offcanvas">
-                <i class="material-icons-outlined">close</i>
-            </a>
-        </div>
-        <div class="offcanvas-body">
-            <p>Theme variation</p>
-
-            <div class="row g-3">
-                <div class="col-12 col-xl-6">
-                    <input type="radio" class="btn-check" name="theme-options" id="BlueTheme" checked>
-                    <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="BlueTheme">
-                        <span class="material-icons-outlined">contactless</span>
-                        <span>Blue</span>
-                    </label>
-                </div>
-                <div class="col-12 col-xl-6">
-                    <input type="radio" class="btn-check" name="theme-options" id="LightTheme">
-                    <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="LightTheme">
-                        <span class="material-icons-outlined">light_mode</span>
-                        <span>Light</span>
-                    </label>
-                </div>
-                <div class="col-12 col-xl-6">
-                    <input type="radio" class="btn-check" name="theme-options" id="DarkTheme">
-                    <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="DarkTheme">
-                        <span class="material-icons-outlined">dark_mode</span>
-                        <span>Dark</span>
-                    </label>
-                </div>
-                <div class="col-12 col-xl-6">
-                    <input type="radio" class="btn-check" name="theme-options" id="SemiDarkTheme">
-                    <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="SemiDarkTheme">
-                        <span class="material-icons-outlined">contrast</span>
-                        <span>Semi Dark</span>
-                    </label>
-                </div>
-                <div class="col-12 col-xl-6">
-                    <input type="radio" class="btn-check" name="theme-options" id="BoderedTheme">
-                    <label class="btn btn-outline-secondary d-flex flex-column gap-1 align-items-center justify-content-center p-4" for="BoderedTheme">
-                        <span class="material-icons-outlined">border_style</span>
-                        <span>Bordered</span>
-                    </label>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!--end switcher-->
-
 
     <!-- UI Kit: Loading Overlay -->
     <div id="appLoading" class="app-loading d-none" aria-hidden="true">
         <div class="app-loading__panel" role="status" aria-live="polite" aria-atomic="true">
             <div class="spinner-border app-loading__spinner" aria-hidden="true"></div>
-            <div class="app-loading__text">Loading...</div>
+            <div class="app-loading__text">Loading…</div>
         </div>
     </div>
 
@@ -369,81 +83,68 @@
         </div>
     </div>
 
+    <partial name="_ThemeScripts" />
 
-    <!--bootstrap js-->
-    <script src="~/theme/assets/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/ui-kit.js"></script>
+    <script src="~/js/ui-kit.js" asp-append-version="true"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-          window.UI?.init?.();
+            window.UI?.init?.();
         });
     </script>
-    <!--plugins-->
-    <script src="~/theme/assets/js/jquery.min.js"></script>
-    <script src="~/theme/assets/plugins/perfect-scrollbar/js/perfect-scrollbar.js"></script>
-    <script src="~/theme/assets/plugins/metismenu/metisMenu.min.js"></script>
-    <script src="~/theme/assets/plugins/simplebar/js/simplebar.min.js"></script>
-
-    <!--main js-->
-    <script src="~/theme/assets/js/main.js"></script>
 
     @await RenderSectionAsync("Scripts", required: false)
-    @if (!string.IsNullOrWhiteSpace(tType) && !string.IsNullOrWhiteSpace(tMsg))
+
+    @if (!string.IsNullOrWhiteSpace(toastType) && !string.IsNullOrWhiteSpace(toastMessage))
     {
         <script>
             document.addEventListener("DOMContentLoaded", function () {
                 if (window.UI?.toast?.show) {
                     UI.toast.show({
-                        type: "@tType",
-                        title: "@(tTitle ?? "")",
-                        msg: "@tMsg",
+                        type: "@toastType",
+                        title: "@(toastTitle ?? "")",
+                        msg: "@toastMessage",
                         timeout: 3500
                     });
                 }
             });
         </script>
     }
+
+    @* A toast queued before a full page reload, replayed once the new page is up. *@
     <script>
         (function () {
-          'use strict';
+            'use strict';
 
-          const KEY = 'vc.toast.afterReload';
+            const KEY = 'vc.toast.afterReload';
 
-          function showToast(t) {
-            if (!t) return;
-            const UI = window.UI || {};
-            const type = String(t.type || '').toLowerCase();
-            const title = t.title || '';
-            const msg = t.message || '';
+            function showToast(t) {
+                if (!t) return;
+                const UI = window.UI || {};
+                const type = String(t.type || '').toLowerCase();
+                const title = t.title || '';
+                const msg = t.message || '';
 
-            // fallback لو UI.toast غير موجودة
-            const fallback = (m) => alert((title ? title + ": " : "") + m);
+                const fallback = (m) => alert((title ? title + ": " : "") + m);
 
-            if (UI.toast?.success && type === 'success') return UI.toast.success(msg, title);
-            if (UI.toast?.warning && (type === 'warning' || type === 'warn')) return UI.toast.warning(msg, title);
-            if (UI.toast?.info && type === 'info') return UI.toast.info(msg, title);
-            if (UI.toast?.error) return UI.toast.error(msg, title);
+                if (UI.toast?.success && type === 'success') return UI.toast.success(msg, title);
+                if (UI.toast?.warning && (type === 'warning' || type === 'warn')) return UI.toast.warning(msg, title);
+                if (UI.toast?.info && type === 'info') return UI.toast.info(msg, title);
+                if (UI.toast?.error) return UI.toast.error(msg, title);
 
-            return fallback(msg);
-          }
-
-          document.addEventListener('DOMContentLoaded', function () {
-            try {
-              const raw = sessionStorage.getItem(KEY);
-              if (!raw) return;
-              sessionStorage.removeItem(KEY);
-              showToast(JSON.parse(raw));
-            } catch {
-              try { sessionStorage.removeItem(KEY); } catch {}
+                return fallback(msg);
             }
-          });
+
+            document.addEventListener('DOMContentLoaded', function () {
+                try {
+                    const raw = sessionStorage.getItem(KEY);
+                    if (!raw) return;
+                    sessionStorage.removeItem(KEY);
+                    showToast(JSON.parse(raw));
+                } catch {
+                    try { sessionStorage.removeItem(KEY); } catch { }
+                }
+            });
         })();
     </script>
-
 </body>
 </html>
-
-
-
-
-

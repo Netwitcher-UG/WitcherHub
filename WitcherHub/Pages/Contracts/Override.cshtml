@@ -137,34 +137,6 @@
         font-size: .95rem;
         margin-bottom: .25rem;
     }
-
-    .wh-btn-primary {
-        background-color: rgb(107 76 230);
-        border-color: rgb(107 76 230);
-        color: #fff;
-    }
-
-        .wh-btn-primary:hover,
-        .wh-btn-primary:focus,
-        .wh-btn-primary:active,
-        .wh-btn-primary.active,
-        .show > .wh-btn-primary.dropdown-toggle {
-            background-color: rgb(95 66 214);
-            border-color: rgb(95 66 214);
-            color: #fff;
-        }
-
-        .wh-btn-primary:focus {
-            box-shadow: 0 0 0 .25rem rgba(107, 76, 230, .25);
-        }
-
-        .wh-btn-primary:disabled,
-        .wh-btn-primary.disabled {
-            background-color: rgb(107 76 230);
-            border-color: rgb(107 76 230);
-            color: #fff;
-            opacity: .65;
-        }
 </style>
 <form method="post" class="mb-3">
     @Html.AntiForgeryToken()
@@ -271,7 +243,7 @@
                                 title="Delete"
                                 formaction="@Url.Page("/Contracts/Override", "DeletePosition", new { id = Model.Vm.ContractId, posNo = p.PositionNo })"
                                 disabled="@Model.Vm.IsLocked">
-                            <i class="material-icons-outlined">delete</i>
+                            <i class="ri-delete-bin-line"></i>
                         </button>
                     </div>
                     <!-- Collapsible body -->
@@ -438,6 +410,5 @@
           });
         })();
     </script>
-
 
 }

@@ -1,0 +1,42 @@
+@*
+    Every stylesheet the WowDash theme needs, in one place.
+
+    All three layouts include this partial, so the dashboard, the login screen and
+    the public contract-signing page cannot drift apart. The previous theme was
+    wired up separately in each layout and had already diverged: the signing page
+    pulled in two icon fonts nothing on it used, and the login page loaded a
+    stylesheet the dashboard did not.
+*@
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>@(ViewData["Title"] is null ? "WitcherHub" : ViewData["Title"] + " · WitcherHub")</title>
+
+<link rel="icon" type="image/png" href="~/img/favicon-32x32.png" sizes="32x32">
+
+@*
+    Applied before the first paint. The theme toggle stores the choice in
+    localStorage and the script at the end of the body applies it, which is one
+    full render too late — a person who chose dark saw a white flash on every
+    navigation.
+*@
+<script>
+    (function () {
+        try {
+            var theme = localStorage.getItem("theme");
+            if (theme === "dark" || theme === "light") {
+                document.documentElement.setAttribute("data-theme", theme);
+            }
+        } catch (e) { /* private mode: keep the default */ }
+    })();
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<link rel="stylesheet" href="~/wowdash/css/remixicon.css">
+<link rel="stylesheet" href="~/wowdash/css/lib/bootstrap.min.css">
+<link rel="stylesheet" href="~/wowdash/css/style.css">
+
+<link rel="stylesheet" href="~/css/site.css" asp-append-version="true">
+<link rel="stylesheet" href="~/css/ui-kit.css" asp-append-version="true">

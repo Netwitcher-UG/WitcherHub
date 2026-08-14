@@ -1,160 +1,366 @@
-html {
-  font-size: 14px;
+/* ==========================================================================
+   Application styles that sit on top of the WowDash theme.
+
+   Every colour here is expressed with a theme variable, never a literal. The
+   previous version of this file hard-coded rgba(255,255,255,…) throughout,
+   because the theme it was written against was dark: the same rules produced
+   white text on white cards the moment a light palette was selected, and each
+   fix was another html[data-bs-theme=…] block layered on top. Four of those
+   blocks existed by the end, all fighting each other with !important.
+
+   Variables used below are defined by the theme in wowdash/css/style.css and
+   redefined under [data-theme=dark], so a rule written once works in both.
+   ========================================================================== */
+
+/* ==========================================================================
+   Heading scale inside the application shell
+
+   The theme sizes headings with clamp() against the viewport, for marketing-style
+   pages: an <h3> renders around 51px on a 1440px screen. Every page title in this
+   application is an <h3>, so "Create Quote" came out larger than the browser tab
+   it sat in.
+
+   Fixed sizes here, scoped to the dashboard body only — the public contract and
+   quote signing pages keep the theme's own scale, where a large heading is right.
+   ========================================================================== */
+
+/* !important is required, not preferred: the theme sets every heading size with
+   !important of its own, so nothing else can win without matching it. */
+.dashboard-main-body h1, .dashboard-main-body .h1 { font-size: 1.75rem !important; }
+.dashboard-main-body h2, .dashboard-main-body .h2 { font-size: 1.5rem !important; }
+.dashboard-main-body h3, .dashboard-main-body .h3 { font-size: 1.375rem !important; }
+.dashboard-main-body h4, .dashboard-main-body .h4 { font-size: 1.25rem !important; }
+.dashboard-main-body h5, .dashboard-main-body .h5 { font-size: 1.125rem !important; }
+.dashboard-main-body h6, .dashboard-main-body .h6 { font-size: 1rem !important; }
+
+.dashboard-main-body h1,
+.dashboard-main-body h2,
+.dashboard-main-body h3,
+.dashboard-main-body h4,
+.dashboard-main-body h5,
+.dashboard-main-body h6 {
+    line-height: 1.3;
+    color: var(--text-primary-light);
 }
 
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
+/* ==========================================================================
+   Disclosure widgets
+
+   The theme opens with `all: unset` on almost every element, which strips the
+   marker off a <summary> and leaves it rendering as a plain list item with a
+   bullet. This restores an affordance that says "this opens".
+   ========================================================================== */
+
+details > summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    cursor: pointer;
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+details > summary::-webkit-details-marker {
+    display: none;
 }
 
-html {
-  position: relative;
-  min-height: 100%;
+details > summary::before {
+    content: "\ea6e"; /* ri-arrow-right-s-line */
+    font-family: remixicon;
+    font-style: normal;
+    line-height: 1;
+    transition: transform .15s ease;
 }
 
-body {
-  margin-bottom: 60px;
+details[open] > summary::before {
+    transform: rotate(90deg);
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
+/* ==========================================================================
+   Branding
+
+   The only brand asset available is the star mark, so the product name is set
+   as text next to it. These rules mirror the theme's own show/hide behaviour
+   for the collapsed sidebar, which it applies to <img> elements by class.
+   ========================================================================== */
+
+.sidebar-logo .wh-mark {
+    max-height: 2.25rem;
+    flex: 0 0 auto;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
+.sidebar-logo .wh-wordmark {
+    display: inline-block;
+    margin-inline-start: .6rem;
+    font-weight: 700;
+    font-size: 1.15rem;
+    white-space: nowrap;
+    color: var(--text-primary-light);
 }
 
-.page-content {
-    padding-top: 70px; 
+.sidebar.active .sidebar-logo .wh-wordmark {
+    display: none;
 }
 
-:root {
-    --top-header-h: 70px; 
-    --primary-menu-h: 70px;
+.sidebar.active:hover .sidebar-logo .wh-wordmark {
+    display: inline-block;
 }
 
-body {
-    padding-top: 30px;
+.wh-auth-mark {
+    width: 8rem;
+    height: auto;
 }
 
-/* wrapper spacing so table doesn't hug card edges */
-.maxton-table-wrap {
+/* ==========================================================================
+   Data tables (see Pages/Shared/_TableCard.cshtml)
+   Rows read as separate cards rather than as ruled lines.
+   ========================================================================== */
+
+.wh-table-wrap {
     padding: .25rem .75rem .75rem;
 }
 
-/* fixed layout + nicer spacing between rows */
-.maxton-table {
+.wh-table {
     table-layout: fixed;
     width: 100%;
     border-collapse: separate !important;
-    border-spacing: 0 .65rem; /* space between rows (card-like rows) */
+    border-spacing: 0 .65rem;
 }
 
-    /* header */
-    .maxton-table thead th {
-        padding: .85rem 1rem;
-        font-weight: 600;
-        font-size: .8rem;
-        letter-spacing: .04em;
-        text-transform: uppercase;
-        border: 0 !important;
-        opacity: .9;
-    }
+.wh-table thead th {
+    padding: .85rem 1rem;
+    font-weight: 600;
+    font-size: .8rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    border: 0 !important;
+    color: var(--text-secondary-light);
+    white-space: nowrap;
 
-    /* body cells */
-    .maxton-table tbody td {
-        padding: 1rem 1rem;
-        border: 0 !important;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        background: rgba(255,255,255,.03); /* works nicely on dark theme */
-    }
+    /* Bootstrap paints every cell with --bs-table-bg, which is white. On the
+       dark palette that turned the header row into a white band with pale grey
+       labels on it. The card behind already provides the surface. */
+    background: transparent !important;
+}
 
-    /* rounded row corners (apply on first/last td because tables) */
-    .maxton-table tbody tr td:first-child {
-        border-top-left-radius: 14px;
-        border-bottom-left-radius: 14px;
-        padding-left: 1.25rem; /* important: prevents "sticking" to left edge */
-    }
+.wh-table tbody td {
+    padding: 1rem;
+    border: 0 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: var(--white);
+    color: var(--text-primary-light);
 
-    .maxton-table tbody tr td:last-child {
-        border-top-right-radius: 14px;
-        border-bottom-right-radius: 14px;
-        padding-right: 1.25rem; /* important: prevents "sticking" to right edge */
-    }
+    /* Outline the row, not each cell: a shadow on all four sides of every <td>
+       draws a full grid and undoes the card-row effect. */
+    box-shadow: inset 0 1px 0 var(--border-color), inset 0 -1px 0 var(--border-color);
+}
 
-    /* subtle row hover */
-    .maxton-table tbody tr:hover td {
-        background: rgba(255,255,255,.05);
-    }
+.wh-table tbody tr td:first-child {
+    box-shadow: inset 0 1px 0 var(--border-color),
+                inset 0 -1px 0 var(--border-color),
+                inset 1px 0 0 var(--border-color);
+}
 
-    /* optional: softer separator line feel (like premium dashboards) */
-    .maxton-table tbody tr td {
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
-    }
+.wh-table tbody tr td:last-child {
+    box-shadow: inset 0 1px 0 var(--border-color),
+                inset 0 -1px 0 var(--border-color),
+                inset -1px 0 0 var(--border-color);
+}
 
-    /* keep actions aligned and not wrapping */
-    .maxton-table td.text-end {
-        overflow: visible; /* so buttons are not clipped */
-        text-overflow: initial;
-    }
+/* Rounded row corners have to be applied to the outer cells: a <tr> cannot
+   carry a border radius. */
+.wh-table tbody tr td:first-child {
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+    padding-left: 1.25rem;
+}
 
-    /* optional: make action buttons look more premium */
-    .maxton-table .btn.rounded-circle {
-        width: 36px;
-        height: 36px;
-        padding: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-    }
+.wh-table tbody tr td:last-child {
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+    padding-right: 1.25rem;
+}
+
+.wh-table tbody tr:hover td {
+    background: var(--neutral-100);
+}
+
+/* Action buttons must not be clipped by the ellipsis rule above. */
+.wh-table td.text-end {
+    overflow: visible;
+    text-overflow: initial;
+}
+
+.wh-table .btn.rounded-circle {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Wide tables scroll inside the card instead of stretching the page. */
+.wh-tablecard-scroll .table-responsive {
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+.wh-tablecard-scroll .table-responsive > table {
+    min-width: var(--wh-table-min-width, 1100px);
+    table-layout: auto !important;
+}
+
+.wh-tablecard-scroll .table-responsive th,
+.wh-tablecard-scroll .table-responsive td {
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   Clickable rows
+   ========================================================================== */
+
+#clientsTableCard tbody tr,
+#servicesTableCard tbody tr {
+    cursor: pointer;
+}
+
+#clientsTableCard tbody tr > td,
+#servicesTableCard tbody tr > td {
+    transition: background-color .16s ease, box-shadow .16s ease;
+}
+
+#clientsTableCard tbody tr > td {
+    max-width: 220px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#clientsTableCard tbody tr:hover > td,
+#servicesTableCard tbody tr:hover > td {
+    background: var(--primary-50);
+    box-shadow: inset 0 0 0 1px var(--primary-200);
+}
+
+/* ==========================================================================
+   Form sections — a labelled group of fields inside a card or a modal
+   ========================================================================== */
 
 .form-section {
     margin-top: 28px;
 }
 
-    .form-section:first-of-type {
-        margin-top: 0;
-    }
+.form-section:first-of-type {
+    margin-top: 0;
+}
 
 .form-section-header {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-weight: 700;
+    font-weight: 600;
     font-size: 13px;
     letter-spacing: .2px;
-    color: rgba(34, 211, 238, .95);
-    text-transform: none;
+    color: var(--brand);
 }
 
-    .form-section-header i {
-        font-size: 18px;
-        opacity: .95;
-    }
+.form-section-header i {
+    font-size: 18px;
+}
 
 .form-section-divider {
     height: 1px;
-    background: rgba(255,255,255,.10);
+    background: var(--border-color);
     margin: 10px 0 16px;
 }
 
 .form-section-sub {
     font-size: 12px;
-    color: rgba(255,255,255,.55);
+    color: var(--text-secondary-light);
     margin-top: -10px;
     margin-bottom: 12px;
 }
 
+.soft-placeholder::placeholder {
+    color: var(--text-secondary-light);
+    opacity: .65;
+}
 
-/* Icon-only buttons: no outline, no focus ring, no hover bg */
+/* ==========================================================================
+   Shared button variants
+
+   These three classes are used across the quote, contract and project editors.
+   Each of those seven pages carried its own copy of the rules in an inline
+   <style> block, all hard-coding the previous theme's purple — so a change to
+   the palette left them the one thing on the page that had not moved. Defined
+   once here, against the theme's own brand colour.
+   ========================================================================== */
+
+.btn.wh-btn-primary {
+    background-color: var(--brand);
+    border-color: var(--brand);
+    color: #fff;
+}
+
+.btn.wh-btn-primary:hover,
+.btn.wh-btn-primary:focus,
+.btn.wh-btn-primary:active,
+.btn.wh-btn-primary.active,
+.show > .btn.wh-btn-primary.dropdown-toggle {
+    background-color: var(--primary-700);
+    border-color: var(--primary-700);
+    color: #fff;
+}
+
+.btn.wh-btn-primary:focus {
+    box-shadow: 0 0 0 .25rem var(--primary-light-white);
+}
+
+.btn.wh-btn-primary:disabled,
+.btn.wh-btn-primary.disabled {
+    background-color: var(--brand);
+    border-color: var(--brand);
+    color: #fff;
+    opacity: .65;
+}
+
+.wh-icon-btn,
+.wh-icon-btn-plain {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wh-icon-btn i,
+.wh-icon-btn-plain i {
+    font-size: 20px;
+    line-height: 1;
+}
+
+.wh-icon-btn-plain {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.wh-icon-btn-plain:hover,
+.wh-icon-btn-plain:focus,
+.wh-icon-btn-plain:active {
+    border: 0 !important;
+    background: var(--primary-50) !important;
+    box-shadow: none !important;
+}
+
+/* ==========================================================================
+   Icon-only buttons — no border, no background, no focus ring
+   ========================================================================== */
+
 .btn.vc-icon-btn,
 .btn.vc-icon-btn:hover,
 .btn.vc-icon-btn:focus,
@@ -167,7 +373,6 @@ body {
     border: 0 !important;
 }
 
-/* optional: keep them tight and centered */
 .btn.vc-icon-btn {
     padding: 0 !important;
     line-height: 1 !important;
@@ -178,24 +383,20 @@ body {
 
 .btn.vc-icon-btn i {
     pointer-events: none;
-}        
-
-.maxton-table td, .maxton-table th {
-    white-space: nowrap;
-}
-
-.maxton-table td {
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .vc-actions-wrap {
-    display: inline-block; 
+    display: inline-block;
     text-align: right;
-    width: 100%; 
-    white-space: nowrap; 
-    min-width:80px;
+    width: 100%;
+    white-space: nowrap;
+    min-width: 80px;
 }
+
+/* ==========================================================================
+   Client editor
+   ========================================================================== */
+
 #create-email-list .input-group .form-select {
     flex: 0 0 170px;
 }
@@ -203,236 +404,18 @@ body {
 #create-email-list .email-row {
     padding: 6px 0;
 }
-.nav-tabs .nav-item.show .nav-link, .nav-tabs .nav-link.active {
-    color: #2d94f9;
-    background-color: var(--bs-nav-tabs-link-active-bg);
-    border-color: var(--bs-nav-tabs-link-active-border-color);
-}
 
-/* ===== Global: TableCard horizontal scroll ===== */
-.wh-tablecard-scroll .table-responsive{
-  overflow-x: auto !important;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-}
+/* ==========================================================================
+   Quote and contract editors
+   ========================================================================== */
 
-.wh-tablecard-scroll .table-responsive > table{
-  min-width: var(--wh-table-min-width, 1100px);
-  table-layout: auto !important;
-}
-
-.wh-tablecard-scroll .table-responsive th,
-.wh-tablecard-scroll .table-responsive td{
-  white-space: nowrap;
-}
-
-/* ===== Loading Overlay (Theme-aware) ===== */
-body.ui-loading {
-    overflow: hidden;
-}
-
-#appLoading.app-loading {
-    position: fixed;
-    inset: 0;
-    z-index: 5000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    background: var(--wh-loading-backdrop);
-    backdrop-filter: blur(2px);
-}
-
-    #appLoading.app-loading.d-none {
-        display: none !important;
-    }
-
-#appLoading .app-loading__panel {
-    display: inline-flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
-    border-radius: 16px;
-    background: var(--wh-loading-panel-bg);
-    color: var(--wh-loading-text);
-    border: 1px solid var(--wh-loading-border);
-    box-shadow: 0 18px 45px rgba(0,0,0,.25);
-}
-
-#appLoading .app-loading__spinner {
-    width: 22px;
-    height: 22px;
-    color: var(--wh-loading-spinner);
-}
-
-#appLoading .app-loading__text {
-    font-weight: 700;
-    letter-spacing: .1px;
-    color: var(--wh-loading-text);
-}
-
-/* ===== Light / Semi-dark ===== */
-html[data-bs-theme="light"],
-html[data-bs-theme="semi-dark"] {
-    --wh-loading-backdrop: rgba(255,255,255,.70);
-    --wh-loading-panel-bg: rgba(255,255,255,.95);
-    --wh-loading-text: rgba(17,17,17,.92);
-    --wh-loading-border: rgba(0,0,0,.10);
-    --wh-loading-spinner: rgba(17,17,17,.85);
-}
-
-/* ===== Dark ===== */
-html[data-bs-theme="dark"] {
-    --wh-loading-backdrop: rgba(0,0,0,.55);
-    --wh-loading-panel-bg: rgba(18,22,32,.92);
-    --wh-loading-text: rgba(255,255,255,.92);
-    --wh-loading-border: rgba(255,255,255,.10);
-    --wh-loading-spinner: rgba(255,255,255,.90);
-}
-
-/* ===== Blue-theme ===== */
-html[data-bs-theme="blue-theme"] {
-    --wh-loading-backdrop: rgba(8,10,20,.60);
-    --wh-loading-panel-bg: rgba(20,25,51,.92);
-    --wh-loading-text: rgba(255,255,255,.92);
-    --wh-loading-border: rgba(255,255,255,.10);
-    --wh-loading-spinner: rgba(255,255,255,.90);
-}
-
-/* btn-grd-primary => solid color (no gradient) */
-/* btn-grd-primary => solid color (no gradient) */
-.btn-grd-primary,
-.btn-grd-primary:hover,
-.btn-grd-primary:focus,
-.btn-grd-primary:active,
-.btn-grd-primary.active {
-    background: rgb(107 76 230) !important;
-    background-image: none !important;
-    border-color: rgb(107 76 230) !important;
-    color: #fff !important;
-}
-
-    .btn-grd-primary * {
-        color: #fff !important;
-    }
-
-/* ===== Project create modal header ===== */
-#FormModal .modal-header {
-    background: rgb(107 76 230) !important;
-    border-bottom-color: rgb(107 76 230) !important;
-}
-
-#FormModal .modal-title {
-    color: #fff !important;
-}
-
-#FormModal .modal-header .btn-close {
-    filter: invert(1) grayscale(100%);
-    opacity: 1 !important;
-}
-
-
-/* ===== TableCard: Row-cards layout for LIGHT + SEMI-DARK ===== */
-html[data-bs-theme="light"] .wh-tablecard-scroll .table-responsive > table,
-html[data-bs-theme="semi-dark"] .wh-tablecard-scroll .table-responsive > table{
-  border-collapse: separate !important;
-  border-spacing: 0 10px !important; /* space between rows (card look) */
-}
-
-/* header */
-html[data-bs-theme="light"] .wh-tablecard-scroll thead th,
-html[data-bs-theme="semi-dark"] .wh-tablecard-scroll thead th{
-  border: 0 !important;
-  background: transparent !important;
-  color: rgba(0,0,0,.55) !important;
-  font-weight: 800 !important;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  font-size: .78rem;
-  white-space: nowrap;
-}
-
-/* row cells as a "card" */
-html[data-bs-theme="light"] .wh-tablecard-scroll tbody td,
-html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody td{
-  background: rgba(255,255,255,.92) !important;
-  border-top: 1px solid rgba(0,0,0,.08) !important;
-  border-bottom: 1px solid rgba(0,0,0,.08) !important;
-  white-space: nowrap;
-}
-
-/* left / right borders + radius */
-html[data-bs-theme="light"] .wh-tablecard-scroll tbody td:first-child,
-html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody td:first-child{
-  border-left: 1px solid rgba(0,0,0,.08) !important;
-  border-top-left-radius: 14px;
-  border-bottom-left-radius: 14px;
-}
-
-html[data-bs-theme="light"] .wh-tablecard-scroll tbody td:last-child,
-html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody td:last-child{
-  border-right: 1px solid rgba(0,0,0,.08) !important;
-  border-top-right-radius: 14px;
-  border-bottom-right-radius: 14px;
-}
-
-/* vertical separators between columns */
-html[data-bs-theme="light"] .wh-tablecard-scroll tbody td + td,
-html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody td + td{
-  border-left: 1px solid rgba(0,0,0,.06) !important;
-}
-
-/* hover */
-html[data-bs-theme="light"] .wh-tablecard-scroll tbody tr:hover td,
-html[data-bs-theme="semi-dark"] .wh-tablecard-scroll tbody tr:hover td{
-  background: rgba(255,255,255,1) !important;
-}
-
-
-
-/* ===== DatePicker: night / blue / semi-dark ===== */
-/* ===== DatePicker ===== */
-input[type="date"].js-datepicker {
-    cursor: pointer !important;
-}
-
+input[type="date"].js-datepicker,
 input[type="date"].js-datepicker::-webkit-calendar-picker-indicator {
     cursor: pointer !important;
 }
 
-html[data-bs-theme="dark"] input[type="date"].js-datepicker,
-html[data-bs-theme="blue-theme"] input[type="date"].js-datepicker,
-html[data-bs-theme="semi-dark"] input[type="date"].js-datepicker {
-    color-scheme: dark;
-    cursor: pointer !important;
-    padding-right: .75rem !important;
-    background-image: none !important;
-}
-
-html[data-bs-theme="dark"] input[type="date"].js-datepicker::-webkit-calendar-picker-indicator,
-html[data-bs-theme="blue-theme"] input[type="date"].js-datepicker::-webkit-calendar-picker-indicator,
-html[data-bs-theme="semi-dark"] input[type="date"].js-datepicker::-webkit-calendar-picker-indicator {
-    cursor: pointer !important;
-}
-html[data-bs-theme="dark"] #ViewServiceModal input[type="date"],
-html[data-bs-theme="blue-theme"] #ViewServiceModal input[type="date"] {
-    color-scheme: dark !important;
-}
-
-html[data-bs-theme="dark"] #ViewServiceModal input[type="date"]::-webkit-calendar-picker-indicator,
-html[data-bs-theme="blue-theme"] #ViewServiceModal input[type="date"]::-webkit-calendar-picker-indicator {
-    cursor: pointer !important;
-    opacity: 1 !important;
-    filter: brightness(0) invert(1) saturate(0) contrast(200%) !important;
-}
-
-html[data-bs-theme="dark"] #ViewServiceModal input[type="date"]::-webkit-calendar-picker-indicator:hover,
-html[data-bs-theme="blue-theme"] #ViewServiceModal input[type="date"]::-webkit-calendar-picker-indicator:hover {
-    cursor: pointer !important;
-    opacity: 1 !important;
-    filter: brightness(0) invert(1) saturate(0) contrast(200%) !important;
-}
-/* ===== VAT alignment ===== */
+/* The VAT checkbox sits in a column beside labelled inputs; without this it
+   floats to the top of the row instead of lining up with them. */
 .quote-vat-field {
     height: 100%;
     display: flex;
@@ -451,16 +434,60 @@ html[data-bs-theme="blue-theme"] #ViewServiceModal input[type="date"]::-webkit-c
     margin-bottom: 0;
 }
 
-.quote-vat-field .form-check-input {
-    margin-top: 0;
-    cursor: pointer !important;
-}
-
+.quote-vat-field .form-check-input,
 .quote-vat-field .form-check-label {
     cursor: pointer !important;
 }
 
-/* ===== Delete dialog ===== */
+.quote-vat-field .form-check-input {
+    margin-top: 0;
+}
+
+.quote-card-toggle {
+    cursor: pointer;
+    user-select: none;
+}
+
+#vpContractPreviewWrap {
+    margin-bottom: .5rem !important;
+}
+
+/* ==========================================================================
+   Modals
+   ========================================================================== */
+
+.wh-modal-header,
+#FormModal .modal-header,
+.quote-confirm-modal .modal-header,
+#ViewServiceModal .vs-purple-modal-header {
+    background: var(--brand);
+    border-bottom-color: var(--brand);
+}
+
+.wh-modal-header .modal-title,
+#FormModal .modal-title,
+.quote-confirm-modal .modal-title,
+#ViewServiceModal .vs-purple-modal-header .modal-title {
+    color: #fff;
+}
+
+.wh-modal-header .btn-close,
+#FormModal .modal-header .btn-close,
+.quote-confirm-modal .modal-header .btn-close,
+#ViewServiceModal .vs-header-close {
+    filter: invert(1) grayscale(100%);
+    opacity: 1;
+}
+
+#ViewServiceModal .vs-header-close:hover,
+#ViewServiceModal .vs-header-close:focus,
+#ViewServiceModal .vs-header-close:focus-visible,
+#ViewServiceModal .vs-header-close:active {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
 .quote-confirm-modal .modal-content {
     border-radius: 16px;
 }
@@ -469,177 +496,74 @@ html[data-bs-theme="blue-theme"] #ViewServiceModal input[type="date"]::-webkit-c
     gap: .5rem;
 }
 
-html[data-bs-theme="dark"] .btn-close,
-html[data-bs-theme="blue-theme"] .btn-close {
-    filter: invert(1) grayscale(100%);
-    opacity: 1 !important;
+#FormModal .modal-footer {
+    padding: 16px 24px 20px !important;
 }
 
-.quote-card-toggle {
-    cursor: pointer;
-    user-select: none;
+#FormModal .modal-footer .btn {
+    min-width: 86px;
 }
 
-#vpContractPreviewWrap{
-    margin-bottom:0.5rem !important;
-}
+/* ==========================================================================
+   Service editor modal
+   ========================================================================== */
+
 .service-form-modal-body {
-    padding: 4px 10px 0 10px;
+    padding: 4px 10px 0;
 }
 
-    .service-form-modal-body .form-section {
-        margin-top: 18px;
-    }
+.service-form-modal-body .form-section {
+    margin-top: 18px;
+}
 
-        .service-form-modal-body .form-section:first-of-type {
-            margin-top: 0;
-        }
+.service-form-modal-body .form-section:first-of-type {
+    margin-top: 0;
+}
 
-    .service-form-modal-body .form-section-divider {
-        margin: 10px 0 18px;
-    }
+.service-form-modal-body .form-section-divider {
+    margin: 10px 0 18px;
+}
 
-    .service-form-modal-body .tab-content {
-        padding: 18px !important;
-        border-radius: 0 0 14px 14px;
-    }
+.service-form-modal-body .tab-content {
+    padding: 18px !important;
+    border-radius: 0 0 14px 14px;
+}
 
-    .service-form-modal-body .form-control,
-    .service-form-modal-body .form-select {
-        min-height: 46px;
-    }
+.service-form-modal-body .form-control,
+.service-form-modal-body .form-select {
+    min-height: 46px;
+}
 
-    .service-form-modal-body textarea.form-control {
-        min-height: 140px;
-    }
+.service-form-modal-body textarea.form-control {
+    min-height: 140px;
+}
 
-    .service-form-modal-body .nav-tabs {
-        margin-top: 10px !important;
-    }
+.service-form-modal-body .nav-tabs {
+    margin-top: 10px !important;
+}
 
-    .service-form-modal-body .row.g-3 {
-        --bs-gutter-y: 1rem;
-    }
+.service-form-modal-body .row.g-3 {
+    --bs-gutter-y: 1rem;
+}
 
 .service-config-tabs {
     padding: 18px !important;
 }
 
-#FormModal .modal-footer {
-    padding: 16px 24px 20px 24px !important;
+#serviceMenu {
+    max-height: 320px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
 }
 
-    #FormModal .modal-footer .btn {
-        min-width: 86px;
-    }
-
-@media (max-width: 767.98px) {
-    .service-form-modal-body {
-        padding: 8px 16px 0 16px;
-    }
-
-        .service-form-modal-body .tab-content {
-            padding: 14px !important;
-        }
-
-    .service-config-tabs {
-        padding: 14px !important;
-    }
-
-    #FormModal .modal-footer {
-        padding: 14px 16px 16px 16px !important;
-    }
+#serviceMenu .dropdown-item {
+    white-space: normal;
 }
 
+/* ==========================================================================
+   Service viewer modal
+   ========================================================================== */
 
-
-/* ===== Clients table only: row hover + pointer by theme ===== */
-html[data-bs-theme="light"] #clientsTableCard {
-    --wh-client-row-hover-bg: rgba(45, 148, 249, .07);
-    --wh-client-row-hover-stroke: rgba(45, 148, 249, .18);
-}
-
-html[data-bs-theme="semi-dark"] #clientsTableCard {
-    --wh-client-row-hover-bg: rgba(45, 148, 249, .10);
-    --wh-client-row-hover-stroke: rgba(45, 148, 249, .22);
-}
-
-html[data-bs-theme="dark"] #clientsTableCard {
-    --wh-client-row-hover-bg: rgba(255, 255, 255, .06);
-    --wh-client-row-hover-stroke: rgba(255, 255, 255, .10);
-}
-
-html[data-bs-theme="blue-theme"] #clientsTableCard {
-    --wh-client-row-hover-bg: rgba(120, 170, 255, .12);
-    --wh-client-row-hover-stroke: rgba(120, 170, 255, .18);
-}
-
-#clientsTableCard tbody tr {
-    cursor: pointer;
-}
-
-    #clientsTableCard tbody tr > td {
-        transition: background-color .16s ease, box-shadow .16s ease;
-        max-width: 220px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-#clientsTableCard tbody tr:hover > td {
-    background: var(--wh-client-row-hover-bg, rgba(255,255,255,.05)) !important;
-    box-shadow: inset 0 0 0 1px var(--wh-client-row-hover-stroke, rgba(255,255,255,.08));
-}
-
-.quote-confirm-modal .modal-header {
-    background: rgb(107 76 230) !important;
-    border-bottom-color: rgb(107 76 230) !important;
-}
-
-.quote-confirm-modal .modal-title {
-    color: #fff !important;
-}
-
-.quote-confirm-modal .modal-header .btn-close {
-    filter: invert(1) grayscale(100%);
-    opacity: 1 !important;
-}
-
-html[data-bs-theme="light"] #servicesTableCard {
-    --wh-service-row-hover-bg: rgba(45, 148, 249, .07);
-    --wh-service-row-hover-stroke: rgba(45, 148, 249, .18);
-}
-
-html[data-bs-theme="semi-dark"] #servicesTableCard {
-    --wh-service-row-hover-bg: rgba(45, 148, 249, .10);
-    --wh-service-row-hover-stroke: rgba(45, 148, 249, .22);
-}
-
-html[data-bs-theme="dark"] #servicesTableCard {
-    --wh-service-row-hover-bg: rgba(255, 255, 255, .06);
-    --wh-service-row-hover-stroke: rgba(255, 255, 255, .10);
-}
-
-html[data-bs-theme="blue-theme"] #servicesTableCard {
-    --wh-service-row-hover-bg: rgba(120, 170, 255, .12);
-    --wh-service-row-hover-stroke: rgba(120, 170, 255, .18);
-}
-
-#servicesTableCard tbody tr {
-    cursor: pointer;
-}
-
-#servicesTableCard tbody tr > td {
-    transition: background-color .16s ease, box-shadow .16s ease;
-}
-
-#servicesTableCard tbody tr:hover > td {
-    background: var(--wh-service-row-hover-bg, rgba(255,255,255,.05)) !important;
-    box-shadow: inset 0 0 0 1px var(--wh-service-row-hover-stroke, rgba(255,255,255,.08));
-}
-
-
-/* ===== View Service modal ===== */
 #ViewServiceModal .vs-view-modal-dialog {
     max-width: min(1440px, calc(100vw - 32px));
     margin: 1rem auto;
@@ -655,31 +579,12 @@ html[data-bs-theme="blue-theme"] #servicesTableCard {
 }
 
 #ViewServiceModal .vs-purple-modal-header {
-    background: rgb(107 76 230) !important;
-    background-image: none !important;
-    border-bottom-color: rgb(107 76 230) !important;
     padding: 16px 22px !important;
     flex: 0 0 auto;
 }
 
-#ViewServiceModal .vs-purple-modal-header .modal-title {
-    color: #fff !important;
-}
-
-#ViewServiceModal .vs-header-close,
-#ViewServiceModal .vs-header-close:hover,
-#ViewServiceModal .vs-header-close:focus,
-#ViewServiceModal .vs-header-close:focus-visible,
-#ViewServiceModal .vs-header-close:active {
-    filter: invert(1) grayscale(100%) !important;
-    opacity: 1 !important;
-    background-color: transparent !important;
-    box-shadow: none !important;
-    outline: none !important;
-}
-
 #ViewServiceModal .vs-view-modal-body {
-    padding: 24px 28px 26px 28px !important;
+    padding: 24px 28px 26px !important;
     overflow-y: auto;
     overflow-x: hidden;
     flex: 1 1 auto;
@@ -689,8 +594,36 @@ html[data-bs-theme="blue-theme"] #servicesTableCard {
     margin-bottom: 0 !important;
 }
 
-/* تحسين على الشاشات الأصغر */
+#ViewServiceModal .btn-outline-info:hover,
+#ViewServiceModal .btn-outline-info:focus,
+#ViewServiceModal .btn-outline-info:focus-visible,
+#ViewServiceModal .btn-outline-info:active,
+#ViewServiceModal .btn-outline-info.active,
+#ViewServiceModal .btn-outline-info:hover *,
+#ViewServiceModal .btn-outline-info:focus *,
+#ViewServiceModal .btn-outline-info:focus-visible *,
+#ViewServiceModal .btn-outline-info:active *,
+#ViewServiceModal .btn-outline-info.active * {
+    color: #fff !important;
+}
+
 @media (max-width: 767.98px) {
+    .service-form-modal-body {
+        padding: 8px 16px 0;
+    }
+
+    .service-form-modal-body .tab-content {
+        padding: 14px !important;
+    }
+
+    .service-config-tabs {
+        padding: 14px !important;
+    }
+
+    #FormModal .modal-footer {
+        padding: 14px 16px 16px !important;
+    }
+
     #ViewServiceModal .vs-view-modal-dialog {
         max-width: calc(100vw - 16px);
         margin: .5rem auto;
@@ -706,38 +639,53 @@ html[data-bs-theme="blue-theme"] #servicesTableCard {
     }
 
     #ViewServiceModal .vs-view-modal-body {
-        padding: 18px 16px 20px 16px !important;
+        padding: 18px 16px 20px !important;
     }
 }
 
-/* ===== View Service modal: keep outline-info text white on hover ===== */
-#ViewServiceModal .btn-outline-info:hover,
-#ViewServiceModal .btn-outline-info:focus,
-#ViewServiceModal .btn-outline-info:focus-visible,
-#ViewServiceModal .btn-outline-info:active,
-#ViewServiceModal .btn-outline-info.active {
-    color: #fff !important;
+/* ==========================================================================
+   Loading overlay (markup lives in _Layout.cshtml)
+   ========================================================================== */
+
+body.ui-loading {
+    overflow: hidden;
 }
 
-#ViewServiceModal .btn-outline-info:hover *,
-#ViewServiceModal .btn-outline-info:focus *,
-#ViewServiceModal .btn-outline-info:focus-visible *,
-#ViewServiceModal .btn-outline-info:active *,
-#ViewServiceModal .btn-outline-info.active * {
-    color: #fff !important;
+#appLoading.app-loading {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(4, 6, 15, .45);
+    backdrop-filter: blur(2px);
 }
 
-.soft-placeholder::placeholder {
-    color: rgba(255, 255, 255, 0.32);
-    opacity: 1;
-}
-/* Service dropdown menu scroll */
-#serviceMenu {
-    max-height: 320px !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
+#appLoading.app-loading.d-none {
+    display: none !important;
 }
 
-    #serviceMenu .dropdown-item {
-        white-space: normal;
-    }
+#appLoading .app-loading__panel {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: var(--white);
+    color: var(--text-primary-light);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-2, 0 18px 45px rgba(0, 0, 0, .25));
+}
+
+#appLoading .app-loading__spinner {
+    width: 22px;
+    height: 22px;
+    color: var(--brand);
+}
+
+#appLoading .app-loading__text {
+    font-weight: 600;
+    color: var(--text-primary-light);
+}

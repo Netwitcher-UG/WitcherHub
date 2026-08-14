@@ -184,8 +184,8 @@ namespace WitcherHub.Pages.Quotes
 
             var fullHtml = QuotePdfHtmlBuilder.Build(docModel);
 
-            var logoPath = Url.Content("~/theme/assets/images/netwitcher-logo.png")
-                          ?? "/theme/assets/images/netwitcher-logo.png";
+            var logoPath = Url.Content("~/img/netwitcher-logo.png")
+                          ?? "/img/netwitcher-logo.png";
 
             var logoUrl = $"{Request.Scheme}://{Request.Host}{logoPath}";
 

@@ -1,28 +1,12 @@
-﻿/* Loading overlay */
-.app-loading {
-    position: fixed;
-    inset: 0;
-    z-index: 2000; /* فوق أغلب عناصر التيمبلت */
-    background: rgba(0,0,0,0.35);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+/* ==========================================================================
+   Toast notifications raised by wwwroot/js/ui-kit.js.
 
-.app-loading__box {
-    background: #fff;
-    border-radius: 14px;
-    padding: 22px 24px;
-    min-width: 240px;
-    text-align: center;
-    box-shadow: 0 14px 50px rgba(0,0,0,0.25);
-}
+   The loading-overlay rules that used to live here were a second, conflicting
+   definition of the same #appLoading element that site.css already styled —
+   including a hard-coded white panel that stayed white in dark mode. The
+   overlay is now defined once, in site.css.
+   ========================================================================== */
 
-.app-loading__text {
-    font-size: 14px;
-    opacity: 0.85;
-}
-/* Rounded Corners Notifications */
 .ui-notify-container {
     position: fixed;
     top: 90px;
@@ -37,16 +21,16 @@
 .ui-notify {
     border-radius: 16px;
     overflow: hidden;
-    box-shadow: 0 14px 40px rgba(0,0,0,.35);
+    box-shadow: 0 14px 40px rgba(4, 6, 15, .35);
     transform: translateY(-6px);
     opacity: 0;
     transition: all .18s ease;
 }
 
-    .ui-notify.show {
-        transform: translateY(0);
-        opacity: 1;
-    }
+.ui-notify.show {
+    transform: translateY(0);
+    opacity: 1;
+}
 
 .ui-notify-body {
     padding: 14px 16px;
@@ -62,13 +46,14 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255,255,255,.18);
+    background: rgba(255, 255, 255, .18);
+    font-size: 20px;
     flex: 0 0 auto;
 }
 
 .ui-notify-title {
-    font-weight: 700;
-    margin: 0 0 2px 0;
+    font-weight: 600;
+    margin: 0 0 2px;
     line-height: 1.2;
 }
 
@@ -85,4 +70,5 @@
     padding: 0;
     line-height: 1;
     opacity: .9;
+    cursor: pointer;
 }
