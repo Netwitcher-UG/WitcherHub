@@ -108,6 +108,26 @@ namespace WitcherHub.Infrastructure.Authentication
                         "configuration on every deploy. Only the value in BootstrapAdmin__Password will " +
                         "work; a password set through 'Forgot password?' is discarded at the next deploy. " +
                         "Remove both variables once you are signed in."));
+
+                    // The override is meant to guarantee a way in. When the account
+                    // has no password despite it being active, the override itself
+                    // is what failed — and the reason is almost always that the
+                    // configured password does not satisfy the policy. Saying so
+                    // here turns "no password stored" from a dead end into a fix.
+                    if (user is not null && user.PasswordHash is null)
+                    {
+                        var rejections = await DescribeConfiguredPasswordAsync(
+                            user, _configuration["BootstrapAdmin:Password"]!, ct);
+
+                        facts.Add(new("Why there is no password",
+                            rejections.Count > 0
+                                ? "The start-up override ran but BootstrapAdmin__Password was rejected by the " +
+                                  $"password policy, which left the account with no password: {string.Join(" | ", rejections)}. " +
+                                  "Set a password that satisfies the policy and redeploy."
+                                : "The start-up override is active and the configured password satisfies the " +
+                                  "policy, so the failure was in the user store rather than validation. " +
+                                  "Check the start-up log for the line about setting the password."));
+                    }
                 }
                 else if (overrideOnStartup && !overridePasswordConfigured)
                 {
@@ -140,6 +160,28 @@ namespace WitcherHub.Infrastructure.Authentication
             }
 
             return new SignInDiagnosticsReport(facts);
+        }
+
+        /// <summary>
+        /// Why the configured break-glass password would be refused, if it would.
+        /// Runs the validators only — nothing is written.
+        /// </summary>
+        private async Task<IReadOnlyList<string>> DescribeConfiguredPasswordAsync(
+            AppUser user, string password, CancellationToken ct)
+        {
+            var problems = new List<string>();
+
+            foreach (var validator in _userManager.PasswordValidators)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var result = await validator.ValidateAsync(_userManager, user, password);
+
+                if (!result.Succeeded)
+                    problems.AddRange(result.Errors.Select(e => e.Description));
+            }
+
+            return problems;
         }
     }
 }
