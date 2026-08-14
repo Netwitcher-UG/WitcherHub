@@ -25,6 +25,13 @@ namespace WitcherHub.Application.Models.DTO.Contracts
         /// <summary>Null for a manual position. Set only when the line came from the catalog.</summary>
         public Guid? CatalogServiceId { get; set; }
 
+        /// <summary>
+        /// The supplied contract version this position was read out of, for a
+        /// position with source <see cref="ContractItemSource.ExtractedFromContractText"/>.
+        /// Keeps the position attached to the document that justifies it.
+        /// </summary>
+        public Guid? SourceDraftId { get; set; }
+
         public int Position { get; set; } = 1;
 
         // ---- what is being sold --------------------------------------------

@@ -156,6 +156,7 @@ namespace WitcherHub.Infrastructure
             // ===== Services =====
             services.AddScoped<IAiTextGenerator, OpenAiTextGenerator>();
             services.AddScoped<IAiPositionOrganizer, AiPositionOrganizer>();
+            services.AddScoped<IContractTextAnalyzer, ContractTextAnalyzer>();
             services.AddScoped<IDataSeeder, IdentityDataSeeder>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<ISignInDiagnostics, SignInDiagnostics>();

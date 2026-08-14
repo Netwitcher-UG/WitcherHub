@@ -213,6 +213,30 @@ namespace WitcherHub.Infrastructure.Seeding
 
             try
             {
+                // Check the new password BEFORE removing the old one.
+                //
+                // This used to remove first and add second. When the configured
+                // password failed the policy — most easily by having no lowercase
+                // letter, since RequireLowercase is the one rule left at its
+                // default — the remove succeeded, the add failed, and the account
+                // was left with no password at all. Strictly worse than before:
+                // the break-glass locked the door it was there to open, and every
+                // subsequent deploy did it again.
+                var problems = await ValidatePasswordAsync(user, password!);
+
+                if (problems.Count > 0)
+                {
+                    _logger.LogError(
+                        "BootstrapAdmin__Password does not satisfy the password policy, so the password " +
+                        "for {Email} was left exactly as it was. Reasons: {Reasons}. The policy requires: " +
+                        "{Policy}.",
+                        email,
+                        string.Join(" | ", problems),
+                        DescribePasswordPolicy());
+
+                    return;
+                }
+
                 // Set the hash directly rather than going through a reset token.
                 //
                 // A token would be encrypted by the Data Protection stack, which
@@ -228,7 +252,7 @@ namespace WitcherHub.Infrastructure.Seeding
                         email, string.Join(" | ", remove.Errors.Select(e => e.Description)));
                 }
 
-                var result = await _userManager.AddPasswordAsync(user, password);
+                var result = await _userManager.AddPasswordAsync(user, password!);
 
                 if (result.Succeeded)
                 {
@@ -239,9 +263,13 @@ namespace WitcherHub.Infrastructure.Seeding
                 }
                 else
                 {
-                    _logger.LogError(
-                        "Failed to overwrite the password for {Email}. Errors: {Errors}",
-                        email, string.Join(" | ", result.Errors.Select(e => e.Description)));
+                    // Validation passed, so reaching here means the store itself
+                    // refused. The account now has no password; say so plainly
+                    // rather than leaving it to be discovered at the login screen.
+                    _logger.LogCritical(
+                        "Failed to set the password for {Email} after clearing it, so the account now has " +
+                        "NO password and cannot be signed in to. Errors: {Errors}",
+                        email, string.Join(" | ", result.Errors.Select(e => $"{e.Code}: {e.Description}")));
                 }
             }
             catch (Exception ex)
@@ -253,6 +281,43 @@ namespace WitcherHub.Infrastructure.Seeding
                     "The break-glass password could not be applied for {Email}. " +
                     "Start-up continues; the existing password is unchanged.", email);
             }
+        }
+
+        /// <summary>
+        /// Runs the configured password validators without touching the account.
+        /// Returns the reasons it was rejected, empty when it is acceptable.
+        /// </summary>
+        private async Task<IReadOnlyList<string>> ValidatePasswordAsync(AppUser user, string password)
+        {
+            var problems = new List<string>();
+
+            foreach (var validator in _userManager.PasswordValidators)
+            {
+                var result = await validator.ValidateAsync(_userManager, user, password);
+
+                if (!result.Succeeded)
+                    problems.AddRange(result.Errors.Select(e => $"{e.Code}: {e.Description}"));
+            }
+
+            return problems;
+        }
+
+        /// <summary>
+        /// The password policy in words, read from the options rather than
+        /// restated, so the log cannot drift away from what is enforced.
+        /// </summary>
+        private string DescribePasswordPolicy()
+        {
+            var options = _userManager.Options.Password;
+            var rules = new List<string> { $"at least {options.RequiredLength} characters" };
+
+            if (options.RequireLowercase) rules.Add("a lowercase letter");
+            if (options.RequireUppercase) rules.Add("an uppercase letter");
+            if (options.RequireDigit) rules.Add("a digit");
+            if (options.RequireNonAlphanumeric) rules.Add("a non-alphanumeric character");
+            if (options.RequiredUniqueChars > 1) rules.Add($"{options.RequiredUniqueChars} distinct characters");
+
+            return string.Join(", ", rules);
         }
 
         /// <summary>

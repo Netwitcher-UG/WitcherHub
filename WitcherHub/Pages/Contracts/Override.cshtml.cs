@@ -267,8 +267,16 @@ namespace WitcherHub.Pages.Contracts
                 .OrderBy(x => x.Position)
                 .ToList();
 
+            // This screen edits the structured terms built out of positions, so it
+            // genuinely needs them — unlike generation, which does not. A contract
+            // whose source is supplied text is edited as text instead, and saying
+            // so is the difference between a dead end and a direction.
             if (items.Count == 0)
-                throw new BadRequestAppException("Please add at least one Position first.");
+            {
+                throw new BadRequestAppException(
+                    "This screen edits the terms built from contract positions, and this contract has none. " +
+                    "A contract built from supplied text is edited as text on the contract builder.");
+            }
 
             foreach (var it in items)
             {

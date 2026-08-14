@@ -19,7 +19,12 @@
     const emptyEl = document.getElementById("emptyState");
 
     const catalog = readJson("catalogServices") || [];
+    const suppliedDraftId = app.dataset.suppliedDraftId || null;
+    const hasSuppliedText = app.dataset.hasText === "true";
+    const emptyMessage = app.dataset.emptyMessage || "";
+
     let positions = (readJson("initialPositions") || []).map(normalise);
+    let extraction = readJson("initialExtraction");
     let organized = null;
     let dirty = false;
     let busy = false;
@@ -42,6 +47,7 @@
             contractItemId: null,
             sourceType: "Manual",
             catalogServiceId: null,
+            sourceDraftId: null,
             position: 1,
             title: "",
             serviceType: "",
@@ -118,9 +124,15 @@
         wrap.className = "border rounded-3 p-3";
         wrap.dataset.clientId = p.clientId;
 
-        const badge = p.sourceType === "Manual"
-            ? '<span class="badge bg-primary-subtle text-primary-emphasis">Manual</span>'
-            : '<span class="badge bg-secondary-subtle text-secondary-emphasis">Catalog</span>';
+        // A position read out of a supplied contract is neither manual nor from
+        // the catalog, and labelling it "Catalog" would claim it came from a
+        // saved service that does not exist.
+        const badge =
+            p.sourceType === "Manual"
+                ? '<span class="badge bg-primary-subtle text-primary-emphasis">Manual</span>'
+            : p.sourceType === "ExtractedFromContractText"
+                ? '<span class="badge bg-info-subtle text-info-emphasis">From contract text</span>'
+                : '<span class="badge bg-secondary-subtle text-secondary-emphasis">Catalog</span>';
 
         wrap.innerHTML = `
           <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
@@ -375,9 +387,47 @@
         catch { return { ok: false, message: "The server returned an unreadable response." }; }
     }
 
+    // Validation and status messages, shown in the page.
+    //
+    // This used to fall back to window.alert, and since window.showToast does not
+    // exist, every message on this page was a native browser dialog — modal,
+    // stamped with the hostname, and blocking. It also froze the button that
+    // raised it on "Working…" for as long as the dialog stood, which is the
+    // stuck state in the screenshots.
     function toast(type, message) {
-        if (window.showToast) window.showToast(type, message);
-        else window.alert(message);
+        if (window.UI?.toast?.show) {
+            window.UI.toast.show({
+                type: type === "info" ? "info" : type,
+                msg: message,
+                timeout: type === "error" ? 8000 : 4000
+            });
+            return;
+        }
+
+        if (window.showToast) { window.showToast(type, message); return; }
+
+        // Last resort: an inline banner, still not a dialog.
+        banner(type, message);
+    }
+
+    /// Sticks a message next to the section it is about, so validation is read
+    /// where the problem is rather than in a corner of the screen.
+    function banner(type, message, anchorId) {
+        const anchor = document.getElementById(anchorId || "positionsApp");
+        if (!anchor) return;
+
+        let box = document.getElementById("inlineNotice");
+        if (!box) {
+            box = document.createElement("div");
+            box.id = "inlineNotice";
+            box.className = "alert radius-8 text-sm";
+            anchor.prepend(box);
+        }
+
+        box.className = "alert radius-8 text-sm alert-" +
+            (type === "error" ? "danger" : type === "success" ? "success" : type === "warning" ? "warning" : "info");
+        box.textContent = message;
+        box.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
     // Guards against a double click producing two saves.
@@ -591,20 +641,141 @@
 
         if (action === "generate-draft") {
             await guard(button, async () => {
-                if (dirty) { toast("info", "Save your positions first."); return; }
+                // Unsaved positions are saved first rather than refused.
+                //
+                // This used to be "if (dirty) stop and say 'Save your positions
+                // first'". With no positions there was nothing to save, and
+                // saving zero positions was itself refused — so a contract built
+                // from pasted text sat in a loop it could not leave. Unsaved work
+                // is a reason to save, not a reason to refuse.
+                if (dirty) {
+                    const saved = await post("Save", positions);
+
+                    if (!saved.ok) {
+                        if (saved.errors) showErrors(saved.errors);
+                        toast("error", saved.message || "The positions could not be saved.");
+                        return;
+                    }
+
+                    dirty = false;
+                    applyServerTotals(saved.totals);
+                }
 
                 let result = await post("GenerateDraft", { overwriteApproved: false });
 
                 if (!result.ok && result.needsConfirmation) {
-                    if (!window.confirm(result.message + "\n\nReplace the approved wording?")) return;
+                    const replace = await confirmDialog(
+                        result.message + "\n\nReplace the approved wording?", "Replace approved wording");
+
+                    if (!replace) return;
+
                     result = await post("GenerateDraft", { overwriteApproved: true });
                 }
 
-                if (!result.ok) { toast("error", result.message || "Could not generate a draft."); return; }
+                if (!result.ok) {
+                    showFailure(result, "Could not prepare the contract.");
+                    return;
+                }
 
                 toast("success", result.message);
                 window.location.reload();
             });
+        }
+
+        // ---- supplied contract text: analysis and review ----
+
+        if (action === "analyze-source") {
+            const version = Number(button.dataset.version);
+
+            await guard(button, async () => {
+                const result = await post("Analyze", { version });
+
+                if (!result.ok) {
+                    // The document is untouched and still the contract's source;
+                    // only the optional reading of it failed.
+                    showFailure(result, "The contract could not be analysed.");
+                    offerRetry(button);
+                    return;
+                }
+
+                extraction = result.extraction;
+                renderExtraction();
+                toast("success", result.message);
+            });
+        }
+
+        if (action === "confirm-extraction") {
+            const version = Number(button.dataset.version);
+            if (!extraction) { toast("info", "There is nothing to confirm yet."); return; }
+
+            await guard(button, async () => {
+                collectExtractionEdits();
+
+                const result = await post("ConfirmExtraction", { version, extraction });
+
+                if (!result.ok) { toast("error", result.message || "Could not save the confirmed values."); return; }
+
+                toast("success", result.message);
+                window.location.reload();
+            });
+        }
+
+        if (action === "extract-positions") {
+            const version = Number(button.dataset.version);
+
+            await guard(button, async () => {
+                const result = await post("Analyze", { version });
+
+                if (!result.ok) { showFailure(result, "The contract could not be analysed."); offerRetry(button); return; }
+
+                extraction = result.extraction;
+                renderExtraction();
+
+                if (!extraction.positions || extraction.positions.length === 0) {
+                    toast("info",
+                        "The contract names no separate services, so no positions were suggested. " +
+                        "It can still be generated from the text.");
+                    return;
+                }
+
+                document.getElementById("extractedPositionsBlock")?.scrollIntoView({ behavior: "smooth" });
+            });
+        }
+
+        if (action === "add-extracted-positions") {
+            const rows = Array.from(document.querySelectorAll("[data-extracted-index]"));
+            const chosen = rows.filter(r => r.querySelector("input[type=checkbox]")?.checked);
+
+            if (chosen.length === 0) { toast("info", "Tick at least one position to add."); return; }
+
+            chosen.forEach(row => {
+                const source = extraction.positions[Number(row.dataset.extractedIndex)];
+
+                // Figures arrive exactly as they were read. Nothing is rounded,
+                // recalculated or filled in on the way across.
+                positions.push(normalise({
+                    clientId: cryptoId(),
+                    sourceType: "ExtractedFromContractText",
+                    catalogServiceId: null,
+                    sourceDraftId: suppliedDraftId || null,
+                    title: source.title || "",
+                    description: source.description || "",
+                    quantity: source.quantity ?? 1,
+                    unit: source.unit || "",
+                    unitPrice: source.unitPrice ?? null,
+                    currency: source.currency || defaultCurrency,
+                    vatRate: source.vatRatePercent ?? null,
+                    billingCycle: BILLING_CYCLES.includes(source.billingCycle) ? source.billingCycle : "OneTime"
+                }));
+            });
+
+            dirty = true;
+            render();
+
+            toast("success",
+                chosen.length + " position(s) added for review. Check them and save — nothing is stored yet.");
+
+            document.getElementById("positionList")?.scrollIntoView({ behavior: "smooth" });
         }
 
         if (action === "approve-version") {
@@ -619,6 +790,168 @@
             });
         }
     });
+
+    /// Shows a failed call, with the reference the server logged it under so a
+    /// screenshot is enough to find it.
+    function showFailure(result, fallback) {
+        const message = result.message || fallback;
+        toast("error", result.reference ? `${message} (reference ${result.reference})` : message);
+    }
+
+    /// Puts a retry next to the action that failed, so a transient outage does
+    /// not mean starting over.
+    function offerRetry(button) {
+        if (!button || button.dataset.retryAdded === "1") return;
+
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.className = "btn btn-outline-primary text-sm px-16 py-8 radius-8 ms-2";
+        retry.innerHTML = '<i class="ri-refresh-line"></i> Try again';
+        retry.dataset.action = button.dataset.action;
+        retry.dataset.version = button.dataset.version || "";
+
+        button.dataset.retryAdded = "1";
+        button.insertAdjacentElement("afterend", retry);
+    }
+
+    /// A confirmation that is part of the page rather than a browser dialog.
+    async function confirmDialog(message, title) {
+        if (window.UI?.modal?.confirm) {
+            return window.UI.modal.confirm({ title: title || "Confirm", message, okText: "Continue" });
+        }
+        return window.confirm(message);
+    }
+
+    // ------------------------------------------------------------------
+    // Review of what analysis read out of a supplied contract
+    //
+    // Every value is shown with what it was read from and has to be ticked
+    // before it counts. Nothing here is applied to the contract until the user
+    // presses save, and the source document is never modified.
+    // ------------------------------------------------------------------
+
+    const EXTRACTION_FIELDS = [
+        ["title", "Title"], ["contractType", "Contract type"], ["purpose", "Purpose"],
+        ["language", "Language"],
+        ["providerName", "Our company"], ["providerAddress", "Our address"],
+        ["providerRepresentative", "Our representative"],
+        ["customerName", "Customer"], ["customerAddress", "Customer address"],
+        ["customerRepresentative", "Customer representative"],
+        ["effectiveDate", "Effective date"], ["startDate", "Start date"], ["endDate", "End date"],
+        ["duration", "Duration"], ["renewalRules", "Renewal"], ["terminationNotice", "Termination notice"],
+        ["totalPrice", "Total price"], ["currency", "Currency"], ["vatRate", "VAT rate"],
+        ["vatTreatment", "VAT treatment"], ["discounts", "Discounts"],
+        ["billingCycle", "Billing cycle"], ["paymentSchedule", "Payment schedule"],
+        ["paymentDueDates", "Payment due dates"], ["deposit", "Deposit"],
+        ["recurringCharges", "Recurring charges"],
+        ["customerResponsibilities", "Customer responsibilities"],
+        ["providerResponsibilities", "Our responsibilities"],
+        ["acceptanceCriteria", "Acceptance"], ["revisions", "Revisions"],
+        ["assumptions", "Assumptions"], ["exclusions", "Exclusions"],
+        ["warranty", "Warranty"], ["liability", "Liability"],
+        ["confidentiality", "Confidentiality"], ["intellectualProperty", "Intellectual property"],
+        ["signatureParties", "Signatories"], ["otherTerms", "Other terms"]
+    ];
+
+    function renderExtraction() {
+        const panel = document.getElementById("extractionReview");
+        if (!panel || !extraction) return;
+
+        panel.classList.remove("d-none");
+
+        const body = document.getElementById("extractionBody");
+        body.innerHTML = "";
+
+        EXTRACTION_FIELDS.forEach(([key, label]) => {
+            const field = extraction[key];
+            if (!field) return;
+
+            const stated = field.value !== null && field.value !== undefined && field.value !== "";
+
+            const row = document.createElement("tr");
+            row.dataset.field = key;
+            row.innerHTML = `
+                <td class="fw-medium">${escapeHtml(label)}</td>
+                <td>
+                    <input type="text" class="form-control form-control-sm radius-8"
+                           data-extract-value value="${escapeAttr(field.value ?? "")}"
+                           placeholder="${stated ? "" : "not stated in the contract"}">
+                </td>
+                <td class="text-secondary-light">
+                    <span class="d-block text-truncate" style="max-width: 22rem"
+                          title="${escapeAttr(field.sourceText ?? "")}">${escapeHtml(field.sourceText ?? "—")}</span>
+                    <span class="text-sm">${stated ? Math.round((field.confidence ?? 0) * 100) + "% sure" : ""}</span>
+                </td>
+                <td class="text-end">
+                    <input type="checkbox" class="form-check-input" data-extract-confirm
+                           ${field.confirmed ? "checked" : ""}>
+                </td>`;
+
+            body.appendChild(row);
+        });
+
+        // Warnings
+        const warnBox = document.getElementById("extractionWarnings");
+        const warnList = document.getElementById("extractionWarningList");
+        warnList.innerHTML = "";
+
+        if (extraction.warnings && extraction.warnings.length) {
+            warnBox.classList.remove("d-none");
+            extraction.warnings.forEach(w => {
+                const li = document.createElement("li");
+                li.textContent = w;
+                warnList.appendChild(li);
+            });
+        } else {
+            warnBox.classList.add("d-none");
+        }
+
+        renderExtractedPositions();
+    }
+
+    function renderExtractedPositions() {
+        const block = document.getElementById("extractedPositionsBlock");
+        const body = document.getElementById("extractedPositionsBody");
+        if (!block || !body) return;
+
+        body.innerHTML = "";
+
+        if (!extraction.positions || extraction.positions.length === 0) {
+            block.classList.add("d-none");
+            return;
+        }
+
+        block.classList.remove("d-none");
+
+        extraction.positions.forEach((p, index) => {
+            const row = document.createElement("tr");
+            row.dataset.extractedIndex = String(index);
+            row.innerHTML = `
+                <td><input type="checkbox" class="form-check-input"></td>
+                <td>
+                    <span class="fw-medium">${escapeHtml(p.title ?? "")}</span>
+                    <span class="d-block text-secondary-light text-sm">${escapeHtml(p.description ?? "")}</span>
+                </td>
+                <td class="text-end">${p.quantity ?? "—"} ${escapeHtml(p.unit ?? "")}</td>
+                <td class="text-end">${p.unitPrice ?? "—"}</td>
+                <td class="text-end">${p.lineTotal ?? "—"}</td>`;
+
+            body.appendChild(row);
+        });
+    }
+
+    /// Reads the review table back, so corrections a person typed are what gets
+    /// saved rather than what the analyser proposed.
+    function collectExtractionEdits() {
+        document.querySelectorAll("#extractionBody tr[data-field]").forEach(row => {
+            const key = row.dataset.field;
+            if (!extraction[key]) return;
+
+            const value = row.querySelector("[data-extract-value]")?.value ?? "";
+            extraction[key].value = value.trim() === "" ? null : value;
+            extraction[key].confirmed = row.querySelector("[data-extract-confirm]")?.checked === true;
+        });
+    }
 
     function applyServerTotals(totals) {
         if (!totals) return;
@@ -691,4 +1024,8 @@
     });
 
     render();
+
+    // A stored extraction is shown straight away, so a review left half-finished
+    // is still there when the page is opened again.
+    if (extraction) renderExtraction();
 })();
