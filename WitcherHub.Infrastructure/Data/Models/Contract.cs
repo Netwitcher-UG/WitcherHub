@@ -33,6 +33,57 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         public InvoiceSendMode InvoiceSendMode { get; set; } = InvoiceSendMode.Automatic;
 
+        // =====================================================================
+        // What the contract is built from
+        //
+        // Recorded rather than inferred from Items.Count. A contract whose
+        // wording is a document the customer supplied has no positions and never
+        // will; counting rows cannot tell that apart from an unfinished one, and
+        // treating the two the same is what blocked supplied-text contracts.
+        // Existing contracts default to Positions, which is what they are.
+        // =====================================================================
+
+        public ContractSourceMode SourceMode { get; set; } = ContractSourceMode.Positions;
+
+        /// <summary>
+        /// The agreed total when the contract names one lump sum instead of
+        /// itemised services. Null means no contract-level total was agreed —
+        /// which is not the same as a total of zero, and is why this is nullable
+        /// rather than defaulted.
+        /// </summary>
+        [Column(TypeName = "numeric(14,2)")]
+        public decimal? AgreedTotalNet { get; set; }
+
+        [Column(TypeName = "numeric(6,3)")]
+        public decimal? AgreedTotalVatRatePercent { get; set; }
+
+        /// <summary>
+        /// True once a person has confirmed that this contract genuinely names no
+        /// price. Without it, a missing price is an open question rather than a
+        /// decision, and the contract shows a warning instead of quietly reading
+        /// as free of charge.
+        /// </summary>
+        public bool PriceDeliberatelyUnspecified { get; set; }
+
+        [MaxLength(2000)]
+        public string? PaymentTermsText { get; set; }
+
+        /// <summary>
+        /// Who the parties were when the contract was prepared, taken from the
+        /// company configuration and the customer record at that moment. Kept so
+        /// that a later change to either does not silently rewrite what was
+        /// signed.
+        /// </summary>
+        [Column(TypeName = "jsonb")]
+        public JsonDocument? PartySnapshot { get; set; }
+
+        /// <summary>SHA-256 of the exact document that was signed.</summary>
+        [MaxLength(64)]
+        public string? SignedDocumentHash { get; set; }
+
+        /// <summary>The version number of the draft that was signed.</summary>
+        public int? SignedDraftVersion { get; set; }
+
         // =========================
         // Serienrechnung / Recurring
         // =========================
@@ -141,6 +192,13 @@ namespace WitcherHub.Infrastructure.Data.Models
         public JsonDocument? Snapshot { get; set; }
 
         public DateTimeOffset? SnapshotTakenAt { get; set; }
+
+        /// <summary>
+        /// The supplied contract version this position was read out of, when it
+        /// came from one. Keeps an extracted position attached to the document
+        /// that justifies it, so it can be traced back and re-checked.
+        /// </summary>
+        public Guid? SourceDraftId { get; set; }
     }
 
     /// <summary>
@@ -190,6 +248,46 @@ namespace WitcherHub.Infrastructure.Data.Models
         /// </summary>
         [MaxLength(64)]
         public string? DocumentHash { get; set; }
+
+        // =====================================================================
+        // Supplied source documents
+        //
+        // A version can also be a contract the customer supplied. That is a
+        // different kind of thing from wording the system generated: it is the
+        // source document, it is never rewritten, and everything generated from
+        // it points back at it.
+        // =====================================================================
+
+        public ContractDraftKind Kind { get; set; } = ContractDraftKind.Generated;
+
+        /// <summary>
+        /// True for a version that must never be edited: the document exactly as
+        /// it was supplied. Edits produce a new version instead.
+        /// </summary>
+        public bool IsImmutableSource { get; set; }
+
+        [MaxLength(20)]
+        public string? SourceLanguage { get; set; }
+
+        /// <summary>
+        /// The supplied version this one was prepared from, for a generated
+        /// version that merged party details into a supplied document.
+        /// </summary>
+        public Guid? SourceDraftId { get; set; }
+
+        /// <summary>
+        /// What analysis read out of a supplied document: values, where each came
+        /// from, and how confident it was. Stored as given by the analyser and
+        /// only promoted onto the contract once a person confirms it.
+        /// </summary>
+        [Column(TypeName = "jsonb")]
+        public JsonDocument? ExtractedTerms { get; set; }
+
+        public ContractExtractionStatus ExtractionStatus { get; set; } = ContractExtractionStatus.NotAnalysed;
+
+        public DateTimeOffset? ExtractedAt { get; set; }
+
+        public DateTimeOffset? ExtractionConfirmedAt { get; set; }
     }
 
     public class ContractSignature : BaseEntity

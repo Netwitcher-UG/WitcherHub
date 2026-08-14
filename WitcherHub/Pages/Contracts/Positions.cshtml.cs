@@ -7,6 +7,7 @@ using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Models.View.Contracts;
+using WitcherHub.Domain.Contracts;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Pages.Contracts
@@ -78,12 +79,24 @@ namespace WitcherHub.Pages.Contracts
         public bool IsLocked => Contract?.Status is DocumentStatus.Signed or DocumentStatus.Terminated;
 
         /// <summary>
-        /// A contract may proceed on positions, or on accepted contract text, or
-        /// both. It does not require a Service Catalog entry.
+        /// What this contract is built from. The rule lives in the domain and is
+        /// the same one the server enforces, so the button the user sees and the
+        /// answer they get from pressing it cannot disagree.
         /// </summary>
-        public bool HasPositions => Positions.Count > 0;
-        public bool HasContractText => Drafts.Count > 0;
-        public bool CanGenerate => HasPositions || HasContractText;
+        public ContractSource Source { get; private set; }
+
+        public bool HasPositions => Source.HasPositions;
+        public bool HasContractText => Source.HasSuppliedText;
+        public bool CanGenerate => Source.CanGenerate;
+
+        /// <summary>The supplied source document, when there is one.</summary>
+        public ContractDraftSummary? SuppliedSource =>
+            Drafts.Where(d => d.IsSupplied).OrderByDescending(d => d.Version).FirstOrDefault();
+
+        public ContractDraftSummary? ApprovedVersion => Drafts.FirstOrDefault(d => d.IsApproved);
+
+        /// <summary>What analysis has found so far, for the review panel.</summary>
+        public ContractExtractionDto? Extraction { get; private set; }
 
         /// <summary>Which step the builder opens on, from what is already filled in.</summary>
         public int CurrentStep =>
@@ -114,6 +127,10 @@ namespace WitcherHub.Pages.Contracts
             Positions = await _positions.GetPositionsAsync(ContractId, ct);
             Totals = _positions.CalculateTotals(Positions, Contract.Currency ?? "EUR");
             Drafts = await _drafts.GetDraftsAsync(ContractId, ct);
+            Source = await _drafts.GetSourceAsync(ContractId, ct);
+
+            if (SuppliedSource is not null)
+                Extraction = await _drafts.GetExtractionAsync(ContractId, SuppliedSource.Version, ct);
 
             var catalog = await _services.GetServicesAsync(1, 500, null, ct);
             CatalogServices = catalog.Items
@@ -194,6 +211,65 @@ namespace WitcherHub.Pages.Contracts
         }
 
         // ------------------------------------------------------------------
+        // Analysis of supplied text
+        //
+        // Optional throughout. The contract can be prepared, approved and signed
+        // from supplied text that was never analysed — analysis only offers to
+        // read values out of it for review.
+        // ------------------------------------------------------------------
+
+        public async Task<IActionResult> OnPostAnalyzeAsync(
+            [FromBody] VersionRequest? request, CancellationToken ct)
+        {
+            if (request is null) return BadRequestJson("No version given.");
+
+            var result = await _drafts.AnalyzeAsync(ContractId, request.Version, ct);
+
+            if (!result.Succeeded)
+            {
+                return new JsonResult(new
+                {
+                    ok = false,
+                    transient = result.IsTransientFailure,
+                    reference = result.CorrelationId,
+                    message = result.FailureReason
+                });
+            }
+
+            return new JsonResult(new
+            {
+                ok = true,
+                extraction = result.Extraction,
+                message = "The contract was analysed. Review the values before confirming them."
+            });
+        }
+
+        public async Task<IActionResult> OnPostConfirmExtractionAsync(
+            [FromBody] ConfirmExtractionRequest? request, CancellationToken ct)
+        {
+            if (request?.Extraction is null)
+                return BadRequestJson("There is nothing to confirm.");
+
+            var result = await _drafts.ConfirmExtractionAsync(
+                ContractId, request.Version, request.Extraction, ct);
+
+            return result.Succeeded
+                ? new JsonResult(new { ok = true, message = "The reviewed values were saved to the contract." })
+                : new JsonResult(new { ok = false, message = result.FailureReason });
+        }
+
+        public sealed class VersionRequest
+        {
+            public int Version { get; set; }
+        }
+
+        public sealed class ConfirmExtractionRequest
+        {
+            public int Version { get; set; }
+            public ContractExtractionDto? Extraction { get; set; }
+        }
+
+        // ------------------------------------------------------------------
         // Live totals — the browser proposes, the server decides.
         // ------------------------------------------------------------------
 
@@ -219,9 +295,11 @@ namespace WitcherHub.Pages.Contracts
         {
             positions ??= new List<ManualPositionDto>();
 
-            if (positions.Count == 0)
-                return BadRequestJson("Add at least one position before saving.");
-
+            // Saving zero positions is allowed. It is how a contract built from
+            // supplied text is saved, and how positions are cleared from one that
+            // no longer needs them. Whether the contract has enough behind it to
+            // be generated is a different question, answered by ContractSource
+            // when generation is attempted.
             var errors = await ValidateAllAsync(positions, ct);
             if (errors.Count > 0)
                 return new JsonResult(new { ok = false, message = "Some positions need attention.", errors });

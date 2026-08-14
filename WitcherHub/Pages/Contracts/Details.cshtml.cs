@@ -20,11 +20,17 @@ namespace WitcherHub.Pages.Contracts
         private readonly AppDbContext _db;
         private readonly IContractDocumentGenerator _generator;
         private readonly ContractTemplateOptions _opt;
+        private readonly IContractDraftService _drafts;
 
-        public DetailsModel(AppDbContext db, IContractDocumentGenerator generator, IOptions<ContractTemplateOptions> opt)
+        public DetailsModel(
+            AppDbContext db,
+            IContractDocumentGenerator generator,
+            IContractDraftService drafts,
+            IOptions<ContractTemplateOptions> opt)
         {
             _db = db;
             _generator = generator;
+            _drafts = drafts;
             _opt = opt.Value;
         }
 
@@ -60,14 +66,19 @@ namespace WitcherHub.Pages.Contracts
             // Generate terms once if missing (نفس Sign)
             // Generate terms once if missing (same as Sign, but must have line items)
             // ✅ بدل التوليد التلقائي:
-            if (contract.Items == null || contract.Items.Count == 0)
+            // A contract needs positions or contract text, not positions
+            // specifically. Sending a supplied-text contract back to the position
+            // builder — which is where it was already finished — was the same
+            // wrong rule that blocked generation.
+            var source = await _drafts.GetSourceAsync(contract.Id, ct);
+
+            if (!source.CanGenerate)
             {
                 TempData["Toast.Type"] = "warning";
-                TempData["Toast.Title"] = "Positions required";
-                TempData["Toast.Message"] = "Please add at least one Position first.";
+                TempData["Toast.Title"] = "Nothing to show yet";
+                TempData["Toast.Message"] = source.BlockingReason;
 
                 return RedirectToPage("/Contracts/Positions", new { contractId = contract.Id });
-
             }
 
             if (string.IsNullOrWhiteSpace(contract.Terms))

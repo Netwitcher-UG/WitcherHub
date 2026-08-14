@@ -8,6 +8,7 @@ using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Contracts;
+using WitcherHub.Domain.Contracts;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
 using WitcherHub.Infrastructure.Services.OpenAI;
@@ -29,6 +30,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         private readonly AppDbContext _db;
         private readonly IContractPositions _positions;
         private readonly IAiTextGenerator _ai;
+        private readonly IContractTextAnalyzer _analyzer;
         private readonly OpenAIOptions _openAi;
         private readonly ContractTemplateOptions _template;
         private readonly ILogger<ContractDraftService> _logger;
@@ -37,6 +39,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             AppDbContext db,
             IContractPositions positions,
             IAiTextGenerator ai,
+            IContractTextAnalyzer analyzer,
             IOptions<OpenAIOptions> openAi,
             IOptions<ContractTemplateOptions> template,
             ILogger<ContractDraftService> logger)
@@ -44,9 +47,26 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             _db = db;
             _positions = positions;
             _ai = ai;
+            _analyzer = analyzer;
             _openAi = openAi.Value;
             _template = template.Value;
             _logger = logger;
+        }
+
+        public async Task<ContractSource> GetSourceAsync(Guid contractId, CancellationToken ct = default)
+        {
+            var positionCount = await _db.Set<ContractItem>()
+                .CountAsync(i => i.ContractId == contractId, ct);
+
+            var drafts = await _db.Set<ContractDraft>()
+                .Where(d => d.ContractId == contractId)
+                .Select(d => new { d.IsApproved })
+                .ToListAsync(ct);
+
+            return ContractSource.From(
+                positionCount,
+                hasSuppliedText: drafts.Count > 0,
+                hasApprovedText: drafts.Any(d => d.IsApproved));
         }
 
         public async Task<ContractDraftResult> GenerateAsync(
@@ -64,10 +84,31 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             }
 
             var positions = await _positions.GetPositionsAsync(contractId, ct);
-            if (positions.Count == 0)
-                return ContractDraftResult.Failed("Add at least one position before generating a contract.");
+
+            // The rule, from the one place it lives. This used to be
+            // "positions.Count == 0 → refuse", which is why a contract whose
+            // wording was a document the customer supplied could never be
+            // generated: it has no positions and never will.
+            var source = ContractSource.From(
+                positions.Count,
+                hasSuppliedText: contract.Drafts.Count > 0,
+                hasApprovedText: contract.Drafts.Any(d => d.IsApproved));
+
+            if (!source.CanGenerate)
+                return ContractDraftResult.Failed(source.BlockingReason!);
+
+            // Remember what it is actually built from, rather than working it out
+            // again from a row count every time somebody asks.
+            contract.SourceMode = source.Mode;
 
             var totals = _positions.CalculateTotals(positions, contract.Currency);
+
+            // With supplied text, the document is the contract. Preparing it means
+            // putting the current parties into it — deterministically, with no
+            // model involved — so a contract can be produced, approved and signed
+            // even when the assistant is unreachable.
+            if (source.Mode is ContractSourceMode.SuppliedText)
+                return await PrepareSuppliedAsync(contract, options, ct);
 
             string document;
             try
@@ -78,10 +119,18 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             {
                 throw;
             }
+            catch (AiInvocationException ex)
+            {
+                // Everything the user entered is already saved; only the wording
+                // step failed. The message now says which failure it was and
+                // carries the reference that finds it in the log.
+                return ContractDraftResult.Failed(
+                    ex.UserMessage + " Your positions and contract text are saved — you can write or paste the " +
+                    "wording by hand, or try again.",
+                    ex.IsTransient);
+            }
             catch (Exception ex)
             {
-                // The positions are already saved. The user loses nothing and can
-                // write or paste the wording by hand.
                 _logger.LogWarning(ex, "Contract draft generation failed for {ContractId}.", contractId);
 
                 return ContractDraftResult.Failed(
@@ -96,6 +145,22 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                     transient: true);
             }
 
+            // A hybrid contract keeps the supplied wording and appends the service
+            // schedule generated from the positions, rather than replacing one
+            // with the other: both were supplied on purpose.
+            if (source.Mode is ContractSourceMode.Hybrid)
+            {
+                var supplied = LatestSupplied(contract);
+
+                if (supplied is not null)
+                {
+                    document =
+                        supplied.DocumentMarkdown.TrimEnd() +
+                        "\n\n---\n\n" +
+                        document.Trim();
+                }
+            }
+
             var draft = new ContractDraft
             {
                 ContractId = contractId,
@@ -106,17 +171,146 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 TemplateVersion = _template.BaseDePath,
                 Model = _openAi.Model,
                 GeneratedBy = "openai",
-                GeneratedAt = DateTimeOffset.UtcNow
+                GeneratedAt = DateTimeOffset.UtcNow,
+                Kind = ContractDraftKind.Generated,
+                SourceDraftId = source.Mode is ContractSourceMode.Hybrid ? LatestSupplied(contract)?.Id : null
             };
 
             _db.Set<ContractDraft>().Add(draft);
             await _db.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Generated draft v{Version} for contract {ContractId} using {Model}.",
-                draft.Version, contractId, _openAi.Model);
+                "Generated draft v{Version} for contract {ContractId} from {Mode} using {Model}.",
+                draft.Version, contractId, source.Mode, _openAi.Model);
 
             return new ContractDraftResult { Succeeded = true, Draft = ToSummary(draft, totals) };
+        }
+
+        /// <summary>
+        /// Produces the customer-specific version of a supplied contract.
+        ///
+        /// Deterministic on purpose. The source document is the agreement; all
+        /// that is needed is to put the current parties into it, and doing that
+        /// with string replacement rather than a model means it cannot reword a
+        /// clause, and it still works when the assistant is down. The original is
+        /// never touched: this writes a new version that points back at it.
+        /// </summary>
+        private async Task<ContractDraftResult> PrepareSuppliedAsync(
+            Contract contract, GenerateDraftOptions options, CancellationToken ct)
+        {
+            var supplied = LatestSupplied(contract);
+
+            if (supplied is null)
+                return ContractDraftResult.Failed("There is no supplied contract text to prepare.");
+
+            var parties = await BuildPartyDetailsAsync(contract, ct);
+            var confirmed = options.ConfirmedReplacements
+                .Select(r => new PartyReplacement(r.Field, r.OldValue, r.NewValue, IsPlaceholder: false))
+                .ToList();
+
+            var merge = ContractPartyMerge.Merge(supplied.DocumentMarkdown, parties, confirmed);
+
+            if (merge.MissingFields.Count > 0 && merge.Applied.Count == 0)
+            {
+                // Only blocking when there was a placeholder to fill and nothing to
+                // fill it with; a document that already names the parties needs
+                // nothing from us.
+                if (ContainsPlaceholder(supplied.DocumentMarkdown))
+                {
+                    return ContractDraftResult.Failed(
+                        "The contract has placeholders to fill in, but this information is missing: " +
+                        string.Join(", ", merge.MissingFields) +
+                        ". Add it to the company settings or the customer record and prepare the contract again.");
+                }
+            }
+
+            var draft = new ContractDraft
+            {
+                ContractId = contract.Id,
+                Version = await NextVersionAsync(contract.Id, ct),
+                DocumentMarkdown = merge.Document.Trim(),
+                PromptVersion = null,
+                TemplateVersion = null,
+                Model = null,
+
+                // No model was involved, and saying so is what lets a later reader
+                // tell a merged supplied document from generated wording.
+                GeneratedBy = "prepared-from-supplied",
+                GeneratedAt = DateTimeOffset.UtcNow,
+                Kind = ContractDraftKind.Generated,
+                SourceDraftId = supplied.Id,
+                SourceLanguage = supplied.SourceLanguage
+            };
+
+            _db.Set<ContractDraft>().Add(draft);
+
+            contract.PartySnapshot = JsonSerializer.SerializeToDocument(new
+            {
+                companyName = parties.CompanyName,
+                companyAddress = parties.CompanyAddress,
+                customerName = parties.CustomerName,
+                customerAddress = parties.CustomerAddress,
+                takenAt = DateTimeOffset.UtcNow
+            });
+
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Prepared supplied contract v{Version} for contract {ContractId} from source v{Source}. " +
+                "{Applied} placeholder(s) filled, {Missing} field(s) missing.",
+                draft.Version, contract.Id, supplied.Version, merge.Applied.Count, merge.MissingFields.Count);
+
+            return new ContractDraftResult { Succeeded = true, Draft = ToSummary(draft, null) };
+        }
+
+        private static ContractDraft? LatestSupplied(Contract contract) =>
+            contract.Drafts
+                .Where(d => d.Kind == ContractDraftKind.Supplied || d.GeneratedBy == "pasted")
+                .OrderByDescending(d => d.IsApproved)
+                .ThenByDescending(d => d.Version)
+                .FirstOrDefault()
+            ?? contract.Drafts.OrderByDescending(d => d.Version).FirstOrDefault();
+
+        private static bool ContainsPlaceholder(string document) =>
+            document.Contains("[COMPANY", StringComparison.OrdinalIgnoreCase) ||
+            document.Contains("[CUSTOMER", StringComparison.OrdinalIgnoreCase) ||
+            document.Contains("[CLIENT", StringComparison.OrdinalIgnoreCase) ||
+            document.Contains("[CONTRACT_DATE", StringComparison.OrdinalIgnoreCase);
+
+        private async Task<PartyDetails> BuildPartyDetailsAsync(Contract contract, CancellationToken ct)
+        {
+            var customer = await _db.Contracts
+                .Where(c => c.Id == contract.Id)
+                .Select(c => new
+                {
+                    c.Project.Customer.Name,
+                    Address = c.Project.Customer.Addresses
+                        .OrderByDescending(a => a.IsDefault)
+                        .Select(a => new { a.StreetRaw, a.AddressLine2, a.PostalCode, a.City, a.Country })
+                        .FirstOrDefault()
+                })
+                .FirstOrDefaultAsync(ct);
+
+            var providerLines = (_template.ProviderBlock ?? "")
+                .Replace("\r\n", "\n")
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+            var customerAddress = customer?.Address is null
+                ? null
+                : string.Join("\n", new[]
+                {
+                    customer.Address.StreetRaw,
+                    customer.Address.AddressLine2,
+                    $"{customer.Address.PostalCode} {customer.Address.City}".Trim(),
+                    customer.Address.Country
+                }.Where(l => !string.IsNullOrWhiteSpace(l)));
+
+            return new PartyDetails(
+                CompanyName: providerLines.FirstOrDefault(),
+                CompanyAddress: providerLines.Length > 1 ? string.Join("\n", providerLines.Skip(1)) : null,
+                CustomerName: customer?.Name,
+                CustomerAddress: customerAddress,
+                ContractDate: contract.StartDate ?? DateOnly.FromDateTime(DateTime.UtcNow));
         }
 
         public async Task<IReadOnlyList<ContractDraftSummary>> GetDraftsAsync(
@@ -147,24 +341,38 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             if (string.IsNullOrWhiteSpace(documentText))
                 return ContractDraftResult.Failed("The contract text cannot be empty.");
 
-            // Loaded to prove the contract exists and to place the version.
-            await LoadAsync(contractId, ct);
+            var contract = await LoadAsync(contractId, ct);
 
             var draft = new ContractDraft
             {
                 Id = Guid.NewGuid(),
                 ContractId = contractId,
                 Version = await NextVersionAsync(contractId, ct),
+
+                // Trimmed at the ends only. Paragraphs, headings, lists and line
+                // breaks inside are the document's structure, and a contract that
+                // comes back reflowed is not the document that was supplied.
                 DocumentMarkdown = documentText.Trim(),
 
                 // No prompt, no template, no model: this text was not generated.
                 // Recording that plainly is what lets a later reader tell supplied
                 // wording from wording the assistant produced.
                 GeneratedBy = source,
-                GeneratedAt = DateTimeOffset.UtcNow
+                GeneratedAt = DateTimeOffset.UtcNow,
+                Kind = ContractDraftKind.Supplied,
+                IsImmutableSource = true,
+                SourceLanguage = DetectLanguage(documentText),
+                ExtractionStatus = ContractExtractionStatus.NotAnalysed
             };
 
             _db.Add(draft);
+
+            // A contract that arrives as a document is a supplied-text contract
+            // from that moment, whether or not positions are ever added.
+            contract.SourceMode = contract.Items.Count > 0
+                ? ContractSourceMode.Hybrid
+                : ContractSourceMode.SuppliedText;
+
             await _db.SaveChangesAsync(ct);
 
             _logger.LogInformation(
@@ -190,8 +398,18 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                     "This version is approved and cannot be edited. Generate a new version instead.");
             }
 
+            if (draft.IsImmutableSource)
+            {
+                // The supplied original is the evidence of what was handed over.
+                // Editing it in place would destroy the only copy of that.
+                return ContractDraftResult.NeedsConfirmation(
+                    "This is the contract exactly as it was supplied and is kept unchanged. " +
+                    "Prepare it to produce an editable version.");
+            }
+
             draft.DocumentMarkdown = documentMarkdown.Trim();
             draft.GeneratedBy = "human-edit";
+            draft.Kind = ContractDraftKind.HumanEdited;
 
             await _db.SaveChangesAsync(ct);
 
@@ -233,6 +451,150 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         }
 
         // -------------------------------------------------------------------
+        // Analysis of a supplied document
+        //
+        // Reading, not rewriting. Nothing here changes the stored document, and
+        // nothing it finds becomes contract data until a person confirms it.
+        // -------------------------------------------------------------------
+
+        public async Task<ContractAnalysisResult> AnalyzeAsync(
+            Guid contractId, int version, CancellationToken ct = default)
+        {
+            var draft = await _db.Set<ContractDraft>()
+                .FirstOrDefaultAsync(d => d.ContractId == contractId && d.Version == version, ct)
+                ?? throw new NotFoundAppException("Draft not found.");
+
+            var result = await _analyzer.AnalyzeAsync(draft.DocumentMarkdown, draft.SourceLanguage, ct);
+
+            if (!result.Succeeded)
+            {
+                draft.ExtractionStatus = ContractExtractionStatus.Failed;
+                await _db.SaveChangesAsync(ct);
+                return result;
+            }
+
+            draft.ExtractedTerms = JsonSerializer.SerializeToDocument(result.Extraction);
+            draft.ExtractionStatus = ContractExtractionStatus.Analysed;
+            draft.ExtractedAt = DateTimeOffset.UtcNow;
+
+            if (result.Extraction!.Language.HasValue)
+                draft.SourceLanguage = result.Extraction.Language.Value;
+
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Analysed supplied contract v{Version} of {ContractId}: {Positions} candidate position(s), " +
+                "{Warnings} warning(s), price missing: {PriceMissing}.",
+                version, contractId, result.Extraction.Positions.Count,
+                result.Extraction.Warnings.Count, result.Extraction.PriceMissing);
+
+            return result;
+        }
+
+        public async Task<ContractExtractionDto?> GetExtractionAsync(
+            Guid contractId, int version, CancellationToken ct = default)
+        {
+            var stored = await _db.Set<ContractDraft>()
+                .AsNoTracking()
+                .Where(d => d.ContractId == contractId && d.Version == version)
+                .Select(d => d.ExtractedTerms)
+                .FirstOrDefaultAsync(ct);
+
+            if (stored is null) return null;
+
+            try
+            {
+                return stored.Deserialize<ContractExtractionDto>();
+            }
+            catch (JsonException ex)
+            {
+                // Stored extraction from an older shape. Not worth failing a page
+                // over — the user can analyse again.
+                _logger.LogWarning(ex, "Stored extraction for {ContractId} v{Version} could not be read.",
+                    contractId, version);
+                return null;
+            }
+        }
+
+        public async Task<ContractDraftResult> ConfirmExtractionAsync(
+            Guid contractId, int version, ContractExtractionDto confirmed, CancellationToken ct = default)
+        {
+            ArgumentNullException.ThrowIfNull(confirmed);
+
+            var contract = await LoadAsync(contractId, ct);
+
+            var draft = contract.Drafts.FirstOrDefault(d => d.Version == version)
+                ?? throw new NotFoundAppException("Draft not found.");
+
+            draft.ExtractedTerms = JsonSerializer.SerializeToDocument(confirmed);
+            draft.ExtractionStatus = ContractExtractionStatus.Confirmed;
+            draft.ExtractionConfirmedAt = DateTimeOffset.UtcNow;
+
+            // Only confirmed values are promoted onto the contract. An unconfirmed
+            // reading stays a reading: it is visible in the review screen and has
+            // no effect on what the contract says it costs.
+            if (confirmed.TotalPrice.Confirmed &&
+                ContractTextAnalyzer.TryParseAmount(confirmed.TotalPrice.Value, out var total))
+            {
+                contract.AgreedTotalNet = total;
+                contract.PriceDeliberatelyUnspecified = false;
+            }
+
+            if (confirmed.VatRate.Confirmed &&
+                ContractTextAnalyzer.TryParseAmount(confirmed.VatRate.Value, out var vat))
+            {
+                contract.AgreedTotalVatRatePercent = vat;
+            }
+
+            if (confirmed.Currency.Confirmed && confirmed.Currency.HasValue)
+                contract.Currency = confirmed.Currency.Value!.Trim().ToUpperInvariant();
+
+            if (confirmed.PaymentSchedule.Confirmed && confirmed.PaymentSchedule.HasValue)
+                contract.PaymentTermsText = confirmed.PaymentSchedule.Value;
+
+            // A price that is deliberately absent is a decision, recorded as one.
+            if (confirmed.PriceMissing && !confirmed.TotalPrice.HasValue)
+            {
+                contract.AgreedTotalNet = null;
+                contract.PriceDeliberatelyUnspecified = confirmed.TotalPrice.Confirmed;
+            }
+
+            if (confirmed.StartDate.Confirmed && DateOnly.TryParse(confirmed.StartDate.Value, out var start))
+                contract.StartDate = start;
+
+            if (confirmed.EndDate.Confirmed && DateOnly.TryParse(confirmed.EndDate.Value, out var end))
+                contract.EndDate = end;
+
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Extracted terms confirmed for contract {ContractId} v{Version}.", contractId, version);
+
+            return new ContractDraftResult { Succeeded = true, Draft = ToSummary(draft, null) };
+        }
+
+        /// <summary>
+        /// A cheap language guess from stopwords, used only to tell the analyser
+        /// what to expect and to label the version. Never a commercial fact.
+        /// </summary>
+        internal static string? DetectLanguage(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return null;
+
+            var sample = text.Length > 4000 ? text[..4000] : text;
+            var words = sample.ToLowerInvariant().Split(
+                new[] { ' ', '\n', '\r', '\t', '.', ',', ';', ':', '(', ')' },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            var german = words.Count(w => w is "und" or "der" or "die" or "das" or "vertrag" or "nicht" or "wird" or "für");
+            var english = words.Count(w => w is "and" or "the" or "shall" or "agreement" or "of" or "this");
+
+            if (german == 0 && english == 0) return null;
+
+            return german >= english ? "de" : "en";
+        }
+
+        // -------------------------------------------------------------------
 
         private async Task<Contract> LoadAsync(Guid contractId, CancellationToken ct)
         {
@@ -241,6 +603,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             return await _db.Contracts
                 .Include(c => c.Drafts)
+                .Include(c => c.Items)
                 .FirstOrDefaultAsync(c => c.Id == contractId, ct)
                 ?? throw new NotFoundAppException("Contract not found.");
         }
@@ -335,9 +698,24 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
         private static ContractDraftSummary ToSummary(ContractDraft d, PositionTotalsDto? totals) =>
             new(d.Id, d.Version, d.DocumentMarkdown, d.Model, d.PromptVersion, d.TemplateVersion,
-                d.GeneratedBy, d.GeneratedAt, d.IsApproved, d.ApprovedAt, d.DocumentHash, totals);
+                d.GeneratedBy, d.GeneratedAt, d.IsApproved, d.ApprovedAt, d.DocumentHash, totals)
+            {
+                // Older rows predate the Kind column and carry the provenance in
+                // GeneratedBy, so a supplied document imported before this change
+                // is still recognised as one.
+                Kind = d.Kind == ContractDraftKind.Generated && d.GeneratedBy == "pasted"
+                    ? ContractDraftKind.Supplied
+                    : d.Kind,
+                IsImmutableSource = d.IsImmutableSource || d.GeneratedBy == "pasted",
+                SourceLanguage = d.SourceLanguage,
+                ExtractionStatus = d.ExtractionStatus
+            };
 
-        internal static string Sha256(string value)
+        /// <summary>
+        /// The hash used to show that the text that was signed was the text that
+        /// was approved. Public because the signing page records it too.
+        /// </summary>
+        public static string Sha256(string value)
         {
             var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
             return Convert.ToHexString(bytes).ToLowerInvariant();

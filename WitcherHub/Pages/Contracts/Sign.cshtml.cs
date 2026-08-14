@@ -119,6 +119,7 @@ namespace WitcherHub.Pages.Contracts
                 .Include(c => c.Items)
                     .ThenInclude(i => i.Service)
                 .Include(c => c.Signatures)
+                .Include(c => c.Drafts)
                 .FirstOrDefaultAsync(c => c.Id == Id, ct);
 
             if (contract is null) return NotFound();
@@ -149,15 +150,35 @@ namespace WitcherHub.Pages.Contracts
             // ✅ enforce recipient email from link (strong)
             SignerEmailPrefill = link.RecipientEmail;
 
-            // Generate Terms once
+            // The document that gets signed
+            //
+            // The approved version is the contract. It is used exactly as
+            // approved and never rebuilt from the current catalog — a service
+            // whose price changed after approval must not change what is being
+            // signed. Only a contract with no approved wording at all falls back
+            // to generating from positions.
             if (string.IsNullOrWhiteSpace(contract.Terms))
             {
-                if (contract.Items == null || contract.Items.Count == 0)
-                    return BadRequest("Contract has no Positions.");
+                var approved = contract.Drafts
+                    .Where(d => d.IsApproved)
+                    .OrderByDescending(d => d.ApprovedAt)
+                    .FirstOrDefault();
 
-                var req = BuildRequestFromDb(contract);
-                var doc = await _generator.GenerateAsync(req, ct);
-                contract.Terms = NormalizeNewLines(doc.FullDocument);
+                if (approved is not null)
+                {
+                    contract.Terms = NormalizeNewLines(approved.DocumentMarkdown);
+                }
+                else if (contract.Items is { Count: > 0 })
+                {
+                    var req = BuildRequestFromDb(contract);
+                    var doc = await _generator.GenerateAsync(req, ct);
+                    contract.Terms = NormalizeNewLines(doc.FullDocument);
+                }
+                else
+                {
+                    return BadRequest(
+                        "This contract has no approved wording and no positions, so there is nothing to sign yet.");
+                }
 
                 await _db.SaveChangesAsync(ct);
             }
@@ -283,6 +304,32 @@ namespace WitcherHub.Pages.Contracts
                 SignedAt = now,
                 SignatureData = payload
             });
+
+            // Record which text was signed and what it hashed to.
+            //
+            // Without this, "the signed contract" means "whatever the contract
+            // says today", and a later edit quietly changes what somebody is held
+            // to. The hash is over the exact terms as they stood at this moment.
+            var signedTerms = await _db.Contracts
+                .Where(c => c.Id == Id)
+                .Select(c => c.Terms)
+                .FirstOrDefaultAsync(ct);
+
+            if (!string.IsNullOrWhiteSpace(signedTerms))
+            {
+                var signedVersion = await _db.Set<ContractDraft>()
+                    .Where(d => d.ContractId == Id && d.IsApproved)
+                    .OrderByDescending(d => d.ApprovedAt)
+                    .Select(d => (int?)d.Version)
+                    .FirstOrDefaultAsync(ct);
+
+                await _db.Contracts
+                    .Where(c => c.Id == Id)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(c => c.SignedDocumentHash, ContractDraftService.Sha256(signedTerms))
+                        .SetProperty(c => c.SignedDraftVersion, signedVersion),
+                        ct);
+            }
 
             await _db.SaveChangesAsync(ct);
 

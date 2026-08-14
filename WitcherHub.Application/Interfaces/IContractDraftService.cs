@@ -1,4 +1,6 @@
 using WitcherHub.Application.Models.DTO.Contracts;
+using WitcherHub.Domain.Contracts;
+using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Application.Interfaces
 {
@@ -46,6 +48,35 @@ namespace WitcherHub.Application.Interfaces
         /// </summary>
         Task<ContractDraftResult> ApproveAsync(
             Guid contractId, int version, Guid? approvedById, CancellationToken ct = default);
+
+        /// <summary>
+        /// What this contract is built from: positions, supplied text, or both.
+        ///
+        /// Every layer that needs to know whether the contract can proceed asks
+        /// this rather than counting positions. That is the whole point — the
+        /// count was the bug.
+        /// </summary>
+        Task<ContractSource> GetSourceAsync(Guid contractId, CancellationToken ct = default);
+
+        /// <summary>
+        /// Reads a stored supplied version and records what it says, without
+        /// changing a character of it. Optional: a contract can be prepared,
+        /// approved and signed from supplied text that was never analysed.
+        /// </summary>
+        Task<ContractAnalysisResult> AnalyzeAsync(
+            Guid contractId, int version, CancellationToken ct = default);
+
+        /// <summary>The extraction stored against a version, if it has one.</summary>
+        Task<ContractExtractionDto?> GetExtractionAsync(
+            Guid contractId, int version, CancellationToken ct = default);
+
+        /// <summary>
+        /// Stores the extracted values a person has reviewed, and promotes the
+        /// confirmed commercial facts onto the contract. Only what is confirmed
+        /// is promoted; the rest stays a reading of the document.
+        /// </summary>
+        Task<ContractDraftResult> ConfirmExtractionAsync(
+            Guid contractId, int version, ContractExtractionDto confirmed, CancellationToken ct = default);
     }
 
     public sealed class GenerateDraftOptions
@@ -60,7 +91,18 @@ namespace WitcherHub.Application.Interfaces
         /// generating over an approved draft is refused.
         /// </summary>
         public bool OverwriteApproved { get; set; }
+
+        /// <summary>
+        /// Party replacements a person has already accepted in the review screen.
+        /// Anything not listed here is left alone — a party name is not changed
+        /// on a guess.
+        /// </summary>
+        public IReadOnlyList<ConfirmedPartyReplacement> ConfirmedReplacements { get; set; } =
+            Array.Empty<ConfirmedPartyReplacement>();
     }
+
+    /// <summary>A replacement the user looked at and accepted.</summary>
+    public sealed record ConfirmedPartyReplacement(string Field, string OldValue, string NewValue);
 
     public sealed class ContractDraftResult
     {
@@ -97,5 +139,18 @@ namespace WitcherHub.Application.Interfaces
         bool IsApproved,
         DateTimeOffset? ApprovedAt,
         string? DocumentHash,
-        PositionTotalsDto? Totals);
+        PositionTotalsDto? Totals)
+    {
+        /// <summary>Generated wording, a supplied source document, or a human edit.</summary>
+        public ContractDraftKind Kind { get; init; } = ContractDraftKind.Generated;
+
+        /// <summary>True for the untouchable original of a supplied document.</summary>
+        public bool IsImmutableSource { get; init; }
+
+        public string? SourceLanguage { get; init; }
+
+        public ContractExtractionStatus ExtractionStatus { get; init; } = ContractExtractionStatus.NotAnalysed;
+
+        public bool IsSupplied => Kind is ContractDraftKind.Supplied;
+    }
 }

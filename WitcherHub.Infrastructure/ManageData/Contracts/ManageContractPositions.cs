@@ -71,8 +71,23 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
             if (contract.Status != DocumentStatus.Draft)
                 throw new BadRequestAppException("Positions can only be changed while the contract is a draft.");
 
+            // An empty list is a legitimate save. A contract built from supplied
+            // text has no positions, and refusing to store that left the builder
+            // in a state it could not leave: the browser asked the user to save
+            // before generating, and saving was refused for having nothing to
+            // save. Only a contract with no text either is short of a source, and
+            // that is caught where generation is decided rather than here.
             if (positions.Count == 0)
-                throw new BadRequestAppException("A contract needs at least one position.");
+            {
+                var hasText = await _db.Set<ContractDraft>().AnyAsync(d => d.ContractId == contractId, ct);
+
+                if (!hasText && contract.Items.Count == 0)
+                {
+                    throw new BadRequestAppException(
+                        "This contract has neither positions nor contract text. Add a position, or paste the " +
+                        "contract text, and it can be built from either.");
+                }
+            }
 
             // A position may reference the catalog, but it never has to. Verify the
             // ones that do, so a stale id cannot produce a dangling reference.
@@ -143,8 +158,15 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
 
             item.Source = dto.SourceType;
 
-            // Null for a manual position. Never a placeholder catalog row.
-            item.ServiceId = dto.SourceType == ContractItemSource.Manual ? null : dto.CatalogServiceId;
+            // Null for a manual position, and equally null for one read out of a
+            // supplied contract: neither has a catalog service behind it, and a
+            // placeholder catalog row would be inventing a service we do not sell.
+            item.ServiceId = dto.SourceType is ContractItemSource.Manual
+                                            or ContractItemSource.ExtractedFromContractText
+                ? null
+                : dto.CatalogServiceId;
+
+            item.SourceDraftId = dto.SourceDraftId;
 
             item.ServiceTypeLabel = dto.ServiceType;
             item.PricingModelName = dto.PricingModel.ToString();
@@ -252,6 +274,7 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                 ContractItemId = item.Id,
                 SourceType = item.Source,
                 CatalogServiceId = item.ServiceId,
+                SourceDraftId = item.SourceDraftId,
                 Position = item.Position,
                 Title = item.Title,
                 ServiceType = item.ServiceTypeLabel,

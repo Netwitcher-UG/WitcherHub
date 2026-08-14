@@ -91,7 +91,11 @@
 <div class="row g-4" id="positionsApp"
      data-contract-id="@Model.ContractId"
      data-currency="@(contract.Currency ?? "EUR")"
-     data-locked="@Model.IsLocked.ToString().ToLowerInvariant()">
+     data-locked="@Model.IsLocked.ToString().ToLowerInvariant()"
+     data-has-text="@Model.HasContractText.ToString().ToLowerInvariant()"
+     data-supplied-version="@(Model.SuppliedSource?.Version ?? 0)"
+     data-supplied-draft-id="@(Model.SuppliedSource?.Id.ToString() ?? "")"
+     data-empty-message="@Model.Source.EmptyPositionsMessage">
 
     <div class="col-12 col-xl-8">
 
@@ -221,20 +225,49 @@
                 }
 
                 @* The empty state offers all three routes, because an empty
-                   contract does not have one obvious next move. *@
+                   contract does not have one obvious next move — and once there
+                   is supplied text, an empty list is a finished state rather
+                   than a missing step, so it says so instead of asking for a
+                   position that is not required. *@
                 <div id="emptyState" class="d-none">
-                    <partial name="_EmptyState" model="@(new EmptyStateVm
-                           {
-                               Title = "No contract positions yet",
-                               Message = "Add a saved service, create a manual position, or paste an existing contract text. None of these is required by the others.",
-                               Icon = "ri-list-check-2",
-                               Actions =
-                               [
-                                   new EmptyStateAction { Text = "Add manual position", Url = "add-manual", Icon = "ri-add-line", IsPrimary = true, IsButton = true },
-                                   new EmptyStateAction { Text = "Add from saved services", Url = "add-catalog", Icon = "ri-box-3-line", IsButton = true },
-                                   new EmptyStateAction { Text = "Paste contract text", Url = "focus-paste", Icon = "ri-clipboard-line", IsButton = true }
-                               ]
-                           })" />
+                    @if (Model.HasContractText)
+                    {
+                        <div class="wh-empty text-center">
+                            <div class="wh-empty__icon"><i class="ri-file-text-line"></i></div>
+                            <h6 class="fw-semibold mb-8">Generated from the supplied contract text</h6>
+                            <p class="text-secondary-light text-sm mb-16">@Model.Source.EmptyPositionsMessage</p>
+                            <div class="wh-actions justify-content-center">
+                                <button type="button" class="btn btn-outline-primary text-sm px-20 py-11 radius-8" data-action="add-manual">
+                                    <i class="ri-add-line"></i> Add manual position
+                                </button>
+                                <button type="button" class="btn btn-outline-primary text-sm px-20 py-11 radius-8" data-action="add-catalog">
+                                    <i class="ri-box-3-line"></i> Add from saved services
+                                </button>
+                                @if (Model.SuppliedSource is not null)
+                                {
+                                    <button type="button" class="btn btn-outline-primary text-sm px-20 py-11 radius-8"
+                                            data-action="extract-positions" data-version="@Model.SuppliedSource.Version">
+                                        <i class="ri-file-search-line"></i> Extract positions from the text
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <partial name="_EmptyState" model="@(new EmptyStateVm
+                               {
+                                   Title = "No contract positions yet",
+                                   Message = Model.Source.EmptyPositionsMessage,
+                                   Icon = "ri-list-check-2",
+                                   Actions =
+                                   [
+                                       new EmptyStateAction { Text = "Add manual position", Url = "add-manual", Icon = "ri-add-line", IsPrimary = true, IsButton = true },
+                                       new EmptyStateAction { Text = "Add from saved services", Url = "add-catalog", Icon = "ri-box-3-line", IsButton = true },
+                                       new EmptyStateAction { Text = "Paste contract text", Url = "focus-paste", Icon = "ri-clipboard-line", IsButton = true }
+                                   ]
+                               })" />
+                    }
                 </div>
 
                 <div id="positionList" class="d-flex flex-column gap-3"></div>
@@ -280,11 +313,156 @@
                     </div>
                 </div>
 
+                @* ---- what this contract is built from, and how far it has got ---- *@
+                @if (Model.SuppliedSource is not null)
+                {
+                    var supplied = Model.SuppliedSource;
+
+                    <div class="border radius-8 p-16 mb-24" id="sourceStatus">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-12">
+                            <h6 class="fw-semibold mb-0">
+                                <i class="ri-file-text-line me-1"></i> Contract source: @Model.Source.ModeLabel
+                            </h6>
+                            <span class="badge bg-primary-focus text-primary-600 border border-primary-600 px-16 py-4 radius-4">
+                                Source version @supplied.Version
+                            </span>
+                        </div>
+
+                        <dl class="row mb-0 text-sm">
+                            <dt class="col-6 col-md-4 fw-medium text-secondary-light py-4">Saved</dt>
+                            <dd class="col-6 col-md-8 py-4 mb-0">
+                                Yes, @Format.DateTime(supplied.GeneratedAt), kept unchanged
+                            </dd>
+
+                            <dt class="col-6 col-md-4 fw-medium text-secondary-light py-4">Language</dt>
+                            <dd class="col-6 col-md-8 py-4 mb-0">@(supplied.SourceLanguage ?? "not detected")</dd>
+
+                            <dt class="col-6 col-md-4 fw-medium text-secondary-light py-4">Analysis</dt>
+                            <dd class="col-6 col-md-8 py-4 mb-0">
+                                @switch (supplied.ExtractionStatus)
+                                {
+                                    case ContractExtractionStatus.Confirmed:
+                                        <text>Reviewed and confirmed</text>
+                                        break;
+                                    case ContractExtractionStatus.Analysed:
+                                        <text>Analysed — waiting for your review</text>
+                                        break;
+                                    case ContractExtractionStatus.Failed:
+                                        <text>Last attempt failed. The contract text is unaffected.</text>
+                                        break;
+                                    default:
+                                        <text>Not analysed. Optional — the contract can go ahead without it.</text>
+                                        break;
+                                }
+                            </dd>
+
+                            <dt class="col-6 col-md-4 fw-medium text-secondary-light py-4">Approval</dt>
+                            <dd class="col-6 col-md-8 py-4 mb-0">
+                                @(Model.ApprovedVersion is null
+                                    ? "No version approved yet"
+                                    : $"Version {Model.ApprovedVersion.Version} approved")
+                            </dd>
+
+                            <dt class="col-6 col-md-4 fw-medium text-secondary-light py-4">Positions</dt>
+                            <dd class="col-6 col-md-8 py-4 mb-0">
+                                @if (!Model.HasPositions)
+                                {
+                                    <text>None — optional for this contract</text>
+                                }
+                                else
+                                {
+                                    @($"{Model.Totals.PositionCount} added")
+                                }
+                            </dd>
+                        </dl>
+
+                        @if (!Model.IsLocked)
+                        {
+                            <div class="wh-actions mt-16">
+                                <button type="button" class="btn btn-outline-primary text-sm px-16 py-8 radius-8"
+                                        data-action="analyze-source" data-version="@supplied.Version">
+                                    <i class="ri-file-search-line"></i>
+                                    @(supplied.ExtractionStatus == ContractExtractionStatus.NotAnalysed
+                                        ? "Analyse this contract" : "Analyse again")
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+
                 <div class="alert alert-info radius-8 text-sm" role="note">
                     <i class="ri-information-line"></i>
-                    The assistant writes wording from the positions. It never sets or changes a price, quantity,
-                    VAT rate, discount, currency, date or duration — those come from the positions exactly as you
-                    entered them. A person must review and approve the wording before it is sent.
+                    The assistant writes wording and reads values out of supplied text. It never sets or changes a
+                    price, quantity, VAT rate, discount, currency, date or duration — those come from the positions
+                    or the supplied document exactly as they stand. A person must review and approve the wording
+                    before it is sent.
+                </div>
+
+                @* ---- review of what analysis read out of the document ---- *@
+                <div id="extractionReview" class="@(Model.Extraction is null ? "d-none" : "") border radius-8 p-16 mb-24">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-12">
+                        <h6 class="fw-semibold mb-0">What the contract says</h6>
+                        <span class="text-secondary-light text-sm">
+                            Nothing here changes the contract until you confirm it.
+                        </span>
+                    </div>
+
+                    <div id="extractionWarnings" class="d-none alert alert-warning radius-8 text-sm">
+                        <ul class="mb-0 ps-16" id="extractionWarningList"></ul>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table text-sm mb-0" id="extractionTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 22%">Field</th>
+                                    <th style="width: 30%">Value</th>
+                                    <th style="width: 30%">Read from</th>
+                                    <th style="width: 18%" class="text-end">Confirm</th>
+                                </tr>
+                            </thead>
+                            <tbody id="extractionBody"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="extractedPositionsBlock" class="d-none mt-20">
+                        <h6 class="fw-semibold mb-8">Positions found in the text</h6>
+                        <p class="text-secondary-light text-sm">
+                            Optional. Tick the ones you want as contract positions, then add them — they arrive in
+                            the list above, editable, and are only stored when you save.
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table text-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 6%"></th>
+                                        <th>Service</th>
+                                        <th class="text-end">Quantity</th>
+                                        <th class="text-end">Unit price</th>
+                                        <th class="text-end">Line total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="extractedPositionsBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="wh-actions mt-12">
+                            <button type="button" class="btn btn-outline-primary text-sm px-16 py-8 radius-8"
+                                    data-action="add-extracted-positions">
+                                <i class="ri-add-line"></i> Add the ticked positions
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (!Model.IsLocked)
+                    {
+                        <div class="wh-actions mt-16">
+                            <button type="button" class="btn btn-primary text-sm px-20 py-11 radius-8"
+                                    data-action="confirm-extraction"
+                                    data-version="@(Model.SuppliedSource?.Version ?? 0)">
+                                <i class="ri-check-line"></i> Save the confirmed values
+                            </button>
+                        </div>
+                    }
                 </div>
 
                 <div id="draftArea">
@@ -367,19 +545,29 @@
                             <button type="button" class="btn btn-outline-primary radius-8" data-action="save">
                                 <i class="ri-save-line me-1"></i> Save positions
                             </button>
-                            <button type="button" class="btn btn-primary radius-8" data-action="generate-draft">
-                                <i class="ri-magic-line me-1"></i> Generate contract draft
+
+                            @* The action names what it will actually do, which
+                               depends on what the contract is built from. It is
+                               disabled only when there is genuinely no source —
+                               not when there happen to be no positions. *@
+                            <button type="button" class="btn btn-primary radius-8" data-action="generate-draft"
+                                    disabled="@(!Model.CanGenerate)">
+                                <i class="ri-magic-line me-1"></i> @Model.Source.PrimaryActionLabel
                             </button>
                         </div>
 
                         <p class="wh-hint mt-12 mb-0" id="generateHint">
                             @if (Model.CanGenerate)
                             {
-                                <text>A draft can be generated from the positions, the supplied text, or both.</text>
+                                <text>Contract source: <strong>@Model.Source.ModeLabel</strong>.</text>
+                                @if (!Model.HasPositions)
+                                {
+                                    <text> Positions are optional for this contract.</text>
+                                }
                             }
                             else
                             {
-                                <text>Add a position or paste contract text first.</text>
+                                @Model.Source.BlockingReason
                             }
                         </p>
                     }
@@ -470,6 +658,9 @@
     </script>
     <script id="catalogServices" type="application/json">
         @Html.Raw(JsonSerializer.Serialize(Model.CatalogServices, jsonOptions))
+    </script>
+    <script id="initialExtraction" type="application/json">
+        @Html.Raw(JsonSerializer.Serialize(Model.Extraction, jsonOptions))
     </script>
     <script src="~/js/decimal-culture.js" asp-append-version="true"></script>
     <script src="~/js/pages/contracts/positions-builder.js" asp-append-version="true"></script>

@@ -51,7 +51,52 @@ namespace WitcherHub.Infrastructure.Data.Models
         {
             Catalog = 0,
             Manual = 1,
-            Quote = 2
+            Quote = 2,
+
+            /// <summary>
+            /// Read out of contract text the user supplied. Like a manual position
+            /// it has no catalog service behind it, and it additionally remembers
+            /// which supplied version it was read from.
+            /// </summary>
+            ExtractedFromContractText = 3
+        }
+
+        /// <summary>
+        /// What a contract is built from.
+        ///
+        /// Recorded on the contract rather than guessed from how many positions
+        /// happen to exist: a contract whose wording is a document the customer
+        /// supplied is legitimately a contract with no positions, and counting
+        /// rows cannot tell that apart from an unfinished one.
+        /// </summary>
+        public enum ContractSourceMode
+        {
+            Positions = 0,
+            SuppliedText = 1,
+            Hybrid = 2
+        }
+
+        /// <summary>
+        /// What a stored contract version is: text the system wrote, text a person
+        /// supplied from outside, or a supplied text a person then edited.
+        /// </summary>
+        public enum ContractDraftKind
+        {
+            Generated = 0,
+            Supplied = 1,
+            HumanEdited = 2
+        }
+
+        /// <summary>
+        /// How far a supplied contract text has got through analysis. Only
+        /// <see cref="Confirmed"/> means a person has agreed the extracted values.
+        /// </summary>
+        public enum ContractExtractionStatus
+        {
+            NotAnalysed = 0,
+            Analysed = 1,
+            Confirmed = 2,
+            Failed = 3
         }
 
         /// <summary>
