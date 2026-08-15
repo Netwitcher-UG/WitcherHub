@@ -199,8 +199,17 @@ namespace WitcherHub.Infrastructure
             services.AddSingleton<IEmailTemplateRenderer, FileEmailTemplateRenderer>();
 
             services.AddScoped<IEmailService, EmailService>();
+            // Bound from either spelling.
+            //
+            // The class says the section is "ContractTemplates"; appsettings calls
+            // it "ContractTemplateOptions". Neither is wrong on its own and
+            // together they meant the section never bound at all, so ProviderBlock
+            // silently fell back to the hard-coded default — which is the company
+            // name that gets merged into every prepared contract.
             services.Configure<ContractTemplateOptions>(
-    configuration.GetSection(ContractTemplateOptions.SectionName));
+                configuration.GetSection(ContractTemplateOptions.SectionName));
+            services.Configure<ContractTemplateOptions>(
+                configuration.GetSection("ContractTemplateOptions"));
 
             services.AddScoped<IContractDocumentGenerator, ContractDocumentGenerator>();
             services.AddScoped<IContractDraftService, ContractDraftService>();

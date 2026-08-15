@@ -45,6 +45,33 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         public ContractSourceMode SourceMode { get; set; } = ContractSourceMode.Positions;
 
+        // ---- where the contract stands, recorded rather than inferred --------
+        //
+        // Reading these off a position count and a version number is what made
+        // the screen unable to say which version was the original, which was the
+        // analysis, and which was ready to sign. Each is stored.
+
+        public ContractSourceState SourceState { get; set; } = ContractSourceState.None;
+        public ContractReviewState ReviewState { get; set; } = ContractReviewState.NotRequired;
+        public ContractPreparationState PreparationState { get; set; } = ContractPreparationState.NoPreparedDraft;
+
+        /// <summary>
+        /// The version currently approved. A pointer rather than a flag search,
+        /// so "the active contract" is one lookup and cannot come back with two
+        /// answers.
+        /// </summary>
+        public Guid? ApprovedDraftId { get; set; }
+
+        /// <summary>
+        /// The last preparation request accepted. A second request carrying the
+        /// same key returns the draft the first one made instead of making
+        /// another, so a double click cannot produce two versions.
+        /// </summary>
+        [MaxLength(64)]
+        public string? LastPreparationKey { get; set; }
+
+        public Guid? LastPreparedDraftId { get; set; }
+
         /// <summary>
         /// The agreed total when the contract names one lump sum instead of
         /// itemised services. Null means no contract-level total was agreed —
@@ -259,6 +286,20 @@ namespace WitcherHub.Infrastructure.Data.Models
         // =====================================================================
 
         public ContractDraftKind Kind { get; set; } = ContractDraftKind.Generated;
+
+        /// <summary>
+        /// Where this version stands. Separate from <see cref="Kind"/>, which is
+        /// what kind of thing it is: an approved supplied original and an
+        /// approved prepared draft are both approved and are not the same thing.
+        /// </summary>
+        public ContractDraftStatus Status { get; set; } = ContractDraftStatus.Draft;
+
+        /// <summary>
+        /// Set when a later version was approved in this one's place. The version
+        /// stays in the history — a superseded version is still the text somebody
+        /// may have signed.
+        /// </summary>
+        public DateTimeOffset? SupersededAt { get; set; }
 
         /// <summary>
         /// True for a version that must never be edited: the document exactly as

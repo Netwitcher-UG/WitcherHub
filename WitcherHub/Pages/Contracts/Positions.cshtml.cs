@@ -98,6 +98,43 @@ namespace WitcherHub.Pages.Contracts
         /// <summary>What analysis has found so far, for the review panel.</summary>
         public ContractExtractionDto? Extraction { get; private set; }
 
+        /// <summary>
+        /// The contract-level figures. A supplied contract's money lives here,
+        /// not on positions, and a null total means none was agreed rather than
+        /// a total of zero.
+        /// </summary>
+        public ContractMoneyDto Money { get; private set; } = new(null, null, "EUR", false);
+
+        public ContractSourceState SourceState { get; private set; }
+        public ContractReviewState ReviewState { get; private set; }
+        public ContractPreparationState PreparationState { get; private set; }
+
+        /// <summary>
+        /// The one action that makes sense next, from where the contract stands.
+        /// Offering every action at all times is what made it unclear which
+        /// version was the source, which the analysis, and which was ready to sign.
+        /// </summary>
+        public string NextStepHint => (SourceState, ReviewState, PreparationState) switch
+        {
+            (ContractSourceState.None, _, _) when !HasPositions =>
+                "Add a position or paste the contract text to begin.",
+            (ContractSourceState.AnalysisFailed, _, _) =>
+                "Analysis failed. Retry it, edit the text, or carry on with the original wording — none of them is required.",
+            (ContractSourceState.SuppliedTextSaved, _, _) =>
+                "Analyse the supplied contract to read its values, or prepare it straight away.",
+            (ContractSourceState.Analysed, ContractReviewState.RequiresReview, _) =>
+                "Review the extracted values and confirm the ones you agree with.",
+            (_, ContractReviewState.PartiallyConfirmed, _) =>
+                "Some values are confirmed. Confirm the rest, or prepare the contract with what you have.",
+            (_, _, ContractPreparationState.PreparedDraft) when ApprovedVersion is null =>
+                "Review the prepared draft and approve it.",
+            (_, _, ContractPreparationState.PreparedDraft) =>
+                "A version is approved. Preview the PDF or send it for signature.",
+            (_, _, ContractPreparationState.PreparationFailed) =>
+                "Preparation failed. Your source text and confirmed values are unchanged.",
+            _ => "Prepare the contract when you are ready."
+        };
+
         /// <summary>Which step the builder opens on, from what is already filled in.</summary>
         public int CurrentStep =>
             !CanGenerate ? 2
@@ -128,6 +165,12 @@ namespace WitcherHub.Pages.Contracts
             Totals = _positions.CalculateTotals(Positions, Contract.Currency ?? "EUR");
             Drafts = await _drafts.GetDraftsAsync(ContractId, ct);
             Source = await _drafts.GetSourceAsync(ContractId, ct);
+
+            var state = await _drafts.GetStateAsync(ContractId, ct);
+            SourceState = state.SourceState;
+            ReviewState = state.ReviewState;
+            PreparationState = state.PreparationState;
+            Money = state.Money;
 
             if (SuppliedSource is not null)
                 Extraction = await _drafts.GetExtractionAsync(ContractId, SuppliedSource.Version, ct);
@@ -253,9 +296,28 @@ namespace WitcherHub.Pages.Contracts
             var result = await _drafts.ConfirmExtractionAsync(
                 ContractId, request.Version, request.Extraction, ct);
 
-            return result.Succeeded
-                ? new JsonResult(new { ok = true, message = "The reviewed values were saved to the contract." })
-                : new JsonResult(new { ok = false, message = result.FailureReason });
+            if (!result.Succeeded)
+                return new JsonResult(new { ok = false, message = result.FailureReason });
+
+            // Read back from the database rather than echoing what was sent, so
+            // the message and the screen both describe what is actually stored.
+            // The old message said "Positions saved" — which was neither what this
+            // action does nor evidence that anything had been written.
+            var persisted = await _drafts.GetExtractionAsync(ContractId, request.Version, ct);
+
+            var message = result.ConfirmedFieldCount == 0
+                ? "No values were confirmed. Tick the values you agree with, then save."
+                : $"Confirmed contract values saved ({result.ConfirmedFieldCount} of {result.StatedFieldCount} stated values).";
+
+            return new JsonResult(new
+            {
+                ok = true,
+                message,
+                confirmedCount = result.ConfirmedFieldCount,
+                statedCount = result.StatedFieldCount,
+                extraction = persisted,
+                money = result.Money
+            });
         }
 
         public sealed class VersionRequest
@@ -372,7 +434,7 @@ namespace WitcherHub.Pages.Contracts
             var result = await _drafts.GenerateAsync(ContractId, new GenerateDraftOptions
             {
                 AdditionalInstructions = request?.AdditionalInstructions,
-                OverwriteApproved = request?.OverwriteApproved ?? false
+                IdempotencyKey = request?.IdempotencyKey
             }, ct);
 
             if (!result.Succeeded)
@@ -386,13 +448,35 @@ namespace WitcherHub.Pages.Contracts
                 });
             }
 
-            return new JsonResult(new { ok = true, draft = result.Draft, message = $"Draft v{result.Draft!.Version} generated." });
+            // The message names what was produced and where it stands, because
+            // "Draft generated" left the user counting versions to work out which
+            // one was the original, which the analysis, and which was ready to sign.
+            var draft = result.Draft!;
+
+            var message = result.WasAlreadyPrepared
+                ? $"{draft.KindLabel} version {draft.Version} was already created."
+                : $"{draft.KindLabel} version {draft.Version} created as a draft.";
+
+            return new JsonResult(new
+            {
+                ok = true,
+                draft,
+                version = draft.Version,
+                draftId = draft.Id,
+                message
+            });
         }
 
         public sealed class GenerateRequest
         {
             public string? AdditionalInstructions { get; set; }
-            public bool OverwriteApproved { get; set; }
+
+            /// <summary>
+            /// Sent by the browser so a double click, or a retry after a timeout,
+            /// returns the version the first request produced rather than adding
+            /// another one.
+            /// </summary>
+            public string? IdempotencyKey { get; set; }
         }
 
         public async Task<IActionResult> OnPostSaveDraftAsync(
@@ -419,16 +503,41 @@ namespace WitcherHub.Pages.Contracts
         {
             if (request is null) return BadRequestJson("No version given.");
 
-            var result = await _drafts.ApproveAsync(ContractId, request.Version, null, ct);
+            var result = await _drafts.ApproveAsync(
+                ContractId, request.Version, null, request.ConfirmReplacingApproved, ct);
 
-            return result.Succeeded
-                ? new JsonResult(new { ok = true, draft = result.Draft, message = $"Version {request.Version} approved." })
-                : new JsonResult(new { ok = false, message = result.FailureReason });
+            if (!result.Succeeded)
+            {
+                return new JsonResult(new
+                {
+                    ok = false,
+                    needsConfirmation = result.RequiresOverwriteConfirmation,
+                    message = result.FailureReason
+                });
+            }
+
+            var superseded = await _drafts.GetDraftsAsync(ContractId, ct);
+            var previous = superseded
+                .Where(d => d.Status == ContractDraftStatus.Superseded)
+                .OrderByDescending(d => d.Version)
+                .FirstOrDefault();
+
+            var message = previous is null
+                ? $"Version {request.Version} approved."
+                : $"Version {request.Version} approved. Version {previous.Version} remains in the history.";
+
+            return new JsonResult(new { ok = true, draft = result.Draft, message });
         }
 
         public sealed class ApproveRequest
         {
             public int Version { get; set; }
+
+            /// <summary>
+            /// Required only when another version is already approved. Approval is
+            /// where replacing the active version is actually decided.
+            /// </summary>
+            public bool ConfirmReplacingApproved { get; set; }
         }
 
         // ------------------------------------------------------------------

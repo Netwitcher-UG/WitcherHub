@@ -69,6 +69,36 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 hasApprovedText: drafts.Any(d => d.IsApproved));
         }
 
+        public async Task<ContractWorkflowState> GetStateAsync(
+            Guid contractId, CancellationToken ct = default)
+        {
+            var contract = await _db.Contracts
+                .AsNoTracking()
+                .Where(c => c.Id == contractId)
+                .Select(c => new
+                {
+                    c.SourceState,
+                    c.ReviewState,
+                    c.PreparationState,
+                    c.AgreedTotalNet,
+                    c.AgreedTotalVatRatePercent,
+                    c.Currency,
+                    c.PriceDeliberatelyUnspecified
+                })
+                .FirstOrDefaultAsync(ct)
+                ?? throw new NotFoundAppException("Contract not found.");
+
+            return new ContractWorkflowState(
+                contract.SourceState,
+                contract.ReviewState,
+                contract.PreparationState,
+                new ContractMoneyDto(
+                    contract.AgreedTotalNet,
+                    contract.AgreedTotalVatRatePercent,
+                    contract.Currency,
+                    contract.PriceDeliberatelyUnspecified));
+        }
+
         public async Task<ContractDraftResult> GenerateAsync(
             Guid contractId, GenerateDraftOptions options, CancellationToken ct = default)
         {
@@ -76,13 +106,14 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             var contract = await LoadAsync(contractId, ct);
 
-            var approved = contract.Drafts.FirstOrDefault(d => d.IsApproved);
-            if (approved is not null && !options.OverwriteApproved)
-            {
-                return ContractDraftResult.NeedsConfirmation(
-                    $"Version {approved.Version} has already been approved. Confirm that you want to replace the approved wording.");
-            }
-
+            // Producing a version never touches an approved one.
+            //
+            // This used to refuse outright and ask the user to confirm replacing
+            // the approved wording — before the new draft even existed, and on
+            // an operation that only ever appends. Versions accumulate: a new one
+            // is created as a Draft, the approved version stays approved and
+            // stays in the history, and the question of which is active belongs
+            // to approval, where it is actually decided.
             var positions = await _positions.GetPositionsAsync(contractId, ct);
 
             // The rule, from the one place it lives. This used to be
@@ -203,6 +234,30 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             if (supplied is null)
                 return ContractDraftResult.Failed("There is no supplied contract text to prepare.");
 
+            // A repeat of a request already carried out returns what it produced
+            // the first time. Two clicks on one button are one intention, and
+            // without this they were two versions.
+            if (!string.IsNullOrWhiteSpace(options.IdempotencyKey) &&
+                string.Equals(contract.LastPreparationKey, options.IdempotencyKey, StringComparison.Ordinal) &&
+                contract.LastPreparedDraftId is { } alreadyMade)
+            {
+                var existing = contract.Drafts.FirstOrDefault(d => d.Id == alreadyMade);
+
+                if (existing is not null)
+                {
+                    _logger.LogInformation(
+                        "Preparation request {Key} for contract {ContractId} was already carried out as v{Version}.",
+                        options.IdempotencyKey, contract.Id, existing.Version);
+
+                    return new ContractDraftResult
+                    {
+                        Succeeded = true,
+                        Draft = ToSummary(existing, null),
+                        WasAlreadyPrepared = true
+                    };
+                }
+            }
+
             var parties = await BuildPartyDetailsAsync(contract, ct);
             var confirmed = options.ConfirmedReplacements
                 .Select(r => new PartyReplacement(r.Field, r.OldValue, r.NewValue, IsPlaceholder: false))
@@ -217,6 +272,9 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 // nothing from us.
                 if (ContainsPlaceholder(supplied.DocumentMarkdown))
                 {
+                    contract.PreparationState = ContractPreparationState.PreparationFailed;
+                    await _db.SaveChangesAsync(ct);
+
                     return ContractDraftResult.Failed(
                         "The contract has placeholders to fill in, but this information is missing: " +
                         string.Join(", ", merge.MissingFields) +
@@ -224,11 +282,21 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 }
             }
 
+            // The confirmed values are folded in as a terms summary, so a prepared
+            // draft is more than a copy of the pasted text: it carries what a
+            // person actually agreed, next to the wording it was read from.
+            var confirmedTerms = await BuildConfirmedTermsBlockAsync(contract, supplied, ct);
+
+            var document = merge.Document.TrimEnd();
+
+            if (!string.IsNullOrWhiteSpace(confirmedTerms))
+                document = document + "\n\n---\n\n" + confirmedTerms;
+
             var draft = new ContractDraft
             {
                 ContractId = contract.Id,
                 Version = await NextVersionAsync(contract.Id, ct),
-                DocumentMarkdown = merge.Document.Trim(),
+                DocumentMarkdown = document.Trim(),
                 PromptVersion = null,
                 TemplateVersion = null,
                 Model = null,
@@ -237,12 +305,17 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 // tell a merged supplied document from generated wording.
                 GeneratedBy = "prepared-from-supplied",
                 GeneratedAt = DateTimeOffset.UtcNow,
-                Kind = ContractDraftKind.Generated,
+                Kind = ContractDraftKind.Prepared,
+                Status = ContractDraftStatus.Draft,
                 SourceDraftId = supplied.Id,
                 SourceLanguage = supplied.SourceLanguage
             };
 
             _db.Set<ContractDraft>().Add(draft);
+
+            contract.PreparationState = ContractPreparationState.PreparedDraft;
+            contract.LastPreparationKey = options.IdempotencyKey;
+            contract.LastPreparedDraftId = draft.Id;
 
             contract.PartySnapshot = JsonSerializer.SerializeToDocument(new
             {
@@ -263,13 +336,60 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             return new ContractDraftResult { Succeeded = true, Draft = ToSummary(draft, null) };
         }
 
+        /// <summary>
+        /// The most recent document the user supplied. Ordered by version alone:
+        /// approving a prepared draft does not make it the source, and the source
+        /// is the thing every prepared version is prepared from.
+        /// </summary>
         private static ContractDraft? LatestSupplied(Contract contract) =>
             contract.Drafts
                 .Where(d => d.Kind == ContractDraftKind.Supplied || d.GeneratedBy == "pasted")
-                .OrderByDescending(d => d.IsApproved)
-                .ThenByDescending(d => d.Version)
+                .OrderByDescending(d => d.Version)
                 .FirstOrDefault()
-            ?? contract.Drafts.OrderByDescending(d => d.Version).FirstOrDefault();
+            ?? contract.Drafts.OrderBy(d => d.Version).FirstOrDefault();
+
+        /// <summary>
+        /// The confirmed commercial facts, written out for the prepared document.
+        ///
+        /// Only values a person ticked appear. An unconfirmed reading is a
+        /// reading, and putting it into the contract would be asserting a term
+        /// nobody agreed to.
+        /// </summary>
+        private async Task<string?> BuildConfirmedTermsBlockAsync(
+            Contract contract, ContractDraft supplied, CancellationToken ct)
+        {
+            var extraction = await GetExtractionAsync(contract.Id, supplied.Version, ct);
+            if (extraction is null) return null;
+
+            var lines = new List<string>();
+
+            void Add(string label, ExtractedValue value)
+            {
+                if (value.Confirmed && value.HasValue)
+                    lines.Add($"- **{label}:** {value.Value!.Trim()}");
+            }
+
+            Add("Vertragsart", extraction.ContractType);
+            Add("Laufzeitbeginn", extraction.StartDate);
+            Add("Laufzeitende", extraction.EndDate);
+            Add("Laufzeit", extraction.Duration);
+            Add("Verlängerung", extraction.RenewalRules);
+            Add("Kündigungsfrist", extraction.TerminationNotice);
+            Add("Gesamtpreis", extraction.TotalPrice);
+            Add("Währung", extraction.Currency);
+            Add("Umsatzsteuer", extraction.VatRate);
+            Add("Steuerliche Behandlung", extraction.VatTreatment);
+            Add("Rabatte", extraction.Discounts);
+            Add("Abrechnungszyklus", extraction.BillingCycle);
+            Add("Zahlungsplan", extraction.PaymentSchedule);
+            Add("Fälligkeit", extraction.PaymentDueDates);
+            Add("Anzahlung", extraction.Deposit);
+            Add("Wiederkehrende Beträge", extraction.RecurringCharges);
+
+            if (lines.Count == 0) return null;
+
+            return "## Bestätigte Vertragsdaten\n\n" + string.Join("\n", lines);
+        }
 
         private static bool ContainsPlaceholder(string document) =>
             document.Contains("[COMPANY", StringComparison.OrdinalIgnoreCase) ||
@@ -360,6 +480,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 GeneratedBy = source,
                 GeneratedAt = DateTimeOffset.UtcNow,
                 Kind = ContractDraftKind.Supplied,
+                Status = ContractDraftStatus.Draft,
                 IsImmutableSource = true,
                 SourceLanguage = DetectLanguage(documentText),
                 ExtractionStatus = ContractExtractionStatus.NotAnalysed
@@ -372,6 +493,9 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             contract.SourceMode = contract.Items.Count > 0
                 ? ContractSourceMode.Hybrid
                 : ContractSourceMode.SuppliedText;
+
+            contract.SourceState = ContractSourceState.SuppliedTextSaved;
+            contract.ReviewState = ContractReviewState.RequiresReview;
 
             await _db.SaveChangesAsync(ct);
 
@@ -417,22 +541,47 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         }
 
         public async Task<ContractDraftResult> ApproveAsync(
-            Guid contractId, int version, Guid? approvedById, CancellationToken ct = default)
+            Guid contractId,
+            int version,
+            Guid? approvedById,
+            bool confirmReplacingApproved = false,
+            CancellationToken ct = default)
         {
             var contract = await LoadAsync(contractId, ct);
 
             var draft = contract.Drafts.FirstOrDefault(d => d.Version == version)
                 ?? throw new NotFoundAppException("Draft not found.");
 
-            // Only one approved version at a time: two would leave it ambiguous
-            // which text a signature applies to.
-            foreach (var other in contract.Drafts.Where(d => d.IsApproved && d.Version != version))
+            var previouslyApproved = contract.Drafts
+                .Where(d => d.IsApproved && d.Version != version)
+                .ToList();
+
+            // Approving over an existing approval is the decision that changes
+            // which text is active, so this is where it is confirmed. It used to
+            // be asked on preparation, which only ever appends a version and
+            // replaces nothing.
+            if (previouslyApproved.Count > 0 && !confirmReplacingApproved)
+            {
+                var current = previouslyApproved.OrderByDescending(d => d.ApprovedAt).First();
+
+                return ContractDraftResult.NeedsConfirmation(
+                    $"Version {current.Version} is already approved. Approving version {version} will make it " +
+                    $"the active version. Version {current.Version} stays in the history.");
+            }
+
+            // The previous approval is superseded, not erased. A superseded
+            // version is still the text somebody may have signed, so it keeps its
+            // approval date and its hash and merely stops being the active one.
+            foreach (var other in previouslyApproved)
             {
                 other.IsApproved = false;
-                other.ApprovedAt = null;
+                other.Status = ContractDraftStatus.Superseded;
+                other.SupersededAt = DateTimeOffset.UtcNow;
             }
 
             draft.IsApproved = true;
+            draft.Status = ContractDraftStatus.Approved;
+            draft.SupersededAt = null;
             draft.ApprovedAt = DateTimeOffset.UtcNow;
             draft.ApprovedById = approvedById;
             draft.DocumentHash = Sha256(draft.DocumentMarkdown);
@@ -440,12 +589,14 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             // The approved wording becomes the contract's terms, which is what the
             // signing page and the PDF read from.
             contract.Terms = draft.DocumentMarkdown;
+            contract.ApprovedDraftId = draft.Id;
 
             await _db.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Draft v{Version} approved for contract {ContractId}. Hash {Hash}.",
-                version, contractId, draft.DocumentHash);
+                "Draft v{Version} approved for contract {ContractId}. Hash {Hash}. Superseded: {Superseded}.",
+                version, contractId, draft.DocumentHash,
+                previouslyApproved.Count == 0 ? "none" : string.Join(", ", previouslyApproved.Select(d => d.Version)));
 
             return new ContractDraftResult { Succeeded = true, Draft = ToSummary(draft, null) };
         }
@@ -460,15 +611,21 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         public async Task<ContractAnalysisResult> AnalyzeAsync(
             Guid contractId, int version, CancellationToken ct = default)
         {
-            var draft = await _db.Set<ContractDraft>()
-                .FirstOrDefaultAsync(d => d.ContractId == contractId && d.Version == version, ct)
+            var contract = await LoadAsync(contractId, ct);
+
+            var draft = contract.Drafts.FirstOrDefault(d => d.Version == version)
                 ?? throw new NotFoundAppException("Draft not found.");
 
             var result = await _analyzer.AnalyzeAsync(draft.DocumentMarkdown, draft.SourceLanguage, ct);
 
             if (!result.Succeeded)
             {
+                // A failed reading is recorded as a failed reading. The document
+                // itself is untouched and remains the contract's source, so the
+                // user can carry on with the original text.
                 draft.ExtractionStatus = ContractExtractionStatus.Failed;
+                contract.SourceState = ContractSourceState.AnalysisFailed;
+
                 await _db.SaveChangesAsync(ct);
                 return result;
             }
@@ -479,6 +636,9 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             if (result.Extraction!.Language.HasValue)
                 draft.SourceLanguage = result.Extraction.Language.Value;
+
+            contract.SourceState = ContractSourceState.Analysed;
+            contract.ReviewState = ContractReviewState.RequiresReview;
 
             await _db.SaveChangesAsync(ct);
 
@@ -526,9 +686,24 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             var draft = contract.Drafts.FirstOrDefault(d => d.Version == version)
                 ?? throw new NotFoundAppException("Draft not found.");
 
+            // Everything reviewed is stored, confirmed or not, together with which
+            // fields were ticked. A field the user cleared or corrected has to
+            // survive a reload, and the confirmation flags are the record of what
+            // a person actually agreed to.
             draft.ExtractedTerms = JsonSerializer.SerializeToDocument(confirmed);
-            draft.ExtractionStatus = ContractExtractionStatus.Confirmed;
             draft.ExtractionConfirmedAt = DateTimeOffset.UtcNow;
+
+            var confirmedCount = CountConfirmed(confirmed);
+            var statedCount = CountStated(confirmed);
+
+            draft.ExtractionStatus = confirmedCount > 0
+                ? ContractExtractionStatus.Confirmed
+                : ContractExtractionStatus.Analysed;
+
+            contract.ReviewState =
+                confirmedCount == 0 ? ContractReviewState.RequiresReview
+                : confirmedCount >= statedCount ? ContractReviewState.Confirmed
+                : ContractReviewState.PartiallyConfirmed;
 
             // Only confirmed values are promoted onto the contract. An unconfirmed
             // reading stays a reading: it is visible in the review screen and has
@@ -547,10 +722,22 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             }
 
             if (confirmed.Currency.Confirmed && confirmed.Currency.HasValue)
-                contract.Currency = confirmed.Currency.Value!.Trim().ToUpperInvariant();
+                contract.Currency = NormaliseCurrency(confirmed.Currency.Value!) ?? contract.Currency;
 
-            if (confirmed.PaymentSchedule.Confirmed && confirmed.PaymentSchedule.HasValue)
-                contract.PaymentTermsText = confirmed.PaymentSchedule.Value;
+            // Payment terms are the schedule, the due dates and the deposit taken
+            // together; storing only one of the three left the contract claiming
+            // terms it did not have.
+            var paymentTerms = string.Join(" · ", new[]
+                {
+                    confirmed.PaymentSchedule.Confirmed ? confirmed.PaymentSchedule.Value : null,
+                    confirmed.PaymentDueDates.Confirmed ? confirmed.PaymentDueDates.Value : null,
+                    confirmed.Deposit.Confirmed ? confirmed.Deposit.Value : null,
+                    confirmed.BillingCycle.Confirmed ? confirmed.BillingCycle.Value : null
+                }
+                .Where(v => !string.IsNullOrWhiteSpace(v)));
+
+            if (paymentTerms.Length > 0)
+                contract.PaymentTermsText = Truncate(paymentTerms, 2000);
 
             // A price that is deliberately absent is a decision, recorded as one.
             if (confirmed.PriceMissing && !confirmed.TotalPrice.HasValue)
@@ -559,19 +746,112 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 contract.PriceDeliberatelyUnspecified = confirmed.TotalPrice.Confirmed;
             }
 
-            if (confirmed.StartDate.Confirmed && DateOnly.TryParse(confirmed.StartDate.Value, out var start))
+            if (confirmed.StartDate.Confirmed && TryParseDate(confirmed.StartDate.Value, out var start))
                 contract.StartDate = start;
 
-            if (confirmed.EndDate.Confirmed && DateOnly.TryParse(confirmed.EndDate.Value, out var end))
+            if (confirmed.EndDate.Confirmed && TryParseDate(confirmed.EndDate.Value, out var end))
                 contract.EndDate = end;
 
+            // The parties as confirmed, recorded next to the ones from our records
+            // so a later reader can see which the contract was prepared against.
+            contract.PartySnapshot = JsonSerializer.SerializeToDocument(new
+            {
+                companyName = Confirmed(confirmed.ProviderName),
+                companyAddress = Confirmed(confirmed.ProviderAddress),
+                companyRepresentative = Confirmed(confirmed.ProviderRepresentative),
+                customerName = Confirmed(confirmed.CustomerName),
+                customerAddress = Confirmed(confirmed.CustomerAddress),
+                customerRepresentative = Confirmed(confirmed.CustomerRepresentative),
+                sourceVersion = version,
+                takenAt = DateTimeOffset.UtcNow
+            });
+
+            // One transaction. Nothing is reported as saved before this returns.
             await _db.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Extracted terms confirmed for contract {ContractId} v{Version}.", contractId, version);
+                "Extracted terms confirmed for contract {ContractId} v{Version}: {Confirmed} of {Stated} " +
+                "stated value(s) confirmed. Review state {ReviewState}.",
+                contractId, version, confirmedCount, statedCount, contract.ReviewState);
 
-            return new ContractDraftResult { Succeeded = true, Draft = ToSummary(draft, null) };
+            return new ContractDraftResult
+            {
+                Succeeded = true,
+                Draft = ToSummary(draft, null),
+                ConfirmedFieldCount = confirmedCount,
+                StatedFieldCount = statedCount,
+                Money = new ContractMoneyDto(
+                    contract.AgreedTotalNet,
+                    contract.AgreedTotalVatRatePercent,
+                    contract.Currency,
+                    contract.PriceDeliberatelyUnspecified)
+            };
         }
+
+        private static string? Confirmed(ExtractedValue value) =>
+            value.Confirmed && value.HasValue ? value.Value : null;
+
+        private static int CountConfirmed(ContractExtractionDto e) =>
+            AllValuesOf(e).Count(v => v.Confirmed && v.HasValue);
+
+        private static int CountStated(ContractExtractionDto e) =>
+            AllValuesOf(e).Count(v => v.HasValue);
+
+        private static IEnumerable<ExtractedValue> AllValuesOf(ContractExtractionDto e) =>
+            typeof(ContractExtractionDto).GetProperties()
+                .Where(p => p.PropertyType == typeof(ExtractedValue))
+                .Select(p => p.GetValue(e) as ExtractedValue)
+                .Where(v => v is not null)!;
+
+        /// <summary>
+        /// Currency has to be a three-letter code to be stored. "Euro", "EUR" and
+        /// "€" all reach here from real documents, and writing "Euro" into a field
+        /// the rest of the system formats as a code breaks every total after it.
+        /// </summary>
+        internal static string? NormaliseCurrency(string value)
+        {
+            var trimmed = value.Trim();
+
+            var known = trimmed.ToUpperInvariant() switch
+            {
+                "EUR" or "EURO" or "€" => "EUR",
+                "USD" or "US$" or "$" => "USD",
+                "CHF" => "CHF",
+                "GBP" or "£" => "GBP",
+                _ => null
+            };
+
+            if (known is not null) return known;
+
+            return trimmed.Length == 3 && trimmed.All(char.IsLetter)
+                ? trimmed.ToUpperInvariant()
+                : null;
+        }
+
+        /// <summary>
+        /// Accepts what German contracts actually write. DateOnly.TryParse alone
+        /// reads "01.08.2026" against the invariant culture and gets it wrong or
+        /// refuses it.
+        /// </summary>
+        internal static bool TryParseDate(string? value, out DateOnly date)
+        {
+            date = default;
+            if (string.IsNullOrWhiteSpace(value)) return false;
+
+            var text = value.Trim();
+
+            string[] formats = { "yyyy-MM-dd", "dd.MM.yyyy", "d.M.yyyy", "dd/MM/yyyy", "MM/dd/yyyy" };
+
+            return DateOnly.TryParseExact(
+                       text, formats, System.Globalization.CultureInfo.InvariantCulture,
+                       System.Globalization.DateTimeStyles.None, out date)
+                || DateOnly.TryParse(
+                       text, System.Globalization.CultureInfo.GetCultureInfo("de-DE"),
+                       System.Globalization.DateTimeStyles.None, out date);
+        }
+
+        private static string Truncate(string value, int max) =>
+            value.Length <= max ? value : value[..max];
 
         /// <summary>
         /// A cheap language guess from stopwords, used only to tell the analyser
@@ -708,7 +988,13 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                     : d.Kind,
                 IsImmutableSource = d.IsImmutableSource || d.GeneratedBy == "pasted",
                 SourceLanguage = d.SourceLanguage,
-                ExtractionStatus = d.ExtractionStatus
+                ExtractionStatus = d.ExtractionStatus,
+
+                // Rows written before the status column existed carry the fact in
+                // IsApproved, so an older approved version still reads as approved.
+                Status = d.Status == ContractDraftStatus.Draft && d.IsApproved
+                    ? ContractDraftStatus.Approved
+                    : d.Status
             };
 
         /// <summary>

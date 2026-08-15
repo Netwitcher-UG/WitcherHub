@@ -29,6 +29,14 @@
     let dirty = false;
     let busy = false;
 
+    // Held across retries of one preparation attempt, so a repeat is recognised
+    // as the same request rather than treated as a second one.
+    let preparationKey = null;
+
+    // The contract-level figures, for a contract whose money lives on the
+    // contract rather than on positions.
+    let contractMoney = readJson("contractMoney");
+
     const money = new Intl.NumberFormat("de-DE", { style: "currency", currency: defaultCurrency });
 
     const BILLING_CYCLES = ["OneTime", "Monthly", "Quarterly", "SemiAnnual", "Annual"];
@@ -344,6 +352,19 @@
     // ---------------------------------------------------------------- totals
 
     function updateTotals() {
+        // With no positions there is nothing to add up, and printing 0,00 € for a
+        // contract that names a price in its text is a claim the system has no
+        // basis for. The contract-level figures answer instead.
+        if (positions.length === 0) {
+            set("count", 0);
+            set("subtotal", contractMoney ? "—" : "0,00 €");
+            set("discount", "—");
+            set("vat", contractMoney && contractMoney.vatRatePercent !== null ? contractMoney.vatRatePercent + " %" : "—");
+
+            applyContractMoney(contractMoney);
+            return;
+        }
+
         const subtotal = positions.reduce((sum, p) => sum + lineNet(p), 0);
         const vat = positions.reduce((sum, p) => sum + lineNet(p) * ((Number(p.vatRate) || 0) / 100), 0);
 
@@ -431,15 +452,79 @@
     }
 
     // Guards against a double click producing two saves.
+    //
+    // The button always comes back. It used to stay on "Working…" whenever the
+    // work awaited something that never returned on its own — a modal dialog, or
+    // a request with no timeout — so the page looked permanently busy.
     async function guard(button, work) {
         if (busy) return;
         busy = true;
+
         const label = button ? button.innerHTML : null;
         if (button) { button.disabled = true; button.innerHTML = "Working…"; }
+
         try { await work(); }
+        catch (error) {
+            // An unhandled failure has to surface as a message, not as a button
+            // that never comes back.
+            toast("error", "Something failed before the server answered. Nothing was changed.");
+            if (window.console) console.error(error);
+        }
         finally {
             busy = false;
             if (button) { button.disabled = false; button.innerHTML = label; }
+        }
+    }
+
+    /// Steps out of the busy state for the duration of a prompt, then steps back
+    /// in. Waiting for a person is not work in progress.
+    async function releaseWhile(button, work) {
+        const label = button ? button.innerHTML : null;
+
+        busy = false;
+        if (button) { button.disabled = false; button.innerHTML = label; }
+
+        try { return await work(); }
+        finally {
+            busy = true;
+            if (button) { button.disabled = true; button.innerHTML = "Working…"; }
+        }
+    }
+
+    /// Shows the contract-level figures the server confirmed.
+    ///
+    /// A supplied contract with no positions has no position totals, and showing
+    /// 0,00 € for one that names a price says something false. Where no total is
+    /// agreed it says so instead.
+    function applyContractMoney(m) {
+        const totalEl = document.querySelector("[data-total='total']");
+        const noteEl = document.getElementById("contractTotalNote");
+
+        if (!m || !totalEl) return;
+
+        if (m.agreedTotalNet === null || m.agreedTotalNet === undefined) {
+            if (positions.length === 0) {
+                totalEl.textContent = "Not specified";
+                if (noteEl) {
+                    noteEl.textContent = m.priceDeliberatelyUnspecified
+                        ? "Confirmed: this contract deliberately names no price."
+                        : "No total is stated in the supplied contract.";
+                    noteEl.classList.remove("d-none");
+                }
+            }
+            return;
+        }
+
+        const fmt = new Intl.NumberFormat("de-DE", {
+            style: "currency",
+            currency: m.currency || defaultCurrency
+        });
+
+        totalEl.textContent = fmt.format(m.agreedTotalNet);
+
+        if (noteEl) {
+            noteEl.textContent = "Contract-level total from the supplied contract.";
+            noteEl.classList.remove("d-none");
         }
     }
 
@@ -640,44 +725,50 @@
         }
 
         if (action === "generate-draft") {
+            // Unsaved positions are saved first rather than refused.
+            //
+            // This used to stop and say "Save your positions first". With no
+            // positions there was nothing to save, and saving zero positions was
+            // itself refused, so a contract built from pasted text sat in a loop
+            // it could not leave. The save is silent: the user pressed "prepare",
+            // and reporting "Positions saved" for it described neither what they
+            // asked for nor what the action does.
+            if (dirty) {
+                const saved = await post("Save", positions);
+
+                if (!saved.ok) {
+                    if (saved.errors) showErrors(saved.errors);
+                    toast("error", saved.message || "The positions could not be saved.");
+                    return;
+                }
+
+                dirty = false;
+                applyServerTotals(saved.totals);
+            }
+
+            // One key per attempt. A second click, or a retry after a timeout,
+            // carries the same key and gets back the version the first request
+            // made instead of adding another one.
+            preparationKey = preparationKey || cryptoId();
+
             await guard(button, async () => {
-                // Unsaved positions are saved first rather than refused.
-                //
-                // This used to be "if (dirty) stop and say 'Save your positions
-                // first'". With no positions there was nothing to save, and
-                // saving zero positions was itself refused — so a contract built
-                // from pasted text sat in a loop it could not leave. Unsaved work
-                // is a reason to save, not a reason to refuse.
-                if (dirty) {
-                    const saved = await post("Save", positions);
-
-                    if (!saved.ok) {
-                        if (saved.errors) showErrors(saved.errors);
-                        toast("error", saved.message || "The positions could not be saved.");
-                        return;
-                    }
-
-                    dirty = false;
-                    applyServerTotals(saved.totals);
-                }
-
-                let result = await post("GenerateDraft", { overwriteApproved: false });
-
-                if (!result.ok && result.needsConfirmation) {
-                    const replace = await confirmDialog(
-                        result.message + "\n\nReplace the approved wording?", "Replace approved wording");
-
-                    if (!replace) return;
-
-                    result = await post("GenerateDraft", { overwriteApproved: true });
-                }
+                const result = await post("GenerateDraft", { idempotencyKey: preparationKey });
 
                 if (!result.ok) {
-                    showFailure(result, "Could not prepare the contract.");
+                    // Preparation appends a version and replaces nothing, so it
+                    // has nothing to confirm. Anything it refuses is a real
+                    // failure, reported as one.
+                    showFailure(result, "The contract could not be prepared.");
+                    if (result.transient) offerRetry(button);
+                    preparationKey = null;
                     return;
                 }
 
                 toast("success", result.message);
+
+                // The new version is a draft awaiting review, so the user is taken
+                // to it rather than left to find it.
+                window.location.hash = "version-" + result.version;
                 window.location.reload();
             });
         }
@@ -713,10 +804,25 @@
 
                 const result = await post("ConfirmExtraction", { version, extraction });
 
-                if (!result.ok) { toast("error", result.message || "Could not save the confirmed values."); return; }
+                if (!result.ok) {
+                    // Every edit stays on screen. Losing a review because a save
+                    // failed would mean doing the whole thing again.
+                    toast("error", result.message || "The confirmed values could not be saved.");
+                    return;
+                }
 
-                toast("success", result.message);
-                window.location.reload();
+                // Refreshed from what the server stored, not from what was sent —
+                // the message is only true of committed state, and the screen now
+                // shows the same thing a reload would.
+                if (result.extraction) {
+                    extraction = result.extraction;
+                    renderExtraction();
+                }
+
+                contractMoney = result.money;
+        applyContractMoney(contractMoney);
+
+                toast(result.confirmedCount === 0 ? "info" : "success", result.message);
             });
         }
 
@@ -780,11 +886,31 @@
 
         if (action === "approve-version") {
             const version = Number(button.dataset.version);
-            if (!window.confirm(`Approve version ${version}? This becomes the contract wording.`)) return;
+
+            // Asked before the button goes busy. Awaiting a dialog inside the
+            // busy state is what left the button reading "Working…" for as long
+            // as the dialog stood open.
+            const go = await confirmDialog(
+                `Approve version ${version}? It becomes the contract wording.`, "Approve version");
+
+            if (!go) return;
 
             await guard(button, async () => {
-                const result = await post("ApproveDraft", { version });
-                if (!result.ok) { toast("error", result.message); return; }
+                let result = await post("ApproveDraft", { version, confirmReplacingApproved: false });
+
+                if (!result.ok && result.needsConfirmation) {
+                    // Only here does anything become inactive, and the message says
+                    // what happens to the version being replaced.
+                    const replace = await releaseWhile(button, () =>
+                        confirmDialog(result.message, "Approve this version"));
+
+                    if (!replace) return;
+
+                    result = await post("ApproveDraft", { version, confirmReplacingApproved: true });
+                }
+
+                if (!result.ok) { toast("error", result.message || "Could not approve this version."); return; }
+
                 toast("success", result.message);
                 window.location.reload();
             });

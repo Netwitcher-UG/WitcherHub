@@ -476,32 +476,58 @@
                             @foreach (var d in Model.Drafts)
                             {
                                 <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2 px-0"
-                                    data-version="@d.Version">
+                                    id="version-@d.Version" data-version="@d.Version">
                                     <span>
                                         <strong>Version @d.Version</strong>
+
+                                        @* What kind of version this is, and where it stands. Two
+                                           separate facts: an approved supplied original and an
+                                           approved prepared draft are both approved and are not
+                                           the same thing. Showing only a date left it impossible
+                                           to tell the source from the analysis from the draft
+                                           that was ready to sign. *@
+                                        <span class="badge bg-neutral-200 text-neutral-600 px-12 py-2 radius-4 ms-2">
+                                            @d.KindLabel
+                                        </span>
+
                                         <span class="text-secondary-light text-sm ms-2">
                                             @Format.DateTime(d.GeneratedAt)
-                                            @if (string.Equals(d.GeneratedBy, "pasted", StringComparison.OrdinalIgnoreCase))
-                                            {
-                                                <text> · supplied text</text>
-                                            }
-                                            else if (!string.IsNullOrWhiteSpace(d.Model))
+                                            @if (!string.IsNullOrWhiteSpace(d.Model))
                                             {
                                                 <text> · @d.Model</text>
                                             }
+                                            @if (d.IsImmutableSource)
+                                            {
+                                                <text> · kept unchanged</text>
+                                            }
                                         </span>
                                     </span>
-                                    @if (d.IsApproved)
-                                    {
-                                        <span class="badge bg-success-focus text-success-main border border-success-main px-16 py-4 radius-4">Approved</span>
-                                    }
-                                    else if (!Model.IsLocked)
-                                    {
-                                        <button type="button" class="btn btn-sm btn-outline-primary radius-8"
-                                                data-action="approve-version" data-version="@d.Version">
-                                            Approve
-                                        </button>
-                                    }
+                                    <span class="d-inline-flex align-items-center gap-2">
+                                        @switch (d.Status)
+                                        {
+                                            case ContractDraftStatus.Approved:
+                                                <span class="badge bg-success-focus text-success-main border border-success-main px-16 py-4 radius-4">Approved</span>
+                                                break;
+                                            case ContractDraftStatus.Superseded:
+                                                @* Superseded, not deleted: it is still the text somebody may have signed. *@
+                                                <span class="badge bg-neutral-200 text-neutral-600 px-16 py-4 radius-4">Superseded</span>
+                                                break;
+                                            case ContractDraftStatus.Signed:
+                                                <span class="badge bg-success-focus text-success-main border border-success-main px-16 py-4 radius-4">Signed</span>
+                                                break;
+                                            default:
+                                                <span class="badge bg-warning-focus text-warning-main border border-warning-main px-16 py-4 radius-4">Draft</span>
+                                                break;
+                                        }
+
+                                        @if (!Model.IsLocked && d.Status != ContractDraftStatus.Approved)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-primary radius-8"
+                                                    data-action="approve-version" data-version="@d.Version">
+                                                Approve
+                                            </button>
+                                        }
+                                    </span>
                                 </li>
                             }
                         </ul>
@@ -536,15 +562,52 @@
 
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="fw-semibold">Total</span>
-                        <span class="fs-5 fw-bold" data-total="total">—</span>
+                        <span class="fs-5 fw-bold" data-total="total">
+                            @if (!Model.HasPositions && Model.Money.AgreedTotalNet is null)
+                            {
+                                @* 0,00 € for a contract whose text names a price is a claim
+                                   the system has no basis for. *@
+                                <text>Not specified</text>
+                            }
+                            else if (!Model.HasPositions)
+                            {
+                                @Format.Money(Model.Money.AgreedTotalNet!.Value, Model.Money.Currency)
+                            }
+                            else
+                            {
+                                <text>—</text>
+                            }
+                        </span>
                     </div>
+
+                    <p class="wh-hint mt-8 mb-0 @(Model.HasPositions ? "d-none" : "")" id="contractTotalNote">
+                        @if (Model.Money.AgreedTotalNet is not null)
+                        {
+                            <text>Contract-level total from the supplied contract.</text>
+                        }
+                        else if (Model.Money.PriceDeliberatelyUnspecified)
+                        {
+                            <text>Confirmed: this contract deliberately names no price.</text>
+                        }
+                        else
+                        {
+                            <text>No total is stated in the supplied contract.</text>
+                        }
+                    </p>
 
                     @if (!Model.IsLocked)
                     {
                         <div class="d-grid gap-2 mt-20">
-                            <button type="button" class="btn btn-outline-primary radius-8" data-action="save">
-                                <i class="ri-save-line me-1"></i> Save positions
-                            </button>
+                            @* Offered only when there are positions to save. On a
+                               supplied-text contract with none, it is an action
+                               with nothing to act on — and the builder used to
+                               insist on it before it would do anything else. *@
+                            @if (Model.HasPositions)
+                            {
+                                <button type="button" class="btn btn-outline-primary radius-8" data-action="save">
+                                    <i class="ri-save-line me-1"></i> Save positions
+                                </button>
+                            }
 
                             @* The action names what it will actually do, which
                                depends on what the contract is built from. It is
@@ -554,6 +617,11 @@
                                     disabled="@(!Model.CanGenerate)">
                                 <i class="ri-magic-line me-1"></i> @Model.Source.PrimaryActionLabel
                             </button>
+                        </div>
+
+                        @* What to do next, from where the contract actually stands. *@
+                        <div class="alert alert-info radius-8 text-sm mt-16 mb-0" id="nextStep">
+                            <i class="ri-guide-line me-1"></i> @Model.NextStepHint
                         </div>
 
                         <p class="wh-hint mt-12 mb-0" id="generateHint">
@@ -658,6 +726,9 @@
     </script>
     <script id="catalogServices" type="application/json">
         @Html.Raw(JsonSerializer.Serialize(Model.CatalogServices, jsonOptions))
+    </script>
+    <script id="contractMoney" type="application/json">
+        @Html.Raw(JsonSerializer.Serialize(Model.Money, jsonOptions))
     </script>
     <script id="initialExtraction" type="application/json">
         @Html.Raw(JsonSerializer.Serialize(Model.Extraction, jsonOptions))
