@@ -8,7 +8,36 @@ namespace WitcherHub.Infrastructure.Data.Models
     public class Enums
     {
         public enum CustomerType { Individual, Company }
-        public enum ProjectStatus { Draft, Active, Closed, Cancelled, Waiting }
+        /// <summary>
+        /// A project's own lifecycle, and nothing else's.
+        ///
+        /// This is set by a person deciding where the project stands. It is never
+        /// written by a quote or a contract changing state: those have their own
+        /// statuses, and a draft contract inside a draft project is two draft
+        /// things, not one ambiguous one.
+        ///
+        /// Waiting is gone. It meant "a document exists but has not been agreed",
+        /// which is a fact about the document, and using it as a project status is
+        /// what made the project list and the project page disagree — and what
+        /// made a project the user had just created refuse to be deleted.
+        /// </summary>
+        public enum ProjectStatus
+        {
+            /// <summary>Being set up. Nothing has been committed to the customer.</summary>
+            Draft = 0,
+
+            /// <summary>Work is live.</summary>
+            Active = 1,
+
+            /// <summary>Finished.</summary>
+            Closed = 2,
+
+            /// <summary>Abandoned.</summary>
+            Cancelled = 3,
+
+            /// <summary>Paused, expected to resume. Replaces the old Waiting.</summary>
+            OnHold = 4
+        }
 
         // حالة الوثائق (نستخدمها للـ Quote/Contract/Invoice)
         public enum DocumentStatus

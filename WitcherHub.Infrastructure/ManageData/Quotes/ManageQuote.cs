@@ -290,7 +290,6 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
                 }
 
                 ApplyDerivedRecurringState(quote);
-                project.Status = GetProjectStatusAfterQuoteState(quote.Status);
                 await quotesRepo.AddAsync(quote, ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
@@ -370,7 +369,7 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
 
             ApplyDerivedRecurringState(quote);
             if (IsQuoteSignedOrAccepted(quote.Status))
-                await SetProjectStatusAsync(quote.ProjectId, ProjectStatus.Active, ct);
+                await ActivateProjectOnAcceptanceAsync(quote.ProjectId, ct);
             await _unitOfWork.SaveChangesAsync(ct);
 
             await InvalidateAfterQuoteChangeAsync(id, ct);
@@ -1187,10 +1186,15 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
         private static bool IsQuoteSignedOrAccepted(DocumentStatus status)
     => status is DocumentStatus.Signed or DocumentStatus.Accepted;
 
-        private static ProjectStatus GetProjectStatusAfterQuoteState(DocumentStatus status)
-            => IsQuoteSignedOrAccepted(status) ? ProjectStatus.Active : ProjectStatus.Waiting;
+        // A quote no longer writes the project's status either. See the note in
+        // ManageContract: a document's state is the document's, and using it as
+        // the project's is what made the two disagree.
 
-        private async Task SetProjectStatusAsync(Guid projectId, ProjectStatus status, CancellationToken ct)
+        /// <summary>
+        /// Promotes a still-draft project to Active when a quote is accepted.
+        /// Never moves a project a person has already placed deliberately.
+        /// </summary>
+        private async Task ActivateProjectOnAcceptanceAsync(Guid projectId, CancellationToken ct)
         {
             var projectsRepo = _unitOfWork.Repo<Project>();
 
@@ -1200,7 +1204,8 @@ namespace WitcherHub.Infrastructure.ManageData.Quotes
             if (project is null)
                 throw new NotFoundAppException("Project not found.");
 
-            project.Status = status;
+            if (project.Status is ProjectStatus.Draft)
+                project.Status = ProjectStatus.Active;
         }
         private async Task<string> GenerateQuoteNoAsync(IRepository<Quote> repo, CancellationToken ct)
         {

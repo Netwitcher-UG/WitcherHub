@@ -487,30 +487,22 @@ namespace WitcherHub.Pages
         private static Microsoft.AspNetCore.Html.IHtmlContent Html(string? text)
             => new Microsoft.AspNetCore.Html.HtmlString(System.Text.Encodings.Web.HtmlEncoder.Default.Encode(text ?? ""));
 
+        /// <summary>
+        /// The project status badge, from the one map that defines them.
+        ///
+        /// This page used to carry its own copy — different colours from the rest
+        /// of the application for the same status, and a second place to forget
+        /// when the vocabulary changed.
+        /// </summary>
         private static Microsoft.AspNetCore.Html.IHtmlContent StatusBadge(ProjectStatus st)
         {
-            var (cls, txt) = st switch
-            {
-                ProjectStatus.Active =>
-                    ("badge bg-success bg-opacity-10 text-success", "Active"),
+            var presentation = DocumentStatusPresentation.ForProject(st);
 
-                ProjectStatus.Waiting =>
-                    ("badge bg-info bg-opacity-10 text-info", "Waiting"),
-
-                ProjectStatus.Closed =>
-                    ("badge bg-secondary bg-opacity-10 text-secondary", "Closed"),
-
-                ProjectStatus.Cancelled =>
-                    ("badge bg-danger bg-opacity-10 text-danger", "Cancelled"),
-
-                ProjectStatus.Draft =>
-                    ("badge bg-warning bg-opacity-10 text-warning", "Draft"),
-
-                _ =>
-                    ("badge bg-warning bg-opacity-10 text-warning", st.ToString())
-            };
-
-            return new Microsoft.AspNetCore.Html.HtmlString($"<span class='{cls}'>{txt}</span>");
+            return new Microsoft.AspNetCore.Html.HtmlString(
+                $"<span class='badge bg-{presentation.Tone}-focus text-{presentation.Tone}-main " +
+                $"border border-{presentation.Tone}-main px-16 py-4 radius-4'>" +
+                System.Text.Encodings.Web.HtmlEncoder.Default.Encode(presentation.Label) +
+                "</span>");
         }
 
         private static Microsoft.AspNetCore.Html.IHtmlContent CountsBadge(int quotes, int invoices)
