@@ -1,6 +1,9 @@
 @page
 @using Microsoft.AspNetCore.Authorization
 @using WitcherHub.Domain.SeedData
+@using WitcherHub.Domain.Projects
+@using WitcherHub.Pages.Models.UI
+@using static WitcherHub.Infrastructure.Data.Models.Enums
 @attribute [Authorize(Policy = AppPolicyPrefixes.Permission + AppPermissions.ManageNetwitcher)]
 @model WitcherHub.Pages.ProjectsModel
 
@@ -8,98 +11,304 @@
     ViewData["Title"] = "Projects";
 }
 
-<div id="projectsTableCard" class="wh-tablecard-scroll">
-    <partial name="_TableCard" model="Model.ProjectsTable" />
+@*
+    The projects list.
+
+    Rewritten from a generic table card that built its cells as HTML strings in
+    the page model, wrapped in a scroller with `min-width: 1100px` and
+    `white-space: nowrap`. That combination forced horizontal scrolling on any
+    ordinary desktop window before a single column had been read.
+
+    This one prioritises instead of scrolling. The project and the customer are
+    always visible; dates and document progress drop away as the window narrows
+    and reappear beneath the title where they still matter. Secondary actions
+    live in a menu rather than as a row of identical outline buttons.
+*@
+
+<div class="wh-section d-flex flex-wrap align-items-start justify-content-between gap-3">
+    <div>
+        <h4 class="mb-4 fw-semibold">Projects</h4>
+        <p class="text-secondary-light mb-0 text-sm">
+            A project holds the quotes, contracts and invoices for one piece of work.
+        </p>
+    </div>
+
+    <div class="wh-actions">
+        <button type="button" class="btn btn-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2"
+                data-bs-toggle="modal" data-bs-target="#FormModal">
+            <i class="ri-add-line"></i> New project
+        </button>
+    </div>
 </div>
+
+@* ---------------------------------------------------------------- filters *@
+<form method="get" class="wh-section card radius-12 border">
+    <div class="card-body d-flex flex-wrap align-items-end gap-3">
+        <div class="flex-grow-1" style="min-width: 14rem">
+            <label class="form-label text-sm" for="q">Search</label>
+            <div class="position-relative">
+                <input type="search" id="q" name="q" value="@Model.Search" class="form-control radius-8 ps-40"
+                       placeholder="Project, customer or email" />
+                <i class="ri-search-line position-absolute top-50 translate-middle-y ms-16 text-secondary-light"></i>
+            </div>
+        </div>
+
+        <div style="min-width: 11rem">
+            <label class="form-label text-sm" for="status">Project status</label>
+            <select id="status" name="status" class="form-select radius-8">
+                <option value="">Any status</option>
+                @foreach (var value in Enum.GetValues<ProjectStatus>())
+                {
+                    <option value="@value" selected="@(Model.Status == value)">
+                        @DocumentStatusPresentation.ForProject(value).Label
+                    </option>
+                }
+            </select>
+        </div>
+
+        <div class="form-check d-flex align-items-center gap-2 pb-8">
+            <input class="form-check-input" type="checkbox" id="includeArchived" name="includeArchived"
+                   value="true" checked="@Model.IncludeArchived" />
+            <label class="form-check-label text-sm mb-0" for="includeArchived">Include archived</label>
+        </div>
+
+        <div class="wh-actions">
+            <button type="submit" class="btn btn-outline-primary text-sm px-20 py-11 radius-8">Apply</button>
+            @if (!string.IsNullOrWhiteSpace(Model.Search) || Model.Status is not null || Model.IncludeArchived)
+            {
+                <a asp-page="/Projects" class="btn btn-outline-secondary text-sm px-20 py-11 radius-8">Clear</a>
+            }
+        </div>
+    </div>
+</form>
+
+@* ------------------------------------------------------------------ list *@
+<div class="card radius-12 border wh-section">
+    <div class="card-body p-0">
+        @if (Model.Projects.Count == 0)
+        {
+            <div class="p-24">
+                <partial name="_EmptyState" model="@(new EmptyStateVm
+                       {
+                           Title = Model.HasFilters ? "No projects match those filters" : "No projects yet",
+                           Message = Model.HasFilters
+                               ? "Try a different search, or clear the filters to see everything."
+                               : "A project is where a customer's quotes, contracts and invoices live. Create one to begin.",
+                           Icon = "ri-briefcase-line",
+                           Actions = Model.HasFilters
+                               ? [new EmptyStateAction { Text = "Clear filters", Url = Url.Page("/Projects") ?? "/Projects", Icon = "ri-filter-off-line" }]
+                               : []
+                       })" />
+            </div>
+        }
+        else
+        {
+            <table class="table wh-projects-table mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">Project</th>
+                        <th scope="col" class="wh-col-status">Status</th>
+                        <th scope="col" class="wh-col-progress">Progress</th>
+                        <th scope="col" class="wh-col-dates">Dates</th>
+                        <th scope="col" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var project in Model.Projects)
+                    {
+                        var status = DocumentStatusPresentation.ForProject(project.Status);
+
+                        <tr class="@(project.IsArchived ? "wh-row-archived" : "")">
+                            @* Project and customer: never hidden, at any width. *@
+                            <td>
+                                <a asp-page="/Projects/Workspace" asp-route-id="@project.Id"
+                                   class="fw-semibold text-primary-600 d-block text-truncate" style="max-width: 22rem">
+                                    @project.Title
+                                </a>
+
+                                <span class="text-secondary-light text-sm d-block text-truncate" style="max-width: 22rem">
+                                    @project.CustomerName
+                                </span>
+
+                                @* What the dropped columns were carrying, folded
+                                   back in where the window is too narrow for them. *@
+                                <span class="wh-row-secondary text-sm text-secondary-light">
+                                    @Format.Date(project.StartDate) — @Format.Date(project.EndDate)
+                                </span>
+                            </td>
+
+                            <td class="wh-col-status">
+                                <span class="badge bg-@status.Tone-focus text-@status.Tone-main border border-@status.Tone-main px-16 py-4 radius-4">
+                                    @status.Label
+                                </span>
+
+                                @if (project.IsArchived)
+                                {
+                                    <span class="badge bg-neutral-200 text-neutral-600 px-12 py-2 radius-4 mt-4 d-inline-block">
+                                        Archived
+                                    </span>
+                                }
+                            </td>
+
+                            @* The documents' own states, beside the project's own
+                               status rather than merged into it. *@
+                            <td class="wh-col-progress">
+                                <div class="d-flex flex-column gap-1">
+                                    <partial name="_ProjectProgress" model="ProjectProgressVm.Quote(project.QuoteProgress)" />
+                                    <partial name="_ProjectProgress" model="ProjectProgressVm.Contract(project.ContractProgress)" />
+                                    <partial name="_ProjectProgress" model="ProjectProgressVm.Invoice(project.InvoiceProgress)" />
+                                </div>
+                            </td>
+
+                            <td class="wh-col-dates text-sm text-secondary-light">
+                                <span class="d-block">@Format.Date(project.StartDate)</span>
+                                <span class="d-block">@Format.Date(project.EndDate)</span>
+                            </td>
+
+                            @* One obvious action, everything else behind a menu —
+                               rather than five outline buttons of equal weight. *@
+                            <td class="text-end">
+                                <div class="d-inline-flex align-items-center gap-2">
+                                    <a asp-page="/Projects/Workspace" asp-route-id="@project.Id"
+                                       class="btn btn-outline-primary btn-sm radius-8">Open</a>
+
+                                    <div class="dropdown">
+                                        <button class="btn btn-outline-secondary btn-sm radius-8" type="button"
+                                                data-bs-toggle="dropdown" aria-expanded="false"
+                                                aria-label="More actions for @project.Title">
+                                            <i class="ri-more-2-fill"></i>
+                                        </button>
+
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li>
+                                                <a class="dropdown-item" asp-page="/Projects/Workspace"
+                                                   asp-route-id="@project.Id" asp-route-tab="contracts">
+                                                    <i class="ri-file-text-line me-2"></i> Contracts
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" asp-page="/Clients/Details"
+                                                   asp-route-id="@project.CustomerId">
+                                                    <i class="ri-user-line me-2"></i> View customer
+                                                </a>
+                                            </li>
+
+                                            <li><hr class="dropdown-divider"></li>
+
+                                            @if (project.IsArchived)
+                                            {
+                                                <li>
+                                                    <button type="button" class="dropdown-item"
+                                                            data-action="restore-project" data-project-id="@project.Id">
+                                                        <i class="ri-inbox-unarchive-line me-2"></i> Restore
+                                                    </button>
+                                                </li>
+                                            }
+                                            else
+                                            {
+                                                <li>
+                                                    <button type="button" class="dropdown-item"
+                                                            data-action="archive-project" data-project-id="@project.Id"
+                                                            data-project-title="@project.Title">
+                                                        <i class="ri-archive-line me-2"></i> Archive
+                                                    </button>
+                                                </li>
+                                            }
+
+                                            @* Destructive, separated and last. *@
+                                            <li>
+                                                <button type="button" class="dropdown-item text-danger-main"
+                                                        data-action="delete-project" data-project-id="@project.Id"
+                                                        data-project-title="@project.Title">
+                                                    <i class="ri-delete-bin-line me-2"></i> Delete permanently
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@if (Model.Pager is { TotalPages: > 1 })
+{
+    <partial name="_RegisterPager" model="Model.Pager" />
+}
 
 <partial name="~/Pages/Shared/Modals/_ModalShell.cshtml" model="Model.CreateProjectModal" />
 
-<form id="tblDeleteForm" method="post" asp-page-handler="DeleteProject" class="d-none">
+@* Archive and restore: ordinary, non-destructive, one confirmation. *@
+<form id="archiveProjectForm" method="post" asp-page-handler="ArchiveProject" class="d-none">
     @Html.AntiForgeryToken()
-    <input type="hidden" name="projectId" id="tblDeleteProjectId" />
+    <input type="hidden" name="projectId" id="archiveProjectId" />
 </form>
 
-<input type="hidden" id="vcProjectWorkspaceUrl" value="@Url.Page("/Projects/Workspace")" />
+<form id="restoreProjectForm" method="post" asp-page-handler="RestoreProject" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="projectId" id="restoreProjectId" />
+</form>
 
-<div class="modal fade quote-confirm-modal" id="DeleteProjectConfirmModal" tabindex="-1" aria-labelledby="DeleteProjectConfirmModalLabel" aria-hidden="true">
+<form id="deleteProjectForm" method="post" asp-page-handler="DeleteProject" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="projectId" id="deleteProjectId" />
+</form>
+
+@*
+    Permanent deletion asks for the project's name to be typed.
+
+    Not friction for its own sake: this is the one action in the list that cannot
+    be undone, and it sits in the same menu as Archive, which can. Typing the
+    name makes it impossible to do by reflex.
+*@
+<div class="modal fade" id="deleteProjectModal" tabindex="-1" aria-labelledby="deleteProjectModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+        <div class="modal-content radius-12">
             <div class="modal-header">
-                <h5 class="modal-title" id="DeleteProjectConfirmModalLabel">Delete project</h5>
+                <h6 class="modal-title" id="deleteProjectModalLabel">Delete project permanently</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
             <div class="modal-body">
-                <div id="DeleteProjectConfirmModalMessage">Are you sure you want to delete this project?</div>
+                <div id="deleteProjectBlocked" class="alert alert-warning radius-8 text-sm d-none"></div>
+
+                <div id="deleteProjectAllowed" class="d-none">
+                    <p class="text-sm">This cannot be undone. The following will be deleted:</p>
+                    <ul class="text-sm" id="deleteProjectImpact"></ul>
+
+                    <p class="text-sm text-secondary-light">
+                        The customer is not affected. To keep everything and simply remove the project from
+                        this list, close this and choose <strong>Archive</strong> instead.
+                    </p>
+
+                    <label class="form-label text-sm" for="deleteProjectConfirmName">
+                        Type <strong id="deleteProjectNameEcho"></strong> to confirm
+                    </label>
+                    <input type="text" class="form-control radius-8" id="deleteProjectConfirmName" autocomplete="off" />
+                </div>
+
+                <div id="deleteProjectLoading" class="text-secondary-light text-sm">
+                    Checking what this project holds…
+                </div>
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="DeleteProjectConfirmModalSubmit">Delete</button>
+                <button type="button" class="btn btn-outline-secondary radius-8" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger radius-8" id="deleteProjectSubmit" disabled>
+                    Delete permanently
+                </button>
             </div>
         </div>
     </div>
 </div>
+
+<input type="hidden" id="deletionImpactUrl" value="@Url.Page("/Projects", "DeletionImpact")" />
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-    <script src="~/js/pages/projects/projects.js" asp-append-version="true"></script>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const params = new URLSearchParams(window.location.search);
-            const openProjectId = params.get('openProjectId');
-            if (!openProjectId) return;
-
-            const tab = params.get('tab') || 'overview';
-            const baseUrl = document.getElementById('vcProjectWorkspaceUrl')?.value || '/Projects/Workspace';
-
-            const url = new URL(baseUrl, window.location.origin);
-            url.searchParams.set('id', openProjectId);
-            url.searchParams.set('tab', tab);
-
-            window.location.href = url.pathname + url.search;
-        });
-    </script>
+    <script src="~/js/pages/projects/projects-list.js" asp-append-version="true"></script>
 }
-
-
-@if (Model.CreateProjectModal?.AutoOpen == true)
-{
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const el = document.getElementById('FormModal');
-            if (!el) return;
-
-            function focusFirstError() {
-                const firstErr = el.querySelector('.field-validation-error, .text-danger:not(:empty)');
-                if (!firstErr) return;
-
-                const input = firstErr.closest('.col-md-2,.col-md-4,.col-md-6,.col-md-8,.col-12')
-                    ?.querySelector('input,select,textarea');
-
-                if (input) input.focus();
-            }
-
-            function tryOpenModal(attempt) {
-                const bsModal = window.bootstrap && window.bootstrap.Modal
-                    ? window.bootstrap.Modal
-                    : null;
-
-                if (!bsModal) {
-                    if (attempt >= 20) return;
-                    window.setTimeout(function () { tryOpenModal(attempt + 1); }, 50);
-                    return;
-                }
-
-                const m = bsModal.getOrCreateInstance(el);
-                m.show();
-                focusFirstError();
-            }
-
-            tryOpenModal(0);
-        });
-    </script>
-}
-
-
-

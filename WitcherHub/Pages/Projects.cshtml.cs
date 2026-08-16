@@ -78,6 +78,22 @@ namespace WitcherHub.Pages
         [BindProperty(SupportsGet = true)] public string? CustomerName { get; set; }
         [BindProperty(SupportsGet = true)] public ProjectStatus? Status { get; set; }
 
+        [BindProperty(SupportsGet = true)] public bool IncludeArchived { get; set; }
+
+        /// <summary>
+        /// The rows themselves, typed. The page used to receive pre-rendered HTML
+        /// strings built in this class — which is why the status badge here had
+        /// drifted to different colours from the rest of the application, and why
+        /// the markup could not adapt to the window at all.
+        /// </summary>
+        public IReadOnlyList<ProjectViews.ProjectListItemView> Projects { get; private set; }
+            = Array.Empty<ProjectViews.ProjectListItemView>();
+
+        public PagerVm? Pager { get; private set; }
+
+        public bool HasFilters =>
+            !string.IsNullOrWhiteSpace(Search) || Status is not null || IncludeArchived;
+
         public TableCardVm ProjectsTable { get; private set; } = new();
 
         // Create form fields
@@ -170,6 +186,77 @@ namespace WitcherHub.Pages
                 status = Status
             });
         }
+
+        /// <summary>
+        /// What permanently deleting a project would destroy, asked before the
+        /// confirmation is shown so a person sees it rather than discovering it.
+        /// </summary>
+        public async Task<IActionResult> OnGetDeletionImpactAsync(Guid projectId, CancellationToken ct)
+        {
+            if (projectId == Guid.Empty) return BadRequest();
+
+            var impact = await _projects.GetDeletionImpactAsync(projectId, ct);
+
+            return new JsonResult(new
+            {
+                blocked = impact.IsBlocked,
+                reason = impact.BlockingReason,
+                clean = impact.IsClean,
+                willDelete = impact.WhatWillBeDeleted
+            });
+        }
+
+        public async Task<IActionResult> OnPostArchiveProjectAsync(Guid projectId, CancellationToken ct)
+        {
+            try
+            {
+                await _projects.ArchiveAsync(projectId, archivedById: null, ct);
+
+                TempData["Toast.Type"] = "success";
+                TempData["Toast.Title"] = "Archived";
+                TempData["Toast.Message"] =
+                    "The project was archived. Nothing was deleted — tick \"Include archived\" to find it again.";
+            }
+            catch (AppException ex)
+            {
+                TempData["Toast.Type"] = "error";
+                TempData["Toast.Title"] = "Could not archive";
+                TempData["Toast.Message"] = ex.Message;
+            }
+
+            return RedirectToCurrentList();
+        }
+
+        public async Task<IActionResult> OnPostRestoreProjectAsync(Guid projectId, CancellationToken ct)
+        {
+            try
+            {
+                await _projects.RestoreAsync(projectId, ct);
+
+                TempData["Toast.Type"] = "success";
+                TempData["Toast.Title"] = "Restored";
+                TempData["Toast.Message"] = "The project is back in the active list.";
+            }
+            catch (AppException ex)
+            {
+                TempData["Toast.Type"] = "error";
+                TempData["Toast.Title"] = "Could not restore";
+                TempData["Toast.Message"] = ex.Message;
+            }
+
+            return RedirectToCurrentList();
+        }
+
+        private IActionResult RedirectToCurrentList() =>
+            RedirectToPage("./Projects", new
+            {
+                p = Page,
+                pageSize = PageSize,
+                q = Search,
+                customerName = CustomerName,
+                status = Status,
+                includeArchived = IncludeArchived
+            });
 
         // =========================
         // POST: Delete (normal form)
@@ -417,7 +504,17 @@ namespace WitcherHub.Pages
         // =========================
         private async Task LoadTableAsync(CancellationToken ct)
         {
-            var res = await _projects.GetProjectsAsync(Page, PageSize, Search, CustomerName, Status, ct);
+            var res = await _projects.GetProjectsAsync(
+                Page, PageSize, Search, CustomerName, Status, IncludeArchived, ct);
+
+            // The rows the page actually renders. TableCardVm below is still
+            // built for the moment because other things read it; the list itself
+            // no longer goes through it.
+            Projects = res.Items;
+
+            // Built from the request, so every filter currently applied survives
+            // a page change.
+            Pager = PagerVm.From(Request, res.Page, res.PageSize, res.TotalItems);
 
             ProjectsTable = new TableCardVm
             {

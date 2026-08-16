@@ -1,0 +1,34 @@
+@using WitcherHub.Domain.Projects
+@model WitcherHub.Pages.Models.UI.ProjectProgressVm
+
+@*
+    The state of one kind of document inside a project.
+
+    Deliberately not a project status badge. A project's own status and the
+    progress of its quotes, contracts and invoices are separate facts, and the
+    list used to have one column trying to be both — which is why it could not
+    honestly be either.
+
+    Rendered small and quiet: at a glance you should read the project's status
+    first and these second.
+*@
+
+@{
+    var (label, tone, icon) = Model.Progress switch
+    {
+        DocumentProgress.NotCreated => ("None", "neutral", "ri-subtract-line"),
+        DocumentProgress.Draft => ("Draft", "warning", "ri-draft-line"),
+        DocumentProgress.Awaiting => ("Sent", "info", "ri-send-plane-line"),
+        DocumentProgress.Settled => (Model.SettledLabel, "success", "ri-checkbox-circle-line"),
+        DocumentProgress.Closed => ("Closed", "neutral", "ri-close-circle-line"),
+        _ => ("—", "neutral", "ri-subtract-line")
+    };
+
+    var muted = Model.Progress == DocumentProgress.NotCreated;
+}
+
+<span class="wh-progress @(muted ? "wh-progress--muted" : "")" title="@Model.Kind: @label">
+    <i class="@icon"></i>
+    <span class="wh-progress__kind">@Model.Kind</span>
+    <span class="wh-progress__state text-@tone-main">@label</span>
+</span>
