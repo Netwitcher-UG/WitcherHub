@@ -1184,3 +1184,42 @@ body.ui-loading {
 .wh-optional-fields[open] > summary::before {
     transform: rotate(90deg);
 }
+
+
+/* Position sections, closed by default.
+   A position card used to show every field it could ever have at once. These
+   group what is left after the essentials, and say what is inside so nothing
+   has to be opened to find out. */
+.wh-position-section > summary {
+    cursor: pointer;
+    list-style: none;
+    padding: var(--wh-space-2) 0;
+    color: var(--text-secondary-light, #6b7280);
+    user-select: none;
+    border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.wh-position-section:first-child > summary {
+    border-top: 0;
+}
+
+.wh-position-section > summary::-webkit-details-marker {
+    display: none;
+}
+
+.wh-position-section > summary::before {
+    content: "\f0142";                    /* remix arrow-right-s */
+    font-family: remixicon !important;
+    display: inline-block;
+    margin-inline-end: 0.25rem;
+    transition: transform 0.15s ease;
+}
+
+.wh-position-section[open] > summary {
+    color: var(--text-primary-light, #111827);
+    font-weight: 500;
+}
+
+.wh-position-section[open] > summary::before {
+    transform: rotate(90deg);
+}

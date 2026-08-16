@@ -127,10 +127,59 @@
         updateTotals();
     }
 
+    // ------------------------------------------------------------------
+    // One position, shown at the depth it actually needs.
+    //
+    // Every position used to render around twenty fields at once — VAT,
+    // discount type and value, activation method, two dates, periods, scope,
+    // deliverables — whatever the position was. A fixed one-off fee was asked
+    // for a billing period and a duration; an hourly rate was given the same
+    // prominence as a delivery date it would never have.
+    //
+    // What is shown now follows the pricing model and the billing cycle. The
+    // essentials are always there; everything else is one click away and
+    // labelled with what is inside, so nothing is hidden, only quiet.
+    // ------------------------------------------------------------------
+
+    /// Which fields this pricing model actually has an answer for.
+    function shape(p) {
+        const model = p.pricingModel || "Fixed";
+        const recurring = p.billingCycle && p.billingCycle !== "OneTime";
+
+        return {
+            // A fixed amount is not a rate times a count, so asking for a
+            // quantity invites a number that means nothing.
+            quantity: model !== "Fixed",
+
+            // The unit only means something once there is a quantity to count.
+            unit: model !== "Fixed",
+
+            // Duration belongs to a charge that repeats.
+            periods: recurring,
+
+            rateLabel:
+                model === "Hourly" ? "Hourly rate"
+                : model === "Unit" ? "Price per unit"
+                : model === "Tiered" ? "Base rate"
+                : "Amount",
+
+            quantityLabel: model === "Hourly" ? "Hours" : "Quantity",
+
+            hint:
+                model === "Tiered"
+                    ? "Tiered pricing is recorded as a base rate; describe the bands in the notes."
+                : model === "Hourly"
+                    ? "Leave the hours empty if no number of hours was agreed — the rate is still recorded."
+                : ""
+        };
+    }
+
     function card(p, index) {
         const wrap = document.createElement("div");
         wrap.className = "border rounded-3 p-3";
         wrap.dataset.clientId = p.clientId;
+
+        const s = shape(p);
 
         // A position read out of a supplied contract is neither manual nor from
         // the catalog, and labelling it "Catalog" would claim it came from a
@@ -154,124 +203,154 @@
             </span>
           </div>
 
+          <!-- ---- what every position needs, whatever it is ---- -->
           <div class="row g-2">
-            <div class="col-12 col-md-6">
-              <label class="form-label small">Title *</label>
-              <input class="form-control form-control-sm" data-f="title" value="${esc(p.title)}" />
-            </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label small">Service type</label>
-              <input class="form-control form-control-sm" data-f="serviceType" value="${esc(p.serviceType)}" />
-            </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label small">Unit</label>
-              <input class="form-control form-control-sm" data-f="unit" value="${esc(p.unit)}" />
+            <div class="col-12">
+              <label class="form-label small">What is being charged for *</label>
+              <input class="form-control form-control-sm" data-f="title" value="${esc(p.title)}"
+                     placeholder="Name of the service or item" />
             </div>
 
-            <div class="col-12">
-              <label class="form-label small">Description</label>
-              <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="description">${esc(p.description)}</textarea>
-            </div>
-            <div class="col-12">
-              <label class="form-label small">Scope of work</label>
-              <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="scope">${esc(p.scope)}</textarea>
-            </div>
-            <div class="col-12">
-              <label class="form-label small">Deliverables <span class="text-secondary">(one per line)</span></label>
-              <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="deliverables">${esc((p.deliverables || []).join("\n"))}</textarea>
-            </div>
-
-            <div class="col-6 col-md-2">
-              <label class="form-label small">Quantity</label>
-              <input class="form-control form-control-sm" data-f="quantity" inputmode="decimal" value="${p.quantity ?? 1}" />
-            </div>
             <div class="col-6 col-md-3">
-              <label class="form-label small">Pricing model</label>
+              <label class="form-label small">How it is priced</label>
               <select class="form-select form-select-sm" data-f="pricingModel">
                 ${PRICING_MODELS.map(m => `<option value="${m}"${p.pricingModel === m ? " selected" : ""}>${m}</option>`).join("")}
               </select>
             </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label small">Unit price</label>
-              <input class="form-control form-control-sm" data-f="unitPrice" inputmode="decimal"
-                     value="${p.unitPrice ?? ""}" ${p.isFree ? "disabled" : ""} />
-            </div>
-            <div class="col-3 col-md-2">
-              <label class="form-label small">VAT %</label>
-              <input class="form-control form-control-sm" data-f="vatRate" inputmode="decimal" value="${p.vatRate ?? ""}" />
-            </div>
-            <div class="col-3 col-md-2 d-flex align-items-end">
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" data-f="isFree" id="free-${p.clientId}" ${p.isFree ? "checked" : ""} />
-                <label class="form-check-label small" for="free-${p.clientId}">Free</label>
-              </div>
-            </div>
 
             <div class="col-6 col-md-3">
-              <label class="form-label small">Discount type</label>
-              <select class="form-select form-select-sm" data-f="discountType">
-                <option value="">None</option>
-                <option value="Percent"${p.discountType === "Percent" ? " selected" : ""}>Percent</option>
-                <option value="Amount"${p.discountType === "Amount" ? " selected" : ""}>Amount</option>
-              </select>
-            </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label small">Discount value</label>
-              <input class="form-control form-control-sm" data-f="discountValue" inputmode="decimal" value="${p.discountValue ?? ""}" />
-            </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label small">Billing cycle</label>
+              <label class="form-label small">How often</label>
               <select class="form-select form-select-sm" data-f="billingCycle">
                 ${BILLING_CYCLES.map(c => `<option value="${c}"${p.billingCycle === c ? " selected" : ""}>${c}</option>`).join("")}
               </select>
             </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label small">Periods</label>
-              <input class="form-control form-control-sm" data-f="durationPeriods" inputmode="numeric" value="${p.durationPeriods ?? ""}" />
+
+            ${s.quantity ? `
+            <div class="col-6 col-md-2">
+              <label class="form-label small">${s.quantityLabel}</label>
+              <input class="form-control form-control-sm" data-f="quantity" inputmode="decimal" value="${p.quantity ?? ""}" />
+            </div>` : ""}
+
+            ${s.unit ? `
+            <div class="col-6 col-md-2">
+              <label class="form-label small">Unit</label>
+              <input class="form-control form-control-sm" data-f="unit" value="${esc(p.unit)}" placeholder="hour, item…" />
+            </div>` : ""}
+
+            <div class="col-6 col-md-2">
+              <label class="form-label small">${s.rateLabel}</label>
+              <input class="form-control form-control-sm" data-f="unitPrice" inputmode="decimal"
+                     value="${p.unitPrice ?? ""}" ${p.isFree ? "disabled" : ""} />
             </div>
 
-            <div class="col-12 col-md-4">
-              <label class="form-label small">Activation</label>
-              <select class="form-select form-select-sm" data-f="activationMethod">
-                ${ACTIVATION.map(a => `<option value="${a}"${p.activationMethod === a ? " selected" : ""}>${a}</option>`).join("")}
-              </select>
-            </div>
-            <div class="col-6 col-md-4">
-              <label class="form-label small">Start date</label>
-              <input type="date" class="form-control form-control-sm" data-f="startDate" value="${p.startDate ?? ""}" />
-            </div>
-            <div class="col-6 col-md-4">
-              <label class="form-label small">Delivery date</label>
-              <input type="date" class="form-control form-control-sm" data-f="deliveryDate" value="${p.deliveryDate ?? ""}" />
-            </div>
+            ${s.periods ? `
+            <div class="col-6 col-md-2">
+              <label class="form-label small">For how many periods</label>
+              <input class="form-control form-control-sm" data-f="durationPeriods" inputmode="numeric"
+                     value="${p.durationPeriods ?? ""}" placeholder="e.g. 12" />
+            </div>` : ""}
+          </div>
 
-            <div class="col-12">
-              <details>
-                <summary class="small text-secondary">Acceptance, responsibilities, assumptions, exclusions</summary>
-                <div class="row g-2 mt-1">
-                  <div class="col-12 col-md-6">
-                    <label class="form-label small">Acceptance criteria</label>
-                    <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="acceptanceCriteria">${esc((p.acceptanceCriteria || []).join("\n"))}</textarea>
-                  </div>
-                  <div class="col-12 col-md-6">
-                    <label class="form-label small">Customer responsibilities</label>
-                    <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="customerResponsibilities">${esc((p.customerResponsibilities || []).join("\n"))}</textarea>
-                  </div>
-                  <div class="col-12 col-md-6">
-                    <label class="form-label small">Assumptions</label>
-                    <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="assumptions">${esc((p.assumptions || []).join("\n"))}</textarea>
-                  </div>
-                  <div class="col-12 col-md-6">
-                    <label class="form-label small">Exclusions</label>
-                    <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="exclusions">${esc((p.exclusions || []).join("\n"))}</textarea>
-                  </div>
-                  <div class="col-12">
-                    <label class="form-label small">Notes</label>
-                    <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="notes">${esc(p.notes)}</textarea>
+          ${s.hint ? `<p class="small text-secondary mt-2 mb-0">${s.hint}</p>` : ""}
+
+          <!-- ---- everything else, grouped and closed ---- -->
+          <div class="mt-3 d-flex flex-column gap-1">
+            <details class="wh-position-section">
+              <summary class="small">Description and scope</summary>
+              <div class="row g-2 mt-1">
+                <div class="col-12">
+                  <label class="form-label small">Description</label>
+                  <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="description">${esc(p.description)}</textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label small">Scope of work</label>
+                  <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="scope">${esc(p.scope)}</textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label small">Deliverables <span class="text-secondary">(one per line)</span></label>
+                  <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="deliverables">${esc((p.deliverables || []).join("\n"))}</textarea>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label small">Service type</label>
+                  <input class="form-control form-control-sm" data-f="serviceType" value="${esc(p.serviceType)}" />
+                </div>
+              </div>
+            </details>
+
+            <details class="wh-position-section">
+              <summary class="small">Tax, discount and free-of-charge</summary>
+              <div class="row g-2 mt-1">
+                <div class="col-6 col-md-3">
+                  <label class="form-label small">VAT %</label>
+                  <input class="form-control form-control-sm" data-f="vatRate" inputmode="decimal" value="${p.vatRate ?? ""}" />
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label small">Discount type</label>
+                  <select class="form-select form-select-sm" data-f="discountType">
+                    <option value="">None</option>
+                    <option value="Percent"${p.discountType === "Percent" ? " selected" : ""}>Percent</option>
+                    <option value="Amount"${p.discountType === "Amount" ? " selected" : ""}>Amount</option>
+                  </select>
+                </div>
+                ${p.discountType ? `
+                <div class="col-6 col-md-3">
+                  <label class="form-label small">Discount value</label>
+                  <input class="form-control form-control-sm" data-f="discountValue" inputmode="decimal" value="${p.discountValue ?? ""}" />
+                </div>` : ""}
+                <div class="col-6 col-md-3 d-flex align-items-end">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" data-f="isFree" id="free-${p.clientId}" ${p.isFree ? "checked" : ""} />
+                    <label class="form-check-label small" for="free-${p.clientId}">Supplied free of charge</label>
                   </div>
                 </div>
-              </details>
-            </div>
+              </div>
+            </details>
+
+            <details class="wh-position-section">
+              <summary class="small">Dates and activation</summary>
+              <div class="row g-2 mt-1">
+                <div class="col-12 col-md-4">
+                  <label class="form-label small">Activation</label>
+                  <select class="form-select form-select-sm" data-f="activationMethod">
+                    ${ACTIVATION.map(a => `<option value="${a}"${p.activationMethod === a ? " selected" : ""}>${a}</option>`).join("")}
+                  </select>
+                </div>
+                <div class="col-6 col-md-4">
+                  <label class="form-label small">Start date</label>
+                  <input type="date" class="form-control form-control-sm" data-f="startDate" value="${p.startDate ?? ""}" />
+                </div>
+                <div class="col-6 col-md-4">
+                  <label class="form-label small">Delivery date</label>
+                  <input type="date" class="form-control form-control-sm" data-f="deliveryDate" value="${p.deliveryDate ?? ""}" />
+                </div>
+              </div>
+            </details>
+
+            <details class="wh-position-section">
+              <summary class="small">Acceptance, responsibilities, assumptions, exclusions</summary>
+              <div class="row g-2 mt-1">
+                <div class="col-12 col-md-6">
+                  <label class="form-label small">Acceptance criteria</label>
+                  <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="acceptanceCriteria">${esc((p.acceptanceCriteria || []).join("\n"))}</textarea>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label small">Customer responsibilities</label>
+                  <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="customerResponsibilities">${esc((p.customerResponsibilities || []).join("\n"))}</textarea>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label small">Assumptions</label>
+                  <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="assumptions">${esc((p.assumptions || []).join("\n"))}</textarea>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label small">Exclusions</label>
+                  <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="exclusions">${esc((p.exclusions || []).join("\n"))}</textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label small">Notes</label>
+                  <textarea class="form-control form-control-sm wh-textarea-sm" rows="2" data-f="notes">${esc(p.notes)}</textarea>
+                </div>
+              </div>
+            </details>
           </div>
 
           <div class="d-flex justify-content-end mt-2">
@@ -305,6 +384,12 @@
         if (event.target.type === "checkbox") {
             p[field] = event.target.checked;
             if (field === "isFree") render();
+        } else if (field === "pricingModel" || field === "billingCycle" || field === "discountType") {
+            // Which fields are relevant follows these, so the card is redrawn.
+            p[field] = event.target.value === "" ? null : event.target.value;
+            dirty = true;
+            render();
+            return;
         } else if (LIST_FIELDS.includes(field)) {
             p[field] = event.target.value.split("\n").map(s => s.trim()).filter(Boolean);
         } else if (NUMBER_FIELDS.includes(field)) {
