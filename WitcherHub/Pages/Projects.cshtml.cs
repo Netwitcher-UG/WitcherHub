@@ -130,8 +130,12 @@ namespace WitcherHub.Pages
         {
             Project.Title ??= "";
 
-            var today = DateTime.UtcNow.Date;
-            Project.StartDate ??= DateOnly.FromDateTime(today);
+            // The start date is deliberately not pre-filled.
+            //
+            // It used to default to today, which is a value nobody chose on a
+            // field a project may not need at all — and a default that looks like
+            // an answer gets saved as one. A project with no dates is a perfectly
+            // ordinary project.
         }
 
         // =========================
@@ -171,20 +175,19 @@ namespace WitcherHub.Pages
                 return Page();
             }
 
-            await _projects.CreateAsync(Project, createdById: null, ct);
+            var projectId = await _projects.CreateAsync(Project, createdById: null, ct);
 
             TempData["Toast.Type"] = "success";
-            TempData["Toast.Title"] = "Success";
-            TempData["Toast.Message"] = "Project created successfully.";
+            TempData["Toast.Title"] = "Project created";
+            TempData["Toast.Message"] = "Pick up where you left off below.";
 
-            return RedirectToPage("./Projects", new
-            {
-                p = Page,
-                pageSize = PageSize,
-                q = Search,
-                customerName = CustomerName,
-                status = Status
-            });
+            // Straight into the new project rather than back to the list.
+            //
+            // Creating a project is never the goal in itself — the next thing is
+            // always to do something inside it, and returning to the list made
+            // the user find the row they had just created before they could
+            // start.
+            return RedirectToPage("/Projects/Workspace", new { id = projectId });
         }
 
         /// <summary>
@@ -567,9 +570,12 @@ namespace WitcherHub.Pages
             CreateProjectModal = new ModalVm
             {
                 Id = "FormModal",
-                Title = "Add Project",
-                SizeClass = "modal-lg",
-                SubmitText = "Save",
+                Title = "New project",
+
+                // Two fields do not need a large dialog. The size was signalling
+                // that this was a bigger job than it is.
+                SizeClass = "",
+                SubmitText = "Create project",
                 CancelText = "Cancel",
                 Handler = null, // OnPostAsync
                 BodyPartialPath = "~/Pages/Shared/Modals/_CreateProjectFields.cshtml",

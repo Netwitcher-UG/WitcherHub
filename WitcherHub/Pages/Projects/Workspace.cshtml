@@ -1,6 +1,8 @@
 @page
 @using Microsoft.AspNetCore.Authorization
 @using WitcherHub.Domain.SeedData
+@using WitcherHub.Domain.Projects
+@using WitcherHub.Pages.Models.UI
 @attribute [Authorize(Policy = AppPolicyPrefixes.Permission + AppPermissions.ManageNetwitcher)]
 @model WitcherHub.Pages.Projects.WorkspaceModel
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
@@ -88,27 +90,137 @@
        id="vcChangeInvoiceStatusUrl"
        value="@Url.Page("/Projects/Workspace", "ChangeInvoiceStatus", new { id = Model.ProjectId, tab = "invoices" })" />
 <div class="container-fluid px-0">
-    <div class="d-flex align-items-center justify-content-between mb-4 gap-3 flex-wrap">
-        <div>
-            <div class="text-muted small">
-                <a asp-page="/Projects"
-                   class="text-decoration-none text-muted"
-                   title="Go to Projects page">
-                    Project
+    @*
+        The summary, rendered by the server.
+
+        This block used to be four empty elements filled by a fetch after the
+        page loaded, behind a "Loading…" card — so the first thing the workspace
+        showed was nothing, which is exactly how it read. All of it comes from
+        one query and none of it needs a round trip.
+    *@
+    @if (Model.Project is not null && Model.Workflow is { } workflow)
+    {
+        var status = DocumentStatusPresentation.ForProject(workflow.Status);
+
+        <div class="wh-section">
+            <nav class="mb-8">
+                <a asp-page="/Projects" class="text-secondary-light text-sm hover-text-primary d-inline-flex align-items-center gap-1">
+                    <i class="ri-arrow-left-line"></i> All projects
                 </a>
-                Workspace
-            </div>
+            </nav>
 
-            <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
-                <h2 class="mb-0" id="vp-title">@Model.ProjectTitle</h2>
-                <span id="vp-statusBadge"></span>
-            </div>
+            <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+                <div>
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <h4 class="mb-0 fw-semibold" id="vp-title">@Model.ProjectTitle</h4>
 
-            <div class="text-muted small" id="vp-meta"></div>
+                        <span class="badge bg-@status.Tone-focus text-@status.Tone-main border border-@status.Tone-main px-16 py-4 radius-4">
+                            @status.Label
+                        </span>
+
+                        @if (workflow.IsArchived)
+                        {
+                            <span class="badge bg-neutral-200 text-neutral-600 px-16 py-4 radius-4">Archived</span>
+                        }
+                    </div>
+
+                    <p class="text-secondary-light mb-0 mt-8 text-sm">
+                        <a asp-page="/Clients/Details" asp-route-id="@Model.Project.CustomerId"
+                           class="text-primary-600 fw-medium">@Model.Project.Customer.Name</a>
+
+                        @if (Model.Project.StartDate is not null || Model.Project.EndDate is not null)
+                        {
+                            <text> · @Format.Date(Model.Project.StartDate) — @Format.Date(Model.Project.EndDate)</text>
+                        }
+                    </p>
+
+                    @if (!string.IsNullOrWhiteSpace(Model.Project.Description))
+                    {
+                        <p class="text-secondary-light mb-0 mt-8 text-sm" style="max-width: 46rem">
+                            @Model.Project.Description
+                        </p>
+                    }
+                </div>
+
+                @* One primary action, chosen from where the project actually is. *@
+                <div class="wh-actions">
+                    @if (workflow.Contracts == DocumentProgress.NotCreated)
+                    {
+                        <a asp-page="/Projects/Workspace" asp-route-id="@Model.ProjectId" asp-route-tab="contracts"
+                           class="btn btn-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2">
+                            <i class="ri-file-add-line"></i> Create contract
+                        </a>
+                    }
+                    else
+                    {
+                        <a asp-page="/Projects/Workspace" asp-route-id="@Model.ProjectId" asp-route-tab="contracts"
+                           class="btn btn-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2">
+                            <i class="ri-file-text-line"></i> Open contract
+                        </a>
+                    }
+
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary text-sm px-16 py-11 radius-8" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false" aria-label="More project actions">
+                            <i class="ri-more-2-fill"></i>
+                        </button>
+
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item" asp-page="/Projects/Workspace"
+                                   asp-route-id="@Model.ProjectId" asp-route-tab="quotes">
+                                    <i class="ri-file-list-3-line me-2"></i> Quotes
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" asp-page="/Projects/Workspace"
+                                   asp-route-id="@Model.ProjectId" asp-route-tab="invoices">
+                                    <i class="ri-bill-line me-2"></i> Invoices
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" asp-page="/Clients/Details"
+                                   asp-route-id="@Model.Project.CustomerId">
+                                    <i class="ri-user-line me-2"></i> View customer
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        
-    </div>
+        @* Where each document stands, and what is worth doing next. *@
+        <div class="wh-section card radius-12 border">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <div class="wh-party">
+                            <span class="wh-party__role">Quotes</span>
+                            <partial name="_ProjectProgress" model="ProjectProgressVm.Quote(workflow.Quotes)" />
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="wh-party">
+                            <span class="wh-party__role">Contracts</span>
+                            <partial name="_ProjectProgress" model="ProjectProgressVm.Contract(workflow.Contracts)" />
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="wh-party">
+                            <span class="wh-party__role">Invoices</span>
+                            <partial name="_ProjectProgress" model="ProjectProgressVm.Invoice(workflow.Invoices)" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-info radius-8 text-sm mt-16 mb-0">
+                    <i class="ri-guide-line me-1"></i> @workflow.NextAction
+                </div>
+            </div>
+        </div>
+    }
 
     <div id="vpLoading" class="card border-0 shadow-sm rounded-4">
         <div class="card-body">Loading...</div>

@@ -1157,3 +1157,30 @@ body.ui-loading {
         display: none;
     }
 }
+
+
+/* Optional fields, folded away until asked for.
+   Creating a project needs a customer and a title; everything else is set
+   inside the project, where there is room for it. */
+.wh-optional-fields > summary {
+    cursor: pointer;
+    list-style: none;
+    padding: var(--wh-space-2) 0;
+    user-select: none;
+}
+
+.wh-optional-fields > summary::-webkit-details-marker {
+    display: none;
+}
+
+.wh-optional-fields > summary::before {
+    content: "\f0142";                    /* remix arrow-right-s */
+    font-family: remixicon !important;
+    display: inline-block;
+    margin-inline-end: 0.25rem;
+    transition: transform 0.15s ease;
+}
+
+.wh-optional-fields[open] > summary::before {
+    transform: rotate(90deg);
+}

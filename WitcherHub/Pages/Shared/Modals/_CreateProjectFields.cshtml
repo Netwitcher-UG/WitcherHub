@@ -1,41 +1,71 @@
 @model WitcherHub.Pages.ProjectsModel
 
+@*
+    Creating a project.
+
+    Two fields, and both are genuinely needed: who it is for, and what it is
+    called. Everything else a project might eventually carry is set inside the
+    project afterwards, where there is room for it and where the user can see
+    what they are describing.
+
+    The dates and the description used to sit here at equal weight, and the start
+    date arrived pre-filled with today — a value nobody chose, on a field the
+    project may not need at all. A default that looks like an answer is worse
+    than an empty field, because it gets saved.
+*@
+
 <div class="row g-3">
+    <div class="col-12">
+        <label class="form-label" asp-for="Project.CustomerId">Customer</label>
 
-    <div class="col-12 col-md-6">
-        <label class="form-label">Customer</label>
-
-        <select class="form-select"
+        <select class="form-select radius-8"
                 asp-for="Project.CustomerId"
                 asp-items="Model.CustomerOptions">
+            <option value="">Choose a customer…</option>
         </select>
 
-        <span class="text-danger small" asp-validation-for="Project.CustomerId"></span>
-    </div>
+        <span class="wh-hint">
+            From your customer records. Their address and contact details come with them —
+            nothing needs re-typing here.
+        </span>
 
-
-    <div class="col-12 col-md-6">
-        <label class="form-label">Title</label>
-        <input class="form-control" asp-for="Project.Title" placeholder="Project title" />
-        <span class="text-danger small" asp-validation-for="Project.Title"></span>
+        <span class="text-danger small d-block" asp-validation-for="Project.CustomerId"></span>
     </div>
 
     <div class="col-12">
-        <label class="form-label">Description</label>
-        <textarea class="form-control soft-placeholder" asp-for="Project.Description" rows="3" placeholder="Optional..."></textarea>
-        <span class="text-danger small" asp-validation-for="Project.Description"></span>
+        <label class="form-label" asp-for="Project.Title">Project title</label>
+        <input class="form-control radius-8" asp-for="Project.Title" placeholder="What is this piece of work?" autofocus />
+        <span class="text-danger small" asp-validation-for="Project.Title"></span>
     </div>
 
-    <div class="col-12 col-md-6">
-        <label class="form-label">Start Date</label>
-        <input type="date" class="form-control js-datepicker" asp-for="Project.StartDate" />
-        <span class="text-danger small" asp-validation-for="Project.StartDate"></span>
-    </div>
+    @*
+        Everything optional, folded away. Open it if it helps; the project is
+        perfectly valid without any of it, and all of it can be set later.
+    *@
+    <div class="col-12">
+        <details class="wh-optional-fields">
+            <summary class="text-sm text-primary-600">Add dates or a description now (optional)</summary>
 
-    <div class="col-12 col-md-6">
-        <label class="form-label">End Date</label>
-        <input type="date" class="form-control js-datepicker" asp-for="Project.EndDate" />
-        <span class="text-danger small" asp-validation-for="Project.EndDate"></span>
-    </div>
+            <div class="row g-3 mt-4">
+                <div class="col-12">
+                    <label class="form-label" asp-for="Project.Description">Description</label>
+                    <textarea class="form-control radius-8" asp-for="Project.Description" rows="3"
+                              placeholder="What the work involves. You can fill this in later."></textarea>
+                    <span class="text-danger small" asp-validation-for="Project.Description"></span>
+                </div>
 
+                <div class="col-12 col-md-6">
+                    <label class="form-label" asp-for="Project.StartDate">Start date</label>
+                    <input type="date" class="form-control radius-8" asp-for="Project.StartDate" />
+                    <span class="text-danger small" asp-validation-for="Project.StartDate"></span>
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <label class="form-label" asp-for="Project.EndDate">End date</label>
+                    <input type="date" class="form-control radius-8" asp-for="Project.EndDate" />
+                    <span class="text-danger small" asp-validation-for="Project.EndDate"></span>
+                </div>
+            </div>
+        </details>
+    </div>
 </div>
