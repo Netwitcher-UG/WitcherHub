@@ -52,13 +52,16 @@ namespace WitcherHub.Infrastructure.ManageData.Projects
             string? search = null,
             string? customerName = null,
             ProjectStatus? status = null,
+            bool includeArchived = false,
             CancellationToken ct = default)
         {
             page = page < 1 ? 1 : page;
             pageSize = pageSize is < 1 or > 200 ? 10 : pageSize;
 
             var version = await _cache.GetOrCreateVersionAsync(ProjectCacheKeys.ListVersionKey, ct);
-            var cacheKey = ProjectCacheKeys.ListWithVersion(page, pageSize, search, customerName, status?.ToString(), version);
+            var cacheKey = ProjectCacheKeys.ListWithVersion(
+                page, pageSize, search, customerName,
+                $"{status?.ToString() ?? "-"}|archived:{includeArchived}", version);
 
             return await _cache.GetOrCreateAsync(
                 cacheKey,
@@ -76,6 +79,11 @@ namespace WitcherHub.Infrastructure.ManageData.Projects
 
                         q = q.Where(x => EF.Functions.Like(x.Customer.Name, customerPattern, "!"));
                     }
+
+                    // Archived projects are out of the way by default, and still
+                    // reachable. Nothing about them is deleted.
+                    if (!includeArchived)
+                        q = q.Where(x => x.ArchivedAt == null);
 
                     // Filter by status
                     if (status.HasValue)
@@ -119,6 +127,39 @@ namespace WitcherHub.Infrastructure.ManageData.Projects
                                 .OrderBy(e => e.Kind) // optional ترتيب ثابت
                                 .Select(e => e.Email)
                                 .FirstOrDefault(),
+
+                            ArchivedAt = x.ArchivedAt,
+
+                            // Read from the documents themselves, so the list and
+                            // the workspace cannot tell different stories.
+                            QuoteProgress =
+                                !x.Quotes.Any() ? DocumentProgress.NotCreated
+                                : x.Quotes.Any(d => d.Status == DocumentStatus.Accepted
+                                                 || d.Status == DocumentStatus.Signed) ? DocumentProgress.Settled
+                                : x.Quotes.Any(d => d.Status == DocumentStatus.Sent) ? DocumentProgress.Awaiting
+                                : x.Quotes.All(d => d.Status == DocumentStatus.Rejected
+                                                 || d.Status == DocumentStatus.Cancelled) ? DocumentProgress.Closed
+                                : DocumentProgress.Draft,
+
+                            ContractProgress =
+                                !x.Contracts.Any() ? DocumentProgress.NotCreated
+                                : x.Contracts.Any(d => d.SignedAt != null
+                                                    || d.Status == DocumentStatus.Signed
+                                                    || d.Status == DocumentStatus.Accepted) ? DocumentProgress.Settled
+                                : x.Contracts.Any(d => d.Status == DocumentStatus.Sent) ? DocumentProgress.Awaiting
+                                : x.Contracts.All(d => d.Status == DocumentStatus.Terminated
+                                                    || d.Status == DocumentStatus.Cancelled) ? DocumentProgress.Closed
+                                : DocumentProgress.Draft,
+
+                            InvoiceProgress =
+                                !x.Invoices.Any() ? DocumentProgress.NotCreated
+                                : x.Invoices.All(d => d.Status == DocumentStatus.Paid) ? DocumentProgress.Settled
+                                : x.Invoices.Any(d => d.Status == DocumentStatus.Issued
+                                                   || d.Status == DocumentStatus.Open
+                                                   || d.Status == DocumentStatus.Overdue) ? DocumentProgress.Awaiting
+                                : x.Invoices.All(d => d.Status == DocumentStatus.Void
+                                                   || d.Status == DocumentStatus.Cancelled) ? DocumentProgress.Closed
+                                : DocumentProgress.Draft,
 
                             QuotesCount = x.Quotes.Count,
                             ContractsCount = x.Contracts.Count,

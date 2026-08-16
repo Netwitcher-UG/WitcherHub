@@ -20,6 +20,7 @@ namespace WitcherHub.Application.Interfaces.ManageData
               string? search = null,
               string? customerName = null,
               ProjectStatus? status = null,
+              bool includeArchived = false,
               CancellationToken ct = default);
 
         Task<ProjectViews.ProjectDetailsView?> GetProjectAsync(Guid id, CancellationToken ct = default);

@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using WitcherHub.Application.Interfaces.ManageData;
+using WitcherHub.Application.Models.View.Project;
+using WitcherHub.Domain.Projects;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Services.Invoices;
 using WitcherHub.Infrastructure.Services.Lexware;
@@ -39,6 +41,23 @@ namespace WitcherHub.Pages.Projects
 
         public string ProjectTitle { get; private set; } = "Project Workspace";
 
+        /// <summary>
+        /// The whole summary, rendered by the server.
+        ///
+        /// The page used to draw a "Loading…" card and then fill the title, the
+        /// status, the customer and the dates from a fetch. Everything that
+        /// matters at a glance therefore arrived after the page did, which is why
+        /// the workspace read as empty — there was a moment where it genuinely
+        /// was. None of it needs a round trip; it is all one query.
+        /// </summary>
+        public ProjectViews.ProjectDetailsView? Project { get; private set; }
+
+        /// <summary>
+        /// The project's own status beside the state of its documents, from the
+        /// one place that answers it.
+        /// </summary>
+        public ProjectWorkflowState? Workflow { get; private set; }
+
         public Guid? CurrentContractId { get; private set; }
         public bool ShowManualInvoiceButton { get; private set; }
 
@@ -56,6 +75,9 @@ namespace WitcherHub.Pages.Projects
             ProjectTitle = string.IsNullOrWhiteSpace(project.Title)
                 ? "Project Workspace"
                 : project.Title;
+
+            Project = project;
+            Workflow = await _projects.GetWorkflowStateAsync(ProjectId, ct);
 
             await LoadContractStateAsync(ct);
 

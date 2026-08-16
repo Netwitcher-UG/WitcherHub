@@ -367,6 +367,61 @@ public class ProjectLifecycleTests : IAsyncLifetime
         await _sut!.DeleteAsync(Guid.NewGuid());
     }
 
+    // ======================================================== the list itself
+
+    [Fact]
+    public async Task Archived_projects_are_out_of_the_default_list_and_findable_on_request()
+    {
+        if (!Available) return;
+
+        var visible = await NewProjectAsync();
+        var archived = await NewProjectAsync();
+
+        await _sut!.ArchiveAsync(archived);
+
+        var active = await _sut.GetProjectsAsync(1, 200);
+        var all = await _sut.GetProjectsAsync(1, 200, includeArchived: true);
+
+        Assert.Contains(active.Items, p => p.Id == visible);
+        Assert.DoesNotContain(active.Items, p => p.Id == archived);
+
+        // Still there, still complete, one tick-box away.
+        var row = all.Items.Single(p => p.Id == archived);
+        Assert.True(row.IsArchived);
+        Assert.NotNull(row.ArchivedAt);
+    }
+
+    [Fact]
+    public async Task The_list_reports_document_progress_beside_the_project_status()
+    {
+        if (!Available) return;
+
+        var projectId = await NewProjectAsync();
+        await AddContractAsync(projectId, DocumentStatus.Draft);
+
+        var row = (await _sut!.GetProjectsAsync(1, 200)).Items.Single(p => p.Id == projectId);
+
+        // The two facts the single Status column used to have to carry between
+        // them, now carried separately and both true.
+        Assert.Equal(ProjectStatus.Draft, row.Status);
+        Assert.Equal(DocumentProgress.Draft, row.ContractProgress);
+        Assert.Equal(DocumentProgress.NotCreated, row.QuoteProgress);
+        Assert.Equal(DocumentProgress.NotCreated, row.InvoiceProgress);
+    }
+
+    [Fact]
+    public async Task A_signed_contract_shows_as_settled_in_the_list()
+    {
+        if (!Available) return;
+
+        var projectId = await NewProjectAsync();
+        await AddContractAsync(projectId, DocumentStatus.Signed, signed: true);
+
+        var row = (await _sut!.GetProjectsAsync(1, 200)).Items.Single(p => p.Id == projectId);
+
+        Assert.Equal(DocumentProgress.Settled, row.ContractProgress);
+    }
+
     [Fact]
     public async Task An_invalid_id_is_refused_rather_than_ignored()
     {
