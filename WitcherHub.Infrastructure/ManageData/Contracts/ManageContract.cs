@@ -322,7 +322,6 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                     FromQuote=dto.Contract.FromQuote,
                     SignedAt = dto.Contract.SignedAt
                 };
-                project.Status = GetProjectStatusAfterContractState(contract.Status, contract.SignedAt);
                 if (dto.Items is not null && dto.Items.Count > 0)
                 {
                     int pos = 1;
@@ -393,7 +392,7 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
             contract.Status = dto.Contract.Status;
 
             if (IsContractSignedOrAccepted(contract.Status, contract.SignedAt))
-                await SetProjectStatusAsync(contract.ProjectId, ProjectStatus.Active, ct);
+                await ActivateProjectOnSignatureAsync(contract.ProjectId, ct);
 
             if (dto.Items is not null)
             {
@@ -479,7 +478,7 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
             entity.InvoiceSendMode = invoiceSendMode;
 
             if (IsContractSignedOrAccepted(entity.Status, entity.SignedAt))
-                await SetProjectStatusAsync(entity.ProjectId, ProjectStatus.Active, ct);
+                await ActivateProjectOnSignatureAsync(entity.ProjectId, ct);
 
             repo.Update(entity);
 
@@ -1254,10 +1253,27 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
         private static bool IsContractSignedOrAccepted(DocumentStatus status, DateTimeOffset? signedAt)
     => signedAt.HasValue || status is DocumentStatus.Signed or DocumentStatus.Accepted;
 
-        private static ProjectStatus GetProjectStatusAfterContractState(DocumentStatus status, DateTimeOffset? signedAt)
-            => IsContractSignedOrAccepted(status, signedAt) ? ProjectStatus.Active : ProjectStatus.Waiting;
+        // A contract no longer writes the project's status.
+        //
+        // It used to: creating a contract set the project to Waiting until the
+        // contract was signed, and signing set it to Active. That made the
+        // project's status a function of a document's status, so a project the
+        // user had created and never touched reported Waiting, two screens
+        // reading it at different moments disagreed, and the delete rule — which
+        // keyed on Draft — refused a project that was nothing but a title.
+        //
+        // A contract's state is now shown as a contract's state, next to the
+        // project's own. Moving a project to Active is a decision a person makes.
 
-        private async Task SetProjectStatusAsync(Guid projectId, ProjectStatus status, CancellationToken ct)
+        /// <summary>
+        /// Moves the project to Active when a contract is signed, and only then.
+        ///
+        /// This is the one place a document still touches the project, because a
+        /// signed contract genuinely does mean the work is live. It only ever
+        /// promotes a project that is still a draft; it never moves one that a
+        /// person has already put somewhere deliberate.
+        /// </summary>
+        private async Task ActivateProjectOnSignatureAsync(Guid projectId, CancellationToken ct)
         {
             var projectsRepo = _unitOfWork.Repo<Project>();
 
@@ -1267,7 +1283,8 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
             if (project is null)
                 throw new NotFoundAppException("Project not found.");
 
-            project.Status = status;
+            if (project.Status is ProjectStatus.Draft)
+                project.Status = ProjectStatus.Active;
         }
         private async Task<string> GenerateQuoteNoAsync(IRepository<Quote> repo, CancellationToken ct)
         {

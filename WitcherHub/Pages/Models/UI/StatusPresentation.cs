@@ -82,7 +82,7 @@ namespace WitcherHub.Pages.Models.UI
         {
             ProjectStatus.Draft => new("Draft", "secondary", "ri-draft-line"),
             ProjectStatus.Active => new("Active", "success", "ri-play-circle-line"),
-            ProjectStatus.Waiting => new("Waiting", "warning", "ri-pause-circle-line"),
+            ProjectStatus.OnHold => new("On hold", "warning", "ri-pause-circle-line"),
             ProjectStatus.Closed => new("Closed", "info", "ri-archive-line"),
             ProjectStatus.Cancelled => new("Cancelled", "danger", "ri-close-circle-line"),
             _ => new(status.ToString(), "secondary", "ri-folder-line")

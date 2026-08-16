@@ -12,6 +12,7 @@ using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Project;
 using WitcherHub.Application.Models.View.Project;
+using WitcherHub.Domain.Projects;
 using WitcherHub.Infrastructure.Data.Models;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
@@ -313,6 +314,50 @@ namespace WitcherHub.Infrastructure.ManageData.Projects
             };
         }
 
+        public async Task<ProjectDeletionImpact> GetDeletionImpactAsync(Guid id, CancellationToken ct = default)
+        {
+            if (id == Guid.Empty) throw new BadRequestAppException("Invalid project id.");
+
+            var project = await _unitOfWork.Repo<Project>()
+                .Query()
+                .Where(p => p.Id == id)
+                .Select(p => new
+                {
+                    Quotes = p.Quotes.Count,
+                    Contracts = p.Contracts.Count,
+                    Invoices = p.Invoices.Count,
+                    Milestones = p.Milestones.Count,
+
+                    // A signed contract and an issued invoice are the two things
+                    // that must outlive the project. Checked by their own status,
+                    // not by the project's — that was the confusion in the first
+                    // place.
+                    HasSignedContract = p.Contracts.Any(c =>
+                        c.SignedAt != null ||
+                        c.Status == DocumentStatus.Signed ||
+                        c.Status == DocumentStatus.Accepted),
+
+                    HasIssuedInvoice = p.Invoices.Any(i =>
+                        i.Status != DocumentStatus.Draft &&
+                        i.Status != DocumentStatus.Void)
+                })
+                .FirstOrDefaultAsync(ct)
+                ?? throw new NotFoundAppException("Project not found.");
+
+            var payments = await _unitOfWork.Repo<Payment>()
+                .Query()
+                .CountAsync(pay => pay.Invoice.ProjectId == id, ct);
+
+            return new ProjectDeletionImpact(
+                project.Quotes,
+                project.Contracts,
+                project.Invoices,
+                payments,
+                project.Milestones,
+                project.HasSignedContract,
+                project.HasIssuedInvoice);
+        }
+
         public async Task DeleteAsync(Guid id, CancellationToken ct = default)
         {
             if (id == Guid.Empty) throw new BadRequestAppException("Invalid project id.");
@@ -323,18 +368,130 @@ namespace WitcherHub.Infrastructure.ManageData.Projects
 
             if (project is null) return;
 
-            if (project.Status != ProjectStatus.Draft)
-                throw new BadRequestAppException("Only draft projects can be deleted.");
+            // Deletion used to be refused unless the project's status was Draft.
+            // Creating a quote or a contract rewrote that status behind the
+            // user's back, so a project containing nothing but a draft contract
+            // reported "Only draft projects can be deleted" — a rule about a
+            // field that the user had never set and could not see the true value
+            // of.
+            //
+            // What actually matters is whether anything would be destroyed that
+            // has to be kept, so that is what is checked.
+            var impact = await GetDeletionImpactAsync(id, ct);
 
-            if (project.Quotes.Count > 0 || project.Contracts.Count > 0 || project.Invoices.Count > 0 || project.Milestones.Count > 0)
-                throw new BadRequestAppException("Project cannot be deleted because it has related data.");
+            if (impact.IsBlocked)
+                throw new BadRequestAppException(impact.BlockingReason!);
 
+            // Quotes, contracts and milestones go with the project. Nothing here
+            // is a financial or legal record — the impact check has already
+            // refused anything that is — and the customer is untouched: a project
+            // is one piece of work for a customer, not the customer.
             repo.Remove(project);
             await _unitOfWork.SaveChangesAsync(ct);
 
             await InvalidateAfterProjectChangeAsync(id, ct);
 
-            _log.LogInformation("Project deleted. {ProjectId}", id);
+            _log.LogInformation(
+                "Project {ProjectId} deleted permanently. Removed {Quotes} quote(s), {Contracts} contract(s), " +
+                "{Milestones} milestone(s). The customer was not touched.",
+                id, impact.Quotes, impact.Contracts, impact.Milestones);
+        }
+
+        public async Task ArchiveAsync(Guid id, Guid? archivedById = null, CancellationToken ct = default)
+        {
+            if (id == Guid.Empty) throw new BadRequestAppException("Invalid project id.");
+
+            var repo = _unitOfWork.Repo<Project>();
+
+            var project = await repo.Query(asNoTracking: false).FirstOrDefaultAsync(p => p.Id == id, ct)
+                ?? throw new NotFoundAppException("Project not found.");
+
+            if (project.IsArchived) return;      // already there; nothing to do
+
+            // Nothing is deleted and no status is changed. The project keeps
+            // whatever state it was in, so restoring it puts back exactly what
+            // was archived.
+            project.ArchivedAt = DateTimeOffset.UtcNow;
+            project.ArchivedById = archivedById;
+
+            await _unitOfWork.SaveChangesAsync(ct);
+            await InvalidateAfterProjectChangeAsync(id, ct);
+
+            _log.LogInformation("Project {ProjectId} archived. Nothing was deleted.", id);
+        }
+
+        public async Task RestoreAsync(Guid id, CancellationToken ct = default)
+        {
+            if (id == Guid.Empty) throw new BadRequestAppException("Invalid project id.");
+
+            var repo = _unitOfWork.Repo<Project>();
+
+            var project = await repo.Query(asNoTracking: false).FirstOrDefaultAsync(p => p.Id == id, ct)
+                ?? throw new NotFoundAppException("Project not found.");
+
+            project.ArchivedAt = null;
+            project.ArchivedById = null;
+
+            await _unitOfWork.SaveChangesAsync(ct);
+            await InvalidateAfterProjectChangeAsync(id, ct);
+
+            _log.LogInformation("Project {ProjectId} restored.", id);
+        }
+
+        public async Task<ProjectWorkflowState> GetWorkflowStateAsync(Guid id, CancellationToken ct = default)
+        {
+            if (id == Guid.Empty) throw new BadRequestAppException("Invalid project id.");
+
+            var snapshot = await _unitOfWork.Repo<Project>()
+                .Query()
+                .Where(p => p.Id == id)
+                .Select(p => new
+                {
+                    p.Status,
+                    p.ArchivedAt,
+                    QuoteStatuses = p.Quotes.Select(q => q.Status).ToList(),
+                    ContractStatuses = p.Contracts.Select(c => c.Status).ToList(),
+                    ContractsSigned = p.Contracts.Any(c => c.SignedAt != null),
+                    InvoiceStatuses = p.Invoices.Select(i => i.Status).ToList()
+                })
+                .FirstOrDefaultAsync(ct)
+                ?? throw new NotFoundAppException("Project not found.");
+
+            var paidInvoices = snapshot.InvoiceStatuses.Count(s => s == DocumentStatus.Paid);
+
+            return new ProjectWorkflowState(
+                snapshot.Status,
+                snapshot.ArchivedAt.HasValue,
+                Progress(snapshot.QuoteStatuses, false),
+                Progress(snapshot.ContractStatuses, snapshot.ContractsSigned),
+                Progress(snapshot.InvoiceStatuses, false),
+                snapshot.InvoiceStatuses.Count == 0 ? DocumentProgress.NotCreated
+                    : paidInvoices == snapshot.InvoiceStatuses.Count ? DocumentProgress.Settled
+                    : paidInvoices > 0 ? DocumentProgress.Awaiting
+                    : DocumentProgress.Awaiting);
+        }
+
+        /// <summary>
+        /// The furthest a set of documents has got, as a fact about those
+        /// documents. Never written back onto the project.
+        /// </summary>
+        private static DocumentProgress Progress(IReadOnlyCollection<DocumentStatus> statuses, bool anySigned)
+        {
+            if (statuses.Count == 0) return DocumentProgress.NotCreated;
+
+            if (anySigned || statuses.Any(s =>
+                    s is DocumentStatus.Signed or DocumentStatus.Accepted or DocumentStatus.Paid))
+                return DocumentProgress.Settled;
+
+            if (statuses.Any(s => s is DocumentStatus.Sent or DocumentStatus.Issued or DocumentStatus.Open
+                                    or DocumentStatus.Overdue))
+                return DocumentProgress.Awaiting;
+
+            if (statuses.All(s => s is DocumentStatus.Rejected or DocumentStatus.Void
+                                    or DocumentStatus.Cancelled or DocumentStatus.Terminated))
+                return DocumentProgress.Closed;
+
+            return DocumentProgress.Draft;
         }
 
         private async Task InvalidateAfterProjectChangeAsync(Guid projectId, CancellationToken ct)

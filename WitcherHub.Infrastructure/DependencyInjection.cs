@@ -141,16 +141,22 @@ namespace WitcherHub.Infrastructure
                     ? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
                     : options.ApiKey;
 
-                if (string.IsNullOrWhiteSpace(apiKey))
+                // No fallback model here any more.
+                //
+                // This used to substitute a hard-coded name when the configured
+                // one was empty, which meant a deployment with no OpenAI__Model
+                // silently called something nobody had chosen — and the resulting
+                // 404 read as a model problem rather than as the configuration
+                // problem it was. The model now comes from configuration or the
+                // call is refused, and the refusal names the setting.
+                if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(options.Model))
                 {
-                    throw new InvalidOperationException("OpenAI API key is not configured.");
+                    throw new InvalidOperationException(
+                        "The assistant is not configured. Missing: " +
+                        string.Join(", ", options.MissingSettings));
                 }
 
-                var model = string.IsNullOrWhiteSpace(options.Model)
-                    ? "gpt-4o"
-                    : options.Model;
-
-                return new ChatClient(model, apiKey);
+                return new ChatClient(options.Model, apiKey);
             });
 
             // ===== Services =====
