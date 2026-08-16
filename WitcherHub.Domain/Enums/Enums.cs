@@ -84,7 +84,14 @@ namespace WitcherHub.Infrastructure.Data.Models
         {
             Generated = 0,
             Supplied = 1,
-            HumanEdited = 2
+            HumanEdited = 2,
+
+            /// <summary>
+            /// A supplied document with the confirmed parties and terms merged
+            /// into it. Distinct from Generated because no model wrote it, and
+            /// distinct from Supplied because it is not the original.
+            /// </summary>
+            Prepared = 3
         }
 
         /// <summary>
@@ -97,6 +104,52 @@ namespace WitcherHub.Infrastructure.Data.Models
             Analysed = 1,
             Confirmed = 2,
             Failed = 3
+        }
+
+        /// <summary>
+        /// Where a stored version stands, separately from what kind of thing it
+        /// is. A version is never edited in place once approved; a newer approval
+        /// supersedes it and both stay in the history, so which text a signature
+        /// applied to remains answerable.
+        /// </summary>
+        public enum ContractDraftStatus
+        {
+            Draft = 0,
+            PendingReview = 1,
+            Approved = 2,
+
+            /// <summary>Was approved, and a later version has since been approved.</summary>
+            Superseded = 3,
+
+            Signed = 4
+        }
+
+        /// <summary>How far the supplied source document has got.</summary>
+        public enum ContractSourceState
+        {
+            None = 0,
+            SuppliedTextSaved = 1,
+            AnalysisPending = 2,
+            AnalysisFailed = 3,
+            Analysed = 4
+        }
+
+        /// <summary>Whether a person has agreed the values read out of it.</summary>
+        public enum ContractReviewState
+        {
+            NotRequired = 0,
+            RequiresReview = 1,
+            PartiallyConfirmed = 2,
+            Confirmed = 3
+        }
+
+        /// <summary>Whether a customer-specific draft has been produced.</summary>
+        public enum ContractPreparationState
+        {
+            NoPreparedDraft = 0,
+            Preparing = 1,
+            PreparedDraft = 2,
+            PreparationFailed = 3
         }
 
         /// <summary>

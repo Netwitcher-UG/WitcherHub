@@ -211,15 +211,11 @@ public class TextOnlyContractWorkflowTests : IAsyncLifetime
         Assert.False(string.IsNullOrWhiteSpace(contract.Terms));
         Assert.Contains("AGENTURVERTRAG", contract.Terms!);
 
-        // And it is still generatable, with the overwrite confirmation the
-        // approved state calls for.
-        var refused = await _sut.GenerateAsync(contractId, new GenerateDraftOptions());
-        Assert.True(refused.RequiresOverwriteConfirmation);
+        // Preparing appends a version and asks nothing: it replaces nothing.
+        var prepared = await _sut.GenerateAsync(contractId, new GenerateDraftOptions());
 
-        var regenerated = await _sut.GenerateAsync(
-            contractId, new GenerateDraftOptions { OverwriteApproved = true });
-
-        Assert.True(regenerated.Succeeded, regenerated.FailureReason);
+        Assert.True(prepared.Succeeded, prepared.FailureReason);
+        Assert.False(prepared.RequiresOverwriteConfirmation);
     }
 
     // =================================================================== 5
@@ -500,10 +496,9 @@ public class TextOnlyContractWorkflowTests : IAsyncLifetime
         await _sut!.ImportTextAsync(contractId, SuppliedContract, "pasted");
         await _sut.ApproveAsync(contractId, 1, null);
 
-        var prepared = await _sut.GenerateAsync(
-            contractId, new GenerateDraftOptions { OverwriteApproved = true });
+        var prepared = await _sut.GenerateAsync(contractId, new GenerateDraftOptions());
 
-        await _sut.ApproveAsync(contractId, prepared.Draft!.Version, null);
+        await _sut.ApproveAsync(contractId, prepared.Draft!.Version, null, confirmReplacingApproved: true);
 
         var approved = await _db!.Set<ContractDraft>().AsNoTracking()
             .Where(d => d.ContractId == contractId && d.IsApproved)
