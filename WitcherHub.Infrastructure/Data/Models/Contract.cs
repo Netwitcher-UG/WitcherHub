@@ -111,6 +111,18 @@ namespace WitcherHub.Infrastructure.Data.Models
         /// <summary>The version number of the draft that was signed.</summary>
         public int? SignedDraftVersion { get; set; }
 
+        /// <summary>
+        /// What the contract adds up to, as the deterministic engine calculated
+        /// it: committed amounts separated from estimated, variable and optional
+        /// ones, with the reason for anything that could not be resolved.
+        ///
+        /// Stored rather than recomputed on every read so that the figure shown
+        /// to a customer is the figure that was calculated when the terms were
+        /// last agreed, not one produced by a later change to the engine.
+        /// </summary>
+        [Column(TypeName = "jsonb")]
+        public JsonDocument? FinancialSummary { get; set; }
+
         // =========================
         // Serienrechnung / Recurring
         // =========================
@@ -226,6 +238,29 @@ namespace WitcherHub.Infrastructure.Data.Models
         /// that justifies it, so it can be traced back and re-checked.
         /// </summary>
         public Guid? SourceDraftId { get; set; }
+
+        // =====================================================================
+        // The generic commercial term
+        //
+        // The flat columns above can express a quantity times a rate on one of
+        // five billing cycles. That is one shape of agreement. Pricing that
+        // changes partway through, a rate with no committed quantity, a charge
+        // that recurs fortnightly, an arrangement indexed to something external —
+        // none of them fits, and forcing them in states an agreement nobody made.
+        //
+        // The full CommercialTerm lives here as written data. The flat columns
+        // are kept in step for the existing workflow and for anything that reads
+        // a position without needing the whole structure.
+        // =====================================================================
+
+        [Column(TypeName = "jsonb")]
+        public JsonDocument? CommercialTerm { get; set; }
+
+        /// <summary>
+        /// True once a person has edited or accepted this term, which stops a
+        /// later analysis from replacing it without being asked.
+        /// </summary>
+        public bool IsHumanReviewed { get; set; }
     }
 
     /// <summary>
