@@ -723,9 +723,7 @@
     }
 
     function activeBadgeHtml(active) {
-        return active
-            ? `<span class="badge bg-success bg-opacity-10 text-success">Active</span>`
-            : `<span class="badge bg-secondary bg-opacity-10 text-secondary">Inactive</span>`;
+        return window.UI.badge.toggle(!!active, 'Active', 'Inactive');
     }
 
     // ---- Add Rule builder injection ----

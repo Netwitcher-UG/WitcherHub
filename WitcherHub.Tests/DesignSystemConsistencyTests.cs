@@ -46,6 +46,23 @@ public class DesignSystemConsistencyTests
             .ToList();
     }
 
+    /// <summary>
+    /// The page scripts. Rows rendered in the browser are just as visible as rows
+    /// rendered on the server, and the first version of this test only read the
+    /// razor sources — which is how eighteen badges in the project workspace went
+    /// on using the old idiom after the pages had been converted.
+    /// </summary>
+    private static IReadOnlyList<string> ScriptSources()
+    {
+        var root = RepositoryRoot();
+        if (root is null) return Array.Empty<string>();
+
+        var js = Path.Combine(root.FullName, "WitcherHub", "wwwroot", "js");
+        if (!Directory.Exists(js)) return Array.Empty<string>();
+
+        return Directory.EnumerateFiles(js, "*.js", SearchOption.AllDirectories).ToList();
+    }
+
     [Fact]
     public void No_page_uses_the_plain_bootstrap_badge_idiom()
     {
@@ -100,6 +117,56 @@ public class DesignSystemConsistencyTests
     }
 
     [Fact]
+    public void No_script_builds_its_own_badge_markup()
+    {
+        var sources = ScriptSources();
+        if (sources.Count == 0) return;
+
+        var offenders = new List<string>();
+
+        foreach (var file in sources)
+        {
+            // ui-kit.js is the one place allowed to name badge classes: it is the
+            // shared renderer the others call.
+            if (Path.GetFileName(file) == "ui-kit.js") continue;
+
+            var text = File.ReadAllText(file);
+
+            if (System.Text.RegularExpressions.Regex.IsMatch(text, @"badge bg-[a-z]+ bg-opacity-10")
+                || System.Text.RegularExpressions.Regex.IsMatch(text, @"badge bg-[a-z]+-focus"))
+                offenders.Add(Path.GetFileName(file));
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            "These scripts build badge markup by hand, so the rows they render can drift from the " +
+            "rows the server renders in both colour and wording. Call UI.badge.status / UI.badge.html " +
+            $"instead: {string.Join(", ", offenders.Distinct())}");
+    }
+
+    [Fact]
+    public void No_page_keeps_a_private_stylesheet_inline()
+    {
+        var root = RepositoryRoot();
+        if (root is null) return;
+
+        var pages = Path.Combine(root.FullName, "WitcherHub", "Pages");
+
+        var offenders = Directory
+            .EnumerateFiles(pages, "*.cshtml", SearchOption.AllDirectories)
+            .Where(f => File.ReadAllText(f).Contains("<style", StringComparison.OrdinalIgnoreCase))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            "A <style> block on a page is a design system of one: it cannot be reused, it overrides " +
+            "the shared rules invisibly, and two pages that need the same thing end up with two " +
+            "slightly different copies of it. Move the rules into css/site.css or a dedicated " +
+            $"stylesheet: {string.Join(", ", offenders)}");
+    }
+
+    [Fact]
     public void The_projects_list_no_longer_forces_horizontal_scrolling()
     {
         var root = RepositoryRoot();
@@ -114,6 +181,93 @@ public class DesignSystemConsistencyTests
         // before a single column had been read.
         Assert.DoesNotContain("--wh-table-min-width", text.Replace(" ", ""));
     }
+
+    /// <summary>
+    /// The client-side vocabulary must say the same thing as the server-side one.
+    ///
+    /// UI.badge exists because some rows are rendered in the browser, but a second
+    /// copy of a map is a second chance to disagree — which is what the scripts it
+    /// replaced actually did: they called a sent quote "Sent" while every
+    /// server-rendered list called the same quote "Awaiting customer".
+    /// </summary>
+    [Fact]
+    public void The_client_side_status_vocabulary_matches_the_server_side_one()
+    {
+        var root = RepositoryRoot();
+        if (root is null) return;
+
+        var uiKit = Path.Combine(root.FullName, "WitcherHub", "wwwroot", "js", "ui-kit.js");
+        if (!File.Exists(uiKit)) return;
+
+        var text = File.ReadAllText(uiKit);
+
+        var kinds = new (string Kind, Func<string, StatusPresentation?> Lookup)[]
+        {
+            ("quote",    name => Parse<DocumentStatus>(name) is { } s ? DocumentStatusPresentation.ForQuote(s) : null),
+            ("contract", name => Parse<DocumentStatus>(name) is { } s ? DocumentStatusPresentation.ForContract(s) : null),
+            ("invoice",  name => Parse<DocumentStatus>(name) is { } s ? DocumentStatusPresentation.ForInvoice(s) : null),
+            ("project",  name => Parse<ProjectStatus>(name) is { } s ? DocumentStatusPresentation.ForProject(s) : null),
+        };
+
+        var problems = new List<string>();
+        var compared = 0;
+
+        foreach (var (kind, lookup) in kinds)
+        {
+            var block = MapBlock(text, kind);
+
+            Assert.False(
+                string.IsNullOrWhiteSpace(block),
+                $"UI.badge has no '{kind}' status map, so the browser cannot word a {kind} " +
+                "the way the server does.");
+
+            // status: ['Label', 'tone']
+            var entries = System.Text.RegularExpressions.Regex.Matches(
+                block!, @"(\w+):\s*\['([^']*)',\s*'(\w+)'\]");
+
+            Assert.NotEmpty(entries);
+
+            foreach (System.Text.RegularExpressions.Match entry in entries)
+            {
+                var statusName = entry.Groups[1].Value;
+                var jsLabel = entry.Groups[2].Value;
+                var jsTone = entry.Groups[3].Value;
+
+                var server = lookup(statusName);
+
+                if (server is null)
+                {
+                    problems.Add($"{kind}.{statusName} is not a status the backend has");
+                    continue;
+                }
+
+                compared++;
+
+                if (server.Label != jsLabel)
+                    problems.Add($"{kind}.{statusName}: server says \"{server.Label}\", script says \"{jsLabel}\"");
+
+                if (server.Tone != jsTone)
+                    problems.Add($"{kind}.{statusName}: server tone '{server.Tone}', script tone '{jsTone}'");
+            }
+        }
+
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
+        Assert.True(compared >= 20, $"only {compared} statuses compared — the map parse is probably broken");
+    }
+
+    /// <summary>Pulls one <c>kind: { … }</c> block out of the STATUS_MAPS literal.</summary>
+    private static string? MapBlock(string text, string kind)
+    {
+        var marker = $"{kind}: {{";
+        var start = text.IndexOf(marker, StringComparison.Ordinal);
+        if (start < 0) return null;
+
+        var end = text.IndexOf('}', start);
+        return end < 0 ? null : text[start..end];
+    }
+
+    private static TEnum? Parse<TEnum>(string name) where TEnum : struct, Enum =>
+        Enum.TryParse<TEnum>(name, ignoreCase: true, out var value) ? value : null;
 
     // ---- the central map itself -------------------------------------------
 

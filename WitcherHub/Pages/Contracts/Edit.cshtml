@@ -16,38 +16,8 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/contracts/contract-sign.css" asp-append-version="true" />
-    <style>
-        /*
-            Only the editor's own typography is local to this page now.
-
-            The topbar, the status pill and the page frame used to be defined
-            here — a third set of status colours and a private layout, on a page
-            that is meant to look like the rest of the application. That markup
-            is gone and so are its rules; what is left is the editable surface,
-            which genuinely has no shared equivalent.
-        */
-        .contractInlineEditor {
-            white-space: pre-wrap;
-            word-break: break-word;
-            outline: none;
-            min-height: 60vh;
-            font-family: inherit;
-            font-size: inherit;
-            line-height: inherit;
-        }
-
-            .contractInlineEditor.is-editing {
-                border: 1px dashed var(--border-color, rgba(0,0,0,.20));
-                border-radius: 12px;
-                padding: 14px;
-            }
-
-        .contractActions {
-            display: none !important;
-        }
-    </style>
 }
-<div class="contractPage">
+<div class="contractPage wh-contract-editor-page">
 
     @*
         The contract's identity and where it stands.
@@ -158,7 +128,7 @@
             @if (Model.Contract.Status == WitcherHub.Infrastructure.Data.Models.Enums.DocumentStatus.Draft)
             {
                 <pre id="contractEditor"
-                     class="contractInlineEditor"
+                     class="wh-contract-editor"
                      contenteditable="true"
                      spellcheck="false">@Html.Raw(HtmlEncoder.Default.Encode(Model.RawTermsEditable ?? ""))</pre>
 

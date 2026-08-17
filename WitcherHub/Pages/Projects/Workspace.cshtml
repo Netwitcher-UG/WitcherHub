@@ -11,60 +11,6 @@
     ViewData["Title"] = $"{Model.ProjectTitle} - Workspace";
 }
 
-<style>
-    #vpContractPreview .contractDoc,
-    #vpContractPreview {
-        font-size: 14px;
-        line-height: 1.55;
-    }
-
-        #vpContractPreview h1 {
-            font-size: 22px;
-            line-height: 1.25;
-            margin: 0 0 10px;
-            font-weight: 700;
-        }
-
-        #vpContractPreview h2 {
-            font-size: 18px;
-            line-height: 1.3;
-            margin: 18px 0 8px;
-            font-weight: 700;
-        }
-
-        #vpContractPreview h3 {
-            font-size: 16px;
-            line-height: 1.35;
-            margin: 14px 0 6px;
-            font-weight: 700;
-        }
-
-        #vpContractPreview h4,
-        #vpContractPreview h5,
-        #vpContractPreview h6 {
-            font-size: 14px;
-            margin: 12px 0 6px;
-            font-weight: 700;
-        }
-
-        #vpContractPreview p {
-            margin: 0 0 8px;
-        }
-
-        #vpContractPreview ul,
-        #vpContractPreview ol {
-            margin: 0 0 10px 18px;
-        }
-
-        #vpContractPreview hr {
-            margin: 14px 0;
-            opacity: .15;
-        }
-
-    .wh-clickable-row {
-        cursor: pointer;
-    }
-</style>
 
 <input type="hidden" id="wsProjectId" value="@Model.ProjectId" />
 <input type="hidden" id="wsOpenTab" value="@Model.Tab" />
@@ -530,8 +476,7 @@
                             <span id="vpContractStatusBadge"></span>
                         </div>
 
-                        <div id="vpContractPreview"
-                             style="height:min(38vh,340px); max-height:min(38vh,340px); overflow:auto; border:1px solid rgba(0,0,0,.08); border-radius:12px; padding:14px;">
+                        <div id="vpContractPreview" class="wh-document-preview wh-document-body">
                         </div>
                     </div>
                 </div>

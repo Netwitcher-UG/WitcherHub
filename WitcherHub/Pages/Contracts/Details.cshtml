@@ -11,40 +11,6 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/contracts/contract-sign.css" asp-append-version="true" />
-    <style>
-        .contractTopbar {
-            position: sticky;
-            top: 12px;
-            z-index: 50;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 12px;
-            padding: 10px 12px;
-            margin-bottom: 12px;
-            border-radius: 14px;
-            background: rgba(255,255,255,.88);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(0,0,0,.06);
-        }
-
-        .contractTopbar__actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
-
-        .contractTopbar__badge {
-            font-size: 12px;
-            font-weight: 700;
-            padding: 6px 10px;
-            border-radius: 999px;
-            border: 1px solid rgba(0,0,0,.08);
-            background: rgba(0,0,0,.03);
-        }
-    </style>
 }
 @*
     Everything that can be done with this contract, in one bar.
@@ -69,6 +35,19 @@
                 <partial name="_StatusBadge"
                          model="WitcherHub.Pages.Models.UI.DocumentStatusPresentation.ForContract(Model.Contract.Status)" />
             }
+
+            @*
+                Whether a signature exists is a separate fact from the contract's
+                status, so it gets its own badge — but the same badge, in the same
+                vocabulary as every other status in the application. It used to be
+                a bespoke pill in a sticky bar of its own further down the page,
+                which meant the state was stated twice on one screen in two
+                different visual languages.
+            *@
+            @WitcherHub.Pages.Models.UI.Badge.Toggle(
+                Model.IsSigned,
+                T["contractPage_Signed"].Value,
+                T["contractPage_Unsigned"].Value)
         </div>
 
         @if (Model.Contract?.Project?.Customer is not null)
@@ -104,14 +83,6 @@
 </div>
 
 <div class="contractPage">
-
-    <div class="contractTopbar">
-        <div class="contractTopbar__leftActions">
-            <span class="contractTopbar__badge" id="signedBadge">
-                @(Model.IsSigned? T["contractPage_Signed"] : T["contractPage_Unsigned"])
-            </span>
-        </div>
-    </div>
 
     <div class="contractPage__container">
         <div class="contractPage__paper" id="paper">

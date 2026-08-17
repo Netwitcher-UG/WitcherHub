@@ -9,135 +9,6 @@
     <div class="alert alert-danger">Invalid contract.</div>
     return;
 }
-<style>
-    .linePreview {
-        margin: 8px 0 0 18px;
-        padding: 0;
-        list-style: disc;
-        opacity: .95;
-    }
-
-        .linePreview li {
-            margin: 2px 0;
-        }
-
-        .linePreview .empty {
-            list-style: none;
-            margin-left: -18px;
-        }
-
-    .pos-toggle {
-        width: 100%;
-        text-align: left;
-        padding: 10px 12px;
-        border: 0;
-        background: transparent;
-        border-radius: 14px;
-    }
-
-        .pos-toggle:hover {
-            background: rgba(255,255,255,.05);
-        }
-
-    .pos-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-    }
-
-    .pos-row {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: nowrap;
-    }
-
-    .pos-toggle {
-        flex: 1 1 auto; 
-        text-align: left;
-        padding: 10px 12px;
-        border: 0;
-        background: transparent;
-        border-radius: 14px;
-        min-width: 0; 
-    }
-
-        .pos-toggle:hover {
-            background: rgba(255,255,255,.05);
-        }
-
-    .pos-head {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        align-items: center;
-        gap: 12px;
-        min-width: 0;
-    }
-
-    .pos-left {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        min-width: 0;
-    }
-
-    .pos-no {
-        width: 28px;
-        height: 28px;
-        border-radius: 999px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 800;
-        background: rgba(255,255,255,.10);
-        flex: 0 0 auto;
-    }
-
-    .pos-title {
-        font-weight: 700;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        min-width: 0;
-    }
-
-    .pos-price {
-        font-size: .9rem;
-        opacity: .85;
-        white-space: nowrap;
-        flex: 0 0 auto;
-    }
-
-    .pos-delbtn {
-        width: 34px;
-        height: 34px;
-        border-radius: 12px;
-        padding: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid rgba(220,53,69,.35);
-        background: transparent;
-        color: #dc3545;
-    }
-
-        .pos-delbtn:hover {
-            background: rgba(220,53,69,.10);
-        }
-
-        .pos-delbtn i {
-            font-size: 18px;
-            line-height: 1;
-        }
-
-    #positionsAccordion .form-label {
-        font-weight: 900 !important;
-        color: #212529 !important; 
-        font-size: .95rem;
-        margin-bottom: .25rem;
-    }
-</style>
 <form method="post" class="mb-3">
     @Html.AntiForgeryToken()
 
@@ -217,29 +88,29 @@
                 <div class="card-body">
 
                     <!-- Header row (collapsed view) -->
-                    <div class="pos-row">
+                    <div class="wh-pos-row">
                         <button type="button"
-                                class="pos-toggle"
+                                class="wh-pos-toggle"
                                 data-bs-toggle="collapse"
                                 data-bs-target="#posCollapse-@i"
                                 aria-controls="posCollapse-@i"
                                 aria-expanded="@(i == 0 ? "true" : "false")">
-                            <div class="pos-head">
-                                <div class="pos-left">
-                                    <span class="pos-no">(@p.PositionNo)</span>
-                                    <span class="pos-title">
+                            <div class="wh-pos-head">
+                                <div class="wh-pos-left">
+                                    <span class="wh-pos-no">(@p.PositionNo)</span>
+                                    <span class="wh-pos-title">
                                         @(string.IsNullOrWhiteSpace(p.Title) ? "—" : p.Title)
                                     </span>
                                 </div>
 
-                                <span class="pos-price">
+                                <span class="wh-pos-price">
                                     @(p.LineNetPrice.HasValue? p.LineNetPrice.Value.ToString("0.00") : "—") @Model.Vm.Currency
                                 </span>
                             </div>
                         </button>
 
                         <button type="submit"
-                                class="pos-delbtn"
+                                class="wh-pos-delbtn"
                                 title="Delete"
                                 formaction="@Url.Page("/Contracts/Override", "DeletePosition", new { id = Model.Vm.ContractId, posNo = p.PositionNo })"
                                 disabled="@Model.Vm.IsLocked">
@@ -275,7 +146,7 @@
                                       name="Vm.Positions[@i].Sections.DeliverablesText"
                                       data-preview="#pv-deliverables-@i"
                                       @(Model.Vm.IsLocked ? "disabled" : "")>@string.Join("\n", p.Sections.Deliverables ?? new())</textarea>
-                                <ul class="linePreview" id="pv-deliverables-@i"></ul>
+                                <ul class="wh-line-preview" id="pv-deliverables-@i"></ul>
                             </div>
 
                             <div class="col-12 col-lg-6">
@@ -285,7 +156,7 @@
                                       name="Vm.Positions[@i].Sections.OutOfScopeText"
                                       data-preview="#pv-outscope-@i"
                                       @(Model.Vm.IsLocked ? "disabled" : "")>@string.Join("\n", p.Sections.OutOfScope ?? new())</textarea>
-                                <ul class="linePreview" id="pv-outscope-@i"></ul>
+                                <ul class="wh-line-preview" id="pv-outscope-@i"></ul>
                             </div>
 
                             <div class="col-12 col-lg-6">
@@ -295,7 +166,7 @@
                                       name="Vm.Positions[@i].Sections.CustomerResponsibilitiesText"
                                       data-preview="#pv-resp-@i"
                                       @(Model.Vm.IsLocked ? "disabled" : "")>@string.Join("\n", p.Sections.CustomerResponsibilities ?? new())</textarea>
-                                <ul class="linePreview" id="pv-resp-@i"></ul>
+                                <ul class="wh-line-preview" id="pv-resp-@i"></ul>
                             </div>
 
                             <div class="col-12 col-lg-6">
@@ -305,7 +176,7 @@
                                       name="Vm.Positions[@i].Sections.AcceptanceCriteriaText"
                                       data-preview="#pv-acc-@i"
                                       @(Model.Vm.IsLocked ? "disabled" : "")>@string.Join("\n", p.Sections.AcceptanceCriteria ?? new())</textarea>
-                                <ul class="linePreview" id="pv-acc-@i"></ul>
+                                <ul class="wh-line-preview" id="pv-acc-@i"></ul>
                             </div>
 
                             <div class="col-12 col-lg-4">
@@ -352,7 +223,7 @@
               .filter(x => x.length > 0);
 
             if (lines.length === 0) {
-              ul.innerHTML = `<li class="text-muted empty">— no items —</li>`;
+              ul.innerHTML = `<li class="text-muted wh-line-preview-empty">— no items —</li>`;
               return;
             }
 

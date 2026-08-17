@@ -460,9 +460,7 @@
     const deleteModalHelper = createDeleteModalHelper();
 
     function typeBadgeHtml(type) {
-        const isCompany = type === 'Company';
-        const cls = isCompany ? "badge bg-success bg-opacity-10 text-success" : "badge bg-info bg-opacity-10 text-info";
-        return `<span class="${cls}">${esc(type)}</span>`;
+        return window.UI.badge.html(type, type === 'Company' ? 'success' : 'info');
     }
 
     function closeAllCollapses() {
@@ -533,17 +531,12 @@
             return String(v);
         };
 
-        const statusBadge = (status) => {
-            const txt = normStatusText(status);
-            const s = txt.toLowerCase();
-
-            if (s.includes("draft")) return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
-            if (s.includes("active")) return `<span class="badge bg-success bg-opacity-10 text-success">Active</span>`;
-            if (s.includes("closed") || s.includes("done") || s.includes("complete")) return `<span class="badge bg-secondary bg-opacity-10 text-secondary">Closed</span>`;
-            if (s.includes("cancel")) return `<span class="badge bg-danger bg-opacity-10 text-danger">Canceled</span>`;
-
-            return `<span class="badge bg-light text-dark">${esc(txt || "-")}</span>`;
-        };
+        // These are project statuses, so they read from the project vocabulary.
+        // Matching on substrings ("closed" also matched "done" and "complete")
+        // meant this quietly disagreed with the projects list about both the
+        // wording and the colour of the same project.
+        const statusBadge = (status) =>
+            window.UI.badge.status('project', normStatusText(status));
 
         const fmtDateOnly = (d) => {
             if (!d) return "—";
@@ -635,7 +628,7 @@
             const cityText = `${esc(postalCode ?? '')} ${esc(city ?? '')}${(city || displayCountry) ? ', ' : ''}${esc(displayCountry ?? '')}`.trim() || '—';
 
             const isDefault = !!(a.isDefault ?? a.IsDefault ?? a.Default);
-            const defaultBadge = isDefault ? `<span class="badge bg-primary bg-opacity-10 text-primary ms-2">Default</span>` : '';
+            const defaultBadge = isDefault ? `<span class="ms-2">${window.UI.badge.html('Default', 'primary')}</span>` : '';
             const starIcon = isDefault ? 'ri-star-fill' : 'ri-star-line';
 
             const canDelete = !isDefault && totalCount > 1;
@@ -866,7 +859,7 @@
             const isEditing = (editingContactIndex === idx);
 
             const isPrimary = !!(c.isPrimary ?? c.IsPrimary ?? c.Primary);
-            const primaryBadge = isPrimary ? `<span class="badge bg-warning bg-opacity-10 text-warning ms-2">Primary</span>` : '';
+            const primaryBadge = isPrimary ? `<span class="ms-2">${window.UI.badge.html('Primary', 'warning')}</span>` : '';
             const starIcon = isPrimary ? 'ri-star-fill' : 'ri-star-line';
 
             const salutation = c.salutation ?? c.Salutation ?? '';
@@ -1073,12 +1066,12 @@
             ? (status === 0 ? 'Imported' : status === 1 ? 'Exported' : 'NotExported')
             : status;
 
-        const cls =
-            s === 'Exported' ? "badge bg-primary bg-opacity-10 text-primary" :
-                s === 'Imported' ? "badge bg-secondary bg-opacity-10 text-secondary" :
-                    "badge bg-warning bg-opacity-10 text-warning";
+        const tone =
+            s === 'Exported' ? 'primary' :
+                s === 'Imported' ? 'neutral' :
+                    'warning';
 
-        return `<span class="${cls}">${esc(s)}</span>`;
+        return window.UI.badge.html(s, tone);
     }
 
 
@@ -2452,13 +2445,10 @@
     }
     function emailChipHtml(kind, email) {
         const k = (kind || 'other').toLowerCase();
-        const cls = k === 'business'
-            ? 'badge bg-primary bg-opacity-10 text-primary'
-            : k === 'private'
-                ? 'badge bg-success bg-opacity-10 text-success'
-                : 'badge bg-secondary bg-opacity-10 text-secondary';
+        const tone = k === 'business' ? 'primary' : k === 'private' ? 'success' : 'neutral';
+
         return `<span class="d-inline-flex align-items-center gap-2 px-2 py-1 rounded-3 border border-opacity-25">
-        <span class="${cls}">${esc(k)}</span>
+        ${window.UI.badge.html(k, tone)}
         <span>${esc(email || '—')}</span>
     </span>`;
     }
@@ -2593,12 +2583,9 @@
     // ---------- Emails (View + Edit in VC) ----------
     function emailBadge(kind, email) {
         const k = (kind || 'business').toLowerCase();
-        const cls =
-            k === 'business' ? 'badge bg-primary bg-opacity-10 text-primary' :
-                k === 'private' ? 'badge bg-success bg-opacity-10 text-success' :
-                    'badge bg-secondary bg-opacity-10 text-secondary';
+        const tone = k === 'business' ? 'primary' : k === 'private' ? 'success' : 'neutral';
 
-        return `<span class="${cls}">${esc(k)}</span> <span class="text-muted">${esc(email)}</span>`;
+        return `${window.UI.badge.html(k, tone)} <span class="text-muted">${esc(email)}</span>`;
     }
 
     function renderEmailsView(emails) {

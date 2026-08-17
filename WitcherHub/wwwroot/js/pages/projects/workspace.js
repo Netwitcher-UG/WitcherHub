@@ -56,60 +56,26 @@
         }
     }
 
+    // Statuses are worded and coloured by UI.badge, the same map the server
+    // renders from, so a document reads the same here as it does in its own list.
+    //
+    // Each of these used to be a local ladder of if-statements ending in a
+    // catch-all, and the catch-all was wrong: an unrecognised project status came
+    // out as "Draft", so a cancelled or on-hold project claimed to be a draft, and
+    // an invoice that had been sent did the same. Unknown statuses are now shown
+    // under their own name instead of being folded into whichever branch happened
+    // to be last.
+
     function statusBadgeHtml(st) {
-        const s = (st ?? '').toString().toLowerCase();
-        if (s === 'active') return `<span class="badge bg-success bg-opacity-10 text-success">Active</span>`;
-        if (s === 'closed') return `<span class="badge bg-secondary bg-opacity-10 text-secondary">Closed</span>`;
-        return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
+        return window.UI.badge.status('project', st);
     }
 
     function quoteStatusBadge(st) {
-        const raw = (st ?? '').toString().trim();
-        const s = raw.toLowerCase();
-
-        if (s === 'signed') {
-            return `<span class="badge bg-success bg-opacity-10 text-success">Signed</span>`;
-        }
-
-        if (s === 'accepted') {
-            return `<span class="badge bg-success bg-opacity-10 text-success">Accepted</span>`;
-        }
-
-        if (s === 'rejected') {
-            return `<span class="badge bg-danger bg-opacity-10 text-danger">Rejected</span>`;
-        }
-
-        if (s === 'sent') {
-            return `<span class="badge bg-info bg-opacity-10 text-info">Sent</span>`;
-        }
-
-        if (s === 'draft' || !s) {
-            return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
-        }
-
-        return `<span class="badge bg-secondary bg-opacity-10 text-secondary">${esc(raw)}</span>`;
+        return window.UI.badge.status('quote', st);
     }
 
     function invoiceStatusBadge(st) {
-        const s = (st ?? '').toString().toLowerCase();
-
-        if (s === 'paid') {
-            return `<span class="badge bg-success bg-opacity-10 text-success">Paid</span>`;
-        }
-
-        if (s === 'overdue') {
-            return `<span class="badge bg-danger bg-opacity-10 text-danger">Overdue</span>`;
-        }
-
-        if (s === 'cancelled' || s === 'void') {
-            return `<span class="badge bg-secondary bg-opacity-10 text-secondary">Cancelled</span>`;
-        }
-
-        if (s === 'open' || s === 'issued') {
-            return `<span class="badge bg-info bg-opacity-10 text-info">Open</span>`;
-        }
-
-        return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
+        return window.UI.badge.status('invoice', st);
     }
     function normalizeInvoiceStatusForSelect(st) {
         const s = (st ?? '').toString().toLowerCase();
@@ -187,12 +153,12 @@
             if (btn) btn.disabled = false;
         }
     }
+    // The contract panel's status. Only ever a contract, so it reads from the
+    // contract vocabulary — where a sent contract is "Awaiting signature", which
+    // says who is now being waited on, rather than the bare "Sent" this used to
+    // show.
     function badgeHtml(status) {
-        const s = (status || '').toString().toLowerCase();
-        if (s === 'signed') return `<span class="badge bg-success bg-opacity-10 text-success">Signed</span>`;
-        if (s === 'sent') return `<span class="badge bg-primary bg-opacity-10 text-primary">Sent</span>`;
-        if (s === 'draft') return `<span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>`;
-        return `<span class="badge bg-secondary bg-opacity-10 text-secondary">${esc(status || '—')}</span>`;
+        return window.UI.badge.status('contract', status);
     }
 
     function toastFromPayload(payload, fallbackTitle, fallbackMsg) {

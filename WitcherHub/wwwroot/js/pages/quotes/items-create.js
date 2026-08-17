@@ -155,8 +155,11 @@
       selectedRulesWrap.innerHTML = '';
 
       for (const r of selected.values()) {
+        // A removable chip rather than a status, but it still takes the theme's
+        // badge colours so it matches everything else on the page.
         const badge = document.createElement('span');
-        badge.className = 'badge bg-primary bg-opacity-10 text-primary d-inline-flex align-items-center gap-2';
+        badge.className =
+          'badge bg-primary-50 text-primary-600 border border-primary-600 d-inline-flex align-items-center gap-2';
         badge.style.padding = '8px 10px';
         badge.innerHTML = `
           <span>${escapeHtml(r.name)}</span>
