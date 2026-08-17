@@ -560,20 +560,42 @@ details[open] > summary::before {
 }
 
 /* Wide tables scroll inside the card instead of stretching the page. */
+/* ==========================================================================
+   Generic table cards (clients, services)
+
+   These used to declare `min-width: 1100px` on the table and `white-space:
+   nowrap` on every cell, so the table was wider than an ordinary desktop window
+   before a single column had been read and horizontal scrolling was guaranteed
+   rather than exceptional.
+
+   Cells wrap now, so a column narrows instead of pushing the table past the
+   window. Overflow stays available as a genuine last resort for very wide
+   content, which is what it was for.
+   ========================================================================== */
+
 .wh-tablecard-scroll .table-responsive {
-    overflow-x: auto !important;
+    overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
 }
 
 .wh-tablecard-scroll .table-responsive > table {
-    min-width: var(--wh-table-min-width, 1100px);
-    table-layout: auto !important;
+    /* No minimum width. The table is as wide as it needs to be and no wider. */
+    width: 100%;
+    table-layout: auto;
 }
 
 .wh-tablecard-scroll .table-responsive th,
 .wh-tablecard-scroll .table-responsive td {
-    white-space: nowrap;
+    /* Wrapping is what lets these fit. Nowrap is what stopped them. */
+    white-space: normal;
+    vertical-align: middle;
+}
+
+/* Long unbroken values — email addresses, ids — break rather than widen the
+   column past the window. */
+.wh-tablecard-scroll .table-responsive td {
+    overflow-wrap: anywhere;
 }
 
 /* ==========================================================================

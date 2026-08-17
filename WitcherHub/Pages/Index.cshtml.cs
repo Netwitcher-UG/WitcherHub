@@ -722,18 +722,16 @@ namespace WitcherHub.Pages
                 });
             }
         }
-        private static Microsoft.AspNetCore.Html.IHtmlContent LexwareBadge(string status)
-        {
-            var cls = status switch
+        // Plain Bootstrap badge classes, where the rest of the application uses
+        // the theme's. Routed through the one renderer so the same colour name
+        // produces the same colour everywhere.
+        private static Microsoft.AspNetCore.Html.IHtmlContent LexwareBadge(string status) =>
+            Badge.Html(status ?? "", status switch
             {
-                "Exported" => "badge bg-primary bg-opacity-10 text-primary",
-                "Imported" => "badge bg-secondary bg-opacity-10 text-secondary",
-                _ => "badge bg-warning bg-opacity-10 text-warning" // NotExported
-            };
-
-            var safe = System.Text.Encodings.Web.HtmlEncoder.Default.Encode(status ?? "");
-            return new Microsoft.AspNetCore.Html.HtmlString($"<span class=\"{cls}\">{safe}</span>");
-        }
+                "Exported" => "primary",
+                "Imported" => "neutral",
+                _ => "warning"          // NotExported
+            });
         
 
 
@@ -955,12 +953,8 @@ namespace WitcherHub.Pages
         private static Microsoft.AspNetCore.Html.IHtmlContent Html(string? text)
             => new Microsoft.AspNetCore.Html.HtmlString(System.Text.Encodings.Web.HtmlEncoder.Default.Encode(text ?? ""));
 
-        private static Microsoft.AspNetCore.Html.IHtmlContent TypeBadge(string type)
-        {
-            var isCompany = type == "Company";
-            var cls = isCompany ? "badge bg-success bg-opacity-10 text-success" : "badge bg-info bg-opacity-10 text-info";
-            return new Microsoft.AspNetCore.Html.HtmlString($"<span class='{cls}'>{System.Text.Encodings.Web.HtmlEncoder.Default.Encode(type)}</span>");
-        }
+        private static Microsoft.AspNetCore.Html.IHtmlContent TypeBadge(string type) =>
+            Badge.Html(type, type == "Company" ? "success" : "info");
 
         private static string Enc(string? v) => System.Text.Encodings.Web.HtmlEncoder.Default.Encode(v ?? "");
 

@@ -610,8 +610,14 @@ namespace WitcherHub.Pages
 
         private static Microsoft.AspNetCore.Html.IHtmlContent CountsBadge(int quotes, int invoices)
         {
-            var html = $"<span class='badge bg-primary bg-opacity-10 text-primary me-1'>Q:{quotes}</span>" +
-                       $"<span class='badge bg-info bg-opacity-10 text-info'>I:{invoices}</span>";
+            // Left in the theme's own badge classes rather than Bootstrap's, so
+            // it matches every other badge in the application.
+            var html =
+                "<span class='badge bg-primary-50 text-primary-600 border border-primary-600 px-12 py-2 radius-4 me-1'>" +
+                $"Q:{quotes}</span>" +
+                "<span class='badge bg-info-focus text-info-main border border-info-main px-12 py-2 radius-4'>" +
+                $"I:{invoices}</span>";
+
             return new Microsoft.AspNetCore.Html.HtmlString(html);
         }
 
