@@ -281,7 +281,7 @@ namespace WitcherHub.Pages
                         Html(s.Name),
                         TypeBadge(s.ServiceType.ToString()),
                         Html(s.PricingModel.ToString()),
-                        Html(s.BasePrice.ToString("0.##")),
+                        Html(Format.Amount(s.BasePrice)),
                         RulesBadge(s.RulesCount),
                         Html(s.DefaultCurrency),
                         ActiveBadge(s.IsActive),

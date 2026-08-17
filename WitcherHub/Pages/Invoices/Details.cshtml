@@ -95,7 +95,7 @@
                                             }
                                         </td>
                                         <td class="text-end text-nowrap">
-                                            @item.Quantity.ToString("0.##")
+                                            @Format.Quantity(item.Quantity)
                                             @if (!string.IsNullOrWhiteSpace(item.UnitName))
                                             {
                                                 <span class="text-secondary-light">@item.UnitName</span>
@@ -298,7 +298,7 @@
                         <div class="col-12 col-sm-6">
                             <label class="form-label text-sm fw-medium" asp-for="PaymentReceivedOn">Received on</label>
                             <input asp-for="PaymentReceivedOn" type="date" class="form-control radius-8 js-datepicker"
-                                   max="@DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd")" required>
+                                   max="@Format.DateInput(DateOnly.FromDateTime(DateTime.UtcNow))" required>
                         </div>
 
                         <div class="col-12 col-sm-6">

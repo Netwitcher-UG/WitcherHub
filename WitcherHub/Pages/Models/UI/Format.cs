@@ -19,9 +19,39 @@ namespace WitcherHub.Pages.Models.UI
         public static string Money(decimal amount, string currency = "EUR") =>
             $"{amount.ToString("N2", German)} {Symbol(currency)}";
 
-        /// <summary>For headline figures, where the cents are noise: "1.235 €".</summary>
+        /// <summary>
+        /// For headline figures, where the cents are noise: "1.235 €".
+        ///
+        /// Rounds half away from zero, which is what a reader expects of a figure on
+        /// a dashboard tile. <see cref="Math.Round(decimal, int)"/> on its own rounds
+        /// half to even — nobody chose that here, it is the default — and it meant
+        /// 1.234,50 was displayed as "1.234", which looks like the cents had been
+        /// cut off rather than rounded. Display only: nothing is calculated from this.
+        /// </summary>
         public static string MoneyCompact(decimal amount, string currency = "EUR") =>
-            $"{Math.Round(amount, 0).ToString("N0", German)} {Symbol(currency)}";
+            $"{Math.Round(amount, 0, MidpointRounding.AwayFromZero).ToString("N0", German)} {Symbol(currency)}";
+
+        /// <summary>
+        /// An amount with no currency symbol, for table columns where the currency
+        /// is already stated once in the header: 1234.5 → "1.234,50".
+        ///
+        /// This exists so those columns stop calling <c>ToString("0.00")</c>, which
+        /// formats in the request culture — and the default request culture here is
+        /// English. A German invoice line was rendering as "1234.50": a dot for a
+        /// decimal comma, and no group separator at all, next to totals elsewhere
+        /// on the same screen that came out as "1.234,50 €". Which shape you got
+        /// depended on which helper the page happened to call, and switching the UI
+        /// language changed the figures under you.
+        /// </summary>
+        public static string Amount(decimal amount) => amount.ToString("N2", German);
+
+        public static string Amount(decimal? amount) => amount is null ? "—" : Amount(amount.Value);
+
+        /// <summary>
+        /// A quantity: whole where it is whole, up to two decimals where it is not,
+        /// and German separators either way. 2 → "2", 2.5 → "2,5".
+        /// </summary>
+        public static string Quantity(decimal quantity) => quantity.ToString("0.##", German);
 
         public static string Symbol(string? currency) => (currency ?? "EUR").ToUpperInvariant() switch
         {
@@ -40,6 +70,24 @@ namespace WitcherHub.Pages.Models.UI
 
         public static string DateTime(DateTimeOffset? moment) =>
             moment is null ? "—" : moment.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", German);
+
+        /// <summary>
+        /// The value for an <c>&lt;input type="date"&gt;</c>, which HTML defines as
+        /// ISO <c>yyyy-MM-dd</c> regardless of the user's locale — the browser
+        /// handles displaying it in local form.
+        ///
+        /// Deliberately not <see cref="Date(DateTimeOffset?)"/>: passing a German
+        /// "31.12.2025" to a date input makes the browser discard it and show an
+        /// empty field, so a date the user had already saved silently disappears the
+        /// next time they open the form. Named for where it goes so the two are not
+        /// confused, and empty rather than "—" because that is the input's own empty
+        /// value.
+        /// </summary>
+        public static string DateInput(DateTimeOffset? moment) =>
+            moment?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
+
+        public static string DateInput(DateOnly? date) =>
+            date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
 
         /// <summary>
         /// "today", "3 days ago", "in 12 days". Used where the age of something is

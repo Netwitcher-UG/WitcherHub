@@ -16,7 +16,6 @@
 }
 
 @functions {
-    string FmtDate(DateTimeOffset? d) => d?.ToString("yyyy-MM-dd") ?? "";
 
     decimal ReadDec(JsonDocument? doc, string prop, decimal fallback = 0m)
     {
@@ -200,7 +199,7 @@
                                 <input type="date"
                                        class="form-control js-themed-date js-datepicker js-pointer-date"
                                        name="Header.Quote.IssuedAt"
-                                       value="@FmtDate(Model.Header.Quote.IssuedAt)" />
+                                       value="@Format.DateInput(Model.Header.Quote.IssuedAt)" />
                             </div>
 
                             <div class="col-12 col-md-3">
@@ -208,7 +207,7 @@
                                 <input type="date"
                                        class="form-control js-themed-date js-datepicker js-pointer-date"
                                        name="Header.Quote.ExpiresAt"
-                                       value="@FmtDate(Model.Header.Quote.ExpiresAt)" />
+                                       value="@Format.DateInput(Model.Header.Quote.ExpiresAt)" />
                             </div>
 
                             <div class="col-12 col-md-3">
@@ -347,14 +346,14 @@
                                             }
 
                                             <div class="text-muted small">
-                                                Sub: <strong>@subTotal.ToString("0.00")</strong>
-                                                &nbsp;•&nbsp; Disc: <strong>@discountAmt.ToString("0.00")</strong>
+                                                Sub: <strong>@Format.Amount(subTotal)</strong>
+                                                &nbsp;•&nbsp; Disc: <strong>@Format.Amount(discountAmt)</strong>
                                             </div>
                                         </td>
 
-                                        <td class="text-end">@it.Quantity.ToString("0.##")</td>
-                                        <td class="text-end">@it.UnitPrice.ToString("0.00")</td>
-                                        <td class="text-end fw-semibold">@total.ToString("0.00")</td>
+                                        <td class="text-end">@Format.Quantity(it.Quantity)</td>
+                                        <td class="text-end">@Format.Amount(it.UnitPrice)</td>
+                                        <td class="text-end fw-semibold">@Format.Amount(total)</td>
 
                                         <td class="text-end">
                                             @if (isDraft)
@@ -417,22 +416,22 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between mb-2">
                     <div class="text-muted">Subtotal</div>
-                    <div class="fw-semibold">@sumSub.ToString("0.00")</div>
+                    <div class="fw-semibold">@Format.Money(sumSub, Model.Quote.Currency)</div>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
                     <div class="text-muted">Discounts</div>
-                    <div class="fw-semibold">-@sumDisc.ToString("0.00")</div>
+                    <div class="fw-semibold">-@Format.Money(sumDisc, Model.Quote.Currency)</div>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
                     <div class="text-muted">Tax</div>
-                    <div class="fw-semibold">@sumTax.ToString("0.00")</div>
+                    <div class="fw-semibold">@Format.Money(sumTax, Model.Quote.Currency)</div>
                 </div>
 
                 <hr />
 
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="text-muted">Total</div>
-                    <div class="fs-4 fw-bold">@sumTotal.ToString("0.00")</div>
+                    <div class="fs-4 fw-bold">@Format.Money(sumTotal, Model.Quote.Currency)</div>
                 </div>
 
                 <div class="text-muted small mt-2">

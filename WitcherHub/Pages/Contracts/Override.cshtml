@@ -104,7 +104,7 @@
                                 </div>
 
                                 <span class="wh-pos-price">
-                                    @(p.LineNetPrice.HasValue? p.LineNetPrice.Value.ToString("0.00") : "—") @Model.Vm.Currency
+                                    @Format.Amount(p.LineNetPrice) @Model.Vm.Currency
                                 </span>
                             </div>
                         </button>
