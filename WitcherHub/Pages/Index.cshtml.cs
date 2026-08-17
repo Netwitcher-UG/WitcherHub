@@ -676,9 +676,6 @@ namespace WitcherHub.Pages
 
             ClientsTable = new TableCardVm
             {
-                Title = "Clients",
-                PrimaryButtonText = "Add Client",
-                PrimaryButtonTarget = "#FormModal",
                 SearchPlaceholder = "Search clients...",
                 Pagination = new PaginationVm
                 {

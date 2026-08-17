@@ -9,6 +9,22 @@
 
 @{
     ViewData["Title"] = "Projects";
+
+    var header = new PageHeaderVm
+    {
+        Title = "Projects",
+        Subtitle = "A project holds the quotes, contracts and invoices for one piece of work.",
+        Actions =
+        [
+            new PageAction
+            {
+                Label = "New project",
+                Icon = "ri-add-line",
+                Style = PageActionStyle.Primary,
+                ModalTarget = "FormModal"
+            }
+        ]
+    };
 }
 
 @*
@@ -25,21 +41,7 @@
     live in a menu rather than as a row of identical outline buttons.
 *@
 
-<div class="wh-section d-flex flex-wrap align-items-start justify-content-between gap-3">
-    <div>
-        <h4 class="mb-4 fw-semibold">Projects</h4>
-        <p class="text-secondary-light mb-0 text-sm">
-            A project holds the quotes, contracts and invoices for one piece of work.
-        </p>
-    </div>
-
-    <div class="wh-actions">
-        <button type="button" class="btn btn-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2"
-                data-bs-toggle="modal" data-bs-target="#FormModal">
-            <i class="ri-add-line"></i> New project
-        </button>
-    </div>
-</div>
+<partial name="_PageHeader" model="header" />
 
 @* ---------------------------------------------------------------- filters *@
 <form method="get" class="wh-section card radius-12 border">

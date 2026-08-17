@@ -1473,3 +1473,37 @@ body.ui-loading {
 .wh-contract-editor-page .contractActions {
     display: none !important;
 }
+
+
+/* Page header (see Shared/_PageHeader.cshtml).
+
+   Identity on the left, actions on the right; both wrap onto their own line on a
+   narrow screen rather than the actions squeezing the title into two words per
+   line. align-items: flex-start so a two-line title does not drag the buttons
+   down with it. */
+.wh-page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--wh-space-3, 0.75rem);
+
+    /* The header owns the space beneath it rather than depending on whatever
+       follows carrying .wh-section. It used to rely on the sibling rule, so on a
+       page whose first card had no .wh-section the gap collapsed to a few pixels
+       and the title sat almost on top of the card. */
+    margin-block-end: var(--wh-space-6);
+}
+
+.wh-page-header__identity {
+    min-width: 0;
+    flex: 1 1 20rem;
+}
+
+/* On a phone the actions go full width and stay in reading order under the
+   title, rather than floating beside it in a 100px column. */
+@media (max-width: 575.98px) {
+    .wh-page-header .wh-actions {
+        width: 100%;
+    }
+}

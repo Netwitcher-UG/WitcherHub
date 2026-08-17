@@ -94,7 +94,6 @@ namespace WitcherHub.Pages
         public bool HasFilters =>
             !string.IsNullOrWhiteSpace(Search) || Status is not null || IncludeArchived;
 
-        public TableCardVm ProjectsTable { get; private set; } = new();
 
         // Create form fields
         [BindProperty] public CreateProjectDto Project { get; set; } = new();
@@ -510,59 +509,11 @@ namespace WitcherHub.Pages
             var res = await _projects.GetProjectsAsync(
                 Page, PageSize, Search, CustomerName, Status, IncludeArchived, ct);
 
-            // The rows the page actually renders. TableCardVm below is still
-            // built for the moment because other things read it; the list itself
-            // no longer goes through it.
             Projects = res.Items;
 
             // Built from the request, so every filter currently applied survives
             // a page change.
             Pager = PagerVm.From(Request, res.Page, res.PageSize, res.TotalItems);
-
-            ProjectsTable = new TableCardVm
-            {
-                Title = "Projects",
-                PrimaryButtonText = "Add Project",
-                PrimaryButtonTarget = "#FormModal",
-                SearchPlaceholder = "Search projects...",
-                Pagination = new PaginationVm
-                {
-                    Page = res.Page,
-                    PageSize = res.PageSize,
-                    TotalItems = res.TotalItems,
-                    SearchQuery = Search,
-                    SearchParam = "q",
-                    PageParam = "p",
-                    PageSizeParam = "pageSize"
-                },
-                Columns =
-                {
-                    new() { Header="Title",       Width="24%", HeaderClass="ps-4", CellClass="ps-4 fw-semibold" },
-                    new() { Header="Customer",    Width="18%" },
-                    new() { Header="Email",       Width="16%" },
-                    new() { Header="Status",      Width="10%" },
-                    new() { Header="Dates",       Width="14%" },
-                    new() { Header="Counts",      Width="10%" },
-                    new() { Header="Actions",     Width="8%", HeaderClass="text-end pe-4", CellClass="text-end pe-4" },
-                }
-            };
-
-            foreach (var p in res.Items)
-            {
-                ProjectsTable.Rows.Add(new TableRowVm
-                {
-                    Cells =
-                    {
-                        Html(p.Title),
-                        Html(p.CustomerName),
-                        Html(p.CustomerEmail ?? "—"),
-                        StatusBadge(p.Status),
-                        Html($"{FmtDate(p.StartDate)} → {FmtDate(p.EndDate)}"),
-                        CountsBadge(p.QuotesCount, p.InvoicesCount),
-                        ActionsButtons(p.Id.ToString())
-                    }
-                });
-            }
         }
 
         private void BuildCreateProjectModal(bool autoOpen)
@@ -584,67 +535,6 @@ namespace WitcherHub.Pages
             };
         }
 
-        // ========= helpers =========
-        private static string FmtDate(DateOnly? d) => d?.ToString("dd-MM-yyyy") ?? "—";
-
-        private static Microsoft.AspNetCore.Html.IHtmlContent Html(string? text)
-            => new Microsoft.AspNetCore.Html.HtmlString(System.Text.Encodings.Web.HtmlEncoder.Default.Encode(text ?? ""));
-
-        /// <summary>
-        /// The project status badge, from the one map that defines them.
-        ///
-        /// This page used to carry its own copy — different colours from the rest
-        /// of the application for the same status, and a second place to forget
-        /// when the vocabulary changed.
-        /// </summary>
-        private static Microsoft.AspNetCore.Html.IHtmlContent StatusBadge(ProjectStatus st)
-        {
-            var presentation = DocumentStatusPresentation.ForProject(st);
-
-            return new Microsoft.AspNetCore.Html.HtmlString(
-                $"<span class='badge bg-{presentation.Tone}-focus text-{presentation.Tone}-main " +
-                $"border border-{presentation.Tone}-main px-16 py-4 radius-4'>" +
-                System.Text.Encodings.Web.HtmlEncoder.Default.Encode(presentation.Label) +
-                "</span>");
-        }
-
-        private static Microsoft.AspNetCore.Html.IHtmlContent CountsBadge(int quotes, int invoices)
-        {
-            // Left in the theme's own badge classes rather than Bootstrap's, so
-            // it matches every other badge in the application.
-            var html =
-                "<span class='badge bg-primary-50 text-primary-600 border border-primary-600 px-12 py-2 radius-4 me-1'>" +
-                $"Q:{quotes}</span>" +
-                "<span class='badge bg-info-focus text-info-main border border-info-main px-12 py-2 radius-4'>" +
-                $"I:{invoices}</span>";
-
-            return new Microsoft.AspNetCore.Html.HtmlString(html);
-        }
-
-        private static string Enc(string? v) => System.Text.Encodings.Web.HtmlEncoder.Default.Encode(v ?? "");
-
-        private static Microsoft.AspNetCore.Html.IHtmlContent ActionsButtons(string projectId)
-        {
-            var quotesUrl = $"/Projects/Workspace?id={projectId}&tab=quotes";
-
-            return new Microsoft.AspNetCore.Html.HtmlString($$"""
-<div class="vc-actions-wrap d-flex justify-content-end gap-1 flex-nowrap">
-  <a class="btn vc-icon-btn text-primary"
-     title="Quotes"
-     href="{{Enc(quotesUrl)}}">
-      <i class="ri-file-text-line"></i>
-  </a>
-
-  <button type="button"
-          class="btn vc-icon-btn text-danger"
-          title="Delete"
-          data-vc-action="table-delete-project"
-          data-project-id="{{Enc(projectId)}}">
-      <i class="ri-delete-bin-line"></i>
-  </button>
-</div>
-""");
-        }
         private async Task LoadCustomersAsync(CancellationToken ct)
         {
             var res = await _customers.GetCustomersAsync(page: 1, pageSize: 200, search: null, ct: ct);

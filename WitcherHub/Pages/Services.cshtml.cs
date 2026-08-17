@@ -245,9 +245,6 @@ namespace WitcherHub.Pages
 
             ServicesTable = new TableCardVm
             {
-                Title = "Services",
-                PrimaryButtonText = "Add Service",
-                PrimaryButtonTarget = "#FormModal",
                 SearchPlaceholder = "Search services...",
                 Pagination = new PaginationVm
                 {

@@ -1,0 +1,134 @@
+@model WitcherHub.Pages.Models.UI.PageHeaderVm
+
+@*
+    The top of a page.
+
+    Left: where you came from, what this is, how it stands. Right: what you can do
+    about it, with the main action drawn as the main action.
+
+    Pages describe their actions rather than styling them (see PageAction), so the
+    hierarchy is decided here once instead of being re-guessed per screen.
+*@
+
+@{
+    string ActionUrl(WitcherHub.Pages.Models.UI.PageAction a)
+    {
+        if (a.Href is not null) return a.Href;
+        if (a.Page is null) return "#";
+
+        return a.RouteValues is null
+            ? Url.Page(a.Page)!
+            : Url.Page(a.Page, new Microsoft.AspNetCore.Routing.RouteValueDictionary(a.RouteValues))!;
+    }
+}
+
+@* Not .wh-section: the header carries its own bottom margin, so it does not
+   depend on the next element declaring one. *@
+<div class="wh-page-header">
+    <div class="wh-page-header__identity">
+        @if (Model.BackLabel is not null && Model.BackPage is not null)
+        {
+            var backUrl = Model.BackRouteValues is null
+                ? Url.Page(Model.BackPage)
+                : Url.Page(Model.BackPage, new Microsoft.AspNetCore.Routing.RouteValueDictionary(Model.BackRouteValues));
+
+            <nav class="mb-8">
+                <a href="@backUrl"
+                   class="text-secondary-light text-sm hover-text-primary d-inline-flex align-items-center gap-1">
+                    <i class="ri-arrow-left-line"></i> @Model.BackLabel
+                </a>
+            </nav>
+        }
+
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            @* One heading level for every page. *@
+            <h4 class="mb-0 fw-semibold">@Model.Title</h4>
+
+            @if (Model.Status is not null)
+            {
+                <partial name="_StatusBadge" model="Model.Status" />
+            }
+
+            @foreach (var (label, tone) in Model.Badges)
+            {
+                @WitcherHub.Pages.Models.UI.Badge.Html(label, tone)
+            }
+        </div>
+
+        @if (Model.Context.Count > 0)
+        {
+            <p class="text-secondary-light mb-0 mt-8 text-sm">
+                @for (var i = 0; i < Model.Context.Count; i++)
+                {
+                    var link = Model.Context[i];
+
+                    if (i > 0)
+                    {
+                        <text> · </text>
+                    }
+
+                    var url = link.Href
+                        ?? (link.Page is null
+                            ? null
+                            : link.RouteValues is null
+                                ? Url.Page(link.Page)
+                                : Url.Page(link.Page, new Microsoft.AspNetCore.Routing.RouteValueDictionary(link.RouteValues)));
+
+                    if (url is null)
+                    {
+                        <span>@link.Label</span>
+                    }
+                    else
+                    {
+                        <a href="@url" class="@(link.Emphasised ? "text-primary-600 fw-medium" : "hover-text-primary")">@link.Label</a>
+                    }
+                }
+            </p>
+        }
+        else if (!string.IsNullOrWhiteSpace(Model.Subtitle))
+        {
+            <p class="text-secondary-light mb-0 mt-8 text-sm">@Model.Subtitle</p>
+        }
+    </div>
+
+    @if (Model.Actions.Count > 0)
+    {
+        <div class="wh-actions">
+            @foreach (var action in Model.Actions)
+            {
+                var classes = $"{WitcherHub.Pages.Models.UI.PageHeaderVm.ButtonClass(action.Style)} " +
+                              WitcherHub.Pages.Models.UI.PageHeaderVm.ButtonShape;
+
+                @* A disabled action says why, rather than simply refusing. *@
+                var tooltip = action.Disabled ? action.DisabledReason : null;
+
+                if (action.IsLink && !action.Disabled)
+                {
+                    <a href="@ActionUrl(action)" class="@classes" id="@action.Id" title="@tooltip">
+                        @if (action.Icon is not null)
+                        {
+                            <i class="@action.Icon"></i>
+                        }
+                        @action.Label
+                    </a>
+                }
+                else
+                {
+                    <button type="button"
+                            class="@classes"
+                            id="@action.Id"
+                            title="@tooltip"
+                            disabled="@action.Disabled"
+                            data-bs-toggle="@(action.ModalTarget is null ? null : "modal")"
+                            data-bs-target="@(action.ModalTarget is null ? null : "#" + action.ModalTarget)">
+                        @if (action.Icon is not null)
+                        {
+                            <i class="@action.Icon"></i>
+                        }
+                        @action.Label
+                    </button>
+                }
+            }
+        </div>
+    }
+</div>

@@ -1,167 +1,161 @@
 @model WitcherHub.Pages.Models.UI.TableCardVm
 
-<div class="row">
-    <div class="col-12 col-xl-11 col-xxl-10 mx-auto">
+@*
+    Full width, like every other card in the application.
 
-        @*
-            h3 to match every other page title in the application. The theme sizes
-            headings with clamp() against the viewport; site.css pins them to a
-            fixed scale inside the dashboard body so this and "Create Quote" and
-            "Client Details" all come out the same size.
-        *@
-        <!-- Toolbar -->
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
-            <h3 class="mb-0 fw-semibold">@Model.Title</h3>
+    This used to sit in a centred col-xl-11 col-xxl-10, so the two pages built on
+    it — clients and services — were inset by about 95px while their own page
+    header and every other page's cards ran the full width of the content area.
+    The table did not line up with its own title.
+*@
 
-            @if (!string.IsNullOrWhiteSpace(Model.PrimaryButtonText) &&
-                        !string.IsNullOrWhiteSpace(Model.PrimaryButtonTarget))
-            {
-                <button type="button"
-                        class="btn btn-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2"
-                        data-bs-toggle="modal"
-                        data-bs-target="@Model.PrimaryButtonTarget">
-                    <i class="ri-add-line text-lg"></i>
-                    @Model.PrimaryButtonText
-                </button>
-            }
+@*
+    No page title or primary action here.
+
+    This partial used to render its own toolbar — an h3 title and a filled
+    primary button — which made it a second page-header implementation
+    living inside a table component, at a different heading level from the
+    real one. A page using it therefore either had two headers or, as with
+    Services, no page header at all and only this one, so the screen never
+    said what it was for.
+
+    The page owns its header now (Shared/_PageHeader.cshtml). This owns the
+    table.
+*@
+<!-- Table Card -->
+<div class="card w-100 rounded-4">
+    <div class="card-body">
+
+      
+        @if (Model.Pagination is not null)
+        {
+            var p = Model.Pagination;
+            var lexUrl = ViewData["LexwareImportUrl"] as string;
+
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 my-3 px-4">
+                <form method="get" class="order-search position-relative w-25 m-0">
+                    <input class="form-control rounded-5 ps-5 pe-5"
+                           type="text"
+                           name="@p.SearchParam"
+                           value="@p.SearchQuery"
+                           placeholder="@Model.SearchPlaceholder" />
+
+                    <input type="hidden" name="@p.PageParam" value="1" />
+                    <input type="hidden" name="@p.PageSizeParam" value="@p.PageSize" />
+
+                    <i class="ri-search-line position-absolute ms-3 translate-middle-y start-0 top-50"></i>
+
+                    <button type="button"
+                            class="btn p-0 border-0 bg-transparent position-absolute end-0 top-50 translate-middle-y me-3 text-muted d-none"
+                            style="z-index: 5;"
+                            data-search-clear
+                            title="Clear search"
+                            aria-label="Clear search">
+                        <i class="ri-close-line" style="font-size:18px;"></i>
+                    </button>
+                </form>
+
+                @if (!string.IsNullOrWhiteSpace(lexUrl))
+                {
+                    <button type="button"
+                            class="btn btn-outline-primary rounded-5 px-3 d-inline-flex align-items-center gap-2"
+                            title="Refresh from Lexware"
+                            data-vc-action="lexware-refresh">
+                        <i class="ri-refresh-line"></i>
+                        <span class="d-none d-md-inline">Lexware</span>
+                    </button>
+                }
+            </div>
+        }
+
+
+
+
+            
+
+        <div class="table-responsive wh-table-wrap mt-2">
+            <table class="table align-middle w-100 wh-table mb-0">
+                <thead>
+                    <tr>
+                        @foreach (var col in Model.Columns)
+                        {
+                            <th class="@col.HeaderClass" style="width:@col.Width">@col.Header</th>
+                        }
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var row in Model.Rows)
+                    {
+                        <tr>
+                            @for (int i = 0; i < row.Cells.Count; i++)
+                            {
+                                var cellClass = (i < Model.Columns.Count) ? Model.Columns[i].CellClass : null;
+                                <td class="@cellClass" style="width:@Model.Columns[i].Width">@row.Cells[i]</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
         </div>
 
-        <!-- Table Card -->
-        <div class="card w-100 rounded-4">
-            <div class="card-body">
+        @* ✅ Pagination (Working with icons) *@
+        @if (Model.Pagination?.HasPages == true)
+        {
+            var p = Model.Pagination;
 
-              
-                @if (Model.Pagination is not null)
-                {
-                    var p = Model.Pagination;
-                    var lexUrl = ViewData["LexwareImportUrl"] as string;
-
-                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 my-3 px-4">
-                        <form method="get" class="order-search position-relative w-25 m-0">
-                            <input class="form-control rounded-5 ps-5 pe-5"
-                                   type="text"
-                                   name="@p.SearchParam"
-                                   value="@p.SearchQuery"
-                                   placeholder="@Model.SearchPlaceholder" />
-
-                            <input type="hidden" name="@p.PageParam" value="1" />
-                            <input type="hidden" name="@p.PageSizeParam" value="@p.PageSize" />
-
-                            <i class="ri-search-line position-absolute ms-3 translate-middle-y start-0 top-50"></i>
-
-                            <button type="button"
-                                    class="btn p-0 border-0 bg-transparent position-absolute end-0 top-50 translate-middle-y me-3 text-muted d-none"
-                                    style="z-index: 5;"
-                                    data-search-clear
-                                    title="Clear search"
-                                    aria-label="Clear search">
-                                <i class="ri-close-line" style="font-size:18px;"></i>
-                            </button>
-                        </form>
-
-                        @if (!string.IsNullOrWhiteSpace(lexUrl))
-                        {
-                            <button type="button"
-                                    class="btn btn-outline-primary rounded-5 px-3 d-inline-flex align-items-center gap-2"
-                                    title="Refresh from Lexware"
-                                    data-vc-action="lexware-refresh">
-                                <i class="ri-refresh-line"></i>
-                                <span class="d-none d-md-inline">Lexware</span>
-                            </button>
-                        }
-                    </div>
-                }
-
-
-
-
-                    
-
-                <div class="table-responsive wh-table-wrap mt-2">
-                    <table class="table align-middle w-100 wh-table mb-0">
-                        <thead>
-                            <tr>
-                                @foreach (var col in Model.Columns)
-                                {
-                                    <th class="@col.HeaderClass" style="width:@col.Width">@col.Header</th>
-                                }
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            @foreach (var row in Model.Rows)
-                            {
-                                <tr>
-                                    @for (int i = 0; i < row.Cells.Count; i++)
-                                    {
-                                        var cellClass = (i < Model.Columns.Count) ? Model.Columns[i].CellClass : null;
-                                        <td class="@cellClass" style="width:@Model.Columns[i].Width">@row.Cells[i]</td>
-                                    }
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+            <div class="d-flex align-items-center justify-content-between mt-3 flex-wrap gap-2">
+                <div class="text-muted small ms-2">
+                    Page @p.Page of @p.TotalPages
+                    <span class="mx-1">•</span>
+                    Total @p.TotalItems
                 </div>
 
-                @* ✅ Pagination (Working with icons) *@
-                @if (Model.Pagination?.HasPages == true)
-                {
-                    var p = Model.Pagination;
+                <nav aria-label="Table pagination">
+                    <ul class="pagination mb-0">
 
-                    <div class="d-flex align-items-center justify-content-between mt-3 flex-wrap gap-2">
-                        <div class="text-muted small ms-2">
-                            Page @p.Page of @p.TotalPages
-                            <span class="mx-1">•</span>
-                            Total @p.TotalItems
-                        </div>
+                        @* Prev *@
+                        <li class="page-item @(p.HasPrev ? "" : "disabled")">
+                            <a class="page-link"
+                               aria-label="Previous"
+                               href="@(p.HasPrev ? $"?{p.PageParam}={p.PrevPage}&{p.PageSizeParam}={p.PageSize}{(string.IsNullOrWhiteSpace(p.SearchQuery) ? "" : $"&{p.SearchParam}={Uri.EscapeDataString(p.SearchQuery)}")}" : "javascript:;")">
+                                <span aria-hidden="true">«</span>
+                            </a>
+                        </li>
 
-                        <nav aria-label="Table pagination">
-                            <ul class="pagination mb-0">
-
-                                @* Prev *@
-                                <li class="page-item @(p.HasPrev ? "" : "disabled")">
+                        @* Numbers + ellipsis *@
+                        @foreach (var it in p.BuildItems())
+                        {
+                            if (it.IsEllipsis)
+                            {
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="javascript:;">…</a>
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="page-item @(it.IsActive ? "active" : "")">
                                     <a class="page-link"
-                                       aria-label="Previous"
-                                       href="@(p.HasPrev ? $"?{p.PageParam}={p.PrevPage}&{p.PageSizeParam}={p.PageSize}{(string.IsNullOrWhiteSpace(p.SearchQuery) ? "" : $"&{p.SearchParam}={Uri.EscapeDataString(p.SearchQuery)}")}" : "javascript:;")">
-                                        <span aria-hidden="true">«</span>
+                                       href="?@p.PageParam=@it.Page&@p.PageSizeParam=@p.PageSize@(string.IsNullOrWhiteSpace(p.SearchQuery) ? "" : $"&{p.SearchParam}={Uri.EscapeDataString(p.SearchQuery)}")">
+                                        @it.Text
                                     </a>
                                 </li>
+                            }
+                        }
 
-                                @* Numbers + ellipsis *@
-                                @foreach (var it in p.BuildItems())
-                                {
-                                    if (it.IsEllipsis)
-                                    {
-                                        <li class="page-item disabled">
-                                            <a class="page-link" href="javascript:;">…</a>
-                                        </li>
-                                    }
-                                    else
-                                    {
-                                        <li class="page-item @(it.IsActive ? "active" : "")">
-                                            <a class="page-link"
-                                               href="?@p.PageParam=@it.Page&@p.PageSizeParam=@p.PageSize@(string.IsNullOrWhiteSpace(p.SearchQuery) ? "" : $"&{p.SearchParam}={Uri.EscapeDataString(p.SearchQuery)}")">
-                                                @it.Text
-                                            </a>
-                                        </li>
-                                    }
-                                }
+                        @* Next *@
+                        <li class="page-item @(p.HasNext ? "" : "disabled")">
+                            <a class="page-link"
+                               aria-label="Next"
+                               href="@(p.HasNext ? $"?{p.PageParam}={p.NextPage}&{p.PageSizeParam}={p.PageSize}{(string.IsNullOrWhiteSpace(p.SearchQuery) ? "" : $"&{p.SearchParam}={Uri.EscapeDataString(p.SearchQuery)}")}" : "javascript:;")">
+                                <span aria-hidden="true">»</span>
+                            </a>
+                        </li>
 
-                                @* Next *@
-                                <li class="page-item @(p.HasNext ? "" : "disabled")">
-                                    <a class="page-link"
-                                       aria-label="Next"
-                                       href="@(p.HasNext ? $"?{p.PageParam}={p.NextPage}&{p.PageSizeParam}={p.PageSize}{(string.IsNullOrWhiteSpace(p.SearchQuery) ? "" : $"&{p.SearchParam}={Uri.EscapeDataString(p.SearchQuery)}")}" : "javascript:;")">
-                                        <span aria-hidden="true">»</span>
-                                    </a>
-                                </li>
-
-                            </ul>
-                        </nav>
-                    </div>
-                }
-
+                    </ul>
+                </nav>
             </div>
-        </div>
+        }
+
     </div>
 </div>

@@ -7,9 +7,29 @@
 
 @{
     ViewData["Title"] = "Services";
+
+    @* This page had no header at all: it opened straight into a table, with
+       nothing saying what the table was or what a service is for. *@
+    var header = new PageHeaderVm
+    {
+        Title = "Services",
+        Subtitle = "Your catalogue of billable work. Quotes and contracts draw their positions from here.",
+        Actions =
+        [
+            new PageAction
+            {
+                Label = "New service",
+                Icon = "ri-add-line",
+                Style = PageActionStyle.Primary,
+                ModalTarget = Model.CreateServiceModal.Id
+            }
+        ]
+    };
 }
 
-<div id="servicesTableCard" class="wh-tablecard-scroll">
+<partial name="_PageHeader" model="header" />
+
+<div id="servicesTableCard" class="wh-tablecard-scroll wh-section">
     <partial name="_TableCard" model="Model.ServicesTable" />
 </div>
 <partial name="~/Pages/Shared/Modals/_ModalShell.cshtml" model="Model.CreateServiceModal" />
