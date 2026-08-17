@@ -1,5 +1,6 @@
 ﻿@page
 @using System.Text.Encodings.Web
+@using WitcherHub.Pages.Models.UI
 @model WitcherHub.Pages.Contracts.EditModel
 
 @{
@@ -16,88 +17,15 @@
 @section Styles {
     <link rel="stylesheet" href="~/css/contracts/contract-sign.css" asp-append-version="true" />
     <style>
-        .contractTopbar {
-            position: sticky;
-            top: 12px;
-            z-index: 50;
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 10px 12px;
-            margin-bottom: 12px;
-            border-radius: 14px;
-            background: rgba(255,255,255,.88);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(0,0,0,.06);
-            flex-direction: row-reverse;
-        }
+        /*
+            Only the editor's own typography is local to this page now.
 
-        .contractTopbar__left {
-            display: flex !important;
-            flex-direction: row !important;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 8px;
-            flex-wrap: wrap;
-            min-width: 0;
-        }
-
-            .contractTopbar__left > .btn {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                white-space: nowrap;
-                flex: 0 0 auto;
-            }
-
-        .contractTopbar__title {
-            font-weight: 800;
-            font-size: 16px;
-            line-height: 1.2;
-        }
-
-        .contractTopbar__sub {
-            color: rgba(0,0,0,.55);
-            font-size: 12px;
-        }
-
-        .contractTopbar__right {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            min-width: 240px;
-            align-items: flex-start;
-            text-align: start;
-        }
-
-        .contractTopbar__badge {
-            font-size: 12px;
-            font-weight: 700;
-            padding: 6px 10px;
-            border-radius: 999px;
-            border: 1px solid rgba(0,0,0,.08);
-            background: rgba(0,0,0,.03);
-        }
-
-            .contractTopbar__badge.is-signed {
-                background: rgba(25,135,84,.10);
-                border-color: rgba(25,135,84,.25);
-                color: #198754;
-            }
-
-            .contractTopbar__badge.is-unsigned {
-                background: rgba(13,110,253,.08);
-                border-color: rgba(13,110,253,.20);
-                color: #0d6efd;
-            }
-
-            .contractTopbar__badge.is-locked {
-                background: rgba(220,53,69,.08);
-                border-color: rgba(220,53,69,.20);
-                color: #dc3545;
-            }
-
+            The topbar, the status pill and the page frame used to be defined
+            here — a third set of status colours and a private layout, on a page
+            that is meant to look like the rest of the application. That markup
+            is gone and so are its rules; what is left is the editable surface,
+            which genuinely has no shared equivalent.
+        */
         .contractInlineEditor {
             white-space: pre-wrap;
             word-break: break-word;
@@ -109,10 +37,9 @@
         }
 
             .contractInlineEditor.is-editing {
-                border: 1px dashed rgba(0,0,0,.20);
+                border: 1px dashed var(--border-color, rgba(0,0,0,.20));
                 border-radius: 12px;
                 padding: 14px;
-                background: rgba(255,255,255,.55);
             }
 
         .contractActions {
@@ -122,33 +49,99 @@
 }
 <div class="contractPage">
 
-    <!-- ✅ Topbar -->
-    <div class="contractTopbar">
-        <div class="contractTopbar__left">
-            @if (Model.Contract.Status == WitcherHub.Infrastructure.Data.Models.Enums.DocumentStatus.Draft)
-            {
-                <button class="btn btn-primary btn-sm" type="button" id="btnSave" disabled>Save</button>
-                <button class="btn btn-outline-secondary btn-sm" type="button" id="btnReset" disabled>Reset</button>
-            }
+    @*
+        The contract's identity and where it stands.
 
-            <a class="btn btn-outline-secondary btn-sm"
-               asp-page="/Contracts/Details"
-               asp-route-id="@Model.Contract.Id">
-                Review
+        This was a contract number, a status pill and a currency, styled by a
+        block of CSS local to this page. Which version was on screen, whether it
+        had been approved, who the contract was with and what it was worth were
+        all missing from the one page whose job is editing that contract — and
+        the status pill was a third independent set of status colours.
+    *@
+    <div class="wh-section">
+        <nav class="mb-8">
+            <a asp-page="/Projects/Workspace" asp-route-id="@Model.Contract.ProjectId" asp-route-tab="contracts"
+               class="text-secondary-light text-sm hover-text-primary d-inline-flex align-items-center gap-1">
+                <i class="ri-arrow-left-line"></i> Back to the project
             </a>
-        </div>
+        </nav>
 
-        <div class="contractTopbar__right">
-            <div class="contractTopbar__title">@Model.Contract.ContractNo</div>
-            <div class="contractTopbar__sub">
-                Status:
-                <span class="statusPill statusPill--@Model.Contract.Status.ToString().ToLowerInvariant()">
-                    @Model.Contract.Status
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+            <div>
+                <div class="d-flex flex-wrap align-items-center gap-3">
+                    <h4 class="mb-0 fw-semibold">@Model.Contract.ContractNo</h4>
+                    <partial name="_StatusBadge" model="DocumentStatusPresentation.ForContract(Model.Contract.Status)" />
+
+                    @if (Model.ApprovedVersion is { } approved)
+                    {
+                        <span class="badge bg-success-focus text-success-main border border-success-main px-16 py-4 radius-4">
+                            Version @approved.Version approved
+                        </span>
+                    }
+                    else if (Model.Drafts.Count > 0)
+                    {
+                        <span class="badge bg-warning-focus text-warning-main border border-warning-main px-16 py-4 radius-4">
+                            @Model.Drafts.Count version(s), none approved
+                        </span>
+                    }
+                </div>
+
+                <p class="text-secondary-light mb-0 mt-8 text-sm">
+                    <a asp-page="/Clients/Details" asp-route-id="@Model.Contract.CustomerId"
+                       class="text-primary-600 fw-medium">@Model.Contract.CustomerName</a>
+
+                    @if (Model.Contract.StartDate is not null || Model.Contract.EndDate is not null)
+                    {
+                        <text> · @Format.Date(Model.Contract.StartDate) — @Format.Date(Model.Contract.EndDate)</text>
+                    }
+
+                    @* The contract's value, or an honest statement that there
+                       is not one. 0,00 € for a contract nobody has priced is a
+                       claim the system cannot support. *@
+                    <text> · </text>
+                    @if (Model.Money?.AgreedTotalNet is { } total)
+                    {
+                        <strong>@Format.Money(total, Model.Money.Currency)</strong>
+                    }
+                    else if (Model.Contract.Items is { Count: > 0 })
+                    {
+                        <text>@Model.Contract.Items.Count position(s)</text>
+                    }
+                    else
+                    {
+                        <text>value not specified</text>
+                    }
+                </p>
+            </div>
+
+            @*
+                One primary action and a live saving state, instead of a Save
+                button and a Reset button that were both disabled until something
+                changed and gave no sign of what had been written.
+            *@
+            <div class="wh-actions align-items-center">
+                <span id="saveState" class="text-sm text-secondary-light" role="status" aria-live="polite">
+                    All changes saved
                 </span>
-                <span class="mx-1">|</span>
-                Currency: <strong>@Model.Contract.Currency</strong>
+
+                @if (Model.Contract.Status == WitcherHub.Infrastructure.Data.Models.Enums.DocumentStatus.Draft)
+                {
+                    <button class="btn btn-primary text-sm px-20 py-11 radius-8" type="button" id="btnSave" disabled>
+                        Save now
+                    </button>
+                    <button class="btn btn-outline-secondary text-sm px-16 py-11 radius-8" type="button" id="btnReset" disabled>
+                        Discard changes
+                    </button>
+                }
+
+                <a class="btn btn-outline-primary text-sm px-20 py-11 radius-8"
+                   asp-page="/Contracts/Details" asp-route-id="@Model.Contract.Id">
+                    Preview
+                </a>
             </div>
         </div>
+    </div>
+
     </div>
     
     
@@ -203,6 +196,10 @@
 
           if (!editor) return;
 
+          // Without the form there is nothing to post to, so the editor stays
+          // read-write but unsaved rather than pretending to autosave.
+          const canSave = Boolean(saveForm && termsHidden);
+
           if (view) view.classList.add('d-none');
           editor.classList.remove('d-none');
           editor.classList.add('is-editing');
@@ -215,24 +212,125 @@
             return normalizeText(editor.textContent ?? '');
           }
 
-          function refreshActionState() {
-            const isDirty = getEditorText() !== originalText;
+          const saveState = document.getElementById('saveState');
 
-            if (btnSave) btnSave.disabled = !isDirty;
-            if (btnReset) btnReset.disabled = !isDirty;
+          // ---- autosave ----------------------------------------------------
+          //
+          // Editing used to end at a Save button, with no indication of whether
+          // anything had reached the server. A long edit could be lost by
+          // closing the tab, and there was no way to tell a saved contract from
+          // an unsaved one by looking.
+          //
+          // The draft now saves itself shortly after typing stops, and the state
+          // says which of the four situations you are in: saved, unsaved,
+          // saving, or failed. The Save button stays, because a person who wants
+          // to be certain should not have to wait for a timer.
+
+          const AUTOSAVE_DELAY_MS = 1500;
+
+          let savedText = null;          // what the server last accepted
+          let saveTimer = null;
+          let saving = false;
+
+          function setState(kind, message) {
+            if (!saveState) return;
+
+            saveState.textContent = message;
+            saveState.className =
+              'text-sm ' + (
+                kind === 'failed' ? 'text-danger-main fw-medium'
+                : kind === 'unsaved' ? 'text-warning-main'
+                : kind === 'saving' ? 'text-secondary-light'
+                : 'text-success-main');
           }
 
-          const originalText = getEditorText();
+          function refreshActionState() {
+            const isDirty = getEditorText() !== savedText;
+
+            if (btnSave) btnSave.disabled = !isDirty || saving;
+            if (btnReset) btnReset.disabled = !isDirty || saving;
+
+            if (!saving) {
+              setState(isDirty ? 'unsaved' : 'saved',
+                       isDirty ? 'Unsaved changes' : 'All changes saved');
+            }
+
+            return isDirty;
+          }
+
+          function scheduleAutosave() {
+            if (!refreshActionState()) return;
+
+            window.clearTimeout(saveTimer);
+            saveTimer = window.setTimeout(save, AUTOSAVE_DELAY_MS);
+          }
+
+          async function save() {
+            if (saving || !canSave) return;
+
+            const text = getEditorText();
+            if (text === savedText) return;
+
+            saving = true;
+            setState('saving', 'Saving…');
+            if (btnSave) btnSave.disabled = true;
+
+            try {
+              // Built from the existing form so the server-side validator gets
+              // every field it requires — the contract's project, currency and
+              // status included. Posting the terms alone would fail validation
+              // for reasons that have nothing to do with the text.
+              if (termsHidden) termsHidden.value = text;
+
+              const body = new FormData(saveForm);
+
+              const response = await fetch(saveForm.action, {
+                method: 'POST',
+                body: body,
+                headers: { 'X-Requested-With': 'fetch' }
+              });
+
+              if (!response.ok) throw new Error('HTTP ' + response.status);
+
+              // Only now is the text actually saved. Saying so before the server
+              // has agreed is how a lost edit looks like a saved one.
+              savedText = text;
+              saving = false;
+              refreshActionState();
+            } catch (error) {
+              saving = false;
+
+              // The text stays on screen and stays dirty, so nothing is lost and
+              // the next attempt still has it.
+              setState('failed', 'Could not save — your text is still here. Retrying shortly.');
+              if (btnSave) btnSave.disabled = false;
+
+              window.clearTimeout(saveTimer);
+              saveTimer = window.setTimeout(save, 10000);
+
+              if (window.console) console.error(error);
+            }
+          }
+
+          savedText = getEditorText();
 
           editor.addEventListener('paste', function (e) {
             e.preventDefault();
             const text = (e.clipboardData || window.clipboardData).getData('text/plain');
             document.execCommand('insertText', false, text);
-            refreshActionState();
+            scheduleAutosave();
           });
 
-          editor.addEventListener('input', refreshActionState);
-          editor.addEventListener('keyup', refreshActionState);
+          editor.addEventListener('input', scheduleAutosave);
+          editor.addEventListener('keyup', scheduleAutosave);
+
+          // A save in flight when the tab closes would be lost silently, so the
+          // user is warned only when there is genuinely something unsaved.
+          window.addEventListener('beforeunload', function (event) {
+            if (getEditorText() === savedText) return;
+            event.preventDefault();
+            event.returnValue = '';
+          });
 
           editor.focus();
           placeCaretAtEnd(editor);
@@ -240,24 +338,18 @@
 
           if (btnReset) {
             btnReset.addEventListener('click', function () {
-              editor.textContent = originalText;
+              window.clearTimeout(saveTimer);
+              editor.textContent = savedText;
               editor.focus();
               placeCaretAtEnd(editor);
               refreshActionState();
             });
           }
 
-          if (btnSave && saveForm && termsHidden) {
+          if (btnSave) {
             btnSave.addEventListener('click', function () {
-              const text = getEditorText();
-              if (text === originalText) {
-                refreshActionState();
-                return;
-              }
-
-              termsHidden.value = text;
-              btnSave.disabled = true;
-              saveForm.submit();
+              window.clearTimeout(saveTimer);
+              save();
             });
           }
 
