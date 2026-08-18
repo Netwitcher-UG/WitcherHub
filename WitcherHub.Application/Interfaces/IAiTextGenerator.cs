@@ -27,8 +27,19 @@ namespace WitcherHub.Application.Interfaces
         /// <summary>The configured model does not exist or this account cannot use it.</summary>
         ModelUnavailable = 3,
 
-        /// <summary>Too many requests, or the account is out of quota.</summary>
+        /// <summary>Too many requests in too short a time. Waiting fixes it.</summary>
         RateLimited = 4,
+
+        /// <summary>
+        /// The account has no credit left, or a spending limit has been reached.
+        ///
+        /// The provider reports this with the same HTTP 429 as ordinary rate
+        /// limiting, which is why the two used to be reported as one thing — but
+        /// they need opposite responses. Rate limiting clears by waiting; an
+        /// exhausted quota does not clear at all until somebody adds credit, so
+        /// retrying it wastes time and makes a permanent fault look intermittent.
+        /// </summary>
+        QuotaExhausted = 9,
 
         /// <summary>The call took too long or was cut off.</summary>
         Timeout = 5,
@@ -81,6 +92,16 @@ namespace WitcherHub.Application.Interfaces
                  or AiFailureKind.BadResponse or AiFailureKind.Unknown;
 
         /// <summary>
+        /// True when the fault is in configuration or billing rather than in the
+        /// moment: the same call will fail the same way until somebody changes a
+        /// setting or adds credit. Retrying these is what turns a fixed problem
+        /// into one that looks intermittent.
+        /// </summary>
+        public bool NeedsOwnerAction =>
+            Kind is AiFailureKind.NotConfigured or AiFailureKind.Authentication
+                 or AiFailureKind.ModelUnavailable or AiFailureKind.QuotaExhausted;
+
+        /// <summary>
         /// What to show the user: the actual problem, what to do about it, and
         /// the reference that ties it to the log. Never the key, the prompt, or
         /// the provider's raw response.
@@ -96,11 +117,18 @@ namespace WitcherHub.Application.Interfaces
                 $"account. Reference {CorrelationId}.",
 
             AiFailureKind.ModelUnavailable =>
-                "The assistant does not offer the configured model to this account. Set OpenAI__Model to a " +
-                $"model the account can use. Reference {CorrelationId}.",
+                "The model named in OpenAI__Model does not exist, or this account cannot use it. Check the " +
+                "exact id against the model list at platform.openai.com and set OpenAI__Model to one of " +
+                $"those. Reference {CorrelationId}.",
 
             AiFailureKind.RateLimited =>
-                $"The assistant is rate limited or out of quota. Try again shortly. Reference {CorrelationId}.",
+                "The assistant is receiving requests faster than the account allows. Wait a moment and try " +
+                $"again — nothing is wrong with the setup. Reference {CorrelationId}.",
+
+            AiFailureKind.QuotaExhausted =>
+                "The OpenAI account has no credit left, or its spending limit has been reached, so the " +
+                "assistant refused the request. Trying again will not help until credit is added at " +
+                $"platform.openai.com under Billing. Reference {CorrelationId}.",
 
             AiFailureKind.Timeout =>
                 $"The assistant took too long to answer. Try again. Reference {CorrelationId}.",

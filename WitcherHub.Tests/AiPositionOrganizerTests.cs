@@ -233,6 +233,65 @@ public class AiPositionOrganizerTests
     }
 
     [Fact]
+    public async Task AnExhaustedAccountIsNotPresentedAsSomethingToRetry()
+    {
+        // "Extract the positions from the contract" hit the same wall as the
+        // analyse button, but this path threw the classification away and told
+        // everyone "the assistant is not reachable right now", transient. An
+        // owner whose account is out of credit then presses the button forever.
+        var ai = new StubAi(_ => throw new AiInvocationException(
+            AiFailureKind.QuotaExhausted, "ClientResultException", "Q1234567", 429));
+
+        var result = await Organizer(ai).OrganizeAsync(new OrganizePositionsRequest
+        {
+            ExistingPositions = { UserPosition() },
+            RoughInput = "x"
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.False(result.IsTransientFailure);
+        Assert.Contains("Billing", result.FailureReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Q1234567", result.FailureReason);
+
+        // The reassurance the old message carried is still worth keeping.
+        Assert.Contains("unchanged", result.FailureReason, StringComparison.OrdinalIgnoreCase);
+
+        // And still no internals on screen.
+        Assert.DoesNotContain("ClientResultException", result.FailureReason);
+    }
+
+    [Fact]
+    public async Task AWrongModelNameNamesTheSettingToFix()
+    {
+        var ai = new StubAi(_ => throw new AiInvocationException(
+            AiFailureKind.ModelUnavailable, "ClientResultException", "M7654321", 404));
+
+        var result = await Organizer(ai).OrganizeAsync(new OrganizePositionsRequest
+        {
+            ExistingPositions = { UserPosition() },
+            RoughInput = "x"
+        });
+
+        Assert.False(result.IsTransientFailure);
+        Assert.Contains("OpenAI__Model", result.FailureReason);
+    }
+
+    [Fact]
+    public async Task AGenuineRateLimitStillOffersARetry()
+    {
+        var ai = new StubAi(_ => throw new AiInvocationException(
+            AiFailureKind.RateLimited, "ClientResultException", "R1111111", 429));
+
+        var result = await Organizer(ai).OrganizeAsync(new OrganizePositionsRequest
+        {
+            ExistingPositions = { UserPosition() },
+            RoughInput = "x"
+        });
+
+        Assert.True(result.IsTransientFailure);
+    }
+
+    [Fact]
     public async Task CancellationPropagatesRatherThanBeingSwallowed()
     {
         using var cts = new CancellationTokenSource();

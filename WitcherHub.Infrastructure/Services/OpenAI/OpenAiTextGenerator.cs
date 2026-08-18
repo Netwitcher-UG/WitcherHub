@@ -111,17 +111,30 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
         {
             if (ex is ClientResultException client)
             {
+                var body = BodyOf(client);
+
                 return client.Status switch
                 {
                     401 or 403 => (AiFailureKind.Authentication, client.Status),
                     404 => (AiFailureKind.ModelUnavailable, client.Status),
-                    429 => (AiFailureKind.RateLimited, client.Status),
+
+                    // 429 covers two different faults. Ordinary rate limiting
+                    // clears by waiting; an exhausted quota or a reached spending
+                    // limit never clears on its own. Only the body tells them
+                    // apart, and telling the owner to "try again shortly" when
+                    // the account is out of credit sends them into a loop.
+                    429 => (ClassifyTooManyRequests(body), client.Status),
+
                     408 => (AiFailureKind.Timeout, client.Status),
                     >= 500 => (AiFailureKind.ServiceError, client.Status),
 
                     // 400 from this API is most often an unusable model name for
-                    // the endpoint being called.
-                    400 => (AiFailureKind.ModelUnavailable, client.Status),
+                    // the endpoint being called, but a billing stop can also
+                    // surface here.
+                    400 => (IndicatesQuota(body)
+                        ? AiFailureKind.QuotaExhausted
+                        : AiFailureKind.ModelUnavailable, client.Status),
+
                     _ => (AiFailureKind.Unknown, client.Status)
                 };
             }
@@ -132,13 +145,79 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
             if (ex is HttpRequestException or SocketException)
                 return (AiFailureKind.Network, null);
 
+            // Look inside before guessing from the outer type. The two checks
+            // below read a shape rather than a statement of fact, and a wrapped
+            // provider error carries a statement of fact: a ClientResultException
+            // inside an InvalidOperationException used to be reported as "no
+            // OpenAI API key is configured" no matter what the provider said,
+            // which sends the owner to the wrong setting entirely.
+            if (ex.InnerException is not null)
+            {
+                var inner = Classify(ex.InnerException);
+                if (inner.Kind != AiFailureKind.Unknown || inner.StatusCode is not null)
+                    return inner;
+            }
+
             if (ex is InvalidOperationException or ArgumentException)
                 return (AiFailureKind.NotConfigured, null);
 
-            if (ex.InnerException is not null)
-                return Classify(ex.InnerException);
-
             return (AiFailureKind.Unknown, null);
+        }
+
+        /// <summary>
+        /// A 429 is either "you are going too fast" or "you have run out", and
+        /// the two need opposite advice. The provider says which in the error
+        /// code; when it says nothing, the safer reading is ordinary rate
+        /// limiting, because that one at least suggests waiting rather than
+        /// sending the owner to a billing page for no reason.
+        /// </summary>
+        private static AiFailureKind ClassifyTooManyRequests(string body) =>
+            IndicatesQuota(body) ? AiFailureKind.QuotaExhausted : AiFailureKind.RateLimited;
+
+        private static bool IndicatesQuota(string body)
+        {
+            if (string.IsNullOrEmpty(body)) return false;
+
+            // The literal codes and phrases OpenAI returns for an account that
+            // cannot spend anything more. Matched case-insensitively because the
+            // wording of the human-readable half is not contractual.
+            string[] markers =
+            [
+                "insufficient_quota",
+                "billing_hard_limit_reached",
+                "billing_not_active",
+                "account_deactivated",
+                "exceeded your current quota",
+                "check your plan and billing"
+            ];
+
+            return markers.Any(marker => body.Contains(marker, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// Everything the client is willing to tell us about the failed call.
+        ///
+        /// The exception message usually already carries the response body, but
+        /// not on every path, so the raw response is read as well. Reading it can
+        /// itself throw once the response is disposed — that is not worth losing
+        /// the classification over.
+        /// </summary>
+        private static string BodyOf(ClientResultException client)
+        {
+            var message = client.Message ?? "";
+
+            try
+            {
+                var content = client.GetRawResponse()?.Content?.ToString();
+                if (!string.IsNullOrEmpty(content))
+                    return message + "\n" + content;
+            }
+            catch
+            {
+                // Fall through to the message alone.
+            }
+
+            return message;
         }
 
         /// <summary>
