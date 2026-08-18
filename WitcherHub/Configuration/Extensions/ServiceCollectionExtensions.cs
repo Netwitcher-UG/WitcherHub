@@ -9,6 +9,7 @@ using WitcherHub.Application;
 using WitcherHub.Configuration.Authorization;
 using WitcherHub.Configuration.Filters;
 using WitcherHub.Configuration.HealthChecks;
+using WitcherHub.Configuration.Http;
 using WitcherHub.Configuration.ModelBinding;
 using WitcherHub.Infrastructure;
 using WitcherHub.Infrastructure.Authentication;
@@ -123,27 +124,47 @@ namespace WitcherHub.Configuration.Extensions
                             return Task.CompletedTask;
                         },
 
+                        // A session lapses after Jwt__AccessTokenMinutes whether or
+                        // not the user is still working, and the page they are on
+                        // has no idea. What happens next depends entirely on who
+                        // is asking.
                         OnChallenge = context =>
                         {
-                            if (!context.Request.Path.StartsWithSegments("/api") &&
-                                !context.Request.Path.StartsWithSegments("/swagger"))
+                            if (context.Request.Path.StartsWithSegments("/api") ||
+                                context.Request.Path.StartsWithSegments("/swagger"))
                             {
-                                context.HandleResponse(); 
-                                var returnUrl = Uri.EscapeDataString(context.Request.Path + context.Request.QueryString);
-                                context.Response.Redirect($"/Auth/Login?returnUrl={returnUrl}");
+                                return Task.CompletedTask;
                             }
+
+                            context.HandleResponse();
+
+                            // Script gets an answer it can read. Redirecting it
+                            // instead is what produced "the server returned an
+                            // unreadable response" on the contract builder: fetch
+                            // follows the redirect itself and hands the page's
+                            // JavaScript a login page to parse as JSON.
+                            if (RequestFormat.WantsJson(context.HttpContext))
+                                return WriteSignedOutAsync(context.HttpContext, StatusCodes.Status401Unauthorized);
+
+                            var returnUrl = Uri.EscapeDataString(context.Request.Path + context.Request.QueryString);
+                            context.Response.Redirect($"/Auth/Login?returnUrl={returnUrl}");
 
                             return Task.CompletedTask;
                         },
 
                         OnForbidden = context =>
                         {
-                            if (!context.Request.Path.StartsWithSegments("/api") &&
-                                !context.Request.Path.StartsWithSegments("/swagger"))
+                            if (context.Request.Path.StartsWithSegments("/api") ||
+                                context.Request.Path.StartsWithSegments("/swagger"))
                             {
-                                var returnUrl = Uri.EscapeDataString(context.Request.Path + context.Request.QueryString);
-                                context.Response.Redirect($"/Auth/Login?returnUrl={returnUrl}");
+                                return Task.CompletedTask;
                             }
+
+                            if (RequestFormat.WantsJson(context.HttpContext))
+                                return WriteSignedOutAsync(context.HttpContext, StatusCodes.Status403Forbidden);
+
+                            var returnUrl = Uri.EscapeDataString(context.Request.Path + context.Request.QueryString);
+                            context.Response.Redirect($"/Auth/Login?returnUrl={returnUrl}");
 
                             return Task.CompletedTask;
                         }
@@ -162,6 +183,42 @@ namespace WitcherHub.Configuration.Extensions
 
 
             return services;
+        }
+
+        /// <summary>
+        /// Tells script, in a form it can read, that the session is over.
+        ///
+        /// The shape matches every other JSON reply the pages handle — an
+        /// <c>ok</c> flag and a <c>message</c> — so no caller needs a special
+        /// case to show it. <c>sessionExpired</c> lets the page offer the one
+        /// action that actually helps, which is signing in again; the work on
+        /// screen is still in the browser and is not lost by reloading after
+        /// that. Nothing here says whether the account exists or what it may do.
+        /// </summary>
+        private static Task WriteSignedOutAsync(HttpContext context, int statusCode)
+        {
+            var signedOut = statusCode == StatusCodes.Status401Unauthorized;
+
+            context.Response.Clear();
+            context.Response.StatusCode = statusCode;
+            context.Response.ContentType = "application/json; charset=utf-8";
+            context.Response.Headers.CacheControl = "no-store";
+
+            var returnUrl = context.Request.Path + context.Request.QueryString;
+
+            var payload = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                ok = false,
+                sessionExpired = signedOut,
+                transient = false,
+                signInUrl = $"/Auth/Login?returnUrl={Uri.EscapeDataString(returnUrl)}",
+                message = signedOut
+                    ? "Your session has ended, so this could not be saved or sent. Sign in again and retry — " +
+                      "nothing on this screen has been lost."
+                    : "This account is not allowed to do that."
+            });
+
+            return context.Response.WriteAsync(payload);
         }
     }
 }

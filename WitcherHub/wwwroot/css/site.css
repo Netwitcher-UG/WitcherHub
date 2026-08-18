@@ -1553,3 +1553,60 @@ body.ui-loading {
     color: var(--text-secondary-light, #6b7280);
     font-style: italic;
 }
+
+/* ==========================================================================
+   AI actions
+   --------------------------------------------------------------------------
+   Which buttons hand your text to the language model, and which are ordinary
+   application actions, was invisible: the AI ones carried ri-magic-line,
+   ri-file-search-line or nothing, while plain buttons carried icons too.
+
+   That distinction is worth showing. An AI action spends money on the OpenAI
+   account, takes seconds rather than milliseconds, fails for reasons nothing
+   else fails for, and returns a proposal a person still has to check.
+
+   One mark, one meaning, on every AI action and on nothing else. The colour is
+   a support, never the message — the icon carries it on its own for anyone who
+   cannot separate the hues, and _AiMark adds "Uses AI" for screen readers.
+   ========================================================================== */
+
+.wh-ai-mark__icon {
+    /* Optically a touch smaller than the label it sits beside, so it reads as a
+       mark on the button rather than as a second word. */
+    font-size: 1.05em;
+    line-height: 1;
+    vertical-align: -0.05em;
+}
+
+.wh-ai-action .wh-ai-mark__icon {
+    color: var(--purple, #8252e9);
+}
+
+/* On a filled button the icon sits on a coloured ground, where a purple mark
+   would be unreadable. It inherits the button's own foreground there. */
+.wh-ai-action.btn-primary .wh-ai-mark__icon,
+.wh-ai-action.btn-success .wh-ai-mark__icon,
+.wh-ai-action.btn-danger .wh-ai-mark__icon {
+    color: currentColor;
+    opacity: .95;
+}
+
+.wh-ai-action:disabled .wh-ai-mark__icon,
+.wh-ai-action[disabled] .wh-ai-mark__icon {
+    color: currentColor;
+    opacity: .5;
+}
+
+/* The legend that says what the mark means, shown once per page next to the
+   actions rather than repeated on every button. */
+.wh-ai-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    font-size: .8125rem;
+    color: var(--text-secondary-light, #6b7280);
+}
+
+.wh-ai-legend .wh-ai-mark__icon {
+    color: var(--purple, #8252e9);
+}

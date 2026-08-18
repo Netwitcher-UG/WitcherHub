@@ -479,18 +479,105 @@
         return el ? el.value : "";
     }
 
+    /// Every action on this page goes through here.
+    ///
+    /// This used to end in `catch { message: "The server returned an unreadable
+    /// response." }`, which is where a whole class of problems went to die. A
+    /// signed-out session, an expired page token, a server error and a dropped
+    /// connection all produced that one sentence, with no status, no reference
+    /// and no next step — and because the two AI actions are the ones you reach
+    /// for after a long time on the page, an ordinary session timeout read as
+    /// "contract generation is broken".
+    ///
+    /// The server no longer redirects these requests, so a session that has
+    /// ended now arrives as readable JSON. This handles the rest: what the
+    /// browser could not even send, and what arrived in the wrong shape.
     async function post(handler, body) {
-        const response = await fetch(`?handler=${handler}`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "RequestVerificationToken": token()
-            },
-            body: JSON.stringify(body)
-        });
+        let response;
 
-        try { return await response.json(); }
-        catch { return { ok: false, message: "The server returned an unreadable response." }; }
+        try {
+            response = await fetch(`?handler=${handler}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "RequestVerificationToken": token()
+                },
+                body: JSON.stringify(body),
+
+                // Never follow a redirect silently. Following one is exactly how
+                // an HTML login page ended up being parsed as JSON; seeing it as
+                // a redirect lets us say what it means instead.
+                redirect: "manual"
+            });
+        }
+        catch {
+            return {
+                ok: false,
+                transient: true,
+                message: "The request could not reach the server. Check your connection and try again — " +
+                    "nothing on this screen has been lost."
+            };
+        }
+
+        // An opaque redirect: the session ended and the server wanted to send us
+        // to the sign-in page.
+        if (response.type === "opaqueredirect" || response.status === 0) {
+            return {
+                ok: false,
+                sessionExpired: true,
+                transient: false,
+                message: "Your session has ended, so this could not be completed. Sign in again and retry — " +
+                    "nothing on this screen has been lost."
+            };
+        }
+
+        const text = await response.text();
+
+        let result = null;
+        try { result = text ? JSON.parse(text) : null; }
+        catch { /* handled below, with the status to explain it */ }
+
+        if (result && typeof result === "object") {
+            // ProblemDetails from the global handler: title/detail, no ok flag.
+            if (result.ok === undefined && (result.title || result.detail)) {
+                return {
+                    ok: false,
+                    transient: response.status >= 500,
+                    message: `${result.detail || result.title} (HTTP ${response.status})`
+                };
+            }
+
+            return result;
+        }
+
+        // Something arrived that is not JSON. Name the status, because that is
+        // the one thing that distinguishes these from each other.
+        if (response.status === 401 || response.status === 403) {
+            return {
+                ok: false,
+                sessionExpired: true,
+                transient: false,
+                message: "Your session has ended, so this could not be completed. Sign in again and retry — " +
+                    "nothing on this screen has been lost."
+            };
+        }
+
+        if (response.status === 502 || response.status === 503 || response.status === 504) {
+            return {
+                ok: false,
+                transient: true,
+                message: `The server did not answer in time (HTTP ${response.status}). This usually means the ` +
+                    "request took too long. Try again, or with a shorter document."
+            };
+        }
+
+        return {
+            ok: false,
+            transient: response.status >= 500,
+            message: `The server answered HTTP ${response.status} in a form this page could not read. ` +
+                "Reload the page and try again; if it keeps happening, the server log for this moment has the detail."
+        };
     }
 
     // Validation and status messages, shown in the page.
@@ -1058,11 +1145,58 @@
     /// why. A lasting problem gets a notice that lasts.
     function showFailure(result, fallback) {
         const message = result.message || fallback;
-        const full = result.reference ? `${message} (reference ${result.reference})` : message;
+
+        // The server's own messages already end with "Reference XXXXXXXX." —
+        // appending it again produced "... Reference 9A72F3B9. (reference
+        // 9A72F3B9)". Only add it when the message does not already carry it.
+        const full = result.reference && !message.includes(result.reference)
+            ? `${message} (reference ${result.reference})`
+            : message;
 
         toast("error", full);
 
         if (!result.transient) banner("error", full);
+
+        // A session that has ended is the one failure with an obvious next step,
+        // and it is not "try again" — every retry fails the same way until the
+        // user signs in. Offer that instead of leaving them pressing the button.
+        if (result.sessionExpired) offerSignIn(result.signInUrl);
+    }
+
+    /// Offers the only action that helps once the session has ended.
+    ///
+    /// Sign-in opens in a new tab deliberately: this page still holds positions
+    /// and contract text the user has been editing, and navigating away from it
+    /// to sign in would throw that work away — which is the opposite of what the
+    /// message promises.
+    function offerSignIn(url) {
+        if (document.querySelector("[data-sign-in-again]")) return;
+
+        const anchor = document.getElementById("positionsApp");
+        if (!anchor) return;
+
+        const target = url || `/Auth/Login?returnUrl=${encodeURIComponent(location.pathname + location.search)}`;
+
+        const link = document.createElement("a");
+        link.href = target;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.className = "btn btn-primary text-sm px-16 py-8 radius-8 d-inline-flex align-items-center gap-8";
+        link.innerHTML = '<i class="ri-login-circle-line"></i> Sign in again';
+
+        // #positionsApp is a Bootstrap grid row, so anything dropped straight
+        // into it becomes a flex item and stretches the full width. The wrapper
+        // takes that role and lets the button keep its own size.
+        const holder = document.createElement("div");
+        holder.dataset.signInAgain = "1";
+        holder.className = "col-12 mb-16";
+        holder.appendChild(link);
+
+        // Placed next to the notice, never inside it: banner() rewrites that
+        // box's text on every message and would delete the link with it.
+        const notice = document.getElementById("inlineNotice");
+        if (notice) notice.insertAdjacentElement("afterend", holder);
+        else anchor.prepend(holder);
     }
 
     /// Puts a retry next to the action that failed, so a transient outage does

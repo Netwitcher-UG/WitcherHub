@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using System.Text.Json;
+using WitcherHub.Configuration.Http;
 
 namespace WitcherHub.Configuration.Extensions
 {
@@ -108,24 +109,9 @@ namespace WitcherHub.Configuration.Extensions
             return ((int)HttpStatusCode.InternalServerError, "Server Error", "An unexpected error occurred.");
         }
 
-        private static bool WantsJson(HttpContext ctx)
-        {
-            if (ctx.Request.Path.StartsWithSegments("/api")) return true;
-
-            if (string.Equals(ctx.Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            var accept = ctx.Request.Headers.Accept.ToString();
-            if (!string.IsNullOrWhiteSpace(accept) &&
-                accept.Contains("application/json", StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            var ct = ctx.Request.ContentType ?? "";
-            if (ct.Contains("application/json", StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            return false;
-        }
+        // One rule for the whole application, so a fetch is never answered with a
+        // page by one component and JSON by another.
+        private static bool WantsJson(HttpContext ctx) => RequestFormat.WantsJson(ctx);
 
         private static string HtmlEnc(string? s)
             => (s ?? "")

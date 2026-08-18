@@ -5,8 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using OpenAI;
 using OpenAI.Chat;
 using System;
+using System.ClientModel;
 using System.Net.Http.Headers;
 using WitcherHub.Application.Common.Caching;
 using WitcherHub.Application.Interfaces;
@@ -156,7 +158,18 @@ namespace WitcherHub.Infrastructure
                         string.Join(", ", options.MissingSettings));
                 }
 
-                return new ChatClient(options.Model, apiKey);
+                // OpenAI__TimeoutSeconds existed as a setting and was never applied
+                // to anything: the client was built with no options at all, so the
+                // SDK's own default governed every call and changing the setting
+                // did nothing. Analysing a long contract with a reasoning model can
+                // legitimately run for minutes, and a timeout that cannot be raised
+                // turns that into a failure nobody can configure their way out of.
+                var timeout = TimeSpan.FromSeconds(Math.Clamp(options.TimeoutSeconds, 10, 900));
+
+                return new ChatClient(
+                    options.Model,
+                    new ApiKeyCredential(apiKey),
+                    new OpenAIClientOptions { NetworkTimeout = timeout });
             });
 
             // ===== Services =====

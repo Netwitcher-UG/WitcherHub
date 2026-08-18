@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc.Core.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using WitcherHub.Configuration.Http;
 
 namespace WitcherHub.Configuration.Filters
 {
@@ -36,6 +37,28 @@ namespace WitcherHub.Configuration.Filters
                 "Rejected a request to {Path} because its antiforgery token could not be validated. " +
                 "Expected for a page loaded before a deploy; the visitor is being sent back to retry.",
                 request.Path);
+
+            // Script cannot follow a redirect usefully — fetch follows it itself
+            // and hands the caller an HTML page where JSON was expected, which is
+            // read as the server having returned gibberish. It gets told what
+            // happened instead, in the same shape as every other JSON reply.
+            if (RequestFormat.WantsJson(context.HttpContext))
+            {
+                context.Result = new JsonResult(new
+                {
+                    ok = false,
+                    sessionExpired = true,
+                    transient = false,
+                    signInUrl = (string?)null,
+                    message = "This page has been open long enough that its security token expired. " +
+                              "Reload the page and try again — nothing has been lost."
+                })
+                {
+                    StatusCode = StatusCodes.Status400BadRequest
+                };
+
+                return;
+            }
 
             // Reload the same page so a fresh token is issued and the visitor can
             // simply submit again — not a redirect to login, which would be wrong
