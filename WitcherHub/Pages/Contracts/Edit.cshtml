@@ -112,12 +112,36 @@
         </div>
     </div>
 
-    </div>
-    
-    
-    
     <div class="contractPage__container">
         <div class="contractPage__paper" id="paper">
+
+            @*
+                A contract with no wording yet.
+
+                The editor showed an empty box and nothing else: no indication that
+                the contract was empty rather than failing to load, and no route to
+                the two places wording actually comes from. Both live on the
+                contract builder — generating it from the positions, or pasting a
+                document you already have — and neither is on this page.
+            *@
+            @if (string.IsNullOrWhiteSpace(Model.RawTermsEditable) &&
+                 string.IsNullOrWhiteSpace(Model.ContractHtml))
+            {
+                <div class="alert alert-info radius-8 d-flex flex-wrap align-items-center justify-content-between gap-3 mb-16">
+                    <div>
+                        <div class="fw-semibold">This contract has no wording yet.</div>
+                        <div class="text-sm">
+                            Write it below, or use the builder to generate it from the positions
+                            or to paste a document you already have.
+                        </div>
+                    </div>
+
+                    <a class="btn btn-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2 text-nowrap"
+                       asp-page="/Contracts/Positions" asp-route-contractId="@Model.Id">
+                        <i class="ri-magic-line"></i> Open the builder
+                    </a>
+                </div>
+            }
 
             <!-- VIEW MODE: formatted contract -->
             <div id="contractView" class="contractPage__contractHtml">

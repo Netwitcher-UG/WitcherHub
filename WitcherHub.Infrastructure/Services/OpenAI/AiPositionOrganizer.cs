@@ -67,10 +67,29 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
             {
                 throw;
             }
+            catch (AiInvocationException ex)
+            {
+                // The generator already worked out what actually went wrong and
+                // whether waiting will help. Flattening that back into "not
+                // reachable right now, transient: true" — as this used to — told
+                // an owner whose account is out of credit, or whose model name is
+                // wrong, to keep pressing the button.
+                // Raised to Error when only the owner can clear it: a bad key, an
+                // unusable model or an empty account will fail every call from now
+                // on, and that deserves to stand out in the platform log rather
+                // than blend into the ordinary run of timeouts.
+                _logger.Log(
+                    ex.NeedsOwnerAction ? LogLevel.Error : LogLevel.Warning,
+                    "The position organizer could not use the model: {Kind} ({CorrelationId}).",
+                    ex.Kind, ex.CorrelationId);
+
+                return OrganizePositionsResult.Failed(
+                    ex.UserMessage + " Your positions are unchanged — you can keep editing them by hand.",
+                    ex.IsTransient);
+            }
             catch (Exception ex)
             {
-                // Timeouts, rate limits and outages all land here. The caller keeps
-                // the user's positions exactly as they were.
+                // Anything the generator did not classify.
                 _logger.LogWarning(ex, "The position organizer could not reach the model.");
 
                 return OrganizePositionsResult.Failed(
