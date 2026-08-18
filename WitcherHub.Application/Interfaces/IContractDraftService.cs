@@ -85,6 +85,28 @@ namespace WitcherHub.Application.Interfaces
         Task<ContractAnalysisResult> AnalyzeAsync(
             Guid contractId, int version, CancellationToken ct = default);
 
+        /// <summary>
+        /// Begins an analysis and returns at once, without waiting for it.
+        ///
+        /// <see cref="AnalyzeAsync"/> runs the model call inline, which is fine
+        /// for a short document and wrong for a real contract: reading one takes
+        /// longer than a platform proxy will hold a connection open, so the
+        /// browser was shown HTTP 502 while the work was still running — and the
+        /// work then finished into a request nobody was listening to.
+        ///
+        /// The reading is the same; only who waits for it changes. The caller
+        /// polls <see cref="GetAnalysisProgressAsync"/>.
+        /// </summary>
+        Task<ContractAnalysisStart> StartAnalysisAsync(
+            Guid contractId, int version, CancellationToken ct = default);
+
+        /// <summary>
+        /// How the analysis of this version is getting on: still running,
+        /// finished, or failed with a reason worth showing.
+        /// </summary>
+        Task<ContractAnalysisProgress> GetAnalysisProgressAsync(
+            Guid contractId, int version, CancellationToken ct = default);
+
         /// <summary>The extraction stored against a version, if it has one.</summary>
         Task<ContractExtractionDto?> GetExtractionAsync(
             Guid contractId, int version, CancellationToken ct = default);
@@ -156,6 +178,58 @@ namespace WitcherHub.Application.Interfaces
     /// <summary>A replacement the user looked at and accepted.</summary>
     public sealed record ConfirmedPartyReplacement(string Field, string OldValue, string NewValue);
 
+    /// <summary>What happened when an analysis was asked for.</summary>
+    public sealed class ContractAnalysisStart
+    {
+        /// <summary>True when a reading is now running, or was already running.</summary>
+        public bool Running { get; init; }
+
+        /// <summary>
+        /// True when this request found one already in flight and joined it
+        /// rather than starting a second. Pressing the button twice costs one
+        /// reading, not two.
+        /// </summary>
+        public bool AlreadyRunning { get; init; }
+
+        /// <summary>Why it could not be started at all.</summary>
+        public string? FailureReason { get; init; }
+
+        public static ContractAnalysisStart Started() => new() { Running = true };
+
+        public static ContractAnalysisStart Joined() =>
+            new() { Running = true, AlreadyRunning = true };
+
+        public static ContractAnalysisStart Refused(string reason) =>
+            new() { Running = false, FailureReason = reason };
+    }
+
+    /// <summary>Where an analysis has got to.</summary>
+    public sealed class ContractAnalysisProgress
+    {
+        public ContractExtractionStatus Status { get; init; }
+
+        /// <summary>True while the reading is still going.</summary>
+        public bool Running => Status == ContractExtractionStatus.Analysing;
+
+        /// <summary>True once there is something to show.</summary>
+        public bool Finished =>
+            Status is ContractExtractionStatus.Analysed or ContractExtractionStatus.Confirmed;
+
+        public bool Failed => Status == ContractExtractionStatus.Failed;
+
+        /// <summary>Why it failed, in the words the user should read.</summary>
+        public string? FailureReason { get; init; }
+
+        /// <summary>True when trying again is worth offering.</summary>
+        public bool IsTransientFailure { get; init; }
+
+        /// <summary>The reading itself, once there is one.</summary>
+        public ContractExtractionDto? Extraction { get; init; }
+
+        /// <summary>How long the current reading has been going, for the screen.</summary>
+        public TimeSpan? Elapsed { get; init; }
+    }
+
     public sealed class ContractDraftResult
     {
         public bool Succeeded { get; init; }
@@ -188,6 +262,22 @@ namespace WitcherHub.Application.Interfaces
 
         /// <summary>How many the document actually stated, for the same message.</summary>
         public int StatedFieldCount { get; init; }
+
+        /// <summary>
+        /// Fields where the document said one thing and the record already said
+        /// another, so the record was kept.
+        ///
+        /// Reported rather than applied silently: the user ticked those values,
+        /// and being told "confirmed" while nothing changed would be a lie. They
+        /// remain visible in the reading, and changing the contract is done on
+        /// the contract.
+        /// </summary>
+        public IReadOnlyList<string> KeptFromRecord { get; init; } = Array.Empty<string>();
+
+        /// <summary>
+        /// Fields the project had no answer for that the contract has now filled.
+        /// </summary>
+        public IReadOnlyList<string> FilledOnProject { get; init; } = Array.Empty<string>();
 
         /// <summary>
         /// The contract-level figures as they stand after the operation, read

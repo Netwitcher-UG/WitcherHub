@@ -36,6 +36,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         private readonly OpenAIOptions _openAi;
         private readonly ContractTemplateOptions _template;
         private readonly ILogger<ContractDraftService> _logger;
+        private readonly IBackgroundAnalysisRunner? _background;
 
         public ContractDraftService(
             AppDbContext db,
@@ -44,7 +45,12 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             ISemanticContractAnalyzer analyzer,
             IOptions<OpenAIOptions> openAi,
             IOptions<ContractTemplateOptions> template,
-            ILogger<ContractDraftService> logger)
+            ILogger<ContractDraftService> logger,
+
+            // Optional so the many tests that construct this service directly keep
+            // working. Without it StartAnalysisAsync runs the reading inline,
+            // which is what a test wants anyway.
+            IBackgroundAnalysisRunner? background = null)
         {
             _db = db;
             _positions = positions;
@@ -53,6 +59,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             _openAi = openAi.Value;
             _template = template.Value;
             _logger = logger;
+            _background = background;
         }
 
         public async Task<ContractSource> GetSourceAsync(Guid contractId, CancellationToken ct = default)
@@ -640,13 +647,24 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 // A failed reading is recorded as a failed reading. The document
                 // itself is untouched and remains the contract's source, so the
                 // user can carry on with the original text.
+                var reason = semantic.FailureReason ?? "The document could not be analysed.";
+
                 draft.ExtractionStatus = ContractExtractionStatus.Failed;
+
+                // Kept, not just returned. The reading now finishes after the
+                // request that asked for it has gone, so the reason has to
+                // survive in the row or the page has nothing to show — and a
+                // reload turned a nameable failure back into "never analysed".
+                draft.ExtractionError = Truncate(reason, 1000);
+                draft.ExtractionErrorIsTransient = semantic.IsTransientFailure;
+                draft.ExtractionStartedAt = null;
+
                 contract.SourceState = ContractSourceState.AnalysisFailed;
 
                 await _db.SaveChangesAsync(ct);
 
                 return ContractAnalysisResult.Failed(
-                    semantic.FailureReason ?? "The document could not be analysed.",
+                    reason,
                     semantic.IsTransientFailure,
                     semantic.CorrelationId);
             }
@@ -674,6 +692,9 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             draft.ExtractedTerms = JsonSerializer.SerializeToDocument(projected);
             draft.ExtractionStatus = ContractExtractionStatus.Analysed;
             draft.ExtractedAt = DateTimeOffset.UtcNow;
+            draft.ExtractionStartedAt = null;
+            draft.ExtractionError = null;
+            draft.ExtractionErrorIsTransient = null;
 
             if (projected.Language.HasValue)
                 draft.SourceLanguage = projected.Language.Value;
@@ -701,6 +722,111 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 CorrelationId = semantic.CorrelationId
             };
         }
+
+        /// <summary>
+        /// How long a reading may say it is running before we stop believing it.
+        ///
+        /// The queue is in-process, so a restart or a crash loses whatever was in
+        /// flight and leaves the row saying "analysing" for ever. Past this, the
+        /// draft is treated as failed and can be started again — which is the
+        /// only way out, since there is nothing left to wait for.
+        /// </summary>
+        internal static readonly TimeSpan AnalysisAbandonedAfter = TimeSpan.FromMinutes(20);
+
+        public async Task<ContractAnalysisStart> StartAnalysisAsync(
+            Guid contractId, int version, CancellationToken ct = default)
+        {
+            var draft = await _db.Set<ContractDraft>()
+                .FirstOrDefaultAsync(d => d.ContractId == contractId && d.Version == version, ct)
+                ?? throw new NotFoundAppException("Draft not found.");
+
+            if (string.IsNullOrWhiteSpace(draft.DocumentMarkdown))
+                return ContractAnalysisStart.Refused("There is no contract text on this version to analyse.");
+
+            // A second press joins the reading already running rather than paying
+            // for another one. The stale check is what stops a lost worker from
+            // making that a permanent refusal.
+            if (draft.ExtractionStatus == ContractExtractionStatus.Analysing &&
+                !HasBeenAbandoned(draft))
+            {
+                return ContractAnalysisStart.Joined();
+            }
+
+            draft.ExtractionStatus = ContractExtractionStatus.Analysing;
+            draft.ExtractionStartedAt = DateTimeOffset.UtcNow;
+            draft.ExtractionError = null;
+            draft.ExtractionErrorIsTransient = null;
+
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Analysis of v{Version} of {ContractId} queued ({Length} characters).",
+                version, contractId, draft.DocumentMarkdown.Length);
+
+            if (_background is null)
+            {
+                // No queue configured — do it here. The caller still polls; it
+                // will simply find the answer already waiting.
+                await AnalyzeAsync(contractId, version, ct);
+                return ContractAnalysisStart.Started();
+            }
+
+            await _background.RunAsync(contractId, version);
+
+            return ContractAnalysisStart.Started();
+        }
+
+        public async Task<ContractAnalysisProgress> GetAnalysisProgressAsync(
+            Guid contractId, int version, CancellationToken ct = default)
+        {
+            var draft = await _db.Set<ContractDraft>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(d => d.ContractId == contractId && d.Version == version, ct)
+                ?? throw new NotFoundAppException("Draft not found.");
+
+            if (draft.ExtractionStatus == ContractExtractionStatus.Analysing && HasBeenAbandoned(draft))
+            {
+                // Reported as failed rather than left spinning for ever. The row
+                // is corrected on the next start; saying so here keeps this a
+                // read.
+                return new ContractAnalysisProgress
+                {
+                    Status = ContractExtractionStatus.Failed,
+                    IsTransientFailure = true,
+                    FailureReason =
+                        "The analysis stopped before it finished, most likely because the application " +
+                        "restarted while it was running. Your document is unchanged — start it again."
+                };
+            }
+
+            return new ContractAnalysisProgress
+            {
+                Status = draft.ExtractionStatus,
+                FailureReason = draft.ExtractionError,
+
+                // As the reading judged it, not as this method guesses. Saying
+                // "worth retrying" about a missing API key is what leaves an
+                // owner pressing a button that cannot succeed. Older rows have
+                // no stored answer; those are retryable, which is the safe way
+                // to be wrong.
+                IsTransientFailure =
+                    draft.ExtractionStatus == ContractExtractionStatus.Failed &&
+                    draft.ExtractionErrorIsTransient != false,
+
+                Extraction = draft.ExtractionStatus is ContractExtractionStatus.Analysed
+                                                    or ContractExtractionStatus.Confirmed
+                    ? ReadExtraction(draft.ExtractedTerms, contractId, version)
+                    : null,
+
+                Elapsed = draft.ExtractionStartedAt is { } started
+                    ? DateTimeOffset.UtcNow - started
+                    : null
+            };
+        }
+
+        private static bool HasBeenAbandoned(ContractDraft draft) =>
+            draft.ExtractionStartedAt is null ||
+            DateTimeOffset.UtcNow - draft.ExtractionStartedAt.Value > AnalysisAbandonedAfter;
 
         /// <summary>
         /// Identifies the shape stored in <see cref="ContractDraft.SemanticAnalysis"/>,
@@ -744,6 +870,16 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 .Select(d => d.ExtractedTerms)
                 .FirstOrDefaultAsync(ct);
 
+            return ReadExtraction(stored, contractId, version);
+        }
+
+        /// <summary>
+        /// The stored extraction, or null when it cannot be read. An extraction
+        /// written in an older shape is not worth failing a page over — the user
+        /// can analyse again.
+        /// </summary>
+        private ContractExtractionDto? ReadExtraction(JsonDocument? stored, Guid contractId, int version)
+        {
             if (stored is null) return null;
 
             try
@@ -752,8 +888,6 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             }
             catch (JsonException ex)
             {
-                // Stored extraction from an older shape. Not worth failing a page
-                // over — the user can analyse again.
                 _logger.LogWarning(ex, "Stored extraction for {ContractId} v{Version} could not be read.",
                     contractId, version);
                 return null;
@@ -820,24 +954,59 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 : confirmedCount >= statedCount ? ContractReviewState.Confirmed
                 : ContractReviewState.PartiallyConfirmed;
 
-            // Only confirmed values are promoted onto the contract. An unconfirmed
-            // reading stays a reading: it is visible in the review screen and has
-            // no effect on what the contract says it costs.
+            // ------------------------------------------------------------------
+            // What the record already says wins.
+            //
+            // A confirmed reading used to be written straight over the contract,
+            // so a start date somebody had entered on the project was replaced by
+            // whatever the supplied PDF happened to say, silently and with no way
+            // back. That is the wrong way round: the details captured against the
+            // project and the contract are the ones the business decided on, and
+            // the document is a source for the gaps in them.
+            //
+            // So a reading now fills what is empty and never overwrites what is
+            // not. Everything the document says is still stored on the draft and
+            // still shown in the review, so nothing is lost — what changes is
+            // which one wins when they disagree.
+            //
+            // Only confirmed values are considered at all. An unconfirmed reading
+            // stays a reading.
+            // ------------------------------------------------------------------
+
+            var keptFromRecord = new List<string>();
+
             if (confirmed.TotalPrice.Confirmed &&
                 ContractTextAnalyzer.TryParseAmount(confirmed.TotalPrice.Value, out var total))
             {
-                contract.AgreedTotalNet = total;
-                contract.PriceDeliberatelyUnspecified = false;
+                if (contract.AgreedTotalNet is null && !contract.PriceDeliberatelyUnspecified)
+                {
+                    contract.AgreedTotalNet = total;
+                    contract.PriceDeliberatelyUnspecified = false;
+                }
+                else if (contract.AgreedTotalNet != total)
+                {
+                    keptFromRecord.Add("total price");
+                }
             }
 
             if (confirmed.VatRate.Confirmed &&
                 ContractTextAnalyzer.TryParseAmount(confirmed.VatRate.Value, out var vat))
             {
-                contract.AgreedTotalVatRatePercent = vat;
+                if (contract.AgreedTotalVatRatePercent is null)
+                    contract.AgreedTotalVatRatePercent = vat;
+                else if (contract.AgreedTotalVatRatePercent != vat)
+                    keptFromRecord.Add("VAT rate");
             }
 
             if (confirmed.Currency.Confirmed && confirmed.Currency.HasValue)
-                contract.Currency = NormaliseCurrency(confirmed.Currency.Value!) ?? contract.Currency;
+            {
+                var fromText = NormaliseCurrency(confirmed.Currency.Value!);
+
+                if (string.IsNullOrWhiteSpace(contract.Currency))
+                    contract.Currency = fromText ?? contract.Currency;
+                else if (fromText is not null && !string.Equals(fromText, contract.Currency, StringComparison.OrdinalIgnoreCase))
+                    keptFromRecord.Add("currency");
+            }
 
             // Payment terms are the schedule, the due dates and the deposit taken
             // together; storing only one of the three left the contract claiming
@@ -852,9 +1021,16 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 .Where(v => !string.IsNullOrWhiteSpace(v)));
 
             if (paymentTerms.Length > 0)
-                contract.PaymentTermsText = Truncate(paymentTerms, 2000);
+            {
+                if (string.IsNullOrWhiteSpace(contract.PaymentTermsText))
+                    contract.PaymentTermsText = Truncate(paymentTerms, 2000);
+                else
+                    keptFromRecord.Add("payment terms");
+            }
 
             // A price that is deliberately absent is a decision, recorded as one.
+            // This is the user saying so on this screen, not the document, so it
+            // is not subject to the rule above.
             if (confirmed.PriceMissing && !confirmed.TotalPrice.HasValue)
             {
                 contract.AgreedTotalNet = null;
@@ -862,10 +1038,21 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             }
 
             if (confirmed.StartDate.Confirmed && TryParseDate(confirmed.StartDate.Value, out var start))
-                contract.StartDate = start;
+            {
+                if (contract.StartDate is null) contract.StartDate = start;
+                else if (contract.StartDate != start) keptFromRecord.Add("start date");
+            }
 
             if (confirmed.EndDate.Confirmed && TryParseDate(confirmed.EndDate.Value, out var end))
-                contract.EndDate = end;
+            {
+                if (contract.EndDate is null) contract.EndDate = end;
+                else if (contract.EndDate != end) keptFromRecord.Add("end date");
+            }
+
+            // A date the contract took from the document is worth having on the
+            // project too, where the dates are otherwise entered by hand — but
+            // again only into a gap.
+            var filledOnProject = await FillProjectGapsAsync(contract, ct);
 
             // The parties as confirmed, recorded next to the ones from our records
             // so a later reader can see which the contract was prepared against.
@@ -895,12 +1082,49 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 Draft = ToSummary(draft, null),
                 ConfirmedFieldCount = confirmedCount,
                 StatedFieldCount = statedCount,
+                KeptFromRecord = keptFromRecord,
+                FilledOnProject = filledOnProject,
                 Money = new ContractMoneyDto(
                     contract.AgreedTotalNet,
                     contract.AgreedTotalVatRatePercent,
                     contract.Currency,
                     contract.PriceDeliberatelyUnspecified)
             };
+        }
+
+        /// <summary>
+        /// Puts the contract's dates onto its project where the project has none.
+        ///
+        /// The project is where these are normally entered, and a project created
+        /// alongside a supplied contract often has them blank. Filling only the
+        /// blanks keeps the same rule as everywhere else here: what somebody
+        /// entered stands, and a document may only answer what nobody has.
+        /// </summary>
+        private async Task<IReadOnlyList<string>> FillProjectGapsAsync(
+            Contract contract, CancellationToken ct)
+        {
+            if (contract.ProjectId == Guid.Empty) return Array.Empty<string>();
+
+            var project = await _db.Set<Project>()
+                .FirstOrDefaultAsync(p => p.Id == contract.ProjectId, ct);
+
+            if (project is null) return Array.Empty<string>();
+
+            var filled = new List<string>();
+
+            if (project.StartDate is null && contract.StartDate is not null)
+            {
+                project.StartDate = contract.StartDate;
+                filled.Add("start date");
+            }
+
+            if (project.EndDate is null && contract.EndDate is not null)
+            {
+                project.EndDate = contract.EndDate;
+                filled.Add("end date");
+            }
+
+            return filled;
         }
 
         private static string? Confirmed(ExtractedValue value) =>

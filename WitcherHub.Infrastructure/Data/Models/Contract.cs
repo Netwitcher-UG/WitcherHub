@@ -378,6 +378,43 @@ namespace WitcherHub.Infrastructure.Data.Models
         public DateTimeOffset? ExtractedAt { get; set; }
 
         public DateTimeOffset? ExtractionConfirmedAt { get; set; }
+
+        /// <summary>
+        /// When the current analysis was started, or null when none is running.
+        ///
+        /// Analysis moved off the request thread because reading a full contract
+        /// takes longer than a platform proxy will hold a connection open — the
+        /// browser was shown HTTP 502 while the work was still going. The status
+        /// now lives here rather than in the request, so the page can ask how it
+        /// is getting on.
+        ///
+        /// This doubles as the recovery signal: the job queue is in-process, so a
+        /// restart loses whatever was running, and a draft left saying "analysing"
+        /// for longer than any real analysis takes is one whose worker is gone.
+        /// </summary>
+        public DateTimeOffset? ExtractionStartedAt { get; set; }
+
+        /// <summary>
+        /// Why the last analysis failed, in the words the user should see. Null
+        /// when the last attempt succeeded or none has been made.
+        ///
+        /// The failure used to be returned in the response and then forgotten, so
+        /// reloading the page turned a contract that had failed for a nameable
+        /// reason back into one that had simply never been analysed.
+        /// </summary>
+        [MaxLength(1000)]
+        public string? ExtractionError { get; set; }
+
+        /// <summary>
+        /// Whether trying the last failed analysis again is worth offering.
+        ///
+        /// Stored rather than assumed. The reading now finishes after its
+        /// request has gone, so the row is the only thing the page can ask — and
+        /// treating every failure as retryable is exactly the flattening that
+        /// had an owner with no API key pressing the button for ever. A missing
+        /// key or an empty account fails identically every time.
+        /// </summary>
+        public bool? ExtractionErrorIsTransient { get; set; }
     }
 
     public class ContractSignature : BaseEntity

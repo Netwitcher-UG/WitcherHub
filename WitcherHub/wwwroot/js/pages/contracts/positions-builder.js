@@ -951,7 +951,7 @@
             const version = Number(button.dataset.version);
 
             await guard(button, async () => {
-                const result = await post("Analyze", { version });
+                const result = await runAnalysis(version, button);
 
                 if (!result.ok) {
                     // The document is untouched and still the contract's source;
@@ -1002,7 +1002,7 @@
             const version = Number(button.dataset.version);
 
             await guard(button, async () => {
-                const result = await post("Analyze", { version });
+                const result = await runAnalysis(version, button);
 
                 if (!result.ok) { showFailure(result, "The contract could not be analysed."); offerRetry(button); return; }
 
@@ -1026,24 +1026,17 @@
 
             if (chosen.length === 0) { toast("info", "Tick at least one position to add."); return; }
 
-            // A charge with no calculable amount has no honest position to become:
-            // a position carries a quantity and a line total and cannot say "not
-            // stated". These stay in the reading and out of the priced lines.
-            const blocked = chosen.filter(row =>
-                extraction.positions[Number(row.dataset.extractedIndex)]?.canBecomePosition === false);
-
-            const addable = chosen.filter(row => !blocked.includes(row));
-
-            if (addable.length === 0) {
-                toast("info",
-                    "Those cannot be added as positions — they are priced at a rate with nothing agreed to " +
-                    "multiply it by. They remain part of the contract text.");
-                return;
-            }
-
+            // Everything ticked is added. A charge whose amount the document
+            // never states is added with that figure left empty rather than
+            // withheld: the title, description, rate, unit and frequency are all
+            // real information from the contract, and the missing number is one
+            // only the user can supply. The position validator still refuses to
+            // save a line with no price, so nothing unpriced reaches the
+            // contract silently.
             let needsBillingChoice = 0;
+            let needsFigures = 0;
 
-            addable.forEach(row => {
+            chosen.forEach(row => {
                 const source = extraction.positions[Number(row.dataset.extractedIndex)];
 
                 // Figures arrive exactly as they were read. Nothing is rounded,
@@ -1063,6 +1056,8 @@
                 const cycle = BILLING_CYCLES.includes(source.billingCycle) ? source.billingCycle : null;
                 if (cycle === null) needsBillingChoice++;
 
+                if (source.canBecomePosition === false) needsFigures++;
+
                 positions.push(normalise({
                     clientId: cryptoId(),
                     sourceType: "ExtractedFromContractText",
@@ -1076,7 +1071,12 @@
                     unitPrice: source.unitPrice ?? null,
                     currency: source.currency || defaultCurrency,
                     vatRate: source.vatRatePercent ?? null,
-                    billingCycle: cycle ?? "OneTime"
+                    billingCycle: cycle ?? "OneTime",
+
+                    // What the document could not settle, carried onto the
+                    // position so it is still visible after the reading has
+                    // scrolled away and after a reload.
+                    notes: source.blockedReason || ""
                 }));
             });
 
@@ -1084,12 +1084,12 @@
             render();
 
             toast("success",
-                addable.length + " position(s) added for review. Check them and save — nothing is stored yet.");
+                chosen.length + " position(s) added for review. Check them and save — nothing is stored yet.");
 
-            if (blocked.length > 0) {
-                toast("info",
-                    blocked.length + " could not be added: priced at a rate with no agreed quantity. " +
-                    "They stay in the contract text.");
+            if (needsFigures > 0) {
+                toast("warning",
+                    needsFigures + " of them has no agreed amount in the contract. Enter the price and " +
+                    "quantity, or mark the position as free — it cannot be saved until you do.");
             }
 
             if (needsBillingChoice > 0) {
@@ -1133,6 +1133,80 @@
             });
         }
     });
+
+    /// Starts a reading of the supplied contract and waits for it, without
+    /// holding a request open while it runs.
+    ///
+    /// One long request was the problem: reading a real contract takes longer
+    /// than the platform proxy will hold a connection, so the browser was shown
+    /// "HTTP 502 ... the request took too long" while the model was still
+    /// working — and the answer, when it came, arrived into a request nobody was
+    /// listening to. The reading now happens on the server's own time and this
+    /// asks how it is getting on.
+    ///
+    /// Returns the same shape the old single call did, so the two callers did
+    /// not have to change how they read the answer.
+    async function runAnalysis(version, button) {
+        const started = await post("Analyze", { version });
+        if (!started.ok) return started;
+
+        const startedAt = Date.now();
+        let waited = 0;
+
+        while (waited < ANALYSIS_GIVE_UP_MS) {
+            // Gentle at first, then slower: most readings finish in the first
+            // half-minute, and a long one does not need to be asked every second.
+            const gap = waited < 30000 ? 1500 : 4000;
+            await sleep(gap);
+            waited = Date.now() - startedAt;
+
+            const progress = await post("AnalysisStatus", { version });
+
+            // A failure to ask is not a failure of the reading — the reading is
+            // still going. Only stop for an answer that says so.
+            if (progress.sessionExpired) return progress;
+
+            if (progress.ok && progress.running) {
+                showProgress(button, progress.elapsedSeconds || Math.round(waited / 1000));
+                continue;
+            }
+
+            if (progress.ok || progress.running === false) {
+                clearProgress(button);
+                return progress;
+            }
+        }
+
+        clearProgress(button);
+
+        return {
+            ok: false,
+            transient: true,
+            message: "The contract is taking unusually long to read. It is still being worked on — " +
+                "reload the page in a minute to see the result."
+        };
+    }
+
+    /// How long to keep asking before telling the user to come back later. The
+    /// reading itself is not cancelled; only the waiting stops.
+    const ANALYSIS_GIVE_UP_MS = 5 * 60 * 1000;
+
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    /// Counts up on the button, so a reading that takes a minute looks like work
+    /// in progress rather than like a page that has stopped responding.
+    function showProgress(button, seconds) {
+        if (!button) return;
+        button.innerHTML = `Reading… ${seconds}s`;
+    }
+
+    function clearProgress(button) {
+        // guard() restores the original label when the work finishes; this only
+        // stops the counter from being the last thing written.
+        if (button) button.innerHTML = "Working…";
+    }
 
     /// Shows a failed call, with the reference the server logged it under so a
     /// screenshot is enough to find it.
@@ -1341,15 +1415,27 @@
             const row = document.createElement("tr");
             row.dataset.extractedIndex = String(index);
 
-            // A charge with no calculable amount is shown, and cannot be ticked.
-            // Offering a checkbox that adds an invented quantity is worse than
-            // saying plainly why this one is not a priced line.
-            const addable = p.canBecomePosition !== false;
+            // Every read position can be ticked, including the ones whose amount
+            // the document never states.
+            //
+            // These used to be shown with the checkbox disabled, on the grounds
+            // that adding one would invent a quantity. The reasoning was right
+            // about inventing values and wrong about what to do: a services
+            // contract is largely made of monthly fees, hourly rates and
+            // conditional costs, so on a real document *every* row came back
+            // disabled and the feature did nothing at all. Refusing does not
+            // spare the user the missing number — it just means retyping the
+            // title, the description, the rate and the frequency by hand first.
+            //
+            // So the reading is offered in full, and what it could not determine
+            // is said plainly on the row. The user supplies the missing figure,
+            // which they are the only one who knows, and the position validator
+            // still refuses to save a line with no price behind it.
+            const needsAttention = p.canBecomePosition === false;
 
-            const tick = addable
-                ? `<input type="checkbox" class="form-check-input">`
-                : `<input type="checkbox" class="form-check-input" disabled
-                          title="${escapeAttr(p.blockedReason ?? "")}">`;
+            const tick = `<input type="checkbox" class="form-check-input"
+                                 ${needsAttention ? 'data-needs-attention="true"' : ""}
+                                 title="${escapeAttr(needsAttention ? p.blockedReason ?? "" : "")}">`;
 
             // How firm the money is, next to the money. Without it a rate nobody
             // committed to reads exactly like an agreed price.
@@ -1366,9 +1452,12 @@
                     ? `<span class="d-block text-warning-main text-sm">${escapeHtml(p.billingCyclePhrase)} — choose a cycle</span>`
                     : "";
 
-            const blocked = addable
-                ? ""
-                : `<span class="d-block text-secondary-light text-sm fst-italic">${escapeHtml(p.blockedReason ?? "")}</span>`;
+            // Stated as what the user has to supply, not as a refusal.
+            const blocked = needsAttention
+                ? `<span class="d-block text-warning-main text-sm">
+                       ${escapeHtml(p.blockedReason ?? "")} You can still add it and fill the figure in.
+                   </span>`
+                : "";
 
             row.innerHTML = `
                 <td>${tick}</td>

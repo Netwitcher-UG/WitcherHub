@@ -3,6 +3,7 @@ using System;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WitcherHub.Infrastructure.Data.Context;
@@ -12,9 +13,11 @@ using WitcherHub.Infrastructure.Data.Context;
 namespace WitcherHub.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260818195644_AnalysisRunsInBackground")]
+    partial class AnalysisRunsInBackground
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -560,9 +563,6 @@ namespace WitcherHub.Infrastructure.Migrations
                     b.Property<string>("ExtractionError")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
-
-                    b.Property<bool?>("ExtractionErrorIsTransient")
-                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ExtractionStartedAt")
                         .HasColumnType("timestamp with time zone");
