@@ -60,9 +60,17 @@
                     <div class="d-flex flex-wrap align-items-center gap-3">
                         <h4 class="mb-0 fw-semibold" id="vp-title">@Model.ProjectTitle</h4>
 
-                        <span class="badge bg-@status.Tone-focus text-@status.Tone-main border border-@status.Tone-main px-16 py-4 radius-4">
-                            @status.Label
-                        </span>
+                        @*
+                            The shared badge, not hand-built classes.
+
+                            This used to interpolate the tone into the class names —
+                            bg-@@status.Tone-focus and so on — which produced
+                            "bg-secondary-focus" for every Draft. The theme has no
+                            such class, so the commonest badge in the application
+                            rendered with no background and no colour: a status
+                            nobody could read.
+                        *@
+                        <partial name="_StatusBadge" model="status" />
 
                         @if (workflow.IsArchived)
                         {

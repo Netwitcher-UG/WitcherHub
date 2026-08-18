@@ -14,14 +14,21 @@
 *@
 
 @{
-    var (label, tone, icon) = Model.Progress switch
+    @*
+        The colour is written out, not assembled from the tone.
+
+        This used to render class="text-@@tone-main", which produced
+        "text-neutral-main" for anything not yet created — a class no stylesheet
+        defines — so "None" and "Closed" came out with no colour at all.
+    *@
+    var (label, colour, icon) = Model.Progress switch
     {
-        DocumentProgress.NotCreated => ("None", "neutral", "ri-subtract-line"),
-        DocumentProgress.Draft => ("Draft", "warning", "ri-draft-line"),
-        DocumentProgress.Awaiting => ("Sent", "info", "ri-send-plane-line"),
-        DocumentProgress.Settled => (Model.SettledLabel, "success", "ri-checkbox-circle-line"),
-        DocumentProgress.Closed => ("Closed", "neutral", "ri-close-circle-line"),
-        _ => ("—", "neutral", "ri-subtract-line")
+        DocumentProgress.NotCreated => ("None", "text-secondary-light", "ri-subtract-line"),
+        DocumentProgress.Draft => ("Draft", "text-warning-main", "ri-draft-line"),
+        DocumentProgress.Awaiting => ("Sent", "text-info-main", "ri-send-plane-line"),
+        DocumentProgress.Settled => (Model.SettledLabel, "text-success-main", "ri-checkbox-circle-line"),
+        DocumentProgress.Closed => ("Closed", "text-secondary-light", "ri-close-circle-line"),
+        _ => ("—", "text-secondary-light", "ri-subtract-line")
     };
 
     var muted = Model.Progress == DocumentProgress.NotCreated;
@@ -30,5 +37,5 @@
 <span class="wh-progress @(muted ? "wh-progress--muted" : "")" title="@Model.Kind: @label">
     <i class="@icon"></i>
     <span class="wh-progress__kind">@Model.Kind</span>
-    <span class="wh-progress__state text-@tone-main">@label</span>
+    <span class="wh-progress__state @colour">@label</span>
 </span>

@@ -313,12 +313,31 @@
         $('vp-basicEdit')?.classList.toggle('d-none', !editingBasic);
     }
 
+    /// Writes text into an element only if the page actually has it.
+    ///
+    /// Every write here used to be unguarded, so removing one element from the
+    /// markup threw a TypeError in the middle of rendering — and because the render
+    /// runs inside the load's try block, the page reported "Failed to load
+    /// project." for a project that had loaded perfectly well. The panel then never
+    /// appeared, which made it look as though projects and contracts could not be
+    /// opened at all.
+    function setText(id, value) {
+        const el = $(id);
+        if (el) el.textContent = value;
+    }
+
+    function setValue(id, value) {
+        const el = $(id);
+        if (el) el.value = value;
+    }
+
     function renderProject(p) {
         currentProject = p;
 
-        $('vp-title').textContent = p.title ?? 'Project';
-        $('vp-statusBadge').innerHTML = statusBadgeHtml(p.status);
-        $('vp-meta').textContent = p.id ? `ID: ${p.id}` : '';
+        // The project's status and identity are rendered on the server now, in the
+        // page header, so they are deliberately not written here: two sources for
+        // one fact is what let them disagree.
+        setText('vp-title', p.title ?? 'Project');
 
         const customerNameEl = $('vp-customerName');
         const customerEmailEl = $('vp-customerEmail');
@@ -339,14 +358,14 @@
             customerEmailEl.textContent = p.customer?.email ?? '—';
         }
 
-        $('vp-v-title').textContent = p.title ?? '—';
-        $('vp-v-desc').textContent = p.description ?? '—';
-        $('vp-v-dates').textContent = `${fmtDate(p.startDate)} → ${fmtDate(p.endDate)}`;
+        setText('vp-v-title', p.title ?? '—');
+        setText('vp-v-desc', p.description ?? '—');
+        setText('vp-v-dates', `${fmtDate(p.startDate)} → ${fmtDate(p.endDate)}`);
 
-        $('vp-e-title').value = p.title ?? '';
-        $('vp-e-desc').value = p.description ?? '';
-        $('vp-e-start').value = p.startDate ?? '';
-        $('vp-e-end').value = p.endDate ?? '';
+        setValue('vp-e-title', p.title ?? '');
+        setValue('vp-e-desc', p.description ?? '');
+        setValue('vp-e-start', p.startDate ?? '');
+        setValue('vp-e-end', p.endDate ?? '');
 
         const q = $('vp-newQuoteBtn');
         if (q && p.id) q.href = `/Quotes/Create?projectId=${encodeURIComponent(p.id)}`;
@@ -375,8 +394,24 @@
         $('vpLoading')?.classList.remove('d-none');
         $('vpBody')?.classList.add('d-none');
 
+        // Loading and rendering are reported separately. They used to share one
+        // catch, so a fault in the rendering — an element the markup no longer had
+        // — was reported as "Failed to load project." for a project that had loaded
+        // perfectly well, and the message sent everyone looking in the wrong place.
+        let data;
+
         try {
-            const data = await fetchProjectById(projectId);
+            data = await fetchProjectById(projectId);
+        } catch (err) {
+            console.error('Loading the project failed.', err);
+
+            const el = $('vpLoading');
+            if (el) el.textContent = 'This project could not be loaded. Reload the page, or open it again from the projects list.';
+
+            return;
+        }
+
+        try {
             renderProject(normalizeProject(data));
 
             $('vpLoading')?.classList.add('d-none');
@@ -384,8 +419,10 @@
 
             activateInitialTab();
         } catch (err) {
-            console.error(err);
-            $('vpLoading').textContent = 'Failed to load project.';
+            console.error('The project loaded but could not be displayed.', err);
+
+            const el = $('vpLoading');
+            if (el) el.textContent = 'This project loaded but could not be displayed. Reload the page — if it keeps happening, the details are in the browser console.';
         }
     }
 

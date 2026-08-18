@@ -296,16 +296,42 @@ namespace WitcherHub.Pages
         // =========================
         // GET: Details (Ajax JSON)
         // =========================
+        /// <summary>
+        /// The project behind the workspace panel.
+        ///
+        /// Every other handler here answers with a structured error; this one threw,
+        /// so any fault became an opaque 500 and the browser could only report that
+        /// something had gone wrong. The exception is logged with the project id so
+        /// a failure can be traced to a row, and the caller is told what happened
+        /// without being shown provider detail or a stack trace.
+        /// </summary>
         public async Task<IActionResult> OnGetProjectAsync(Guid id, CancellationToken ct)
         {
-            if (id == Guid.Empty)
-                throw new BadRequestAppException("Invalid project id.");
+            try
+            {
+                if (id == Guid.Empty)
+                    return ToastBadRequest("Error", "Project id is missing.");
 
-            var project = await _projects.GetProjectAsync(id, ct);
-            if (project is null)
-                throw new NotFoundAppException("Project not found.");
+                var project = await _projects.GetProjectAsync(id, ct);
 
-            return new JsonResult(project);
+                if (project is null)
+                    return ToastNotFound("Not found", "This project no longer exists.");
+
+                return new JsonResult(project);
+            }
+            catch (BadRequestAppException ex)
+            {
+                return ToastBadRequest("Not allowed", ex.Message);
+            }
+            catch (NotFoundAppException ex)
+            {
+                return ToastNotFound("Not found", ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Loading project {ProjectId} for the workspace failed.", id);
+                return ToastServerError();
+            }
         }
 
         // =========================
