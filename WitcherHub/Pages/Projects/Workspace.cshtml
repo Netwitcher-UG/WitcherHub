@@ -107,9 +107,10 @@
                     }
                     else
                     {
+                        @* Plural: a project may hold several, and the tab lists them all. *@
                         <a asp-page="/Projects/Workspace" asp-route-id="@Model.ProjectId" asp-route-tab="contracts"
                            class="btn btn-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2">
-                            <i class="ri-file-text-line"></i> Open contract
+                            <i class="ri-file-text-line"></i> Contracts
                         </a>
                     }
 
@@ -182,23 +183,18 @@
 
     <div id="vpBody" class="d-none">
 
-        <div class="mb-3">
-            <div class="text-muted small">
-                <a asp-page="/Index"
-                   class="text-decoration-none text-muted"
-                   title="Go to Customers page">
-                    Customer
-                </a>
-            </div>
+        @*
+            The customer is named once, in the page header above, as a link to their
+            record. This block repeated it directly underneath — the same name twice
+            within a hundred pixels, the second time without a working link until a
+            fetch had completed.
 
-            <a class="fw-semibold text-decoration-none"
-               id="vp-customerName"
-               href="#"
-               title="Open customer details">
-                —
-            </a>
-
-            <div class="text-muted small" id="vp-customerEmail">—</div>
+            The email is kept because the header does not carry it, and the send
+            dialog needs somewhere to read the recipient from.
+        *@
+        <div class="mb-3 text-secondary-light text-sm" id="vp-customerContact">
+            <span id="vp-customerName" class="d-none"></span>
+            <span id="vp-customerEmail"></span>
         </div>
 
         <ul class="nav nav-tabs" id="vpTabs" role="tablist">

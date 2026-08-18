@@ -355,7 +355,10 @@
         }
 
         if (customerEmailEl) {
-            customerEmailEl.textContent = p.customer?.email ?? '—';
+            // Blank, not a dash. This line sits on its own under the header, and a
+            // lone "—" reads as something failing to load rather than as a customer
+            // who simply has no email on file.
+            customerEmailEl.textContent = p.customer?.email ?? '';
         }
 
         setText('vp-v-title', p.title ?? '—');
@@ -941,10 +944,12 @@
 
         setText('vpSendContractProject', ($('vp-title')?.textContent || '—').trim());
         setText('vpSendContractContract', contractNo || '—');
-        setText('vpSendContractCustomerName', ($('vp-customerName')?.textContent || '—').trim());
+        // Read from the project that was loaded, rather than scraping text back out
+        // of the page it was written into.
+        setText('vpSendContractCustomerName', currentProject?.customer?.name || '—');
 
-        const email = ($('vp-customerEmail')?.textContent || '').trim();
-        setText('vpSendContractCustomerEmail', (email && email !== '—') ? email : '');
+        const email = (currentProject?.customer?.email || '').trim();
+        setText('vpSendContractCustomerEmail', email);
 
         setSending(false);
         bootstrap.Modal.getOrCreateInstance(confirmModalEl).show();
