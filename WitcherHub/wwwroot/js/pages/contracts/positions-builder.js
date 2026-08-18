@@ -1049,9 +1049,20 @@
 
     /// Shows a failed call, with the reference the server logged it under so a
     /// screenshot is enough to find it.
+    /// Reports a failure in the medium that matches how long it will last.
+    ///
+    /// Everything used to go to a toast, which clears itself after eight seconds.
+    /// That suits a transient outage — try again in a moment — but not a
+    /// configuration fault: a wrong API key is still wrong tomorrow, and a
+    /// disappearing message left the contract empty with nothing on screen saying
+    /// why. A lasting problem gets a notice that lasts.
     function showFailure(result, fallback) {
         const message = result.message || fallback;
-        toast("error", result.reference ? `${message} (reference ${result.reference})` : message);
+        const full = result.reference ? `${message} (reference ${result.reference})` : message;
+
+        toast("error", full);
+
+        if (!result.transient) banner("error", full);
     }
 
     /// Puts a retry next to the action that failed, so a transient outage does

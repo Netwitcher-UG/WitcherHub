@@ -1507,3 +1507,49 @@ body.ui-loading {
         width: 100%;
     }
 }
+
+
+/* ==========================================================================
+   Contract documents inside the application shell
+
+   css/contracts/contract-sign.css describes a document as a page: a full
+   viewport band, an A4 sheet with a 297mm minimum, and 64px of clearance for
+   the floating language switcher. That is right on the public signing page,
+   where the document IS the page.
+
+   The contract editor and the contract details page load the same stylesheet
+   inside the admin shell, where the document is a panel on a page that already
+   has a header, a sidebar and a footer. There it produced a full screen of
+   empty band followed by a blank A4 sheet — around 2400px of mostly nothing
+   for a contract with no text yet.
+
+   Scoped by .dashboard-main-body, which only the admin layout has, so the
+   public signing pages are untouched.
+   ========================================================================== */
+
+.dashboard-main-body .contractPage {
+    min-height: 0;
+    padding: 0;
+    background: transparent;
+}
+
+.dashboard-main-body .contractPage__container {
+    /* The clearance exists for a control the admin pages do not have. */
+    padding: 0;
+    max-width: none;
+}
+
+.dashboard-main-body .contractPage__paper {
+    /* A contract with no wording yet is an empty panel, not a blank sheet of
+       paper. The height comes from the content. */
+    min-height: 0;
+    margin-top: 0;
+    box-shadow: none;
+}
+
+/* An empty document says so, rather than showing nothing at all. */
+.dashboard-main-body .contractPage__contractHtml:empty::before {
+    content: "No contract wording yet.";
+    color: var(--text-secondary-light, #6b7280);
+    font-style: italic;
+}
