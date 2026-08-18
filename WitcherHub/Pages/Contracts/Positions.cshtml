@@ -86,6 +86,15 @@
             <span class="wh-stepper__label">Review and approve</span>
         </li>
     </ol>
+
+    @* Says once what the mark on the buttons means, rather than repeating it in
+       every tooltip. Placed with the stepper because it describes the whole
+       page, not any one action. *@
+    <p class="wh-ai-legend mt-12 mb-0">
+        <i class="ri-sparkling-2-line wh-ai-mark__icon" aria-hidden="true"></i>
+        Buttons marked with this use the AI model. They propose — nothing they return
+        is applied to the contract until you confirm it.
+    </p>
 </div>
 
 <div class="row g-4" id="positionsApp"
@@ -217,9 +226,10 @@
                                 data-action="add-catalog">
                             <i class="ri-box-3-line"></i> Add from saved services
                         </button>
-                        <button type="button" class="btn btn-outline-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2 ms-auto"
-                                data-action="organize">
-                            <i class="ri-magic-line"></i> Organise with AI
+                        <button type="button" class="btn btn-outline-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2 ms-auto wh-ai-action"
+                                data-action="organize" data-ai="true"
+                                title="Sends your positions to the AI model and proposes a tidied version for you to review.">
+                            <partial name="_AiMark" /> Organise with AI
                         </button>
                     </div>
                 }
@@ -245,9 +255,11 @@
                                 </button>
                                 @if (Model.SuppliedSource is not null)
                                 {
-                                    <button type="button" class="btn btn-outline-primary text-sm px-20 py-11 radius-8"
-                                            data-action="extract-positions" data-version="@Model.SuppliedSource.Version">
-                                        <i class="ri-file-search-line"></i> Extract positions from the text
+                                    <button type="button" class="btn btn-outline-primary text-sm px-20 py-11 radius-8 wh-ai-action"
+                                            data-action="extract-positions" data-version="@Model.SuppliedSource.Version"
+                                            data-ai="true"
+                                            title="Reads the contract text with the AI model and proposes positions for you to review.">
+                                        <partial name="_AiMark" /> Extract positions from the text
                                     </button>
                                 }
                             </div>
@@ -379,9 +391,11 @@
                         @if (!Model.IsLocked)
                         {
                             <div class="wh-actions mt-16">
-                                <button type="button" class="btn btn-outline-primary text-sm px-16 py-8 radius-8"
-                                        data-action="analyze-source" data-version="@supplied.Version">
-                                    <i class="ri-file-search-line"></i>
+                                <button type="button" class="btn btn-outline-primary text-sm px-16 py-8 radius-8 wh-ai-action"
+                                        data-action="analyze-source" data-version="@supplied.Version"
+                                        data-ai="true"
+                                        title="Reads this document with the AI model. Nothing it finds is applied until you confirm it.">
+                                    <partial name="_AiMark" />
                                     @(supplied.ExtractionStatus == ContractExtractionStatus.NotAnalysed
                                         ? "Analyse this contract" : "Analyse again")
                                 </button>
@@ -731,9 +745,10 @@
                                depends on what the contract is built from. It is
                                disabled only when there is genuinely no source —
                                not when there happen to be no positions. *@
-                            <button type="button" class="btn btn-primary radius-8" data-action="generate-draft"
-                                    disabled="@(!Model.CanGenerate)">
-                                <i class="ri-magic-line me-1"></i> @Model.Source.PrimaryActionLabel
+                            <button type="button" class="btn btn-primary radius-8 wh-ai-action" data-action="generate-draft"
+                                    disabled="@(!Model.CanGenerate)" data-ai="true"
+                                    title="Writes the contract wording with the AI model. It is created as a draft for you to review before approval.">
+                                <partial name="_AiMark" /> @Model.Source.PrimaryActionLabel
                             </button>
                         </div>
 
@@ -830,7 +845,10 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-primary radius-8" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary radius-8" data-action="run-organize">Organise</button>
+                <button type="button" class="btn btn-primary radius-8 wh-ai-action" data-action="run-organize" data-ai="true"
+                        title="Sends the text above to the AI model and proposes positions for you to review.">
+                    <partial name="_AiMark" /> Organise
+                </button>
                 <button type="button" class="btn btn-success radius-8 d-none" data-action="apply-organize">Apply positions</button>
             </div>
         </div>

@@ -30,8 +30,15 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
         /// </summary>
         public string? FallbackModel { get; set; }
 
-        /// <summary>How long to wait for one call before giving up.</summary>
-        public int TimeoutSeconds { get; set; } = 60;
+        /// <summary>
+        /// How long to wait for one call before giving up.
+        ///
+        /// Raised from 60. A reasoning model reading a full contract routinely
+        /// takes longer than a minute before the first token, and cutting it off
+        /// there produced a timeout that looked like a fault in the contract
+        /// tooling. Clamped to 10..900 seconds where it is applied.
+        /// </summary>
+        public int TimeoutSeconds { get; set; } = 180;
 
         /// <summary>
         /// How many times to retry a call that failed for a reason that might
