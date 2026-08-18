@@ -9,6 +9,7 @@ using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Services.Contracts;
+using WitcherHub.Domain.Commercial;
 using WitcherHub.Domain.Contracts;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
@@ -755,6 +756,37 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 // over — the user can analyse again.
                 _logger.LogWarning(ex, "Stored extraction for {ContractId} v{Version} could not be read.",
                     contractId, version);
+                return null;
+            }
+        }
+
+        public async Task<ContractFinancials?> GetFinancialsAsync(
+            Guid contractId, int version, CancellationToken ct = default)
+        {
+            var stored = await _db.Set<ContractDraft>()
+                .AsNoTracking()
+                .Where(d => d.ContractId == contractId && d.Version == version)
+                .Select(d => d.SemanticAnalysis)
+                .FirstOrDefaultAsync(ct);
+
+            if (stored is null) return null;
+
+            try
+            {
+                if (!stored.RootElement.TryGetProperty("financials", out var financials))
+                    return null;
+
+                return financials.Deserialize<ContractFinancials>(SemanticAnalysisJson);
+            }
+            catch (JsonException ex)
+            {
+                // A reading stored under an earlier shape. Not worth failing a page
+                // over: the figures are absent, which the caller shows as unknown
+                // rather than as zero.
+                _logger.LogWarning(ex,
+                    "Stored semantic analysis for {ContractId} v{Version} could not be read.",
+                    contractId, version);
+
                 return null;
             }
         }

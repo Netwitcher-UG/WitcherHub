@@ -285,19 +285,16 @@ namespace WitcherHub.Application.Services.Contracts
                     : $"{name} — {issue.Field}: {issue.Message}");
             }
 
-            // Amounts the engine refused to total. These are the ones that would
-            // otherwise quietly go missing from the contract value.
-            if (result.Financials is not null)
+            // Amounts the engine refused to total are listed in the financial
+            // breakdown, one per line with the term named — a better place for them
+            // than a flat warning list, so only the fact that the total is a floor
+            // is repeated here.
+            if (result.Financials is not null && result.Financials.IsPartial &&
+                result.Financials.CommittedNet > 0m)
             {
-                foreach (var unresolved in result.Financials.Unresolved)
-                    warnings.Add($"{unresolved.TermName}: {unresolved.Reason}");
-
-                if (result.Financials.IsPartial && result.Financials.CommittedNet > 0m)
-                {
-                    warnings.Add(
-                        "The committed total below covers only the amounts that could be calculated. " +
-                        "The items listed above it are not included in it.");
-                }
+                warnings.Add(
+                    "The committed total covers only the amounts that could be calculated. " +
+                    "Some items are not included in it.");
             }
 
             // A proposal with nothing usable in it, and why. Kept because "the

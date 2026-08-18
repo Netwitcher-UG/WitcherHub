@@ -90,6 +90,18 @@ namespace WitcherHub.Application.Interfaces
             Guid contractId, int version, CancellationToken ct = default);
 
         /// <summary>
+        /// What the financial engine made of the last reading of this version:
+        /// committed money separated from estimated, variable and optional, and
+        /// every amount it would not total listed with the reason.
+        ///
+        /// Null for a version analysed before the semantic pipeline existed, or
+        /// never analysed at all. A caller must treat that as "not known" rather
+        /// than as zero.
+        /// </summary>
+        Task<Domain.Commercial.ContractFinancials?> GetFinancialsAsync(
+            Guid contractId, int version, CancellationToken ct = default);
+
+        /// <summary>
         /// Stores the extracted values a person has reviewed, and promotes the
         /// confirmed commercial facts onto the contract. Only what is confirmed
         /// is promoted; the rest stays a reading of the document.

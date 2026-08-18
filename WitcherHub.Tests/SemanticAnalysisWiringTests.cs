@@ -276,6 +276,50 @@ public class SemanticAnalysisWiringTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_engines_figures_can_be_read_back_for_display()
+    {
+        if (!Available) return;
+
+        // Stored as JSON and read back as a record with a positional constructor,
+        // which is where a naming-policy mismatch would quietly return null and the
+        // page would show nothing at all rather than an error.
+        var contractId = await NewContractWithSuppliedTextAsync(months: 12);
+
+        await Service(new StubAi(TwoTermsResponse)).AnalyzeAsync(contractId, version: 1);
+
+        var financials = await Service(new StubAi("unused"))
+            .GetFinancialsAsync(contractId, version: 1);
+
+        Assert.NotNull(financials);
+        Assert.Equal("EUR", financials!.Currency);
+        Assert.Equal(6000m, financials.CommittedRecurringTotal);
+        Assert.Equal(6000m, financials.CommittedNet);
+
+        // The hourly term could not be totalled, and says why — with the term named,
+        // so the reader can find the line it belongs to.
+        Assert.True(financials.IsPartial);
+
+        var unresolved = Assert.Single(financials.Unresolved);
+        Assert.Equal("Zusätzliche Arbeiten", unresolved.TermName);
+        Assert.False(string.IsNullOrWhiteSpace(unresolved.Reason));
+    }
+
+    [Fact]
+    public async Task A_version_that_was_never_analysed_reports_unknown_rather_than_zero()
+    {
+        if (!Available) return;
+
+        var contractId = await NewContractWithSuppliedTextAsync();
+
+        var financials = await Service(new StubAi("unused"))
+            .GetFinancialsAsync(contractId, version: 1);
+
+        // Null means "not known". A ContractFinancials of all zeros would be a
+        // claim that the contract is worth nothing.
+        Assert.Null(financials);
+    }
+
+    [Fact]
     public async Task A_reading_that_finds_no_committed_price_does_not_invent_one()
     {
         if (!Available) return;

@@ -214,10 +214,14 @@ public class SemanticExtractionProjectionTests
 
         var dto = SemanticExtractionProjection.ToLegacyExtraction(result);
 
-        // The user is told which item is missing from the total and why, and told
-        // that the total is a floor.
-        Assert.Contains(dto.Warnings, w => w.Contains("Verbrauch"));
+        // The user is told the total is a floor. Which item is missing, and why, is
+        // shown in the financial breakdown with the term named — repeating it here
+        // as a flat warning said the same thing twice on one screen.
         Assert.Contains(dto.Warnings, w => w.Contains("only the amounts that could be calculated"));
+        Assert.DoesNotContain(dto.Warnings, w => w.Contains("Verbrauch"));
+
+        // ...and it is still recorded, in the place that shows it properly.
+        Assert.Contains(result.Financials!.Unresolved, u => u.TermName == "Verbrauch");
     }
 
     [Fact]

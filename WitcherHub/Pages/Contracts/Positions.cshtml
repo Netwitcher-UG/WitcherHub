@@ -411,6 +411,124 @@
                         <ul class="mb-0 ps-16" id="extractionWarningList"></ul>
                     </div>
 
+                    @*
+                        What the money adds up to, and what it does not.
+
+                        One number cannot honestly describe a contract that mixes a
+                        fixed fee, an hourly rate with no agreed hours, and an
+                        optional extra. These are the engine's own buckets: the
+                        arithmetic is the application's and is reproducible, and
+                        anything it would not total is named below with the reason
+                        rather than quietly left out of the figure.
+                    *@
+                    @if (Model.Financials is not null)
+                    {
+                        var money = Model.Financials;
+                        var currency = string.IsNullOrWhiteSpace(money.Currency) ? "EUR" : money.Currency;
+
+                        <div class="border radius-8 p-16 mb-16">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-12">
+                                <h6 class="fw-semibold mb-0 text-sm">What this adds up to</h6>
+
+                                @if (money.IsPartial)
+                                {
+                                    @Badge.Html("Partial", "warning")
+                                }
+                            </div>
+
+                            <dl class="row mb-0 text-sm">
+                                @if (money.CommittedOneTime != 0m)
+                                {
+                                    <dt class="col-7 fw-medium text-secondary-light py-4">Committed, one-off</dt>
+                                    <dd class="col-5 text-end py-4 mb-0">@Format.Money(money.CommittedOneTime, currency)</dd>
+                                }
+
+                                @if (money.CommittedRecurringTotal != 0m)
+                                {
+                                    <dt class="col-7 fw-medium text-secondary-light py-4">Committed, over the term</dt>
+                                    <dd class="col-5 text-end py-4 mb-0">@Format.Money(money.CommittedRecurringTotal, currency)</dd>
+
+                                    <dt class="col-7 fw-medium text-secondary-light py-4">— per month</dt>
+                                    <dd class="col-5 text-end py-4 mb-0">@Format.Money(money.CommittedMonthlyEquivalent, currency)</dd>
+                                }
+
+                                @if (money.Discounts != 0m)
+                                {
+                                    <dt class="col-7 fw-medium text-secondary-light py-4">Discounts</dt>
+                                    <dd class="col-5 text-end py-4 mb-0">-@Format.Money(money.Discounts, currency)</dd>
+                                }
+
+                                @if (money.CommittedTax != 0m)
+                                {
+                                    <dt class="col-7 fw-medium text-secondary-light py-4">Tax on committed</dt>
+                                    <dd class="col-5 text-end py-4 mb-0">@Format.Money(money.CommittedTax, currency)</dd>
+                                }
+                            </dl>
+
+                            <hr class="my-12">
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-semibold text-sm">Committed net</span>
+                                <span class="fw-bold">
+                                    @if (money.HasNoCommittedValue)
+                                    {
+                                        @* Not "0,00 €": nothing committed is not the
+                                           same claim as a contract that is free. *@
+                                        <text>Nothing committed</text>
+                                    }
+                                    else
+                                    {
+                                        @Format.Money(money.CommittedNet, currency)
+                                    }
+                                </span>
+                            </div>
+
+                            @* Money that is real but that nobody has agreed to owe.
+                               Kept out of the committed figure and shown anyway, so
+                               it is neither counted nor hidden. *@
+                            @if (money.Estimated != 0m || money.VariableRateTotal != 0m || money.Optional != 0m)
+                            {
+                                <dl class="row mb-0 text-sm mt-12 pt-12 border-top">
+                                    @if (money.Estimated != 0m)
+                                    {
+                                        <dt class="col-7 fw-medium text-secondary-light py-4">Estimated</dt>
+                                        <dd class="col-5 text-end py-4 mb-0">@Format.Money(money.Estimated, currency)</dd>
+                                    }
+
+                                    @if (money.VariableRateTotal != 0m)
+                                    {
+                                        <dt class="col-7 fw-medium text-secondary-light py-4">Depends on usage</dt>
+                                        <dd class="col-5 text-end py-4 mb-0">@Format.Money(money.VariableRateTotal, currency)</dd>
+                                    }
+
+                                    @if (money.Optional != 0m)
+                                    {
+                                        <dt class="col-7 fw-medium text-secondary-light py-4">Optional</dt>
+                                        <dd class="col-5 text-end py-4 mb-0">@Format.Money(money.Optional, currency)</dd>
+                                    }
+                                </dl>
+
+                                <p class="wh-hint mt-8 mb-0">
+                                    Not included in the committed total. Nobody has agreed to owe these.
+                                </p>
+                            }
+
+                            @if (money.Unresolved.Count > 0)
+                            {
+                                <div class="mt-12 pt-12 border-top">
+                                    <div class="fw-medium text-sm mb-8">Not counted, and why</div>
+
+                                    <ul class="mb-0 ps-16 text-sm text-secondary-light">
+                                        @foreach (var item in money.Unresolved)
+                                        {
+                                            <li><span class="fw-medium">@item.TermName</span> — @item.Reason</li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        </div>
+                    }
+
                     <div class="table-responsive">
                         <table class="table text-sm mb-0" id="extractionTable">
                             <thead>

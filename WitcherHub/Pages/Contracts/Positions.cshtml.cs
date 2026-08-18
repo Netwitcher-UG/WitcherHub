@@ -99,6 +99,16 @@ namespace WitcherHub.Pages.Contracts
         public ContractExtractionDto? Extraction { get; private set; }
 
         /// <summary>
+        /// What the financial engine made of that reading: committed money kept
+        /// apart from estimated, variable and optional, and every amount it would
+        /// not total listed with the reason.
+        ///
+        /// Null when this version predates the semantic pipeline or was never
+        /// analysed — which the page shows as unknown, never as zero.
+        /// </summary>
+        public WitcherHub.Domain.Commercial.ContractFinancials? Financials { get; private set; }
+
+        /// <summary>
         /// The contract-level figures. A supplied contract's money lives here,
         /// not on positions, and a null total means none was agreed rather than
         /// a total of zero.
@@ -173,7 +183,10 @@ namespace WitcherHub.Pages.Contracts
             Money = state.Money;
 
             if (SuppliedSource is not null)
+            {
                 Extraction = await _drafts.GetExtractionAsync(ContractId, SuppliedSource.Version, ct);
+                Financials = await _drafts.GetFinancialsAsync(ContractId, SuppliedSource.Version, ct);
+            }
 
             var catalog = await _services.GetServicesAsync(1, 500, null, ct);
             CatalogServices = catalog.Items
