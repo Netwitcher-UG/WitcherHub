@@ -214,14 +214,17 @@ public class SemanticExtractionProjectionTests
 
         var dto = SemanticExtractionProjection.ToLegacyExtraction(result);
 
-        // The user is told the total is a floor. Which item is missing, and why, is
-        // shown in the financial breakdown with the term named — repeating it here
-        // as a flat warning said the same thing twice on one screen.
+        // The user is told the total is a floor.
         Assert.Contains(dto.Warnings, w => w.Contains("only the amounts that could be calculated"));
-        Assert.DoesNotContain(dto.Warnings, w => w.Contains("Verbrauch"));
 
-        // ...and it is still recorded, in the place that shows it properly.
+        // The engine's reason for not totalling it is not repeated as a flat
+        // warning — it belongs in the financial breakdown, where the term is named
+        // beside it.
+        Assert.DoesNotContain(dto.Warnings, w => w.Contains("cannot be totalled"));
         Assert.Contains(result.Financials!.Unresolved, u => u.TermName == "Verbrauch");
+
+        // It is named here for a different reason: it cannot become a priced line.
+        Assert.Contains(dto.Warnings, w => w.Contains("Verbrauch") && w.Contains("cannot be added"));
     }
 
     [Fact]
@@ -288,6 +291,126 @@ public class SemanticExtractionProjectionTests
         // "Something is wrong somewhere" is not actionable; the line has to be
         // findable.
         Assert.Contains(dto.Warnings, w => w.Contains("Hosting") && w.Contains("BillingRecurrence"));
+    }
+
+    // ---- what can honestly become a priced line ----------------------------
+
+    [Fact]
+    public void A_charge_with_no_calculable_amount_cannot_become_a_position()
+    {
+        // A contract position carries a quantity and a line total and has no way to
+        // say "not stated". Adopting an hourly rate as one used to default the
+        // quantity to 1, which turned a rate into money on the contract.
+        var hourly = new CommercialTerm
+        {
+            Name = "Support",
+            PricingModel = PricingModelKind.TimeAndMaterials,
+            UnitRate = new MoneyAmount(95m, "EUR", Commitment.Variable),
+            QuantityUnit = "Stunde",
+            Commitment = Commitment.Variable
+        };
+
+        var dto = SemanticExtractionProjection.ToLegacyExtraction(
+            Analysed(new SemanticExtractionDto(), [hourly]));
+
+        var position = Assert.Single(dto.Positions);
+
+        Assert.False(position.CanBecomePosition);
+        Assert.Contains("Stunde", position.BlockedReason);
+
+        // And it is said out loud rather than merely being absent from the lines.
+        Assert.Contains(dto.Warnings, w => w.Contains("Support") && w.Contains("cannot be added"));
+    }
+
+    [Fact]
+    public void A_fixed_amount_can_become_a_position()
+    {
+        var dto = SemanticExtractionProjection.ToLegacyExtraction(
+            Analysed(new SemanticExtractionDto(), [Fixed("Setup", 2500m)]));
+
+        var position = Assert.Single(dto.Positions);
+
+        Assert.True(position.CanBecomePosition);
+        Assert.Null(position.BlockedReason);
+        Assert.Equal(2500m, position.LineTotal);
+    }
+
+    [Fact]
+    public void A_terms_commitment_travels_with_it()
+    {
+        var dto = SemanticExtractionProjection.ToLegacyExtraction(
+            Analysed(new SemanticExtractionDto(), [Fixed("Setup", 2500m)]));
+
+        Assert.Equal("Committed", Assert.Single(dto.Positions).Commitment);
+    }
+
+    [Fact]
+    public void A_position_links_back_to_the_term_it_was_read_from()
+    {
+        var term = Fixed("Setup", 2500m);
+
+        var dto = SemanticExtractionProjection.ToLegacyExtraction(
+            Analysed(new SemanticExtractionDto(), [term]));
+
+        // Without this the full structure — phases, caps, separate delivery and
+        // billing frequencies — cannot be recovered when the position is saved.
+        Assert.Equal(term.Key, Assert.Single(dto.Positions).TermKey);
+    }
+
+    // ---- billing frequency --------------------------------------------------
+
+    [Theory]
+    [InlineData(PeriodUnit.Month, 1, "Monthly")]
+    [InlineData(PeriodUnit.Month, 3, "Quarterly")]
+    [InlineData(PeriodUnit.Month, 6, "SemiAnnual")]
+    [InlineData(PeriodUnit.Month, 12, "Annual")]
+    [InlineData(PeriodUnit.Quarter, 1, "Quarterly")]
+    [InlineData(PeriodUnit.Year, 1, "Annual")]
+    public void A_frequency_the_app_has_is_mapped_to_it(PeriodUnit unit, int interval, string expected)
+    {
+        var term = Fixed("Pauschale", 500m) with
+        {
+            BillingRecurrence = Recurrence.Every(unit, interval, "monatlich")
+        };
+
+        var dto = SemanticExtractionProjection.ToLegacyExtraction(
+            Analysed(new SemanticExtractionDto(), [term]));
+
+        Assert.Equal(expected, Assert.Single(dto.Positions).BillingCycle);
+    }
+
+    [Fact]
+    public void A_frequency_the_app_does_not_have_is_reported_as_unmapped_not_as_one_off()
+    {
+        // This is the one that mattered: the analyser reports the frequency in the
+        // document's own words, which matches no member of a five-value enum, and
+        // the fallback used to be "OneTime". A weekly charge became a single charge.
+        var weekly = Fixed("Wöchentliche Betreuung", 200m) with
+        {
+            BillingRecurrence = Recurrence.Every(PeriodUnit.Week, 1, "wöchentlich")
+        };
+
+        var dto = SemanticExtractionProjection.ToLegacyExtraction(
+            Analysed(new SemanticExtractionDto(), [weekly]));
+
+        var position = Assert.Single(dto.Positions);
+
+        Assert.Null(position.BillingCycle);
+        Assert.Equal("wöchentlich", position.BillingCyclePhrase);
+
+        // And the user is told, rather than left with a silently wrong cycle.
+        Assert.Contains(dto.Warnings, w => w.Contains("wöchentlich") && w.Contains("Choose one"));
+    }
+
+    [Fact]
+    public void A_one_off_charge_is_mapped_to_one_off()
+    {
+        var once = Fixed("Setup", 900m) with { BillingRecurrence = Recurrence.Once("einmalig") };
+
+        var dto = SemanticExtractionProjection.ToLegacyExtraction(
+            Analysed(new SemanticExtractionDto(), [once]));
+
+        Assert.Equal("OneTime", Assert.Single(dto.Positions).BillingCycle);
     }
 
     // ---- protections carried over from the analyser it replaced -------------

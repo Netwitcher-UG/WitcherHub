@@ -187,6 +187,16 @@ namespace WitcherHub.Application.Services.Contracts
                     ? term.Quantity.Value * term.UnitRate.Value!.Value
                     : null;
 
+            // A contract position carries a quantity and a line total and cannot say
+            // "not stated". A charge with no calculable amount therefore has no
+            // honest position to become, and offering one would put a figure on the
+            // contract that nobody agreed to.
+            var blocked = lineTotal is null
+                ? term.UnitRate.HasValue
+                    ? $"Priced at a rate with no agreed {(string.IsNullOrWhiteSpace(term.QuantityUnit) ? "quantity" : term.QuantityUnit)}, so it has no line total."
+                    : "No amount could be read for this, so it has no line total."
+                : null;
+
             return new ExtractedPositionDto
             {
                 // A row with no title cannot be reviewed, so it gets a placeholder
@@ -200,12 +210,54 @@ namespace WitcherHub.Application.Services.Contracts
                 LineTotal = lineTotal,
                 Currency = term.UnitRate.Currency ?? term.FixedAmount?.Currency,
                 VatRatePercent = term.TaxRatePercent,
-                BillingCycle = term.BillingRecurrence.SourcePhrase,
+
+                BillingCycle = ToBillingCycle(term.BillingRecurrence),
+                BillingCyclePhrase = term.BillingRecurrence.SourcePhrase,
+
+                Commitment = term.Commitment.ToString(),
+                TermKey = term.Key,
+
+                CanBecomePosition = blocked is null,
+                BlockedReason = blocked,
+
                 SourceText = term.Provenance?.SourceSnippet,
                 Confidence = term.Provenance?.Confidence ?? 0d,
 
                 // Never pre-ticked. A position becomes real when a person says so.
                 Accepted = false
+            };
+        }
+
+        /// <summary>
+        /// The document's billing frequency as one of the application's own cycles,
+        /// or null where it has no equivalent.
+        ///
+        /// The application knows five: one-off, monthly, quarterly, half-yearly,
+        /// yearly. A contract may bill weekly, per milestone, or on a condition, and
+        /// there is no member for those. Null says so; it does not mean one-off.
+        /// </summary>
+        private static string? ToBillingCycle(Recurrence recurrence)
+        {
+            if (recurrence.Kind == RecurrenceKind.None) return "OneTime";
+            if (recurrence.Kind != RecurrenceKind.Periodic || recurrence.Unit is null) return null;
+
+            var interval = Math.Max(1, recurrence.Interval);
+
+            return (recurrence.Unit, interval) switch
+            {
+                (PeriodUnit.Month, 1) => "Monthly",
+                (PeriodUnit.Month, 3) => "Quarterly",
+                (PeriodUnit.Month, 6) => "SemiAnnual",
+                (PeriodUnit.Month, 12) => "Annual",
+                (PeriodUnit.Quarter, 1) => "Quarterly",
+                (PeriodUnit.Quarter, 2) => "SemiAnnual",
+                (PeriodUnit.Quarter, 4) => "Annual",
+                (PeriodUnit.Year, 1) => "Annual",
+
+                // Weekly, daily, every two months, every eighteen months: real
+                // arrangements the enum cannot hold. Reported as unmapped so a
+                // person chooses, rather than being rounded to the nearest member.
+                _ => null
             };
         }
 
@@ -302,16 +354,39 @@ namespace WitcherHub.Application.Services.Contracts
             // found" are different things to a person deciding whether to trust it.
             warnings.AddRange(result.DiscardedReasons.Where(r => !string.IsNullOrWhiteSpace(r)));
 
+            // Charges that cannot become priced lines. Said once, here, so their
+            // absence from the positions is a stated fact rather than something the
+            // user has to notice for themselves.
+            var unpriceable = dto.Positions
+                .Where(p => !p.CanBecomePosition)
+                .Select(p => $"{p.Title} cannot be added as a position: {p.BlockedReason}")
+                .ToList();
+
+            warnings.AddRange(unpriceable);
+
+            // A billing frequency the application's own vocabulary cannot express.
+            // Left unsaid, it would be filled in with one-off on the way across.
+            foreach (var position in dto.Positions.Where(p =>
+                         p.BillingCycle is null && !string.IsNullOrWhiteSpace(p.BillingCyclePhrase)))
+            {
+                warnings.Add(
+                    $"{position.Title} is billed \"{position.BillingCyclePhrase}\", which is not one of the " +
+                    "billing cycles here. Choose one when you add it.");
+            }
+
             // A contract with no committed price at all is worth saying out loud.
             // Left as a flag alone it reads as an oversight; said plainly, it is a
             // decision the user is asked to confirm before the contract goes out.
-            if (dto.PriceMissing &&
-                !warnings.Any(w => w.Contains("price", StringComparison.OrdinalIgnoreCase)))
-            {
-                warnings.Add(
-                    "This contract names no committed price. Nothing has been filled in. Confirm that it is " +
-                    "deliberately without one before sending it.");
-            }
+            //
+            // Matched on this exact sentence rather than on the word "price": the
+            // blocked-position messages say "Priced at a rate…", and a substring
+            // guard on "price" let one of those suppress the statement entirely.
+            const string noPriceWarning =
+                "This contract names no committed price. Nothing has been filled in. Confirm that it is " +
+                "deliberately without one before sending it.";
+
+            if (dto.PriceMissing && !warnings.Contains(noPriceWarning))
+                warnings.Add(noPriceWarning);
 
             dto.Warnings = warnings.Distinct().ToList();
         }

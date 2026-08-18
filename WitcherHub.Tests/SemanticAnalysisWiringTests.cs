@@ -320,6 +320,88 @@ public class SemanticAnalysisWiringTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_position_adopted_from_a_term_keeps_the_term_beside_it()
+    {
+        if (!Available) return;
+
+        // A position is a priced line and cannot hold pricing phases, a delivery
+        // frequency separate from the billing one, a cap, or the passage it was read
+        // from. Storing the term beside the line is what stops all of that being
+        // discarded at the last step — which is what used to happen.
+        var contractId = await NewContractWithSuppliedTextAsync(months: 12);
+
+        await Service(new StubAi(TwoTermsResponse)).AnalyzeAsync(contractId, version: 1);
+
+        var extraction = await Service(new StubAi("unused"))
+            .GetExtractionAsync(contractId, version: 1);
+
+        var adopted = extraction!.Positions.First(p => p.CanBecomePosition);
+
+        Assert.False(string.IsNullOrWhiteSpace(adopted.TermKey));
+
+        var positions = new ManageContractPositions(_db!, NullLogger<ManageContractPositions>.Instance);
+
+        await positions.SavePositionsAsync(contractId,
+        [
+            new ManualPositionDto
+            {
+                SourceType = ContractItemSource.ExtractedFromContractText,
+                SourceTermKey = adopted.TermKey,
+                Title = adopted.Title ?? "",
+                Quantity = 1,
+                UnitPrice = adopted.LineTotal,
+                Currency = "EUR",
+                BillingCycle = BillingCycle.Monthly
+            }
+        ]);
+
+        var item = await _db!.Set<ContractItem>()
+            .AsNoTracking()
+            .FirstAsync(i => i.ContractId == contractId);
+
+        Assert.NotNull(item.CommercialTerm);
+
+        // The whole term, not a summary of it.
+        var stored = item.CommercialTerm!.RootElement;
+        Assert.Equal(adopted.TermKey, stored.GetProperty("key").GetString());
+        Assert.Equal("Monatliche Pauschale", stored.GetProperty("name").GetString());
+
+        // A person chose and could edit this line, so re-analysis must not quietly
+        // overwrite it.
+        Assert.True(item.IsHumanReviewed);
+    }
+
+    [Fact]
+    public async Task A_manually_typed_position_is_saved_without_a_term_and_without_complaint()
+    {
+        if (!Available) return;
+
+        var contractId = await NewContractWithSuppliedTextAsync();
+
+        var positions = new ManageContractPositions(_db!, NullLogger<ManageContractPositions>.Instance);
+
+        await positions.SavePositionsAsync(contractId,
+        [
+            new ManualPositionDto
+            {
+                SourceType = ContractItemSource.Manual,
+                Title = "Von Hand",
+                Quantity = 2,
+                UnitPrice = 250m,
+                Currency = "EUR"
+            }
+        ]);
+
+        var item = await _db!.Set<ContractItem>()
+            .AsNoTracking()
+            .FirstAsync(i => i.ContractId == contractId);
+
+        // No term behind it, and nothing pretends there is.
+        Assert.Null(item.CommercialTerm);
+        Assert.False(item.IsHumanReviewed);
+    }
+
+    [Fact]
     public async Task A_reading_that_finds_no_committed_price_does_not_invent_one()
     {
         if (!Available) return;

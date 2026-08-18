@@ -109,6 +109,12 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                     throw new BadRequestAppException("One of the positions refers to a service that no longer exists.");
             }
 
+            // The commercial terms behind any positions adopted from an analysed
+            // document, so the structure a priced line cannot hold — phases, a
+            // delivery frequency separate from the billing one, caps, the passage
+            // it was read from — is stored beside the line rather than discarded.
+            var terms = await LoadAdoptedTermsAsync(contractId, positions, ct);
+
             var existing = contract.Items.ToDictionary(i => i.Id);
             var keptIds = new HashSet<Guid>();
             var order = 1;
@@ -128,6 +134,17 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
                 }
 
                 Apply(dto, item);
+
+                if (dto.SourceTermKey is not null && terms.TryGetValue(dto.SourceTermKey, out var term))
+                {
+                    item.CommercialTerm = term;
+
+                    // A person chose this line and can edit it before saving, so it
+                    // is reviewed by the time it gets here. Re-analysis must not
+                    // silently overwrite it.
+                    item.IsHumanReviewed = true;
+                }
+
                 keptIds.Add(item.Id);
             }
 
@@ -148,6 +165,60 @@ namespace WitcherHub.Infrastructure.ManageData.Contracts
         }
 
         // -------------------------------------------------------------------
+
+        /// <summary>
+        /// The stored commercial terms for the positions being saved, by key.
+        ///
+        /// Reads them out of the semantic analysis kept against the contract's
+        /// drafts. A key that matches nothing simply yields no term: the position is
+        /// saved as the priced line it is, which is what happens for every manually
+        /// entered position anyway.
+        /// </summary>
+        private async Task<Dictionary<string, JsonDocument>> LoadAdoptedTermsAsync(
+            Guid contractId,
+            IReadOnlyList<ManualPositionDto> positions,
+            CancellationToken ct)
+        {
+            var wanted = positions
+                .Select(p => p.SourceTermKey)
+                .Where(k => !string.IsNullOrWhiteSpace(k))
+                .Distinct()
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (wanted.Count == 0) return new Dictionary<string, JsonDocument>(StringComparer.Ordinal);
+
+            var analyses = await _db.Set<ContractDraft>()
+                .AsNoTracking()
+                .Where(d => d.ContractId == contractId && d.SemanticAnalysis != null)
+                .OrderByDescending(d => d.Version)
+                .Select(d => d.SemanticAnalysis!)
+                .ToListAsync(ct);
+
+            var found = new Dictionary<string, JsonDocument>(StringComparer.Ordinal);
+
+            foreach (var analysis in analyses)
+            {
+                if (!analysis.RootElement.TryGetProperty("terms", out var terms) ||
+                    terms.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                foreach (var term in terms.EnumerateArray())
+                {
+                    if (!term.TryGetProperty("key", out var key)) continue;
+
+                    var value = key.GetString();
+                    if (value is null || !wanted.Contains(value) || found.ContainsKey(value)) continue;
+
+                    // Newest version wins: drafts are read newest first, so a term
+                    // re-read by a later analysis supersedes the earlier reading.
+                    found[value] = JsonDocument.Parse(term.GetRawText());
+                }
+            }
+
+            return found;
+        }
 
         private static void Apply(ManualPositionDto dto, ContractItem item)
         {

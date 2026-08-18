@@ -939,24 +939,57 @@
 
             if (chosen.length === 0) { toast("info", "Tick at least one position to add."); return; }
 
-            chosen.forEach(row => {
+            // A charge with no calculable amount has no honest position to become:
+            // a position carries a quantity and a line total and cannot say "not
+            // stated". These stay in the reading and out of the priced lines.
+            const blocked = chosen.filter(row =>
+                extraction.positions[Number(row.dataset.extractedIndex)]?.canBecomePosition === false);
+
+            const addable = chosen.filter(row => !blocked.includes(row));
+
+            if (addable.length === 0) {
+                toast("info",
+                    "Those cannot be added as positions — they are priced at a rate with nothing agreed to " +
+                    "multiply it by. They remain part of the contract text.");
+                return;
+            }
+
+            let needsBillingChoice = 0;
+
+            addable.forEach(row => {
                 const source = extraction.positions[Number(row.dataset.extractedIndex)];
 
                 // Figures arrive exactly as they were read. Nothing is rounded,
                 // recalculated or filled in on the way across.
+                //
+                // Quantity is the exception worth spelling out: it used to default
+                // to 1 when the document did not state one, which turned a rate into
+                // a line total and put money on the contract nobody had agreed. Only
+                // a single fixed amount is a quantity of one, and that is because
+                // 1 x the amount is the amount.
+                const quantity =
+                    source.quantity ?? (source.unitPrice === null && source.lineTotal !== null ? 1 : null);
+
+                // A frequency the application cannot express arrives as null rather
+                // than as one-off. Defaulting it silently turned a monthly charge
+                // into a single charge.
+                const cycle = BILLING_CYCLES.includes(source.billingCycle) ? source.billingCycle : null;
+                if (cycle === null) needsBillingChoice++;
+
                 positions.push(normalise({
                     clientId: cryptoId(),
                     sourceType: "ExtractedFromContractText",
                     catalogServiceId: null,
                     sourceDraftId: suppliedDraftId || null,
+                    sourceTermKey: source.termKey || null,
                     title: source.title || "",
                     description: source.description || "",
-                    quantity: source.quantity ?? 1,
+                    quantity: quantity ?? 1,
                     unit: source.unit || "",
                     unitPrice: source.unitPrice ?? null,
                     currency: source.currency || defaultCurrency,
                     vatRate: source.vatRatePercent ?? null,
-                    billingCycle: BILLING_CYCLES.includes(source.billingCycle) ? source.billingCycle : "OneTime"
+                    billingCycle: cycle ?? "OneTime"
                 }));
             });
 
@@ -964,7 +997,19 @@
             render();
 
             toast("success",
-                chosen.length + " position(s) added for review. Check them and save — nothing is stored yet.");
+                addable.length + " position(s) added for review. Check them and save — nothing is stored yet.");
+
+            if (blocked.length > 0) {
+                toast("info",
+                    blocked.length + " could not be added: priced at a rate with no agreed quantity. " +
+                    "They stay in the contract text.");
+            }
+
+            if (needsBillingChoice > 0) {
+                toast("info",
+                    needsBillingChoice + " position(s) are billed on a frequency this app does not have. " +
+                    "They were added as one-off — set the billing cycle before saving.");
+            }
 
             document.getElementById("positionList")?.scrollIntoView({ behavior: "smooth" });
         }
@@ -1120,6 +1165,19 @@
         renderExtractedPositions();
     }
 
+    /// An amount in the same shape as every other figure in the application:
+    /// German separators and the currency symbol. These cells used to print the
+    /// raw number, so a line total read "500" here and "500,00 EUR" everywhere
+    /// else on the same screen.
+    function amount(value, currency) {
+        if (value === null || value === undefined) return "—";
+
+        return new Intl.NumberFormat("de-DE", {
+            style: "currency",
+            currency: currency || defaultCurrency
+        }).format(value);
+    }
+
     function renderExtractedPositions() {
         const block = document.getElementById("extractedPositionsBlock");
         const body = document.getElementById("extractedPositionsBody");
@@ -1137,15 +1195,47 @@
         extraction.positions.forEach((p, index) => {
             const row = document.createElement("tr");
             row.dataset.extractedIndex = String(index);
+
+            // A charge with no calculable amount is shown, and cannot be ticked.
+            // Offering a checkbox that adds an invented quantity is worse than
+            // saying plainly why this one is not a priced line.
+            const addable = p.canBecomePosition !== false;
+
+            const tick = addable
+                ? `<input type="checkbox" class="form-check-input">`
+                : `<input type="checkbox" class="form-check-input" disabled
+                          title="${escapeAttr(p.blockedReason ?? "")}">`;
+
+            // How firm the money is, next to the money. Without it a rate nobody
+            // committed to reads exactly like an agreed price.
+            const commitment = p.commitment && p.commitment !== "Committed"
+                ? `<span class="badge bg-neutral-200 text-neutral-600 border border-neutral-400
+                           px-8 py-2 radius-4 text-sm ms-1">${escapeHtml(p.commitment)}</span>`
+                : "";
+
+            // The frequency in the document's own words when this app has no
+            // matching cycle, so the difference is visible before it is chosen.
+            const cycle = p.billingCycle
+                ? `<span class="d-block text-secondary-light text-sm">${escapeHtml(p.billingCycle)}</span>`
+                : p.billingCyclePhrase
+                    ? `<span class="d-block text-warning-main text-sm">${escapeHtml(p.billingCyclePhrase)} — choose a cycle</span>`
+                    : "";
+
+            const blocked = addable
+                ? ""
+                : `<span class="d-block text-secondary-light text-sm fst-italic">${escapeHtml(p.blockedReason ?? "")}</span>`;
+
             row.innerHTML = `
-                <td><input type="checkbox" class="form-check-input"></td>
+                <td>${tick}</td>
                 <td>
-                    <span class="fw-medium">${escapeHtml(p.title ?? "")}</span>
+                    <span class="fw-medium">${escapeHtml(p.title ?? "")}</span>${commitment}
                     <span class="d-block text-secondary-light text-sm">${escapeHtml(p.description ?? "")}</span>
+                    ${cycle}
+                    ${blocked}
                 </td>
                 <td class="text-end">${p.quantity ?? "—"} ${escapeHtml(p.unit ?? "")}</td>
-                <td class="text-end">${p.unitPrice ?? "—"}</td>
-                <td class="text-end">${p.lineTotal ?? "—"}</td>`;
+                <td class="text-end">${amount(p.unitPrice, p.currency)}</td>
+                <td class="text-end">${amount(p.lineTotal, p.currency)}</td>`;
 
             body.appendChild(row);
         });

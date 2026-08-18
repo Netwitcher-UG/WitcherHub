@@ -51,7 +51,50 @@ namespace WitcherHub.Application.Models.DTO.Contracts
         public decimal? LineTotal { get; set; }
         public string? Currency { get; set; }
         public decimal? VatRatePercent { get; set; }
+
+        /// <summary>
+        /// The billing frequency as one of the application's own cycles, and null
+        /// when the document's frequency has no equivalent here — weekly, per
+        /// milestone, on a condition.
+        ///
+        /// Null means "this does not map", never "one-off". Treating the two the
+        /// same is how a monthly charge became a single charge: the analyser
+        /// reports the frequency in the document's words ("monatlich"), which
+        /// matches no member of a five-value enum, so the fallback silently won.
+        /// </summary>
         public string? BillingCycle { get; set; }
+
+        /// <summary>The frequency in the document's own words, always kept.</summary>
+        public string? BillingCyclePhrase { get; set; }
+
+        /// <summary>
+        /// How firm the money is: Committed, Estimated, Variable, Optional,
+        /// Conditional, Unknown. Shown beside the figure, because a rate nobody has
+        /// committed to reads exactly like an agreed price without it.
+        /// </summary>
+        public string? Commitment { get; set; }
+
+        /// <summary>
+        /// Links back to the commercial term this was read from, so the full
+        /// structure — phases, separate delivery and billing frequencies, caps —
+        /// can be recovered when the position is saved.
+        /// </summary>
+        public string? TermKey { get; set; }
+
+        /// <summary>
+        /// Whether this can honestly become a priced contract line.
+        ///
+        /// False for a charge with no calculable amount — an hourly rate with no
+        /// agreed hours, a usage charge with no volume. A contract position carries
+        /// a quantity and a line total and has no way to say "not stated", so
+        /// adopting one of these would put a number on the contract that nobody
+        /// agreed. It stays visible, and stays out of the priced lines.
+        /// </summary>
+        public bool CanBecomePosition { get; set; } = true;
+
+        /// <summary>Why it cannot, in words, when <see cref="CanBecomePosition"/> is false.</summary>
+        public string? BlockedReason { get; set; }
+
         public string? SourceText { get; set; }
         public double Confidence { get; set; }
 
