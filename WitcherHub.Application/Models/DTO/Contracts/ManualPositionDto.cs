@@ -32,6 +32,18 @@ namespace WitcherHub.Application.Models.DTO.Contracts
         /// </summary>
         public Guid? SourceDraftId { get; set; }
 
+        /// <summary>
+        /// The commercial term this position was adopted from, when it came out of
+        /// an analysed document.
+        ///
+        /// A position is a priced line: a title, a quantity, a rate, a cycle. The
+        /// term behind it holds what that shape cannot — pricing phases, a delivery
+        /// frequency that differs from the billing one, a cap, a minimum, the
+        /// passage it was read from. Keeping the key lets the term be stored beside
+        /// the line instead of being discarded at the last step.
+        /// </summary>
+        public string? SourceTermKey { get; set; }
+
         public int Position { get; set; } = 1;
 
         // ---- what is being sold --------------------------------------------

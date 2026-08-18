@@ -359,6 +359,20 @@ namespace WitcherHub.Infrastructure.Data.Models
         [Column(TypeName = "jsonb")]
         public JsonDocument? ExtractedTerms { get; set; }
 
+        /// <summary>
+        /// The full semantic reading: every concept recognised, the commercial
+        /// terms among them, the validation issues, and the figures the financial
+        /// engine calculated from them.
+        ///
+        /// Kept separately from <see cref="ExtractedTerms"/> rather than replacing
+        /// it. That column holds the fixed-field shape the review screen reads and
+        /// the confirmation flow writes back, and it carries which values a person
+        /// ticked — so it stays as it is, and existing rows keep working, while
+        /// this holds everything the older shape has no room for.
+        /// </summary>
+        [Column(TypeName = "jsonb")]
+        public JsonDocument? SemanticAnalysis { get; set; }
+
         public ContractExtractionStatus ExtractionStatus { get; set; } = ContractExtractionStatus.NotAnalysed;
 
         public DateTimeOffset? ExtractedAt { get; set; }

@@ -110,10 +110,10 @@ public class TextOnlyContractWorkflowTests : IAsyncLifetime
         new(_db!,
             _positions!,
             ai,
-            new ContractTextAnalyzer(
+            new SemanticContractAnalyzer(
                 ai,
                 Options.Create(new OpenAIOptions { ApiKey = "test", Model = "test-model" }),
-                NullLogger<ContractTextAnalyzer>.Instance),
+                NullLogger<SemanticContractAnalyzer>.Instance),
             Options.Create(new OpenAIOptions { ApiKey = "test", Model = "test-model" }),
             Options.Create(new ContractTemplateOptions()),
             NullLogger<ContractDraftService>.Instance);
