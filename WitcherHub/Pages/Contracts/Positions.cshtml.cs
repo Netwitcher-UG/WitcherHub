@@ -274,28 +274,84 @@ namespace WitcherHub.Pages.Contracts
         // read values out of it for review.
         // ------------------------------------------------------------------
 
+        /// <summary>
+        /// Starts a reading and answers at once.
+        ///
+        /// This used to run the model call inline and answer with the result.
+        /// Reading a real contract takes longer than the platform proxy will
+        /// hold a connection open, so the browser was shown HTTP 502 while the
+        /// work was still going — and the reading then completed into a request
+        /// nobody was listening to. The caller now polls AnalysisStatus.
+        /// </summary>
         public async Task<IActionResult> OnPostAnalyzeAsync(
             [FromBody] VersionRequest? request, CancellationToken ct)
         {
             if (request is null) return BadRequestJson("No version given.");
 
-            var result = await _drafts.AnalyzeAsync(ContractId, request.Version, ct);
+            var started = await _drafts.StartAnalysisAsync(ContractId, request.Version, ct);
 
-            if (!result.Succeeded)
+            if (!started.Running)
+                return new JsonResult(new { ok = false, transient = false, message = started.FailureReason });
+
+            return new JsonResult(new
+            {
+                ok = true,
+                running = true,
+                alreadyRunning = started.AlreadyRunning,
+                message = started.AlreadyRunning
+                    ? "This contract is already being read. Waiting for it to finish…"
+                    : "Reading the contract…"
+            });
+        }
+
+        /// <summary>
+        /// How the reading is getting on. Polled by the page while it runs.
+        /// </summary>
+        public async Task<IActionResult> OnPostAnalysisStatusAsync(
+            [FromBody] VersionRequest? request, CancellationToken ct)
+        {
+            if (request is null) return BadRequestJson("No version given.");
+
+            var progress = await _drafts.GetAnalysisProgressAsync(ContractId, request.Version, ct);
+
+            if (progress.Running)
+            {
+                return new JsonResult(new
+                {
+                    ok = true,
+                    running = true,
+                    elapsedSeconds = (int)(progress.Elapsed?.TotalSeconds ?? 0)
+                });
+            }
+
+            if (progress.Failed)
             {
                 return new JsonResult(new
                 {
                     ok = false,
-                    transient = result.IsTransientFailure,
-                    reference = result.CorrelationId,
-                    message = result.FailureReason
+                    running = false,
+                    transient = progress.IsTransientFailure,
+                    message = progress.FailureReason ?? "The document could not be analysed."
+                });
+            }
+
+            if (!progress.Finished)
+            {
+                // Never started, or the stored reading could not be read back.
+                return new JsonResult(new
+                {
+                    ok = false,
+                    running = false,
+                    transient = true,
+                    message = "This version has not been analysed. Start the analysis to read it."
                 });
             }
 
             return new JsonResult(new
             {
                 ok = true,
-                extraction = result.Extraction,
+                running = false,
+                extraction = progress.Extraction,
                 message = "The contract was analysed. Review the values before confirming them."
             });
         }
@@ -322,12 +378,27 @@ namespace WitcherHub.Pages.Contracts
                 ? "No values were confirmed. Tick the values you agree with, then save."
                 : $"Confirmed contract values saved ({result.ConfirmedFieldCount} of {result.StatedFieldCount} stated values).";
 
+            // Said out loud rather than left for the user to notice. A value the
+            // document stated that the contract already answered differently is
+            // not applied — the record wins — and being told "confirmed" while
+            // nothing moved would be misleading.
+            if (result.KeptFromRecord.Count > 0)
+            {
+                message += $" The {Join(result.KeptFromRecord)} already recorded on this contract " +
+                           "was kept — change it in Contract details if the document is right.";
+            }
+
+            if (result.FilledOnProject.Count > 0)
+                message += $" The project's {Join(result.FilledOnProject)} was filled in from this contract.";
+
             return new JsonResult(new
             {
                 ok = true,
                 message,
                 confirmedCount = result.ConfirmedFieldCount,
                 statedCount = result.StatedFieldCount,
+                keptFromRecord = result.KeptFromRecord,
+                filledOnProject = result.FilledOnProject,
                 extraction = persisted,
                 money = result.Money
             });
@@ -578,6 +649,18 @@ namespace WitcherHub.Pages.Contracts
 
             return errors;
         }
+
+        /// <summary>
+        /// "start date", "start date and end date", "start date, end date and
+        /// currency" — a list a person reads rather than one a machine prints.
+        /// </summary>
+        private static string Join(IReadOnlyList<string> items) =>
+            items.Count switch
+            {
+                0 => "",
+                1 => items[0],
+                _ => string.Join(", ", items.Take(items.Count - 1)) + " and " + items[^1]
+            };
 
         private JsonResult BadRequestJson(string message)
         {

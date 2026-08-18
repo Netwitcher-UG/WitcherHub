@@ -132,7 +132,14 @@ namespace WitcherHub.Infrastructure.Data.Models
             NotAnalysed = 0,
             Analysed = 1,
             Confirmed = 2,
-            Failed = 3
+            Failed = 3,
+
+            /// <summary>
+            /// Started and still running. Reading a long contract takes longer
+            /// than a proxy will hold a connection, so the work happens off the
+            /// request and the page asks how it is getting on.
+            /// </summary>
+            Analysing = 4
         }
 
         /// <summary>

@@ -239,6 +239,10 @@ namespace WitcherHub.Infrastructure
 
             services.AddScoped<IContractDocumentGenerator, ContractDocumentGenerator>();
             services.AddScoped<IContractDraftService, ContractDraftService>();
+
+            // Reading a contract takes longer than a proxy will hold a
+            // connection, so it runs off the request and the page polls.
+            services.AddSingleton<IBackgroundAnalysisRunner, BackgroundAnalysisRunner>();
             
             services.AddSingleton<IPdfGenerator, PlaywrightPdfGenerator>();
             services.AddSingleton<PlaywrightBrowserInstaller>();
