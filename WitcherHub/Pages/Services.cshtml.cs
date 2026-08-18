@@ -245,9 +245,6 @@ namespace WitcherHub.Pages
 
             ServicesTable = new TableCardVm
             {
-                Title = "Services",
-                PrimaryButtonText = "Add Service",
-                PrimaryButtonTarget = "#FormModal",
                 SearchPlaceholder = "Search services...",
                 Pagination = new PaginationVm
                 {
@@ -281,7 +278,7 @@ namespace WitcherHub.Pages
                         Html(s.Name),
                         TypeBadge(s.ServiceType.ToString()),
                         Html(s.PricingModel.ToString()),
-                        Html(s.BasePrice.ToString("0.##")),
+                        Html(Format.Amount(s.BasePrice)),
                         RulesBadge(s.RulesCount),
                         Html(s.DefaultCurrency),
                         ActiveBadge(s.IsActive),
@@ -311,29 +308,19 @@ namespace WitcherHub.Pages
         private static Microsoft.AspNetCore.Html.IHtmlContent Html(string? text)
             => new Microsoft.AspNetCore.Html.HtmlString(System.Text.Encodings.Web.HtmlEncoder.Default.Encode(text ?? ""));
 
-        private static Microsoft.AspNetCore.Html.IHtmlContent TypeBadge(string type)
-        {
-            var cls = "badge bg-info bg-opacity-10 text-info";
-            return new Microsoft.AspNetCore.Html.HtmlString($"<span class='{cls}'>{System.Text.Encodings.Web.HtmlEncoder.Default.Encode(type)}</span>");
-        }
+        // These three used plain Bootstrap badge classes, while the newer pages
+        // used the theme's own. The same green was two different shades depending
+        // on which screen you were on, which is most of what "it looks like
+        // several products" amounts to. They now come from the one renderer.
 
-        private static Microsoft.AspNetCore.Html.IHtmlContent ActiveBadge(bool active)
-        {
-            var (cls, txt) = active
-                ? ("badge bg-success bg-opacity-10 text-success", "Active")
-                : ("badge bg-secondary bg-opacity-10 text-secondary", "Inactive");
+        private static Microsoft.AspNetCore.Html.IHtmlContent TypeBadge(string type) =>
+            Badge.Html(type, "info");
 
-            return new Microsoft.AspNetCore.Html.HtmlString($"<span class='{cls}'>{txt}</span>");
-        }
+        private static Microsoft.AspNetCore.Html.IHtmlContent ActiveBadge(bool active) =>
+            Badge.Toggle(active, "Active", "Inactive");
 
-        private static Microsoft.AspNetCore.Html.IHtmlContent RulesBadge(int count)
-        {
-            var cls = count > 0
-                ? "badge bg-primary bg-opacity-10 text-primary"
-                : "badge bg-secondary bg-opacity-10 text-secondary";
-
-            return new Microsoft.AspNetCore.Html.HtmlString($"<span class='{cls}'>{count}</span>");
-        }
+        private static Microsoft.AspNetCore.Html.IHtmlContent RulesBadge(int count) =>
+            Badge.Html(count.ToString(), count > 0 ? "primary" : "neutral");
 
         private static string Enc(string? v) => System.Text.Encodings.Web.HtmlEncoder.Default.Encode(v ?? "");
 

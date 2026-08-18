@@ -2,13 +2,16 @@
 
 namespace WitcherHub.Pages.Models.UI
 {
+    /// <summary>
+    /// A table with a search box and pagination.
+    ///
+    /// It no longer carries a page title or a primary action: those belong to
+    /// <see cref="PageHeaderVm"/>, and having them here as well meant a page either
+    /// showed two titles or relied on this one and so had no header of its own.
+    /// </summary>
     public class TableCardVm
     {
-        public string Title { get; set; } = "";
         public string SearchPlaceholder { get; set; } = "Search";
-
-        public string? PrimaryButtonText { get; set; }
-        public string? PrimaryButtonTarget { get; set; } 
 
         public List<TableColumnVm> Columns { get; set; } = new();
         public List<TableRowVm> Rows { get; set; } = new();

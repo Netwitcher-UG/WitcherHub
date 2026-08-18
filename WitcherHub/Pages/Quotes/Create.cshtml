@@ -7,7 +7,6 @@
 }
 
 @functions {
-    string FmtDate(DateTimeOffset? d) => d?.ToString("yyyy-MM-dd") ?? "";
 
 }
 
@@ -36,7 +35,7 @@
                 <input type="date"
                        class="form-control js-themed-date js-datepicker js-pointer-date"
                        name="Form.Quote.IssuedAt"
-                       value="@FmtDate(Model.Form.Quote.IssuedAt)" />
+                       value="@Format.DateInput(Model.Form.Quote.IssuedAt)" />
                 <span class="text-danger small" asp-validation-for="Form.Quote.IssuedAt"></span>
             </div>
 
@@ -45,7 +44,7 @@
                 <input type="date"
                        class="form-control js-themed-date js-datepicker js-pointer-date"
                        name="Form.Quote.ExpiresAt"
-                       value="@FmtDate(Model.Form.Quote.ExpiresAt)" />
+                       value="@Format.DateInput(Model.Form.Quote.ExpiresAt)" />
                 <span class="text-danger small" asp-validation-for="Form.Quote.ExpiresAt"></span>
             </div>
 

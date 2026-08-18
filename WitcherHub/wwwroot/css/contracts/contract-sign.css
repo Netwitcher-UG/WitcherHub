@@ -8,7 +8,7 @@
 }
 
 .contractPage__container {
-    max-width: 1150px;
+    max-width: 960px;
     margin: 0 auto;
     padding: 64px 14px 0;
 }
@@ -50,9 +50,9 @@
     background: #fff;
     color: #111;
     width: 100%;
-    max-width: 210mm;
+    max-width: 920px;
     min-height: 297mm;
-    padding: 28px 26px;
+    padding: 14px 16px 20px;
     border-radius: 14px;
     border: 1px solid rgba(0,0,0,.10);
     box-shadow: 0 18px 45px rgba(0,0,0,.12);
@@ -181,7 +181,13 @@
     font-weight: 800;
 }
 
-/* ✅ Bottom actions */
+/* Bottom actions.
+
+   The consent sentence and the buttons stack rather than sitting side by side.
+   Side by side, the sentence was squeezed into a narrow column next to the
+   buttons and broke across four or five lines — the one piece of text on the
+   page the signer is legally agreeing to was the hardest thing on it to read.
+   Full width for the sentence, buttons underneath. */
 .contractActions {
     margin-top: 26px;
     padding: 14px 14px;
@@ -189,28 +195,60 @@
     background: #fff;
     border: 1px solid rgba(0,0,0,.10);
     box-shadow: 0 10px 25px rgba(0,0,0,.06);
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 12px;
-    align-items: center;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
 }
 
 .contractActions__agree {
-    display: grid;
-    grid-template-columns: 18px 1fr;
-    gap: 10px;
-    align-items: start;
-    font-size: 13px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+    margin: 0;
     color: #111;
 }
 
-    .contractActions__agree input {
+    .contractActions__agree input[type="checkbox"] {
         margin-top: 4px;
+        flex: 0 0 auto;
     }
 
+.contractActions__agreeBody {
+    display: block;
+    min-width: 0;
+    line-height: 1.65;
+}
+
+.contractActions__agreeLine {
+    display: block;
+    color: #111827;
+    font-size: 15px;
+    line-height: 1.75;
+    word-break: normal;
+    overflow-wrap: break-word;
+}
+
+    .contractActions__agreeLine a,
+    .contractActions__agree a {
+        color: #6d28d9;
+        font-weight: 700;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+        .contractActions__agreeLine a:hover,
+        .contractActions__agree a:hover {
+            color: #5b21b6;
+        }
+
 .contractActions__text {
-    color: #555;
-    line-height: 1.5;
+    display: block;
+    margin-top: 6px;
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.6;
 }
 
 .contractActions__right {
@@ -218,7 +256,8 @@
     gap: 10px;
     align-items: center;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: flex-start;
+    width: 100%;
 }
 
 .contractActions__badge {
@@ -259,19 +298,24 @@
     cursor: not-allowed;
 }
 
-/* ✅ Signature section */
+/* Signature section.
+
+   Separated from the document body by a rule, so it reads as something the
+   signer does rather than as one more clause of what they are signing. */
 .contractSign {
-    margin-top: 26px;
+    margin-top: 42px;
+    padding-top: 30px;
+    border-top: 1px solid rgba(15, 23, 42, .08);
 }
 
 .contractSign__title {
-    margin: 10px 0 12px;
+    margin: 10px 0 18px;
 }
 
 .contractSign__grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 28px;
+    gap: 40px;
 }
 
 .contractSign__party {
@@ -317,7 +361,7 @@
 
 .contractSign__sigLine {
     border-bottom: 1px solid #222;
-    min-height: 44px;
+    min-height: 42px;
     display: flex;
     align-items: flex-end;
     padding-bottom: 4px;
@@ -338,7 +382,10 @@
 
 .contractSign__placeholder {
     display: block;
-    height: 1px; /* keep empty, no underscores */
+    /* Reserves the height of the signature line while it is still empty, so the
+       layout does not jump when an image is dropped in. Deliberately blank —
+       no row of underscores to sign "on". */
+    min-height: 22px;
 }
 
 .contractSign__meta {
@@ -368,14 +415,68 @@
     color: #666;
 }
 
-/* Responsive */
-@media (max-width: 900px) {
-    .contractActions {
-        grid-template-columns: 1fr;
+/* A link that is no longer valid.
+
+   Shown instead of the document when a share link has expired, so the
+   recipient gets an explanation rather than an empty page or an error. */
+.contractExpired {
+    min-height: 380px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 56px 24px;
+}
+
+.contractExpired__icon {
+    width: 74px;
+    height: 74px;
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 22px;
+    background: rgba(124, 58, 237, .12);
+    color: #6d28d9;
+    font-size: 38px;
+    font-weight: 900;
+}
+
+.contractExpired__title {
+    margin: 0 0 10px;
+    color: #1f1147;
+    font-size: 28px;
+    font-weight: 900;
+}
+
+.contractExpired__message {
+    margin: 0;
+    color: #6b7280;
+    font-size: 15px;
+    line-height: 1.8;
+}
+
+.contractExpired__date {
+    margin-top: 14px;
+    color: #4b5563;
+    font-size: 13px;
+}
+
+/* Responsive.
+
+   One breakpoint per change. The actions bar no longer needs a rule here at all
+   — it stacks at every width, which is what the two pages were each reaching
+   for with their own copy of a 980px override. */
+@media (max-width: 980px) {
+    .contractPage__paper {
+        max-width: 100%;
+        padding: 20px 18px;
     }
 
-    .contractActions__right {
-        justify-content: flex-start;
+    .contractSign__grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
     }
 }
 
@@ -383,10 +484,6 @@
     .contractPage__paper {
         padding: 18px 16px;
         min-height: auto;
-    }
-
-    .contractSign__grid {
-        grid-template-columns: 1fr;
     }
 
     .contractPage__sigPad canvas {
@@ -502,121 +599,93 @@
             font-size: 12pt;
         }
 }
-.contractTopbar {
-    position: sticky;
-    top: 0;
-    z-index: 30;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px 12px;
-    margin: 10px 12px;
-    border-radius: 14px;
-    border: 1px solid rgba(0,0,0,.08);
-    background: rgba(255,255,255,.85);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+
+
+/* NOTE ON ORDER: the block below is last on purpose.
+
+   It sets a font size on the same element as the document typography above,
+   at the same specificity, so whichever comes last wins. These rules used to
+   live in a <style> block on each page, which the browser applies after the
+   stylesheet — so moving them into this file only reproduces what the pages
+   rendered if they stay at the end. Adding rules after this point that target
+   .contractPage__contractHtml will change the size of the document text.  */
+
+/* Generated document HTML, on screen.
+
+   Contracts and quotes are rendered by the same PDF pipeline, so the markup
+   arrives carrying print geometry: a fixed page width, millimetre padding, and
+   centred cells. On screen that produced a page inside a page. These rules undo
+   the print geometry for the two scopes the pipeline emits.
+
+   Both scopes are listed on every rule on purpose: they had drifted apart while
+   the same declarations were maintained by hand in two razor files. */
+.contractPage__contractHtml.contractPdfScope,
+.contractPage__contractHtml.quotePdfScope {
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 28px;
+    overflow: hidden;
 }
 
-.contractTopbar__left,
-.contractTopbar__right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
+.contractPdfScope,
+.quotePdfScope {
+    color: #111827;
+    font-size: 13px;
+    line-height: 1.55;
 }
 
-.contractTopbar__btn {
-    border-radius: 999px;
-}
+    /* The print page box: let it size to the paper it now sits in. */
+    .contractPdfScope .page,
+    .quotePdfScope .page {
+        width: unset !important;
+        padding: 0 !important;
+    }
 
-.contractTopbar__lang .btn {
-    border-radius: 999px;
-}
+    .contractPdfScope .sheet,
+    .quotePdfScope .sheet {
+        border-radius: 20px;
+    }
 
-.contractTopbar__badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 6px 10px;
-    border-radius: 999px;
-    border: 1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.9);
-    font-size: 12px;
-    font-weight: 600;
-}
-.contractTopbar {
-    position: sticky;
-    top: 12px;
-    z-index: 50;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px 14px;
-    margin-bottom: 12px;
-    border-radius: 14px;
-    background: rgba(255,255,255,.88);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(0,0,0,.06);
-}
+    .contractPdfScope .content,
+    .quotePdfScope .content {
+        padding: 14mm 10mm 10mm !important;
+    }
 
-.contractTopbar__left {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 320px;
-    text-align: left; /* ✅ */
-}
+    /* Print templates centre these; reading them on screen wants left. */
+    .contractPdfScope .card,
+    .contractPdfScope .info-line,
+    .contractPdfScope .meta-row,
+    .contractPdfScope td,
+    .contractPdfScope th,
+    .contractPdfScope p,
+    .contractPdfScope li,
+    .quotePdfScope .card,
+    .quotePdfScope .info-line,
+    .quotePdfScope .service-title,
+    .quotePdfScope .service-note,
+    .quotePdfScope .desc-empty,
+    .quotePdfScope .notes p,
+    .quotePdfScope .meta-row,
+    .quotePdfScope td,
+    .quotePdfScope th {
+        text-align: left !important;
+    }
 
-.contractTopbar__title {
-    font-weight: 800;
-    font-size: 18px; /* ✅ أوضح */
-    line-height: 1.2;
-    width:100%;
-}
+    /* Quote-only: the totals box and the metadata column.
 
-.contractTopbar__sub {
-    color: rgba(0,0,0,.55);
-    font-size: 12px;
-    width: 100%;
-}
+       `.meta` was previously capped by an unscoped `!important` rule declared on
+       the quote page, which reached any element named `.meta` on the page rather
+       than only the one inside the quote. */
+    .quotePdfScope .sumBox {
+        float: right;
+    }
 
-/* ✅ Status pill داخل النص */
-.statusPill {
-    display: inline-block;
-    font-weight: 700;
-    font-size: 12px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    border: 1px solid rgba(0,0,0,.10);
-    background: rgba(0,0,0,.04);
-    color: rgba(0,0,0,.75);
-    vertical-align: middle;
-}
+    .quotePdfScope .card,
+    .quotePdfScope .sumBox {
+        box-shadow: none;
+    }
 
-/* لو عندك statuses أخرى أضفها */
-.statusPill--draft {
-    background: rgba(13,110,253,.08);
-    border-color: rgba(13,110,253,.22);
-    color: #0d6efd;
-}
-
-.statusPill--signed {
-    background: rgba(25,135,84,.10);
-    border-color: rgba(25,135,84,.25);
-    color: #198754;
-}
-
-.statusPill--sent {
-    background: rgba(255,193,7,.14);
-    border-color: rgba(255,193,7,.25);
-    color: #b58100;
-}
-
-.statusPill--canceled {
-    background: rgba(220,53,69,.10);
-    border-color: rgba(220,53,69,.22);
-    color: #dc3545;
-}
+    .quotePdfScope .meta {
+        max-width: 275px;
+    }

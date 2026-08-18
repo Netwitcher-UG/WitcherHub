@@ -5,6 +5,26 @@
     ViewData["Title"] = "Overview";
     var money = Model.Overview.Money;
     var pipeline = Model.Overview.Pipeline;
+
+    var header = new PageHeaderVm
+    {
+        Title = "Overview",
+        Subtitle =
+            $"{pipeline.CustomerCount} {(pipeline.CustomerCount == 1 ? "customer" : "customers")} · " +
+            $"{pipeline.ActiveProjectCount} active {(pipeline.ActiveProjectCount == 1 ? "project" : "projects")} · " +
+            $"{pipeline.LiveContractCount} live {(pipeline.LiveContractCount == 1 ? "contract" : "contracts")}",
+        Actions =
+        [
+            new PageAction { Label = "Clients", Icon = "ri-group-line", Page = "/Index" },
+            new PageAction
+            {
+                Label = "Projects",
+                Icon = "ri-briefcase-line",
+                Style = PageActionStyle.Primary,
+                Page = "/Projects"
+            }
+        ]
+    };
 }
 
 @section Styles {
@@ -12,25 +32,7 @@
     <link rel="stylesheet" href="~/wowdash/css/lib/apexcharts.css">
 }
 
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
-    <div>
-        <h3 class="mb-4 fw-semibold">Overview</h3>
-        <p class="text-secondary-light mb-0 text-sm">
-            @pipeline.CustomerCount @(pipeline.CustomerCount == 1 ? "customer" : "customers") ·
-            @pipeline.ActiveProjectCount active @(pipeline.ActiveProjectCount == 1 ? "project" : "projects") ·
-            @pipeline.LiveContractCount live @(pipeline.LiveContractCount == 1 ? "contract" : "contracts")
-        </p>
-    </div>
-
-    <div class="d-flex flex-wrap gap-2">
-        <a asp-page="/Index" class="btn btn-outline-primary text-sm px-16 py-8 radius-8 d-inline-flex align-items-center gap-2">
-            <i class="ri-group-line"></i> Clients
-        </a>
-        <a asp-page="/Projects" class="btn btn-primary text-sm px-16 py-8 radius-8 d-inline-flex align-items-center gap-2">
-            <i class="ri-briefcase-line"></i> Projects
-        </a>
-    </div>
-</div>
+<partial name="_PageHeader" model="header" />
 
 @if (Model.Overview.IsEmpty)
 {

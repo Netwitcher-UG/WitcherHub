@@ -560,20 +560,42 @@ details[open] > summary::before {
 }
 
 /* Wide tables scroll inside the card instead of stretching the page. */
+/* ==========================================================================
+   Generic table cards (clients, services)
+
+   These used to declare `min-width: 1100px` on the table and `white-space:
+   nowrap` on every cell, so the table was wider than an ordinary desktop window
+   before a single column had been read and horizontal scrolling was guaranteed
+   rather than exceptional.
+
+   Cells wrap now, so a column narrows instead of pushing the table past the
+   window. Overflow stays available as a genuine last resort for very wide
+   content, which is what it was for.
+   ========================================================================== */
+
 .wh-tablecard-scroll .table-responsive {
-    overflow-x: auto !important;
+    overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
 }
 
 .wh-tablecard-scroll .table-responsive > table {
-    min-width: var(--wh-table-min-width, 1100px);
-    table-layout: auto !important;
+    /* No minimum width. The table is as wide as it needs to be and no wider. */
+    width: 100%;
+    table-layout: auto;
 }
 
 .wh-tablecard-scroll .table-responsive th,
 .wh-tablecard-scroll .table-responsive td {
-    white-space: nowrap;
+    /* Wrapping is what lets these fit. Nowrap is what stopped them. */
+    white-space: normal;
+    vertical-align: middle;
+}
+
+/* Long unbroken values — email addresses, ids — break rather than widen the
+   column past the window. */
+.wh-tablecard-scroll .table-responsive td {
+    overflow-wrap: anywhere;
 }
 
 /* ==========================================================================
@@ -1222,4 +1244,266 @@ body.ui-loading {
 
 .wh-position-section[open] > summary::before {
     transform: rotate(90deg);
+}
+
+
+/* Collapsed position rows in the contract override editor.
+
+   These lived in a <style> block on the page, where the same two selectors were
+   declared twice in a row and the second copy silently won. Worse, the hover and
+   badge fills were white at low opacity — rgba(255,255,255,.05) over a white
+   card, which is invisible — so a row gave no feedback that it could be clicked.
+   Written against the theme's tokens instead. */
+.wh-pos-row {
+    display: flex;
+    align-items: center;
+    gap: var(--wh-space-3, 0.75rem);
+}
+
+.wh-pos-toggle {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    text-align: left;
+    padding: 0.625rem 0.75rem;
+    border: 0;
+    background: transparent;
+    border-radius: 14px;
+}
+
+.wh-pos-toggle:hover {
+    background: var(--wh-surface-hover, rgba(15, 23, 42, .04));
+}
+
+.wh-pos-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: var(--wh-space-3, 0.75rem);
+    min-width: 0;
+}
+
+.wh-pos-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-width: 0;
+}
+
+.wh-pos-no {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    background: var(--wh-surface-hover, rgba(15, 23, 42, .06));
+    flex: 0 0 auto;
+}
+
+/* The title truncates; the price never does. A row is scanned by its number and
+   its amount, so the amount has to stay whole even when the title cannot. */
+.wh-pos-title {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.wh-pos-price {
+    font-size: 0.9rem;
+    color: var(--text-secondary-light, #6b7280);
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.wh-pos-delbtn {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(220, 53, 69, .35);
+    background: transparent;
+    color: #dc3545;
+    flex: 0 0 auto;
+}
+
+.wh-pos-delbtn:hover:not(:disabled) {
+    background: rgba(220, 53, 69, .10);
+}
+
+.wh-pos-delbtn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.wh-pos-delbtn i {
+    font-size: 18px;
+    line-height: 1;
+}
+
+/* Read-only summary of what a position will print as. */
+.wh-line-preview {
+    margin: 0.5rem 0 0 1.125rem;
+    padding: 0;
+    list-style: disc;
+    color: var(--text-secondary-light, #6b7280);
+}
+
+.wh-line-preview li {
+    margin: 2px 0;
+}
+
+.wh-line-preview .wh-line-preview-empty {
+    list-style: none;
+    margin-left: -1.125rem;
+}
+
+
+/* Generated document HTML shown inside the application.
+
+   Contracts and quotes are rendered by the PDF pipeline and then embedded in a
+   panel — the workspace preview, the contract editor. The markup arrives with
+   print-sized headings, so an h1 came through at poster size inside a 340px box.
+
+   This is the on-screen counterpart to the typography in
+   css/contracts/contract-sign.css, which does the same job for the public
+   document pages. It was previously a fourth copy of these rules, written by id
+   in a <style> block on the workspace page. */
+.wh-document-body {
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+.wh-document-body h1 {
+    font-size: 22px;
+    line-height: 1.25;
+    margin: 0 0 10px;
+    font-weight: 700;
+}
+
+.wh-document-body h2 {
+    font-size: 18px;
+    line-height: 1.3;
+    margin: 18px 0 8px;
+    font-weight: 700;
+}
+
+.wh-document-body h3 {
+    font-size: 16px;
+    line-height: 1.35;
+    margin: 14px 0 6px;
+    font-weight: 700;
+}
+
+.wh-document-body h4,
+.wh-document-body h5,
+.wh-document-body h6 {
+    font-size: 14px;
+    margin: 12px 0 6px;
+    font-weight: 700;
+}
+
+.wh-document-body p {
+    margin: 0 0 8px;
+}
+
+.wh-document-body ul,
+.wh-document-body ol {
+    margin: 0 0 10px 18px;
+}
+
+.wh-document-body hr {
+    margin: 14px 0;
+    opacity: .15;
+}
+
+/* A scrolling preview pane for the above. Height was set with an inline style
+   attribute on the element itself, which no other preview could reuse. */
+.wh-document-preview {
+    height: min(38vh, 340px);
+    max-height: min(38vh, 340px);
+    overflow: auto;
+    border: 1px solid var(--border-color, rgba(0,0,0,.08));
+    border-radius: 12px;
+    padding: 14px;
+}
+
+/* A whole table row that behaves as a link to its record. */
+.wh-clickable-row {
+    cursor: pointer;
+}
+
+/* The editable contract surface.
+
+   Plain contenteditable text: it must wrap like the document it represents and
+   inherit the surrounding type rather than falling back to a monospace default.
+   The dashed border appears only while editing, so the reading view is not
+   framed like a form field. */
+.wh-contract-editor {
+    white-space: pre-wrap;
+    word-break: break-word;
+    outline: none;
+
+    /* A writing surface large enough to work in, sized in rem rather than in
+       viewport height. It was 60vh while it lived in a <style> block on the page,
+       where the rule against viewport-relative minimums could not see it — and on
+       a tall monitor that is a very large empty box under a short contract. */
+    min-height: 24rem;
+
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+}
+
+.wh-contract-editor.is-editing {
+    border: 1px dashed var(--border-color, rgba(0,0,0,.20));
+    border-radius: 12px;
+    padding: 14px;
+}
+
+/* The generated contract HTML carries the public signing page's action bar with
+   it. Inside the editor there is nothing to sign, and the page has its own Save
+   and Preview controls, so it is hidden here. */
+.wh-contract-editor-page .contractActions {
+    display: none !important;
+}
+
+
+/* Page header (see Shared/_PageHeader.cshtml).
+
+   Identity on the left, actions on the right; both wrap onto their own line on a
+   narrow screen rather than the actions squeezing the title into two words per
+   line. align-items: flex-start so a two-line title does not drag the buttons
+   down with it. */
+.wh-page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--wh-space-3, 0.75rem);
+
+    /* The header owns the space beneath it rather than depending on whatever
+       follows carrying .wh-section. It used to rely on the sibling rule, so on a
+       page whose first card had no .wh-section the gap collapsed to a few pixels
+       and the title sat almost on top of the card. */
+    margin-block-end: var(--wh-space-6);
+}
+
+.wh-page-header__identity {
+    min-width: 0;
+    flex: 1 1 20rem;
+}
+
+/* On a phone the actions go full width and stay in reading order under the
+   title, rather than floating beside it in a 100px column. */
+@media (max-width: 575.98px) {
+    .wh-page-header .wh-actions {
+        width: 100%;
+    }
 }

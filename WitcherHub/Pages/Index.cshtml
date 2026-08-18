@@ -9,9 +9,28 @@
 @{
     ViewData["Title"] = "Clients";
     ViewData["LexwareImportUrl"] = Url.Page("./Index", "LexwareImportContacts");
+
+    @* The title and the create button used to come from inside the table card. *@
+    var header = new WitcherHub.Pages.Models.UI.PageHeaderVm
+    {
+        Title = "Clients",
+        Subtitle = "The companies and people you invoice. Projects, quotes and contracts hang off them.",
+        Actions =
+        [
+            new WitcherHub.Pages.Models.UI.PageAction
+            {
+                Label = "New client",
+                Icon = "ri-add-line",
+                Style = WitcherHub.Pages.Models.UI.PageActionStyle.Primary,
+                ModalTarget = Model.CreateCustomerModal.Id
+            }
+        ]
+    };
 }
 
-<div id="clientsTableCard" class="wh-tablecard-scroll">
+<partial name="_PageHeader" model="header" />
+
+<div id="clientsTableCard" class="wh-tablecard-scroll wh-section">
     <partial name="_TableCard" model="Model.ClientsTable" />
 </div>
 <partial name="~/Pages/Shared/Modals/_ModalShell.cshtml" model="Model.CreateCustomerModal" />

@@ -29,6 +29,41 @@ namespace WitcherHub.Pages.Models.UI
         };
     }
 
+    /// <summary>
+    /// Renders a badge, once, for everything that is not a document status.
+    ///
+    /// Two badge idioms had grown up side by side: the theme's
+    /// <c>bg-success-focus text-success-main border …</c> on the newer pages, and
+    /// plain Bootstrap <c>bg-success bg-opacity-10 text-success</c> on the older
+    /// ones. The same green meant two different shades depending on which screen
+    /// you were looking at, which is most of what "it looks like several
+    /// products" amounts to.
+    ///
+    /// Anything with a status — active or not, a company or a person, exported or
+    /// not — comes through here and comes out looking the same.
+    /// </summary>
+    public static class Badge
+    {
+        /// <summary>
+        /// A badge in the theme's own markup. <paramref name="tone"/> takes the
+        /// contextual names: success, danger, warning, info, primary, or anything
+        /// else for neutral.
+        /// </summary>
+        public static Microsoft.AspNetCore.Html.IHtmlContent Html(string label, string tone = "neutral")
+        {
+            var classes = new StatusPresentation(label, tone, "").BadgeClass;
+
+            return new Microsoft.AspNetCore.Html.HtmlString(
+                $"<span class=\"badge {classes} px-16 py-4 radius-4\">" +
+                System.Text.Encodings.Web.HtmlEncoder.Default.Encode(label) +
+                "</span>");
+        }
+
+        /// <summary>A yes/no state, green when true and quiet when not.</summary>
+        public static Microsoft.AspNetCore.Html.IHtmlContent Toggle(bool on, string whenOn, string whenOff) =>
+            Html(on ? whenOn : whenOff, on ? "success" : "neutral");
+    }
+
     public static class DocumentStatusPresentation
     {
         /// <summary>

@@ -245,6 +245,109 @@
         }
     };
 
+    // ---------- Status badges ----------
+    //
+    // The mirror of Pages/Models/UI/StatusPresentation.cs, for rows that are
+    // rendered in the browser rather than on the server.
+    //
+    // Those rows used to build their own badge markup, in Bootstrap's idiom
+    // (`bg-success bg-opacity-10 text-success`) rather than the theme's
+    // (`bg-success-focus text-success-main border …`). The two are different
+    // shades of the same colour, so a quote in the project workspace and the same
+    // quote in the quotes list did not look alike. The wording had drifted too:
+    // the server calls a sent quote "Awaiting customer" and a sent contract
+    // "Awaiting signature", while these scripts called both "Sent" — the status
+    // that says least about who is now waiting for whom.
+    //
+    // Keep the maps below in step with the C# ones. There is a test that fails if
+    // a script starts emitting badge markup of its own instead of calling this.
+
+    const BADGE_TONES = {
+        success: 'bg-success-focus text-success-main border border-success-main',
+        danger: 'bg-danger-focus text-danger-main border border-danger-main',
+        warning: 'bg-warning-focus text-warning-main border border-warning-main',
+        info: 'bg-info-focus text-info-main border border-info-main',
+        primary: 'bg-primary-50 text-primary-600 border border-primary-600',
+        neutral: 'bg-neutral-200 text-neutral-600 border border-neutral-400'
+    };
+
+    // Statuses arrive from the API as strings and their casing is not guaranteed.
+    function key(status) {
+        return String(status ?? '').trim().toLowerCase();
+    }
+
+    const STATUS_MAPS = {
+        quote: {
+            draft: ['Draft', 'secondary'],
+            sent: ['Awaiting customer', 'warning'],
+            accepted: ['Accepted', 'success'],
+            signed: ['Signed', 'success'],
+            rejected: ['Rejected', 'danger'],
+            cancelled: ['Cancelled', 'secondary'],
+            void: ['Void', 'secondary']
+        },
+        contract: {
+            draft: ['Draft', 'secondary'],
+            sent: ['Awaiting signature', 'warning'],
+            signed: ['Signed', 'success'],
+            accepted: ['Accepted', 'success'],
+            rejected: ['Rejected', 'danger'],
+            terminated: ['Terminated', 'danger'],
+            cancelled: ['Cancelled', 'secondary'],
+            void: ['Void', 'secondary']
+        },
+        invoice: {
+            draft: ['Draft', 'secondary'],
+            issued: ['Issued', 'info'],
+            sent: ['Sent', 'info'],
+            open: ['Open', 'warning'],
+            overdue: ['Overdue', 'danger'],
+            paid: ['Paid', 'success'],
+            cancelled: ['Cancelled', 'secondary'],
+            void: ['Void', 'secondary']
+        },
+        project: {
+            draft: ['Draft', 'secondary'],
+            active: ['Active', 'success'],
+            onhold: ['On hold', 'warning'],
+            closed: ['Closed', 'info'],
+            cancelled: ['Cancelled', 'danger']
+        }
+    };
+
+    UI.badge = {
+        /**
+         * A badge in the theme's markup. Unknown tones come out neutral rather
+         * than unstyled.
+         */
+        html(label, tone = 'neutral') {
+            const classes = BADGE_TONES[tone] ?? BADGE_TONES.neutral;
+            return `<span class="badge ${classes} px-16 py-4 radius-4">${escapeHtml(label)}</span>`;
+        },
+
+        /**
+         * A document status, worded and coloured the way the server words and
+         * colours it. `kind` is one of quote, contract, invoice, project.
+         *
+         * An unrecognised status is shown as it arrived rather than hidden or
+         * guessed at — if the backend grows a status the UI has not been taught,
+         * the user should see its name, not a blank space.
+         */
+        status(kind, status) {
+            const map = STATUS_MAPS[kind];
+            const entry = map?.[key(status)];
+
+            if (!entry) return this.html(status || '—', 'secondary');
+
+            return this.html(entry[0], entry[1]);
+        },
+
+        /** A yes/no state: green when true, quiet when not. */
+        toggle(on, whenOn, whenOff) {
+            return this.html(on ? whenOn : whenOff, on ? 'success' : 'neutral');
+        }
+    };
+
     // ---------- init ----------
     UI.init = function () {
         ensureModal();

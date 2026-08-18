@@ -4,21 +4,18 @@
 @{
     ViewData["Title"] = "Quotes";
     var noMatches = EmptyStateVm.NoMatches("quotes");
+
+    var header = new PageHeaderVm
+    {
+        Title = "Quotes",
+        Subtitle = "Every quote, across all customers and projects.",
+        Badges = Model.AwaitingCount > 0
+            ? [($"{Model.AwaitingCount} awaiting a decision · {Format.Money(Model.AwaitingValue)}", "warning")]
+            : []
+    };
 }
 
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
-    <div>
-        <h3 class="mb-4 fw-semibold">Quotes</h3>
-        <p class="text-secondary-light mb-0 text-sm">Every quote, across all customers and projects.</p>
-    </div>
-
-    @if (Model.AwaitingCount > 0)
-    {
-        <span class="badge bg-warning-focus text-warning-main border border-warning-main px-16 py-8 radius-8 text-sm">
-            @Model.AwaitingCount awaiting a decision · @Format.Money(Model.AwaitingValue)
-        </span>
-    }
-</div>
+<partial name="_PageHeader" model="header" />
 
 <div class="card radius-12 border">
     <div class="card-body p-24">

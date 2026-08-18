@@ -11,40 +11,6 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/contracts/contract-sign.css" asp-append-version="true" />
-    <style>
-        .contractTopbar {
-            position: sticky;
-            top: 12px;
-            z-index: 50;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 12px;
-            padding: 10px 12px;
-            margin-bottom: 12px;
-            border-radius: 14px;
-            background: rgba(255,255,255,.88);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(0,0,0,.06);
-        }
-
-        .contractTopbar__actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
-
-        .contractTopbar__badge {
-            font-size: 12px;
-            font-weight: 700;
-            padding: 6px 10px;
-            border-radius: 999px;
-            border: 1px solid rgba(0,0,0,.08);
-            background: rgba(0,0,0,.03);
-        }
-    </style>
 }
 @*
     Everything that can be done with this contract, in one bar.
@@ -53,65 +19,81 @@
     /Contracts/Positions/{id} into the address bar — nothing anywhere linked to
     it, so the manual-position editor was effectively invisible.
 *@
-<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-24">
-    <div>
-        <nav class="mb-8">
-            <a asp-page="/Contracts/Index" class="text-secondary-light text-sm hover-text-primary d-inline-flex align-items-center gap-1">
-                <i class="ri-arrow-left-line"></i> All contracts
-            </a>
-        </nav>
+@{
+    var header = new PageHeaderVm
+    {
+        Title = Model.Contract?.ContractNo ?? "Contract",
+        BackLabel = "All contracts",
+        BackPage = "/Contracts/Index",
 
-        <div class="d-flex flex-wrap align-items-center gap-3">
-            <h3 class="mb-0 fw-semibold">@(Model.Contract?.ContractNo ?? "Contract")</h3>
+        Status = Model.Contract is null
+            ? null
+            : DocumentStatusPresentation.ForContract(Model.Contract.Status),
 
-            @if (Model.Contract is not null)
+        @* Whether a signature exists is a separate fact from the contract's status,
+           so it gets its own badge — in the same vocabulary as every other status
+           in the application. It used to be a bespoke pill in a sticky bar of its
+           own further down the page, so the state was given twice on one screen in
+           two different visual languages. *@
+        Badges =
+        [
+            (Model.IsSigned ? T["contractPage_Signed"].Value : T["contractPage_Unsigned"].Value,
+             Model.IsSigned ? "success" : "neutral")
+        ],
+
+        Context = Model.Contract?.Project?.Customer is null
+            ? []
+            :
+            [
+                new PageLink
+                {
+                    Label = Model.Contract.Project.Customer.Name,
+                    Page = "/Clients/Details",
+                    RouteValues = new Dictionary<string, string?> { ["id"] = Model.Contract.Project.CustomerId.ToString() },
+                    Emphasised = true
+                },
+                new PageLink
+                {
+                    Label = Model.Contract.Project.Title,
+                    Page = "/Projects/Workspace",
+                    RouteValues = new Dictionary<string, string?>
+                    {
+                        ["id"] = Model.ProjectId.ToString(),
+                        ["tab"] = "contracts"
+                    }
+                }
+            ],
+
+        Actions =
+        [
+            new PageAction
             {
-                <partial name="_StatusBadge"
-                         model="WitcherHub.Pages.Models.UI.DocumentStatusPresentation.ForContract(Model.Contract.Status)" />
+                Label = "Positions",
+                Icon = "ri-list-check-2",
+                Page = "/Contracts/Positions",
+                RouteValues = new Dictionary<string, string?> { ["contractId"] = Model.ContractId.ToString() }
+            },
+            new PageAction
+            {
+                Label = "Edit",
+                Icon = "ri-edit-line",
+                Page = "/Contracts/Edit",
+                RouteValues = new Dictionary<string, string?> { ["id"] = Model.ContractId.ToString() }
+            },
+            new PageAction
+            {
+                Label = T["contractPage_Print"].Value,
+                Icon = "ri-printer-line",
+                Style = PageActionStyle.Primary,
+                Id = "btnPrint"
             }
-        </div>
+        ]
+    };
+}
 
-        @if (Model.Contract?.Project?.Customer is not null)
-        {
-            <p class="text-secondary-light mb-0 mt-8 text-sm">
-                <a asp-page="/Clients/Details" asp-route-id="@Model.Contract.Project.CustomerId" class="text-primary-600 fw-medium">
-                    @Model.Contract.Project.Customer.Name
-                </a>
-                ·
-                <a asp-page="/Projects/Workspace" asp-route-id="@Model.ProjectId" asp-route-tab="contracts" class="hover-text-primary">
-                    @Model.Contract.Project.Title
-                </a>
-            </p>
-        }
-    </div>
-
-    <div class="d-flex flex-wrap gap-2">
-        <a asp-page="/Contracts/Positions" asp-route-contractId="@Model.ContractId"
-           class="btn btn-outline-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2">
-            <i class="ri-list-check-2"></i> Positions
-        </a>
-
-        <a asp-page="/Contracts/Edit" asp-route-id="@Model.ContractId"
-           class="btn btn-outline-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2">
-            <i class="ri-edit-line"></i> Edit
-        </a>
-
-        <button class="btn btn-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2"
-                type="button" id="btnPrint">
-            <i class="ri-printer-line"></i> @T["contractPage_Print"]
-        </button>
-    </div>
-</div>
+<partial name="_PageHeader" model="header" />
 
 <div class="contractPage">
-
-    <div class="contractTopbar">
-        <div class="contractTopbar__leftActions">
-            <span class="contractTopbar__badge" id="signedBadge">
-                @(Model.IsSigned? T["contractPage_Signed"] : T["contractPage_Unsigned"])
-            </span>
-        </div>
-    </div>
 
     <div class="contractPage__container">
         <div class="contractPage__paper" id="paper">

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using WitcherHub.Application.Common.Exceptions;
+using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Models.View.Contracts;
@@ -22,13 +23,17 @@ namespace WitcherHub.Pages.Contracts
         private readonly IValidator<CreateContractItemDto> _createItemValidator;
         private readonly IValidator<UpdateContractItemDto> _updateItemValidator;
 
+        private readonly IContractDraftService _drafts;
+
         public EditModel(
             IContract contracts,
+            IContractDraftService drafts,
             IValidator<UpdateContractDto> updateValidator,
             IValidator<CreateContractItemDto> createItemValidator,
             IValidator<UpdateContractItemDto> updateItemValidator)
         {
             _contracts = contracts;
+            _drafts = drafts;
             _updateValidator = updateValidator;
             _createItemValidator = createItemValidator;
             _updateItemValidator = updateItemValidator;
@@ -43,6 +48,22 @@ namespace WitcherHub.Pages.Contracts
         public bool IsSigned { get; private set; }
 
         public ContractViews.ContractDetailsView? Contract { get; private set; }
+
+        /// <summary>
+        /// Where the contract's versions stand: how many there are, which is
+        /// approved, and whether the wording on screen is the approved one.
+        ///
+        /// The editor showed a contract number, a status and a currency. Which
+        /// version was being edited, whether it had been approved, and what the
+        /// contract was worth were all absent from a page whose whole job is
+        /// editing that contract.
+        /// </summary>
+        public IReadOnlyList<ContractDraftSummary> Drafts { get; private set; }
+            = Array.Empty<ContractDraftSummary>();
+
+        public ContractDraftSummary? ApprovedVersion => Drafts.FirstOrDefault(d => d.IsApproved);
+
+        public ContractMoneyDto? Money { get; private set; }
 
         [BindProperty]
         public UpdateContractDto Header { get; set; } = new()
@@ -77,6 +98,13 @@ namespace WitcherHub.Pages.Contracts
 
             await LoadPageStateAsync(Id, ct, termsOverride: null);
             if (Contract is null) return NotFound();
+
+            // The version history and the contract's own money, so the editor can
+            // say which version is on screen and what the contract is worth.
+            Drafts = await _drafts.GetDraftsAsync(Id, ct);
+
+            var state = await _drafts.GetStateAsync(Id, ct);
+            Money = state.Money;
 
             return Page();
         }
