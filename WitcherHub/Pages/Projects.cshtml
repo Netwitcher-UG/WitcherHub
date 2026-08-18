@@ -140,9 +140,10 @@
                             </td>
 
                             <td class="wh-col-status">
-                                <span class="badge bg-@status.Tone-focus text-@status.Tone-main border border-@status.Tone-main px-16 py-4 radius-4">
-                                    @status.Label
-                                </span>
+                                @* Hand-built classes produced "bg-secondary-focus" for
+                                   every Draft — a class the theme does not define, so the
+                                   badge rendered with no colour at all. *@
+                                <partial name="_StatusBadge" model="status" />
 
                                 @if (project.IsArchived)
                                 {

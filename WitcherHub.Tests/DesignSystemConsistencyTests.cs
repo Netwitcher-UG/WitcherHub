@@ -269,6 +269,106 @@ public class DesignSystemConsistencyTests
     private static TEnum? Parse<TEnum>(string name) where TEnum : struct, Enum =>
         Enum.TryParse<TEnum>(name, ignoreCase: true, out var value) ? value : null;
 
+    /// <summary>
+    /// Every badge the status vocabulary can produce must be made of classes that
+    /// actually exist in a stylesheet.
+    ///
+    /// A class name that is merely plausible renders as nothing at all: no
+    /// background, no colour, invisible text on a white card. The project workspace
+    /// built its badge by interpolating the tone into the class names, which turned
+    /// every Draft into "bg-secondary-focus" — a class no stylesheet defines — so
+    /// the commonest status in the application could not be read.
+    /// </summary>
+    [Fact]
+    public void Every_badge_the_vocabulary_produces_is_defined_in_a_stylesheet()
+    {
+        var root = RepositoryRoot();
+        if (root is null) return;
+
+        var css = LoadStylesheets(root);
+        if (css.Count == 0) return;
+
+        var vocabularies = new List<StatusPresentation>();
+
+        foreach (var status in Enum.GetValues<DocumentStatus>())
+        {
+            vocabularies.Add(DocumentStatusPresentation.ForQuote(status));
+            vocabularies.Add(DocumentStatusPresentation.ForContract(status));
+            vocabularies.Add(DocumentStatusPresentation.ForInvoice(status));
+        }
+
+        foreach (var status in Enum.GetValues<ProjectStatus>())
+            vocabularies.Add(DocumentStatusPresentation.ForProject(status));
+
+        foreach (var status in Enum.GetValues<PaymentStatus>())
+            vocabularies.Add(DocumentStatusPresentation.ForPayment(status));
+
+        var undefined = vocabularies
+            .SelectMany(v => v.BadgeClass.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .Where(c => c != "border")
+            .Distinct()
+            .Where(c => !css.Contains(c))
+            .ToList();
+
+        Assert.True(
+            undefined.Count == 0,
+            "These badge classes are used by the status vocabulary but defined in no stylesheet, so a badge " +
+            $"carrying them renders with no colour at all: {string.Join(", ", undefined)}");
+    }
+
+    /// <summary>
+    /// A page must not build a css class by interpolating a value into it.
+    ///
+    /// The compiler cannot check the result, no stylesheet search finds it, and a
+    /// value the theme has no variant for produces a class that silently does
+    /// nothing. Status colours come from StatusPresentation for exactly this reason.
+    /// </summary>
+    [Fact]
+    public void No_page_assembles_a_css_class_out_of_a_variable()
+    {
+        var root = RepositoryRoot();
+        if (root is null) return;
+
+        var pages = Path.Combine(root.FullName, "WitcherHub", "Pages");
+
+        var offenders = new List<string>();
+
+        foreach (var file in Directory.EnumerateFiles(pages, "*.cshtml", SearchOption.AllDirectories))
+        {
+            foreach (System.Text.RegularExpressions.Match match in
+                     System.Text.RegularExpressions.Regex.Matches(
+                         File.ReadAllText(file), @"class=""[^""]*\b(bg|text|border)-@[A-Za-z]"))
+            {
+                offenders.Add($"{Path.GetFileName(file)}: {match.Value.Trim()}");
+            }
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            "These pages build a css class from a variable, so the class may not exist and the element " +
+            $"renders unstyled. Use _StatusBadge or Badge.Html: {string.Join(", ", offenders.Distinct())}");
+    }
+
+    /// <summary>Class names defined anywhere in the application's stylesheets.</summary>
+    private static HashSet<string> LoadStylesheets(DirectoryInfo root)
+    {
+        var wwwroot = Path.Combine(root.FullName, "WitcherHub", "wwwroot");
+        if (!Directory.Exists(wwwroot)) return new HashSet<string>();
+
+        var defined = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var file in Directory.EnumerateFiles(wwwroot, "*.css", SearchOption.AllDirectories))
+        {
+            foreach (System.Text.RegularExpressions.Match match in
+                     System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(file), @"\.([a-zA-Z][\w-]*)"))
+            {
+                defined.Add(match.Groups[1].Value);
+            }
+        }
+
+        return defined;
+    }
+
     // ---- the central map itself -------------------------------------------
 
     [Fact]

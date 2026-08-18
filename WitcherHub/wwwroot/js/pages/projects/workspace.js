@@ -313,12 +313,31 @@
         $('vp-basicEdit')?.classList.toggle('d-none', !editingBasic);
     }
 
+    /// Writes text into an element only if the page actually has it.
+    ///
+    /// Every write here used to be unguarded, so removing one element from the
+    /// markup threw a TypeError in the middle of rendering — and because the render
+    /// runs inside the load's try block, the page reported "Failed to load
+    /// project." for a project that had loaded perfectly well. The panel then never
+    /// appeared, which made it look as though projects and contracts could not be
+    /// opened at all.
+    function setText(id, value) {
+        const el = $(id);
+        if (el) el.textContent = value;
+    }
+
+    function setValue(id, value) {
+        const el = $(id);
+        if (el) el.value = value;
+    }
+
     function renderProject(p) {
         currentProject = p;
 
-        $('vp-title').textContent = p.title ?? 'Project';
-        $('vp-statusBadge').innerHTML = statusBadgeHtml(p.status);
-        $('vp-meta').textContent = p.id ? `ID: ${p.id}` : '';
+        // The project's status and identity are rendered on the server now, in the
+        // page header, so they are deliberately not written here: two sources for
+        // one fact is what let them disagree.
+        setText('vp-title', p.title ?? 'Project');
 
         const customerNameEl = $('vp-customerName');
         const customerEmailEl = $('vp-customerEmail');
@@ -336,17 +355,20 @@
         }
 
         if (customerEmailEl) {
-            customerEmailEl.textContent = p.customer?.email ?? '—';
+            // Blank, not a dash. This line sits on its own under the header, and a
+            // lone "—" reads as something failing to load rather than as a customer
+            // who simply has no email on file.
+            customerEmailEl.textContent = p.customer?.email ?? '';
         }
 
-        $('vp-v-title').textContent = p.title ?? '—';
-        $('vp-v-desc').textContent = p.description ?? '—';
-        $('vp-v-dates').textContent = `${fmtDate(p.startDate)} → ${fmtDate(p.endDate)}`;
+        setText('vp-v-title', p.title ?? '—');
+        setText('vp-v-desc', p.description ?? '—');
+        setText('vp-v-dates', `${fmtDate(p.startDate)} → ${fmtDate(p.endDate)}`);
 
-        $('vp-e-title').value = p.title ?? '';
-        $('vp-e-desc').value = p.description ?? '';
-        $('vp-e-start').value = p.startDate ?? '';
-        $('vp-e-end').value = p.endDate ?? '';
+        setValue('vp-e-title', p.title ?? '');
+        setValue('vp-e-desc', p.description ?? '');
+        setValue('vp-e-start', p.startDate ?? '');
+        setValue('vp-e-end', p.endDate ?? '');
 
         const q = $('vp-newQuoteBtn');
         if (q && p.id) q.href = `/Quotes/Create?projectId=${encodeURIComponent(p.id)}`;
@@ -375,8 +397,24 @@
         $('vpLoading')?.classList.remove('d-none');
         $('vpBody')?.classList.add('d-none');
 
+        // Loading and rendering are reported separately. They used to share one
+        // catch, so a fault in the rendering — an element the markup no longer had
+        // — was reported as "Failed to load project." for a project that had loaded
+        // perfectly well, and the message sent everyone looking in the wrong place.
+        let data;
+
         try {
-            const data = await fetchProjectById(projectId);
+            data = await fetchProjectById(projectId);
+        } catch (err) {
+            console.error('Loading the project failed.', err);
+
+            const el = $('vpLoading');
+            if (el) el.textContent = 'This project could not be loaded. Reload the page, or open it again from the projects list.';
+
+            return;
+        }
+
+        try {
             renderProject(normalizeProject(data));
 
             $('vpLoading')?.classList.add('d-none');
@@ -384,8 +422,10 @@
 
             activateInitialTab();
         } catch (err) {
-            console.error(err);
-            $('vpLoading').textContent = 'Failed to load project.';
+            console.error('The project loaded but could not be displayed.', err);
+
+            const el = $('vpLoading');
+            if (el) el.textContent = 'This project loaded but could not be displayed. Reload the page — if it keeps happening, the details are in the browser console.';
         }
     }
 
@@ -715,172 +755,103 @@
         $('vpContractPreviewWrap')?.classList.toggle('d-none', !on);
     }
 
-    async function loadProjectContractSnapshot() {
+    /// Every contract in the project, listed.
+    ///
+    /// This used to fetch one contract — the newest — and drive a row of buttons
+    /// that acted on "the" contract. A project can hold several, and the rest were
+    /// invisible from inside the project. Per-contract actions live on the
+    /// contract's own page now: with a list on screen, one "Send" button cannot say
+    /// which contract it would send.
+    async function loadProjectContracts() {
         if (!contractState.projectId) return;
 
-        const urlBase = $('vcProjectContractSnapshotUrl')?.value;
-        if (!urlBase) return toastError('vcProjectContractSnapshotUrl not found', 'Error');
-
-        const btnCreate = $('vpContractCreateBtn');
-        
-        const editLink = $('vpContractEditLink');
-        const detailsLink = $('vpContractDetailsLink');
-        const sendBtn = $('vpContractSendBtn');
-        const itemsLink = $('vpContractItemsLink');
-        const copyLinkBtn = $('vpContractCopyLinkBtn');
+        const urlBase = $('vcProjectContractsUrl')?.value;
+        if (!urlBase) return toastError('vcProjectContractsUrl not found', 'Error');
 
         setContractLoading(true);
-        showContractEmpty(false);
-        showContractPreview(false);
-
-        const joiner = urlBase.includes('?') ? '&' : '?';
-        const url = `${urlBase}${joiner}projectId=${encodeURIComponent(contractState.projectId)}`;
 
         try {
+            const joiner = urlBase.includes('?') ? '&' : '?';
+            const url = `${urlBase}${joiner}projectId=${encodeURIComponent(contractState.projectId)}&p=1&pageSize=50`;
+
             const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
-            const json = await res.json().catch(() => ({}));
+            const payload = await res.json().catch(() => null);
 
-            if (!res.ok) {
-                toastFromPayload(json, 'Error', 'Failed to load contract.');
+            if (!res.ok || !payload?.ok) {
+                toastFromPayload(payload, 'Error', 'The contracts could not be loaded.');
                 return;
             }
 
-            const data = json.data ?? json;
+            const items = payload.data?.items ?? payload.data?.Items ?? [];
+            renderContractRows(items);
 
-            if (!data.exists) {
-                $('vpContractTitle').textContent = 'No contract';
-                $('vpContractMeta').textContent = '—';
-                $('vpContractStatusBadge').innerHTML = '';
-                $('vpContractPreview').innerHTML = '';
-
-                btnCreate?.classList.remove('d-none');
-                btnCreate.textContent = 'Add Contract';
-
-                editLink?.classList.add('d-none');
-                detailsLink?.classList.add('d-none');
-                sendBtn?.classList.add('d-none');
-                copyLinkBtn?.classList.add('d-none');
-                itemsLink?.classList.add('d-none');
-
-                showContractEmpty(true);
-                showContractPreview(false);
-
-                contractState.loadedOnce = true;
-                return;
-            }
-
-            const status = (data.status || '').toString().toLowerCase();
-            const isSigned = status === 'signed' || !!data.signedAt;
-            const canUpdate = !!data.canUpdate && !isSigned;
-
-            $('vpContractTitle').textContent = data.contractNo || 'Contract';
-            // $('vpContractMeta').textContent = data.signedAt ? `Signed at: ${fmtDateTime(data.signedAt)}` : 'Not signed yet';
-            const contractStatusText = (data.status || '').toString().toLowerCase();
-
-            $('vpContractMeta').textContent =
-                contractStatusText === 'signed' && data.signedAt
-                    ? `Signed at: ${fmtDateTime(data.signedAt)}`
-                    : contractStatusText === 'sent'
-                        ? 'Sent'
-                        : contractStatusText === 'draft'
-                            ? 'Draft'
-                            : data.signedAt
-                                ? `Signed at: ${fmtDateTime(data.signedAt)}`
-                                : (data.status || 'Draft');
-            $('vpContractStatusBadge').innerHTML = badgeHtml(data.status);
-
-            const cid = data.contractId || data.id || null;
-            const itemsCount = Number(data.itemsCount || 0);
-            const hasItems = itemsCount > 0;
-            const hasTerms = !!data.hasTerms;
-
-            if (itemsLink && cid && canUpdate) {
-                itemsLink.href = `/Contracts/Items/Manage?contractId=${encodeURIComponent(cid)}&returnTo=items`;
-                itemsLink.textContent = 'Positions';
-                itemsLink.classList.remove('d-none');
-            } else {
-                itemsLink?.classList.add('d-none');
-            }
-
-            $('vpContractPreview').innerHTML = data.previewHtml || '<div class="text-muted">No contract terms yet.</div>';
-
-            if (!hasItems) {
-                if (itemsLink && cid && canUpdate) {
-                    itemsLink.href = `/Contracts/Items/Manage?contractId=${encodeURIComponent(cid)}&returnTo=items&toast=noItems`;
-                    itemsLink.textContent = 'Add Positions';
-                    itemsLink.classList.remove('d-none');
-                } else {
-                    itemsLink?.classList.add('d-none');
-                }
-
-                btnCreate?.classList.add('d-none');
-                editLink?.classList.add('d-none');
-                detailsLink?.classList.add('d-none');
-                sendBtn?.classList.add('d-none');
-                btnCreate?.classList.add('d-none');
-
-                $('vpContractPreview').innerHTML =
-                    '<div class="alert alert-warning mb-0">This contract has no Positions. Please add at least one line item to continue.</div>';
-
-                showContractEmpty(false);
-                showContractPreview(true);
-                contractState.loadedOnce = true;
-                return;
-            }
-
-            btnCreate?.classList.add('d-none');
-
-            
-
-            if (editLink) {
-                editLink.href = data.editUrl || '#';
-                editLink.classList.toggle('d-none', !canUpdate);
-            }
-
-            if (detailsLink) {
-                let href = data.detailsUrl || '';
-                if (!href && cid) href = `/Contracts/Details?id=${encodeURIComponent(cid)}`;
-                detailsLink.href = href || '#';
-                detailsLink.classList.toggle('d-none', isSigned || !hasTerms);
-            }
-
-            if (sendBtn) {
-                sendBtn.classList.remove('d-none');
-
-                if (isSigned) {
-                    sendBtn.disabled = true;
-                    sendBtn.textContent = 'Signed';
-                    sendBtn.classList.remove('btn-outline-success');
-                    sendBtn.classList.add('btn-success');
-                    sendBtn.title = 'This contract is already signed.';
-                } else {
-                    sendBtn.disabled = !hasItems;
-                    sendBtn.textContent = 'Send';
-                    sendBtn.classList.remove('btn-success');
-                    sendBtn.classList.add('btn-outline-success');
-                    sendBtn.removeAttribute('title');
-                }
-            }
-
-            if (copyLinkBtn) {
-                if (isSigned) {
-                    copyLinkBtn.classList.add('d-none');
-                } else {
-                    copyLinkBtn.classList.remove('d-none');
-                    copyLinkBtn.disabled = !hasItems;
-                    copyLinkBtn.textContent = 'Copy Link';
-                    copyLinkBtn.removeAttribute('title');
-                }
-            }
-
-            showContractEmpty(false);
-            showContractPreview(true);
             contractState.loadedOnce = true;
         } catch (err) {
-            console.error(err);
-            toastError('Failed to load contract.', 'Error');
+            console.error('Loading the contracts failed.', err);
+            toastError('The contracts could not be loaded.', 'Error');
         } finally {
             setContractLoading(false);
+        }
+    }
+
+    function renderContractRows(items) {
+        const body = $('vpContractsBody');
+        const wrap = $('vpContractsTableWrap');
+        const empty = $('vpContractEmpty');
+        const summary = $('vpContractsSummary');
+
+        if (!body) return;
+
+        body.innerHTML = '';
+
+        if (summary) {
+            summary.textContent = items.length === 0
+                ? 'None yet'
+                : `${items.length} contract${items.length === 1 ? '' : 's'} in this project`;
+        }
+
+        wrap?.classList.toggle('d-none', items.length === 0);
+        empty?.classList.toggle('d-none', items.length !== 0);
+
+        for (const c of items) {
+            const id = c.id ?? c.Id;
+            const no = c.contractNo ?? c.ContractNo ?? '—';
+            const status = c.status ?? c.Status;
+            const currency = c.currency ?? c.Currency ?? 'EUR';
+            const total = c.itemsTotal ?? c.ItemsTotal;
+            const start = c.startDate ?? c.StartDate;
+            const end = c.endDate ?? c.EndDate;
+
+            // A contract built from pasted wording has no positions and therefore a
+            // total of zero. Printing "0,00 EUR" would state a price nobody agreed,
+            // so an absent total is shown as absent.
+            const value = (total === null || total === undefined || Number(total) === 0)
+                ? '<span class="text-secondary-light">—</span>'
+                : new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(total);
+
+            const period = (start || end)
+                ? `${fmtDate(start)} → ${fmtDate(end)}`
+                : '<span class="text-secondary-light">—</span>';
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="fw-medium">${esc(no)}</td>
+                <td>${badgeHtml(status)}</td>
+                <td class="text-end">${value}</td>
+                <td class="text-secondary-light text-sm">${period}</td>
+                <td class="text-end">
+                    <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+                        <a class="btn btn-sm btn-outline-primary" href="/Contracts/Details/${encodeURIComponent(id)}">Open</a>
+                        <a class="btn btn-sm btn-outline-secondary" href="/Contracts/Positions/${encodeURIComponent(id)}">Positions</a>
+                        <button type="button" class="btn btn-sm btn-outline-success"
+                                data-contract-action="send" data-contract-id="${esc(id)}"
+                                data-contract-no="${esc(no)}">Send</button>
+                        <button type="button" class="btn btn-sm btn-outline-info"
+                                data-contract-action="copy-link" data-contract-id="${esc(id)}">Copy link</button>
+                    </div>
+                </td>`;
+
+            body.appendChild(row);
         }
     }
 
@@ -940,7 +911,7 @@
                 return;
             }
 
-            await loadProjectContractSnapshot();
+            await loadProjectContracts();
         } catch (err) {
             console.error(err);
             toastError('Failed to create contract.', 'Error');
@@ -964,21 +935,26 @@
         if (btnText) btnText.textContent = isSending ? 'Sending...' : 'Confirm & Send';
     }
 
-    function openSendConfirm() {
-        const sendBtn = $('vpContractSendBtn');
-        if (!sendBtn || sendBtn.disabled) return;
+    /// The contract the open confirmation dialog is about. A project can hold
+    /// several, so "the contract" is not a thing the dialog can assume.
+    let pendingSendContractId = null;
 
-        $('vpSendContractProject').textContent = ($('vp-title')?.textContent || '—').trim();
-        $('vpSendContractContract').textContent = ($('vpContractTitle')?.textContent || '—').trim();
-        $('vpSendContractCustomerName').textContent = ($('vp-customerName')?.textContent || '—').trim();
+    function openSendConfirm(contractId, contractNo) {
+        pendingSendContractId = contractId || null;
 
-        const email = ($('vp-customerEmail')?.textContent || '').trim();
-        $('vpSendContractCustomerEmail').textContent = (email && email !== '—') ? email : '';
+        setText('vpSendContractProject', ($('vp-title')?.textContent || '—').trim());
+        setText('vpSendContractContract', contractNo || '—');
+        // Read from the project that was loaded, rather than scraping text back out
+        // of the page it was written into.
+        setText('vpSendContractCustomerName', currentProject?.customer?.name || '—');
+
+        const email = (currentProject?.customer?.email || '').trim();
+        setText('vpSendContractCustomerEmail', email);
 
         setSending(false);
         bootstrap.Modal.getOrCreateInstance(confirmModalEl).show();
     }
-    async function copyProjectContractLink() {
+    async function copyProjectContractLink(contractId) {
         if (!contractState.projectId) {
             showToast({ type: 'error', title: 'Error', message: 'ProjectId is missing.' });
             return;
@@ -992,13 +968,16 @@
             return;
         }
 
-        const btn = $('vpContractCopyLinkBtn');
+        const btn = document.querySelector(`[data-contract-action="copy-link"][data-contract-id="${contractId}"]`);
         if (btn?.dataset.busy === '1') return;
 
         try {
             if (btn) btn.dataset.busy = '1';
 
-            const body = `projectId=${encodeURIComponent(contractState.projectId)}`;
+            // The contract is named. Without it the server had to guess which of the
+            // project's contracts the link was for.
+            const body = `projectId=${encodeURIComponent(contractState.projectId)}` +
+                         `&contractId=${encodeURIComponent(contractId || '')}`;
 
             const res = await fetch(url, {
                 method: 'POST',
@@ -1031,7 +1010,7 @@
         }
     }
 
-    async function sendProjectContract() {
+    async function sendProjectContract(contractId) {
         if (!contractState.projectId) {
             showToast({ type: 'error', title: 'Error', message: 'ProjectId is missing.' });
             return;
@@ -1045,14 +1024,16 @@
             return;
         }
 
-        const sendBtn = $('vpContractSendBtn');
+        const sendBtn = document.querySelector(`[data-contract-action="send"][data-contract-id="${contractId}"]`);
         const prevSendDisabled = sendBtn ? sendBtn.disabled : null;
 
         if (sendBtn) sendBtn.disabled = true;
         setSending(true);
 
         try {
-            const body = `projectId=${encodeURIComponent(contractState.projectId)}`;
+            // Named explicitly: this is the document that goes to the customer.
+            const body = `projectId=${encodeURIComponent(contractState.projectId)}` +
+                         `&contractId=${encodeURIComponent(contractId || '')}`;
 
             const res = await fetch(url, {
                 method: 'POST',
@@ -1077,7 +1058,7 @@
             bootstrap.Modal.getOrCreateInstance(confirmModalEl).hide();
             if (sendBtn && prevSendDisabled !== null) sendBtn.disabled = prevSendDisabled;
 
-            await loadProjectContractSnapshot();
+            await loadProjectContracts();
         } catch (err) {
             console.error(err);
             showToast({ type: 'error', title: 'Server error', message: 'An unexpected error occurred.' });
@@ -1147,7 +1128,7 @@
         }
 
         if (target?.id === 'vp-tab-contracts') {
-            loadProjectContractSnapshot();
+            loadProjectContracts();
         }
     });
     document.addEventListener('click', function (e) {
@@ -1195,10 +1176,22 @@
     });
 
     $('vpSaveBasicBtn')?.addEventListener('click', saveBasic);
-    $('vpContractCreateBtn')?.addEventListener('click', createProjectContract);
-    $('vpContractSendBtn')?.addEventListener('click', openSendConfirm);
-    $('vpContractCopyLinkBtn')?.addEventListener('click', copyProjectContractLink);
-    $('vpSendContractConfirmBtn')?.addEventListener('click', sendProjectContract);
+    // Row actions are delegated: the rows are built after this runs, and each
+    // carries the id of the contract it acts on.
+    document.addEventListener('click', function (e) {
+        const button = e.target.closest('[data-contract-action]');
+        if (!button) return;
+
+        const id = button.dataset.contractId;
+
+        if (button.dataset.contractAction === 'send') {
+            openSendConfirm(id, button.dataset.contractNo);
+        } else if (button.dataset.contractAction === 'copy-link') {
+            copyProjectContractLink(id);
+        }
+    });
+
+    $('vpSendContractConfirmBtn')?.addEventListener('click', () => sendProjectContract(pendingSendContractId));
     $('vpChangeInvoiceStatusConfirmBtn')?.addEventListener('click', changeInvoiceStatus);
     (function bindDatePickers() {
         function bindOne(el) {

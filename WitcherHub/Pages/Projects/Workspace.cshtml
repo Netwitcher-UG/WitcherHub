@@ -60,9 +60,17 @@
                     <div class="d-flex flex-wrap align-items-center gap-3">
                         <h4 class="mb-0 fw-semibold" id="vp-title">@Model.ProjectTitle</h4>
 
-                        <span class="badge bg-@status.Tone-focus text-@status.Tone-main border border-@status.Tone-main px-16 py-4 radius-4">
-                            @status.Label
-                        </span>
+                        @*
+                            The shared badge, not hand-built classes.
+
+                            This used to interpolate the tone into the class names —
+                            bg-@@status.Tone-focus and so on — which produced
+                            "bg-secondary-focus" for every Draft. The theme has no
+                            such class, so the commonest badge in the application
+                            rendered with no background and no colour: a status
+                            nobody could read.
+                        *@
+                        <partial name="_StatusBadge" model="status" />
 
                         @if (workflow.IsArchived)
                         {
@@ -99,9 +107,10 @@
                     }
                     else
                     {
+                        @* Plural: a project may hold several, and the tab lists them all. *@
                         <a asp-page="/Projects/Workspace" asp-route-id="@Model.ProjectId" asp-route-tab="contracts"
                            class="btn btn-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2">
-                            <i class="ri-file-text-line"></i> Open contract
+                            <i class="ri-file-text-line"></i> Contracts
                         </a>
                     }
 
@@ -174,23 +183,18 @@
 
     <div id="vpBody" class="d-none">
 
-        <div class="mb-3">
-            <div class="text-muted small">
-                <a asp-page="/Index"
-                   class="text-decoration-none text-muted"
-                   title="Go to Customers page">
-                    Customer
-                </a>
-            </div>
+        @*
+            The customer is named once, in the page header above, as a link to their
+            record. This block repeated it directly underneath — the same name twice
+            within a hundred pixels, the second time without a working link until a
+            fetch had completed.
 
-            <a class="fw-semibold text-decoration-none"
-               id="vp-customerName"
-               href="#"
-               title="Open customer details">
-                —
-            </a>
-
-            <div class="text-muted small" id="vp-customerEmail">—</div>
+            The email is kept because the header does not carry it, and the send
+            dialog needs somewhere to read the recipient from.
+        *@
+        <div class="mb-3 text-secondary-light text-sm" id="vp-customerContact">
+            <span id="vp-customerName" class="d-none"></span>
+            <span id="vp-customerEmail"></span>
         </div>
 
         <ul class="nav nav-tabs" id="vpTabs" role="tablist">
@@ -401,72 +405,60 @@
             </div>
 
             <div class="tab-pane fade" id="vp-pane-contracts" role="tabpanel">
+                @*
+                    Every contract in this project, not just the newest.
+
+                    This pane used to show one contract — the most recently created —
+                    with a row of buttons acting on "the" contract. A project can
+                    hold several: an original and its replacement, one per phase of
+                    the work, one per site. The others were reachable only from the
+                    contracts register, so from inside the project they did not
+                    appear to exist at all.
+
+                    Actions that apply to one contract now live on that contract's
+                    own page. With several in a list, a single "Send" button cannot
+                    say which one it would send.
+                *@
                 <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
                     <div>
-                        <div class="text-muted small">Contract</div>
-                        <div class="fw-semibold" id="vpContractTitle">—</div>
-                        <div class="text-muted small" id="vpContractMeta">—</div>
+                        <div class="fw-semibold">Contracts</div>
+                        <div class="text-secondary-light text-sm" id="vpContractsSummary">—</div>
                     </div>
-                    @if (Model.CurrentContractId.HasValue)
-                    {
-                        <form method="post"
-                              asp-page="/Projects/Workspace"
-                              asp-page-handler="GenerateInvoice"
-                              asp-route-id="@Model.ProjectId"
-                              asp-route-tab="contracts"
-                              class="d-inline @(Model.ShowManualInvoiceButton ? "" : "d-none")">
-                            <input type="hidden" name="contractId" value="@Model.CurrentContractId.Value" />
-                            <button type="submit" class="btn btn-success" id="vpContractGenerateInvoiceBtn">
-                                Create Invoice
-                            </button>
-                        </form>
-                    }
-                    <div class="d-flex gap-2 flex-wrap">
-                        <a class="btn btn-outline-primary d-none"
-                           id="vpContractItemsLink"
-                           href="#">
-                            Positions
-                        </a>
 
-                        <button class="btn btn-primary d-none"
-                                type="button"
-                                id="vpContractCreateBtn">
-                            Add Contract
-                        </button>
-
-                        
-
-                        <a class="btn btn-outline-secondary d-none"
-                           id="vpContractEditLink"
-                           href="#">
-                            Edit
-                        </a>
-
-                        <a class="btn btn-outline-primary d-none"
-                           id="vpContractDetailsLink"
-                           href="#">
-                            Review
-                        </a>
-
-                        <button class="btn btn-outline-success d-none"
-                                type="button"
-                                id="vpContractSendBtn"
-                                disabled>
-                            Send
-                        </button>
-                        <button class="btn btn-outline-info d-none"
-                                type="button"
-                                id="vpContractCopyLinkBtn"
-                                disabled>
-                            Copy Link
-                        </button>
-                    </div>
+                    <a class="btn btn-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2"
+                       id="vpContractCreateLink"
+                       asp-page="/Contracts/Create"
+                       asp-route-projectId="@Model.ProjectId">
+                        <i class="ri-add-line"></i> New contract
+                    </a>
                 </div>
 
-                <div id="vpContractLoading" class="text-muted small d-none">Loading contract...</div>
+                <div id="vpContractLoading" class="text-muted small d-none">Loading contracts…</div>
 
-                <div id="vpContractEmpty" class="alert alert-light border d-none">
-                    No contract yet for this project.
+                <div id="vpContractEmpty" class="d-none">
+                    <partial name="_EmptyState" model="@(new EmptyStateVm
+                             {
+                                 Icon = "ri-file-paper-2-line",
+                                 Title = "No contracts yet",
+                                 Message = "A contract can be written from positions, or from wording you paste in.",
+                                 ActionText = "New contract",
+                                 ActionUrl = Url.Page("/Contracts/Create", new { projectId = Model.ProjectId })
+                             })" />
+                </div>
+
+                <div class="table-responsive d-none" id="vpContractsTableWrap">
+                    <table class="table table-sm align-middle mb-2" id="vpContractsTable">
+                        <thead>
+                            <tr>
+                                <th>Contract</th>
+                                <th>Status</th>
+                                <th class="text-end">Value</th>
+                                <th>Period</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vpContractsBody"></tbody>
+                    </table>
                 </div>
 
                 <div id="vpContractPreviewWrap" class="card border-0 shadow-sm rounded-4 d-none">
