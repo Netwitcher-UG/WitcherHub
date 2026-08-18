@@ -162,6 +162,12 @@ namespace WitcherHub.Infrastructure
             // ===== Services =====
             services.AddScoped<IAiTextGenerator, OpenAiTextGenerator>();
             services.AddScoped<IAiPositionOrganizer, AiPositionOrganizer>();
+            // The semantic analyser is what reads supplied documents now. The older
+            // fixed-field one is kept registered but nothing injects it: its parsing
+            // helpers are still used, and keeping it resolvable means the previous
+            // behaviour can be compared against the new one on a real document.
+            // Delete it once the semantic pipeline has been exercised against real
+            // contracts with a working API key.
             services.AddScoped<IContractTextAnalyzer, ContractTextAnalyzer>();
             services.AddScoped<ISemanticContractAnalyzer, SemanticContractAnalyzer>();
             services.AddScoped<IDataSeeder, IdentityDataSeeder>();

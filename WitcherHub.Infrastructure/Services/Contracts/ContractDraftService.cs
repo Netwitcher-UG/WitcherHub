@@ -8,6 +8,7 @@ using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Contracts;
+using WitcherHub.Application.Services.Contracts;
 using WitcherHub.Domain.Contracts;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
@@ -30,7 +31,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         private readonly AppDbContext _db;
         private readonly IContractPositions _positions;
         private readonly IAiTextGenerator _ai;
-        private readonly IContractTextAnalyzer _analyzer;
+        private readonly ISemanticContractAnalyzer _analyzer;
         private readonly OpenAIOptions _openAi;
         private readonly ContractTemplateOptions _template;
         private readonly ILogger<ContractDraftService> _logger;
@@ -39,7 +40,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             AppDbContext db,
             IContractPositions positions,
             IAiTextGenerator ai,
-            IContractTextAnalyzer analyzer,
+            ISemanticContractAnalyzer analyzer,
             IOptions<OpenAIOptions> openAi,
             IOptions<ContractTemplateOptions> template,
             ILogger<ContractDraftService> logger)
@@ -616,9 +617,24 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             var draft = contract.Drafts.FirstOrDefault(d => d.Version == version)
                 ?? throw new NotFoundAppException("Draft not found.");
 
-            var result = await _analyzer.AnalyzeAsync(draft.DocumentMarkdown, draft.SourceLanguage, ct);
+            // The semantic pipeline: classify what the document contains, structure
+            // only the parts that are charges, validate without discarding partial
+            // readings, then calculate. The arithmetic is the engine's, not the
+            // model's, so the figures below can be reproduced and defended.
+            var semantic = await _analyzer.AnalyzeAsync(
+                draft.DocumentMarkdown,
+                new SemanticAnalysisOptions
+                {
+                    LanguageHint = draft.SourceLanguage,
+                    FallbackCurrency = contract.Currency ?? "EUR",
 
-            if (!result.Succeeded)
+                    // Lets a monthly charge with no stated end be totalled against
+                    // the contract's own term instead of being left uncalculable.
+                    ContractMonths = MonthsBetween(contract.StartDate, contract.EndDate)
+                },
+                ct);
+
+            if (!semantic.Succeeded)
             {
                 // A failed reading is recorded as a failed reading. The document
                 // itself is untouched and remains the contract's source, so the
@@ -627,15 +643,39 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 contract.SourceState = ContractSourceState.AnalysisFailed;
 
                 await _db.SaveChangesAsync(ct);
-                return result;
+
+                return ContractAnalysisResult.Failed(
+                    semantic.FailureReason ?? "The document could not be analysed.",
+                    semantic.IsTransientFailure,
+                    semantic.CorrelationId);
             }
 
-            draft.ExtractedTerms = JsonSerializer.SerializeToDocument(result.Extraction);
+            // Everything the reading produced, kept whole.
+            draft.SemanticAnalysis = JsonSerializer.SerializeToDocument(
+                new
+                {
+                    schema = SemanticAnalysisSchema,
+                    analysedAt = DateTimeOffset.UtcNow,
+                    model = semantic.Model,
+                    promptVersion = semantic.PromptVersion,
+                    extraction = semantic.Extraction,
+                    terms = semantic.Terms,
+                    issues = semantic.Issues,
+                    discarded = semantic.DiscardedReasons,
+                    financials = semantic.Financials
+                },
+                SemanticAnalysisJson);
+
+            // And the same reading in the shape the review screen reads, so that
+            // screen keeps working while it is replaced.
+            var projected = SemanticExtractionProjection.ToLegacyExtraction(semantic);
+
+            draft.ExtractedTerms = JsonSerializer.SerializeToDocument(projected);
             draft.ExtractionStatus = ContractExtractionStatus.Analysed;
             draft.ExtractedAt = DateTimeOffset.UtcNow;
 
-            if (result.Extraction!.Language.HasValue)
-                draft.SourceLanguage = result.Extraction.Language.Value;
+            if (projected.Language.HasValue)
+                draft.SourceLanguage = projected.Language.Value;
 
             contract.SourceState = ContractSourceState.Analysed;
             contract.ReviewState = ContractReviewState.RequiresReview;
@@ -643,12 +683,55 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             await _db.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Analysed supplied contract v{Version} of {ContractId}: {Positions} candidate position(s), " +
-                "{Warnings} warning(s), price missing: {PriceMissing}.",
-                version, contractId, result.Extraction.Positions.Count,
-                result.Extraction.Warnings.Count, result.Extraction.PriceMissing);
+                "Analysed supplied contract v{Version} of {ContractId}: {Concepts} concept(s), {Terms} billable " +
+                "term(s), {Warnings} warning(s), {Unresolved} unresolved amount(s), committed net {Committed}.",
+                version, contractId,
+                semantic.Extraction?.Concepts.Count ?? 0,
+                semantic.Terms.Count,
+                projected.Warnings.Count,
+                semantic.Financials?.Unresolved.Count ?? 0,
+                semantic.Financials?.CommittedNet);
 
-            return result;
+            return new ContractAnalysisResult
+            {
+                Succeeded = true,
+                Extraction = projected,
+                Model = semantic.Model,
+                CorrelationId = semantic.CorrelationId
+            };
+        }
+
+        /// <summary>
+        /// Identifies the shape stored in <see cref="ContractDraft.SemanticAnalysis"/>,
+        /// so a later reader can tell what it is looking at rather than inferring it
+        /// from which fields happen to be present.
+        /// </summary>
+        public const string SemanticAnalysisSchema = "semantic-analysis-v1";
+
+        /// <summary>
+        /// Stated rather than left to the default, because this document is read
+        /// back by name — by a later reader here, and by anyone querying the jsonb
+        /// column directly. Property casing that depends on the serialiser's
+        /// default is a shape nobody chose and nothing can rely on.
+        /// </summary>
+        internal static readonly JsonSerializerOptions SemanticAnalysisJson = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        };
+
+        /// <summary>
+        /// The contract's length, where both ends are known. Null otherwise — a
+        /// term the contract does not state must not be invented here either, and
+        /// a guessed length would silently change every recurring total.
+        /// </summary>
+        private static int? MonthsBetween(DateOnly? start, DateOnly? end)
+        {
+            if (start is null || end is null || end <= start) return null;
+
+            var months = ((end.Value.Year - start.Value.Year) * 12) + end.Value.Month - start.Value.Month;
+
+            return months > 0 ? months : null;
         }
 
         public async Task<ContractExtractionDto?> GetExtractionAsync(
