@@ -910,13 +910,23 @@ namespace WitcherHub.Pages
                 });
             }
         }
-        public async Task<IActionResult> OnPostSendProjectContractAsync(Guid projectId, CancellationToken ct)
+        /// <summary>
+        /// The contract an action is meant to act on.
+        ///
+        /// These handlers used to take only a project id and call
+        /// FirstOrDefaultAsync(c =&gt; c.ProjectId == projectId) with no ordering, so
+        /// with more than one contract in a project they operated on whichever row
+        /// the database happened to return. For sending a contract to a customer
+        /// for signature, that is sending a document nobody chose.
+        ///
+        /// A contract id is now used when given. Without one, a project holding
+        /// exactly one contract is unambiguous and still works; a project holding
+        /// several refuses and says so, rather than guessing.
+        /// </summary>
+        private async Task<(Contract? Contract, IActionResult? Problem)> ResolveProjectContractAsync(
+            Guid projectId, Guid contractId, CancellationToken ct)
         {
-            if (projectId == Guid.Empty)
-                return new JsonResult(new { ok = false, toast = new { type = "error", title = "Error", message = "Invalid project id." } }) { StatusCode = 400 };
-
-            // 1) Load contract for this project
-            var contract = await _db.Contracts
+            var query = _db.Contracts
                 .Include(c => c.Items)
                 .Include(c => c.Project)
                     .ThenInclude(p => p.Customer)
@@ -924,11 +934,42 @@ namespace WitcherHub.Pages
                 .Include(c => c.Project)
                     .ThenInclude(p => p.Customer)
                         .ThenInclude(cu => cu.EmailAddresses)
-                .FirstOrDefaultAsync(c => c.ProjectId == projectId, ct);
+                .Where(c => c.ProjectId == projectId);
 
+            if (contractId != Guid.Empty)
+            {
+                var chosen = await query.FirstOrDefaultAsync(c => c.Id == contractId, ct);
 
-            if (contract is null)
-                return new JsonResult(new { ok = false, toast = new { type = "warning", title = "No contract", message = "There is no contract for this project." } }) { StatusCode = 404 };
+                return chosen is null
+                    ? (null, ToastNotFound("Not found", "That contract is not part of this project."))
+                    : (chosen, null);
+            }
+
+            var all = await query.OrderBy(c => c.CreatedAt).ToListAsync(ct);
+
+            if (all.Count == 0)
+                return (null, ToastNotFound("No contract", "There is no contract for this project."));
+
+            if (all.Count > 1)
+            {
+                return (null, ToastBadRequest(
+                    "Which contract?",
+                    "This project has more than one contract. Open the one you mean and act on it there."));
+            }
+
+            return (all[0], null);
+        }
+
+        public async Task<IActionResult> OnPostSendProjectContractAsync(
+            Guid projectId, Guid contractId, CancellationToken ct)
+        {
+            if (projectId == Guid.Empty)
+                return new JsonResult(new { ok = false, toast = new { type = "error", title = "Error", message = "Invalid project id." } }) { StatusCode = 400 };
+
+            // Which contract, said explicitly. Sending the wrong document to a
+            // customer for signature is not a mistake that can be taken back.
+            var (contract, problem) = await ResolveProjectContractAsync(projectId, contractId, ct);
+            if (problem is not null) return problem;
             if (string.IsNullOrWhiteSpace(contract.Terms))
                 return new JsonResult(new
                 {
@@ -1057,7 +1098,8 @@ namespace WitcherHub.Pages
                 toast = new { type = "success", title = "Sent", message = "Contract email sent successfully." }
             });
         }
-        public async Task<IActionResult> OnPostCreateProjectContractLinkAsync(Guid projectId, CancellationToken ct)
+        public async Task<IActionResult> OnPostCreateProjectContractLinkAsync(
+            Guid projectId, Guid contractId, CancellationToken ct)
         {
             if (projectId == Guid.Empty)
                 return new JsonResult(new
@@ -1067,15 +1109,9 @@ namespace WitcherHub.Pages
                 })
                 { StatusCode = 400 };
 
-            var contract = await _db.Contracts
-                .Include(c => c.Items)
-                .Include(c => c.Project)
-                    .ThenInclude(p => p.Customer)
-                        .ThenInclude(cu => cu.Contacts)
-                .Include(c => c.Project)
-                    .ThenInclude(p => p.Customer)
-                        .ThenInclude(cu => cu.EmailAddresses)
-                .FirstOrDefaultAsync(c => c.ProjectId == projectId, ct);
+            // A signing link is a link to one specific contract.
+            var (contract, problem) = await ResolveProjectContractAsync(projectId, contractId, ct);
+            if (problem is not null) return problem;
 
             if (contract is null)
                 return new JsonResult(new
