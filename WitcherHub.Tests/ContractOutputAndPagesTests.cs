@@ -382,12 +382,17 @@ namespace WitcherHub.Tests
         [Fact]
         public void WhatTheContractDoesNotCoverReachesTheScreen()
         {
-            var page = File.ReadAllText(Path.Combine(
-                TestPaths.WebProject, "Pages", "Contracts", "Positions.cshtml.cs"));
+            var job = File.ReadAllText(Path.Combine(
+                TestPaths.Repository, "WitcherHub.Infrastructure", "Services", "Contracts",
+                "ContractAiJobService.cs"));
 
             // Generation used to answer with "version 3 created as a draft" and
             // nothing else, whether it had covered everything or a third of it.
-            Assert.Contains("reviewNotes = result.ReviewNotes", page);
+            //
+            // The notes travel with the job now rather than on the response,
+            // because the request that asked for the generation ended minutes
+            // before it finished.
+            Assert.Contains("reviewNotes = result.ReviewNotes", job);
 
             var script = File.ReadAllText(Path.Combine(
                 TestPaths.WebProject, "wwwroot", "js", "pages", "contracts", "positions-builder.js"));

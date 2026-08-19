@@ -26,25 +26,31 @@ namespace WitcherHub.Pages.Contracts
         private readonly IContract _contracts;
         private readonly IContractPositions _positions;
         private readonly IServiceCatalog _services;
-        private readonly IAiPositionOrganizer _organizer;
         private readonly IContractDraftService _drafts;
         private readonly IValidator<ManualPositionDto> _validator;
         private readonly ILogger<PositionsModel> _logger;
+
+        /// <summary>
+        /// Where the long assistant actions go. The two that call the model —
+        /// writing the contract and tidying the positions — used to run on this
+        /// thread and answered HTTP 502 for it.
+        /// </summary>
+        private readonly IContractAiJobs _jobs;
 
         public PositionsModel(
             IContract contracts,
             IContractPositions positions,
             IServiceCatalog services,
-            IAiPositionOrganizer organizer,
             IContractDraftService drafts,
+            IContractAiJobs jobs,
             IValidator<ManualPositionDto> validator,
             ILogger<PositionsModel> logger)
         {
             _contracts = contracts;
             _positions = positions;
             _services = services;
-            _organizer = organizer;
             _drafts = drafts;
+            _jobs = jobs;
             _validator = validator;
             _logger = logger;
         }
@@ -465,40 +471,34 @@ namespace WitcherHub.Pages.Contracts
         // AI organizer — proposes, never applies.
         // ------------------------------------------------------------------
 
+        /// <summary>
+        /// Starts the tidying and returns at once.
+        ///
+        /// It used to call the model on this thread. That is a request held open
+        /// for as long as the model takes, which is longer than the platform proxy
+        /// allows — so the browser was shown "HTTP 502, the request took too long"
+        /// while the work was still going, and the answer arrived into a request
+        /// nobody was listening to. The caller polls <see cref="OnPostAiJobStatusAsync"/>.
+        /// </summary>
         public async Task<IActionResult> OnPostOrganizeAsync(
             [FromBody] OrganizeRequest? request, CancellationToken ct)
         {
             if (request is null)
                 return BadRequestJson("Nothing to organize.");
 
-            var result = await _organizer.OrganizeAsync(new OrganizePositionsRequest
-            {
-                RoughInput = request.RoughInput ?? "",
-                ExistingPositions = request.Positions ?? new List<ManualPositionDto>(),
-                Currency = string.IsNullOrWhiteSpace(request.Currency) ? "EUR" : request.Currency
-            }, ct);
-
-            if (!result.Succeeded)
-            {
-                // The caller keeps whatever the user had; nothing is replaced.
-                return new JsonResult(new
+            var started = await _jobs.StartAsync(
+                ContractId,
+                ContractAiJobKind.Organize,
+                new OrganizeJobRequest
                 {
-                    ok = false,
-                    transient = result.IsTransientFailure,
-                    message = result.FailureReason
-                });
-            }
+                    RoughInput = request.RoughInput,
+                    Currency = request.Currency,
+                    Positions = request.Positions
+                },
+                requestKey: null,
+                ct);
 
-            // Returned for review only. The user applies it explicitly.
-            return new JsonResult(new
-            {
-                ok = true,
-                positions = result.Positions,
-                totals = _positions.CalculateTotals(result.Positions),
-                changes = result.Changes.Select(c => new { c.PositionTitle, c.Field, c.Before, c.After, kind = c.Kind.ToString() }),
-                rejected = result.RejectedChanges.Select(c => new { c.PositionTitle, c.Field, c.Before, c.After }),
-                model = result.Model
-            });
+            return StartedJson(started, "Tidying the positions…", "This is already being tidied. Waiting for it to finish…");
         }
 
         public sealed class OrganizeRequest
@@ -512,47 +512,101 @@ namespace WitcherHub.Pages.Contracts
         // Draft generation and approval
         // ------------------------------------------------------------------
 
+        /// <summary>
+        /// Starts the generation and returns at once.
+        ///
+        /// Writing a contract is several model calls now — the sources are
+        /// planned, the sections written in batches, and the result audited — and
+        /// it was still being done on the request thread, where one model call was
+        /// already marginal. The page polls <see cref="OnPostAiJobStatusAsync"/>.
+        /// </summary>
         public async Task<IActionResult> OnPostGenerateDraftAsync(
             [FromBody] GenerateRequest? request, CancellationToken ct)
         {
-            var result = await _drafts.GenerateAsync(ContractId, new GenerateDraftOptions
-            {
-                AdditionalInstructions = request?.AdditionalInstructions,
-                IdempotencyKey = request?.IdempotencyKey
-            }, ct);
+            var started = await _jobs.StartAsync(
+                ContractId,
+                ContractAiJobKind.Generation,
+                new GenerateJobRequest
+                {
+                    AdditionalInstructions = request?.AdditionalInstructions
+                },
+                // The browser's key travels with the job, so a retry after a
+                // timeout still produces one version rather than two.
+                requestKey: request?.IdempotencyKey,
+                ct);
 
-            if (!result.Succeeded)
+            return StartedJson(started,
+                "Writing the contract…",
+                "This contract is already being written. Waiting for it to finish…");
+        }
+
+        /// <summary>
+        /// How a queued assistant action is getting on. Polled by the page.
+        /// </summary>
+        public async Task<IActionResult> OnPostAiJobStatusAsync(
+            [FromBody] AiJobRequest? request, CancellationToken ct)
+        {
+            if (request is null || request.JobId == Guid.Empty)
+                return BadRequestJson("No request given.");
+
+            var state = await _jobs.GetAsync(request.JobId, ct);
+
+            if (state.Running)
+            {
+                return new JsonResult(new
+                {
+                    ok = true,
+                    running = true,
+                    elapsedSeconds = (int)(state.Elapsed?.TotalSeconds ?? 0)
+                });
+            }
+
+            if (state.Failed)
             {
                 return new JsonResult(new
                 {
                     ok = false,
-                    transient = result.IsTransientFailure,
-                    needsConfirmation = result.RequiresOverwriteConfirmation,
-                    message = result.FailureReason
+                    running = false,
+                    transient = state.IsTransientFailure,
+                    message = state.FailureReason
                 });
             }
 
-            // The message names what was produced and where it stands, because
-            // "Draft generated" left the user counting versions to work out which
-            // one was the original, which the analysis, and which was ready to sign.
-            var draft = result.Draft!;
+            // The result exactly as the work wrote it, so the page reads the same
+            // shape it read when these ran on the request thread.
+            return Content(
+                $"{{\"ok\":true,\"running\":false,\"result\":{state.ResultJson ?? "null"}}}",
+                "application/json");
+        }
 
-            var message = result.WasAlreadyPrepared
-                ? $"{draft.KindLabel} version {draft.Version} was already created."
-                : $"{draft.KindLabel} version {draft.Version} created as a draft.";
+        public sealed class AiJobRequest
+        {
+            public Guid JobId { get; set; }
+        }
+
+        /// <summary>
+        /// The answer to "it has been queued", worded for whichever action asked.
+        /// </summary>
+        private JsonResult StartedJson(
+            ContractAiJobHandle started, string startedMessage, string joinedMessage)
+        {
+            if (!started.Running)
+            {
+                return new JsonResult(new
+                {
+                    ok = false,
+                    transient = false,
+                    message = started.FailureReason
+                });
+            }
 
             return new JsonResult(new
             {
                 ok = true,
-                draft,
-                version = draft.Version,
-                draftId = draft.Id,
-                message,
-
-                // What the version does not say. Generation used to report only
-                // that it had happened, so a contract missing most of the agreed
-                // scope arrived with the same cheerful message as a complete one.
-                reviewNotes = result.ReviewNotes
+                running = true,
+                jobId = started.JobId,
+                alreadyRunning = started.AlreadyRunning,
+                message = started.AlreadyRunning ? joinedMessage : startedMessage
             });
         }
 

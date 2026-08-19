@@ -51,6 +51,12 @@ namespace WitcherHub.Infrastructure.Data.Context
         public DbSet<ContractSignature> ContractSignatures => Set<ContractSignature>();
         public DbSet<ContractDraft> ContractDrafts => Set<ContractDraft>();
 
+        /// <summary>
+        /// Assistant work that outlives the request that asked for it. The page
+        /// polls these rather than holding a connection open for minutes.
+        /// </summary>
+        public DbSet<ContractAiJob> ContractAiJobs => Set<ContractAiJob>();
+
         // -------- Invoices --------
         public DbSet<Invoice> Invoices => Set<Invoice>();
         public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
@@ -183,6 +189,22 @@ namespace WitcherHub.Infrastructure.Data.Context
             b.Entity<ContractDraft>()
                 .HasIndex(x => new { x.ContractId, x.Version })
                 .IsUnique();
+
+            // ContractAiJob -> Contract
+            //
+            // Cascade on purpose: a job is a record of work in flight, not a
+            // business document. Deleting the contract it belongs to leaves it
+            // meaningless, and it holds nothing that has to outlive it.
+            b.Entity<ContractAiJob>()
+                .HasOne(x => x.Contract)
+                .WithMany()
+                .HasForeignKey(x => x.ContractId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // The lookup every poll makes: the newest job of this kind for this
+            // contract.
+            b.Entity<ContractAiJob>()
+                .HasIndex(x => new { x.ContractId, x.Kind, x.StartedAt });
 
             // ContractSignature -> Contract
             b.Entity<ContractSignature>()
