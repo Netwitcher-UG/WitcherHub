@@ -933,12 +933,109 @@
 .contractPage__paper {
     /* A4 at the margins a contract is set to, rather than a web page's
        padding. 25mm all round is the German norm for a business document. */
-    max-width: 210mm;
+    width: 210mm;
+    max-width: 100%;
     padding: 25mm 25mm 30mm;
 
     /* Paper has corners. The rounded card radius further up this file is right
        for a UI panel and wrong for a document somebody will print. */
     border-radius: 2px;
+
+    /* The page overlay is positioned against this. Deliberately NOT
+       `overflow: hidden` — clipping the sheet is exactly how a long contract
+       would come to look like a short one. */
+    position: relative;
+}
+
+/* ---- the letterhead ---------------------------------------------------- */
+
+.contractPaper__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12mm;
+    padding-bottom: 6mm;
+    margin-bottom: 10mm;
+    border-bottom: 0.4mm solid #111;
+}
+
+.contractPaper__logo {
+    /* Set in millimetres, so replacing the file does not resize every contract
+       to whatever the new image's pixel dimensions happen to be. */
+    height: 14mm;
+    width: auto;
+    max-width: 70mm;
+    object-fit: contain;
+}
+
+.contractPaper__wordmark {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 13pt;
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: #111;
+}
+
+.contractPaper__headMeta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1mm;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 9.5pt;
+    color: #333;
+    text-align: right;
+}
+
+.contractPaper__ref {
+    font-weight: 700;
+    letter-spacing: .04em;
+    color: #111;
+}
+
+/* ---- the page boundaries ----------------------------------------------- */
+
+/*  Drawn over the sheet, never in the flow of it.
+
+    Every rule here is a mark on top of the document. Nothing scales it, nothing
+    clips it and nothing changes its type size — the contract is the length it
+    is, and this only says where the printer will cut it. */
+.contractPaper__pages {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.contractPaper__pageEdge {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1px dashed rgba(0,0,0,.22);
+}
+
+/*  Outside the sheet, in the margin beside it.
+
+    Inside, it lands on top of a line of the contract: the preview is one
+    continuous column, so there is no page footer for it to sit in, and a
+    justified German paragraph reaches the full width of the text block. A page
+    number printed across a clause is worse than no page number. */
+.contractPaper__pageNo {
+    position: absolute;
+    left: calc(100% + 6mm);
+    transform: translateY(-4mm);
+    white-space: nowrap;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 8.5pt;
+    color: #8a8a8a;
+    letter-spacing: .04em;
+}
+
+/* No room beside the sheet at this width — the dashed rule alone says where
+   the page ends, and the total is on the page header. */
+@media (max-width: 1200px) {
+    .contractPaper__pageNo {
+        display: none;
+    }
 }
 
 /* ---- printing ---------------------------------------------------------- */
@@ -961,17 +1058,34 @@
     .contractPage__paper {
         /* The page's own margins do this work now; a second set of paper
            margins inside them left the text in a narrow column. */
+        width: auto;
         max-width: none;
-        min-height: 0;
         margin: 0;
         padding: 0;
         border: 0;
         border-radius: 0;
         box-shadow: none;
+
+        /* The screen preview sets this to a whole number of sheets so the last
+           page looks finished. On paper it would add blank pages at the end. */
+        min-height: 0 !important;
     }
 
     .contractPage__contractHtml {
         font-size: 10.5pt;
+    }
+
+    /* The letterhead repeats nothing the document already says, so it stays —
+       but it belongs to the first sheet, not to every one. */
+    .contractPaper__head {
+        page-break-after: avoid;
+        break-after: avoid;
+    }
+
+    /* The screen's page marks are the browser's job on paper. Left visible they
+       would print a dashed line and a page number in the middle of a clause. */
+    .contractPaper__pages {
+        display: none !important;
     }
 
     /* Nothing interactive belongs on paper. */

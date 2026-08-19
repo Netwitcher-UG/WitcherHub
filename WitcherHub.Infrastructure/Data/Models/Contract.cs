@@ -300,6 +300,23 @@ namespace WitcherHub.Infrastructure.Data.Models
 
         public DateTimeOffset GeneratedAt { get; set; } = DateTimeOffset.UtcNow;
 
+        /// <summary>
+        /// How this version was produced and how much of what was agreed it
+        /// accounts for: the coverage count, the entries it does not cover, the
+        /// number of model calls, the token counts, whether any of them hit the
+        /// output limit.
+        ///
+        /// Kept so that "why is this contract short?" is answerable afterwards,
+        /// which it was not: generation left no trace at all beyond the document
+        /// itself, so a run that dropped two thirds of the agreed scope and a run
+        /// that had two thirds less to say were indistinguishable a day later.
+        ///
+        /// Numbers and internal ids only. No prompt, no answer, no customer data,
+        /// nothing from the provider's response.
+        /// </summary>
+        [Column(TypeName = "jsonb")]
+        public JsonDocument? GenerationReport { get; set; }
+
         public bool IsApproved { get; set; }
         public DateTimeOffset? ApprovedAt { get; set; }
         public Guid? ApprovedById { get; set; }

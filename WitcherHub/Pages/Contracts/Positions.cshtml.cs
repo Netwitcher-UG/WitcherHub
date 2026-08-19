@@ -547,7 +547,12 @@ namespace WitcherHub.Pages.Contracts
                 draft,
                 version = draft.Version,
                 draftId = draft.Id,
-                message
+                message,
+
+                // What the version does not say. Generation used to report only
+                // that it had happened, so a contract missing most of the agreed
+                // scope arrived with the same cheerful message as a complete one.
+                reviewNotes = result.ReviewNotes
             });
         }
 

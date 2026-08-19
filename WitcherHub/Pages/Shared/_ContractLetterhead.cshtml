@@ -1,0 +1,38 @@
+@model WitcherHub.Pages.Models.UI.ContractLetterheadVm
+@*
+    The letterhead a contract is printed on.
+
+    Deliberately outside the stored document. The contract's own text carries the
+    Vertragsnummer, the parties and the term, because those are the contract; the
+    logo is the company's mark on the paper, and burying an environment-specific
+    image URL inside every saved version would tie the stored text to wherever the
+    file happened to live that month.
+
+    The signing page does not use this: it renders the PDF pipeline's own HTML,
+    which brings its own header, and two letterheads on one sheet is worse than
+    none.
+*@
+
+<div class="contractPaper__head">
+    @if (!string.IsNullOrWhiteSpace(Model.LogoUrl))
+    {
+        <img class="contractPaper__logo" src="@Model.LogoUrl" alt="@Model.CompanyName" />
+    }
+    else
+    {
+        @* No logo configured, so the company's name does the work rather than
+           leaving a blank corner that reads as a broken image. *@
+        <span class="contractPaper__wordmark">@Model.CompanyName</span>
+    }
+
+    <div class="contractPaper__headMeta">
+        @if (!string.IsNullOrWhiteSpace(Model.ContractNo))
+        {
+            <span class="contractPaper__ref">@Model.ContractNo</span>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.IssuedOn))
+        {
+            <span class="contractPaper__date">@Model.IssuedOn</span>
+        }
+    </div>
+</div>

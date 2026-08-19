@@ -179,6 +179,11 @@
 </div>
 
 @section Scripts {
+    @* The editor rewrites the preview as you type, so the page marks are
+       recalculated with it — a clause that pushes the signature block onto a new
+       sheet should show that while it is being written, not after it is saved. *@
+    <script src="~/js/pages/contracts/contract-pages.js" asp-append-version="true"></script>
+
     <script>
         (function () {
           const view = document.getElementById('contractView');

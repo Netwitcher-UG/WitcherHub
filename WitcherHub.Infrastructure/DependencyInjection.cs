@@ -244,6 +244,10 @@ namespace WitcherHub.Infrastructure
             // connection, so it runs off the request and the page polls.
             services.AddSingleton<IBackgroundAnalysisRunner, BackgroundAnalysisRunner>();
             
+            // Where the logo lives, rather than a path compiled into the PDF
+            // generator that pointed at a directory this repository does not have.
+            services.Configure<BrandingOptions>(configuration.GetSection(BrandingOptions.SectionName));
+
             services.AddSingleton<IPdfGenerator, PlaywrightPdfGenerator>();
             services.AddSingleton<PlaywrightBrowserInstaller>();
             services.AddScoped<ContractCreationService>();
