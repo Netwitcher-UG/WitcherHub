@@ -61,15 +61,7 @@ namespace WitcherHub.Pages.Contracts
 
             ContractMarkdown = NormalizeNewLines(doc.FullDocument);
 
-            var pipeline = new MarkdownPipelineBuilder()
-                .UseAdvancedExtensions()
-                .Build();
-
-            var html = Markdown.ToHtml(ContractMarkdown, pipeline);
-
-            var sanitizer = new HtmlSanitizer();
-            sanitizer.AllowedSchemes.Add("mailto");
-            ContractHtml = sanitizer.Sanitize(html);
+            ContractHtml = Rendering.ContractMarkdown.ToHtml(ContractMarkdown);
         }
 
         private static string NormalizeNewLines(string s)

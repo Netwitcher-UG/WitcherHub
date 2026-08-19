@@ -21,4 +21,8 @@
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="WitcherHub.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -185,6 +185,30 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                     transient: true);
             }
 
+            // The model writes clauses; the document around them is composed here.
+            //
+            // Asked for directly: what came back was not a German contract. It had
+            // a title like a page heading, sections numbered "1." "2." "3.", and
+            // neither a party block nor a signature block — so it could not be
+            // printed and signed as it stood. None of that frame is a matter of
+            // wording, so none of it is left to a model that might phrase it
+            // differently on every run. It comes from the record, the same way
+            // every time.
+            var parties = await BuildPartyDetailsAsync(contract, ct);
+
+            document = GermanContractDocument.Compose(
+                title: GeneratedContractTitle,
+                contractNo: contract.ContractNo,
+                projectTitle: contract.Project?.Title,
+                parties: new GermanContractDocument.Parties(
+                    parties.CompanyName,
+                    parties.CompanyAddress,
+                    parties.CustomerName,
+                    parties.CustomerAddress),
+                clauses: StripComposedParts(document),
+                start: contract.StartDate,
+                end: contract.EndDate);
+
             // A hybrid contract keeps the supplied wording and appends the service
             // schedule generated from the positions, rather than replacing one
             // with the other: both were supplied on purpose.
@@ -1223,6 +1247,10 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             return await _db.Contracts
                 .Include(c => c.Drafts)
                 .Include(c => c.Items)
+
+                // The project's title goes into the composed document's reference
+                // line. Without this include it was silently null there.
+                .Include(c => c.Project)
                 .FirstOrDefaultAsync(c => c.Id == contractId, ct)
                 ?? throw new NotFoundAppException("Contract not found.");
         }
@@ -1277,12 +1305,27 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             });
 
             return $$"""
-                Write the service schedule of an agency contract, in {{options.Language}}, as Markdown.
+                Write the clauses of a German service contract (Dienstleistungsvertrag),
+                in {{options.Language}}, as Markdown.
 
-                Produce these sections, in order:
+                FORM — this is a German contract and must be set like one:
+                - Each clause is a level-2 heading in the form "## § 1 Gegenstand des Vertrags",
+                  numbered from 1 upwards with no gaps.
+                - Inside a clause, each paragraph begins with its number in round
+                  brackets: "(1) ", "(2) ". A clause with a single paragraph needs no
+                  number.
+                - Where a paragraph lists items, use a lettered list: a), b), c).
+                - Use the formal register these documents are written in: "Der
+                  Auftragnehmer erbringt …", not "Wir machen …".
+                - Refer to the parties only as "der Auftragnehmer" and "der
+                  Auftraggeber". Never write the company names into the clauses.
+                - German number format throughout: 1.234,56 EUR.
+
+                Produce these clauses, in this order, as §§:
                 1. Gegenstand des Vertrags — what is being delivered, in prose.
-                2. Leistungsumfang — one subsection per position, using its scope and deliverables.
-                3. Mitwirkungspflichten des Kunden — customer responsibilities.
+                2. Leistungsumfang — one paragraph per position, using its scope and
+                   deliverables.
+                3. Mitwirkungspflichten des Auftraggebers — customer responsibilities.
                 4. Abnahme — acceptance criteria.
                 5. Annahmen und Ausschlüsse — assumptions and exclusions.
                 6. Vergütung und Zahlung — restate the figures below exactly.
@@ -1292,12 +1335,16 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 - Restate every number exactly as given. Do not recalculate, round or
                   convert anything, and do not add a figure that is not below.
                 - Do not add legal clauses, liability terms, warranties or payment
-                  obligations beyond the figures given. Separate legal sections are
-                  appended from an approved template.
+                  obligations beyond the figures given. Haftung, Gerichtsstand,
+                  Datenschutz and Schlussbestimmungen are not yours to write.
                 - Do not invent services, dates or parties.
+                - Do NOT write the document title, the "zwischen … und …" party block,
+                  or a signature block. Those are composed from the customer record
+                  and would be wrong if you wrote them.
                 - If information is missing, write "wird noch festgelegt" rather than
                   inventing a value.
-                - Output only the contract Markdown. No commentary.
+                - Output only the clauses as Markdown, starting with "## § 1". No
+                  commentary, no preamble, no closing remark.
 
                 Currency: {{totals.Currency}}
                 Net total: {{totals.Subtotal}}
@@ -1313,6 +1360,47 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                     ? ""
                     : "Additional guidance for the wording only:\n" + options.AdditionalInstructions)}}
                 """;
+        }
+
+        /// <summary>
+        /// What this contract is called at the head of the document.
+        ///
+        /// A German contract names its type on the first line. The project name
+        /// in that position — which is what a generated document used to open
+        /// with — reads as a web page, not as a Vertrag.
+        /// </summary>
+        private const string GeneratedContractTitle = "Dienstleistungsvertrag";
+
+        /// <summary>
+        /// Removes a title, party block or signature block the model produced
+        /// anyway, so the composed ones are not shown twice.
+        ///
+        /// The prompt tells it not to, and mostly it does not — but a document
+        /// with two titles is the sort of thing a customer notices, and dropping
+        /// a stray heading costs nothing. Only a leading level-1 heading and the
+        /// lines around it are touched; the §§ are never altered.
+        /// </summary>
+        internal static string StripComposedParts(string clauses)
+        {
+            var lines = clauses.Replace("\r\n", "\n").Split('\n').ToList();
+
+            // Anything before the first § heading is frame the model was asked
+            // not to write. Kept only if there is no § at all, because then this
+            // is all we have and showing it beats showing nothing.
+            var firstClause = lines.FindIndex(l => l.TrimStart().StartsWith("## §", StringComparison.Ordinal));
+
+            if (firstClause > 0)
+                lines.RemoveRange(0, firstClause);
+
+            // A trailing signature block, if it wrote one.
+            var signature = lines.FindIndex(l =>
+                l.Contains("Ort, Datum", StringComparison.OrdinalIgnoreCase) ||
+                l.Contains("Unterschrift", StringComparison.OrdinalIgnoreCase));
+
+            if (signature > 0 && !lines[signature].TrimStart().StartsWith("## §", StringComparison.Ordinal))
+                lines.RemoveRange(signature, lines.Count - signature);
+
+            return string.Join("\n", lines).Trim();
         }
 
         private static ContractDraftSummary ToSummary(ContractDraft d, PositionTotalsDto? totals) =>

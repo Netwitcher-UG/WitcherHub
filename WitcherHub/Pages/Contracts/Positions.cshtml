@@ -653,6 +653,17 @@
                                                 break;
                                         }
 
+                                        @* Reading comes before agreeing: every version can be
+                                           opened on the contract page, where the wording renders
+                                           as the document it will become. Approval used to be the
+                                           only act on offer, on text nobody had been shown. *@
+                                        <a class="btn btn-sm btn-outline-primary radius-8"
+                                           asp-page="/Contracts/Details"
+                                           asp-route-id="@Model.ContractId"
+                                           asp-route-version="@d.Version">
+                                            <i class="ri-eye-line"></i> View
+                                        </a>
+
                                         @if (!Model.IsLocked && d.Status != ContractDraftStatus.Approved)
                                         {
                                             <button type="button" class="btn btn-sm btn-outline-primary radius-8"

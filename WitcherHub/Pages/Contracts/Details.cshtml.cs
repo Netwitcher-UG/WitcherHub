@@ -1,3 +1,4 @@
+using WitcherHub.Rendering;
 using Ganss.Xss;
 using Markdig;
 using Microsoft.AspNetCore.Authorization;
@@ -37,6 +38,16 @@ namespace WitcherHub.Pages.Contracts
         [BindProperty(SupportsGet = true)]
         public Guid Id { get; set; }
 
+        /// <summary>
+        /// A specific version to show instead of the approved wording.
+        ///
+        /// Without this, the page could only render <c>contract.Terms</c> — which
+        /// is set by approval — so the owner was asked to approve wording they
+        /// had never been able to read. Reading has to come before agreeing.
+        /// </summary>
+        [BindProperty(SupportsGet = true)]
+        public int? Version { get; set; }
+
         public string ContractHtml { get; private set; } = "";
 
         public bool IsSigned { get; private set; }
@@ -44,6 +55,23 @@ namespace WitcherHub.Pages.Contracts
         public Guid ProjectId { get; private set; }
         public Guid ContractId => Id;
         public Contract? Contract { get; private set; }
+
+        /// <summary>True when a version is being previewed rather than the approved wording.</summary>
+        public bool IsPreview => Version is not null;
+
+        /// <summary>The previewed version's standing, for the banner.</summary>
+        public string? PreviewStatusLabel { get; private set; }
+
+        /// <summary>True when the previewed version can be approved from here.</summary>
+        public bool PreviewCanApprove { get; private set; }
+
+        /// <summary>
+        /// The versions this contract has, for the empty state: a contract with
+        /// unapproved wording is not "not generated", it is "not approved yet",
+        /// and the difference is a link away from being resolved.
+        /// </summary>
+        public IReadOnlyList<ContractDraftSummary> Versions { get; private set; } =
+            Array.Empty<ContractDraftSummary>();
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             if (Id == Guid.Empty) return NotFound();
@@ -70,6 +98,31 @@ namespace WitcherHub.Pages.Contracts
             // specifically. Sending a supplied-text contract back to the position
             // builder — which is where it was already finished — was the same
             // wrong rule that blocked generation.
+            // A version asked for by number is shown regardless of what stands
+            // approved. This is how wording is read before it is agreed to; the
+            // banner in the view says plainly that it is a preview.
+            if (Version is int version)
+            {
+                var draft = await _drafts.GetDraftAsync(contract.Id, version, ct);
+
+                if (draft is null || string.IsNullOrWhiteSpace(draft.DocumentMarkdown))
+                {
+                    TempData["Toast.Type"] = "warning";
+                    TempData["Toast.Title"] = "No such version";
+                    TempData["Toast.Message"] = $"Version {version} has no wording to show.";
+
+                    return RedirectToPage("/Contracts/Details", new { id = contract.Id });
+                }
+
+                PreviewStatusLabel = draft.StatusLabel;
+                PreviewCanApprove = draft.Status is not ContractDraftStatus.Approved
+                                                and not ContractDraftStatus.Signed;
+
+                ContractHtml = RenderMarkdown(draft.DocumentMarkdown);
+
+                return Page();
+            }
+
             var source = await _drafts.GetSourceAsync(contract.Id, ct);
 
             if (!source.CanGenerate)
@@ -83,13 +136,12 @@ namespace WitcherHub.Pages.Contracts
 
             if (string.IsNullOrWhiteSpace(contract.Terms))
             {
-                TempData["Toast.Type"] = "info";
-                TempData["Toast.Title"] = "Not generated";
-                TempData["Toast.Message"] = "Contract terms are not generated yet. Click Update Contract from the project.";
+                // Not a dead end. "Not generated yet" was the wrong diagnosis for
+                // the common case — the wording exists as versions and simply has
+                // not been approved — and the message gave the reader nothing to
+                // click. The view now lists the versions with a preview link each.
+                Versions = await _drafts.GetDraftsAsync(contract.Id, ct);
 
-                // ✅ لا توليد هنا أبداً
-                // خليه يكمل يعرض صفحة فيها رسالة بدل HTML
-                ContractHtml = "<div class='alert alert-info'>Contract is not generated yet.</div>";
                 return Page();
             }
 
@@ -110,16 +162,13 @@ namespace WitcherHub.Pages.Contracts
                 IsSigned = contract.Status == DocumentStatus.Signed;
             }
 
-            // Markdown -> HTML
-            var markdown = NormalizeNewLines(contract.Terms ?? "");
-            var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
-            var html = Markdown.ToHtml(markdown, pipeline);
-
-            var sanitizer = new HtmlSanitizer();
-            sanitizer.AllowedSchemes.Add("mailto");
-            ContractHtml = sanitizer.Sanitize(html);
+            ContractHtml = RenderMarkdown(contract.Terms ?? "");
             return Page();
         }
+
+        /// <summary>Markdown to sanitised HTML, one way for every path on this page.</summary>
+        private static string RenderMarkdown(string markdown) =>
+            ContractMarkdown.ToHtml(markdown);
 
         private GenerateContractDocumentRequest BuildRequestFromDb(Contract contract)
         {

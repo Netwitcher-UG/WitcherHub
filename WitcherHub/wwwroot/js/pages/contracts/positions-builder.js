@@ -587,12 +587,18 @@
     // stamped with the hostname, and blocking. It also froze the button that
     // raised it on "Working…" for as long as the dialog stood, which is the
     // stuck state in the screenshots.
-    function toast(type, message) {
+    function toast(type, message, opts) {
+        const sticky = opts?.sticky === true;
+
+        if (opts?.sound) window.UI?.sound?.chime();
+
         if (window.UI?.toast?.show) {
             window.UI.toast.show({
                 type: type === "info" ? "info" : type,
                 msg: message,
-                timeout: type === "error" ? 8000 : 4000
+
+                // timeout 0 keeps the toast until it is closed by hand.
+                timeout: sticky ? 0 : (type === "error" ? 8000 : 4000)
             });
             return;
         }
@@ -601,6 +607,16 @@
 
         // Last resort: an inline banner, still not a dialog.
         banner(type, message);
+    }
+
+    /// The outcome of work that ran long enough to leave for another tab.
+    ///
+    /// The AI actions take minutes; by the time they finish, the user has
+    /// usually switched away, and a toast that removes itself after four
+    /// seconds announces the result to an empty room. These stay until closed,
+    /// and they chime — asked for by the owner, for the AI actions only.
+    function aiToast(type, message) {
+        toast(type, message, { sticky: true, sound: true });
     }
 
     /// Sticks a message next to the section it is about, so validation is read
@@ -787,6 +803,11 @@
         if (!action) return;
         const button = event.target.closest("[data-action]");
 
+        // Audio must start inside a user gesture or the browser refuses it, and
+        // the chime is wanted minutes from now, when this work finishes into a
+        // tab the user has probably left. This click is the gesture.
+        if (button.dataset.ai === "true") window.UI?.sound?.prime();
+
         if (action === "add-manual") {
             positions.push(normalise({ clientId: cryptoId(), sourceType: "Manual", catalogServiceId: null }));
             dirty = true;
@@ -877,9 +898,11 @@
 
                 if (!result.ok) {
                     // The user's positions are untouched.
-                    toast("error", result.message || "The assistant could not help.");
+                    aiToast("error", result.message || "The assistant could not help.");
                     return;
                 }
+
+                aiToast("success", "The assistant has a proposal ready. Review the changes before applying them.");
 
                 organized = result.positions.map(normalise);
                 showReview(result);
@@ -930,12 +953,16 @@
                     // Preparation appends a version and replaces nothing, so it
                     // has nothing to confirm. Anything it refuses is a real
                     // failure, reported as one.
-                    showFailure(result, "The contract could not be prepared.");
+                    showFailure(result, "The contract could not be prepared.", { ai: true });
                     if (result.transient) offerRetry(button);
                     preparationKey = null;
                     return;
                 }
 
+                // The chime plays before the reload wipes the page; the message
+                // itself survives the reload as the version list the user lands
+                // on, so nothing is lost with the toast.
+                window.UI?.sound?.chime();
                 toast("success", result.message);
 
                 // The new version is a draft awaiting review, so the user is taken
@@ -956,14 +983,14 @@
                 if (!result.ok) {
                     // The document is untouched and still the contract's source;
                     // only the optional reading of it failed.
-                    showFailure(result, "The contract could not be analysed.");
+                    showFailure(result, "The contract could not be analysed.", { ai: true });
                     offerRetry(button);
                     return;
                 }
 
                 extraction = result.extraction;
                 renderExtraction();
-                toast("success", result.message);
+                aiToast("success", result.message);
             });
         }
 
@@ -1004,17 +1031,21 @@
             await guard(button, async () => {
                 const result = await runAnalysis(version, button);
 
-                if (!result.ok) { showFailure(result, "The contract could not be analysed."); offerRetry(button); return; }
+                if (!result.ok) { showFailure(result, "The contract could not be analysed.", { ai: true }); offerRetry(button); return; }
 
                 extraction = result.extraction;
                 renderExtraction();
 
                 if (!extraction.positions || extraction.positions.length === 0) {
-                    toast("info",
+                    aiToast("info",
                         "The contract names no separate services, so no positions were suggested. " +
                         "It can still be generated from the text.");
                     return;
                 }
+
+                aiToast("success",
+                    extraction.positions.length + " position(s) were read out of the text. " +
+                    "Tick the ones you want, then add them.");
 
                 document.getElementById("extractedPositionsBlock")?.scrollIntoView({ behavior: "smooth" });
             });
@@ -1217,7 +1248,7 @@
     /// configuration fault: a wrong API key is still wrong tomorrow, and a
     /// disappearing message left the contract empty with nothing on screen saying
     /// why. A lasting problem gets a notice that lasts.
-    function showFailure(result, fallback) {
+    function showFailure(result, fallback, opts) {
         const message = result.message || fallback;
 
         // The server's own messages already end with "Reference XXXXXXXX." —
@@ -1227,7 +1258,9 @@
             ? `${message} (reference ${result.reference})`
             : message;
 
-        toast("error", full);
+        // An AI action's failure arrives minutes after the click, usually into
+        // a tab the user has left. It stays until closed, and it chimes.
+        toast("error", full, opts?.ai ? { sticky: true, sound: true } : undefined);
 
         if (!result.transient) banner("error", full);
 

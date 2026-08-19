@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using WitcherHub.Rendering;
 using Ganss.Xss;
 using Markdig;
 using Microsoft.AspNetCore.Authorization;
@@ -159,15 +160,7 @@ namespace WitcherHub.Pages.Contracts
             markdown ??= "";
             markdown = markdown.Replace("\r\n", "\n");
 
-            var pipeline = new MarkdownPipelineBuilder()
-                .UseAdvancedExtensions()
-                .Build();
-
-            var html = Markdown.ToHtml(markdown, pipeline);
-
-            var sanitizer = new HtmlSanitizer();
-            sanitizer.AllowedSchemes.Add("mailto");
-            return sanitizer.Sanitize(html);
+            return ContractMarkdown.ToHtml(markdown);
         }
 
         public async Task<IActionResult> OnPostUpdateHeaderAsync(CancellationToken ct)

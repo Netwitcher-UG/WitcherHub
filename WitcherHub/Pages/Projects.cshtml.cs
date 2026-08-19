@@ -1,4 +1,5 @@
-using FluentValidation;
+﻿using FluentValidation;
+using WitcherHub.Rendering;
 using Ganss.Xss;
 using Markdig;
 using Microsoft.AspNetCore.Mvc;
@@ -809,12 +810,7 @@ namespace WitcherHub.Pages
         {
             if (string.IsNullOrWhiteSpace(markdown)) return "";
 
-            var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
-            var html = Markdown.ToHtml(markdown.Replace("\r\n", "\n"), pipeline);
-
-            var sanitizer = new HtmlSanitizer();
-            sanitizer.AllowedSchemes.Add("mailto");
-            return sanitizer.Sanitize(html);
+            return ContractMarkdown.ToHtml(markdown);
         }
         public async Task<IActionResult> OnPostCreateProjectContractAsync(Guid projectId, CancellationToken ct = default)
         {
