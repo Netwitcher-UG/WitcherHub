@@ -93,13 +93,86 @@
 
 <partial name="_PageHeader" model="header" />
 
+@if (Model.IsPreview)
+{
+    @* Says whose wording is on the paper below. A preview that looked identical
+       to the approved contract would be worse than no preview at all. *@
+    <div class="alert alert-info radius-8 d-flex flex-wrap align-items-center gap-3" role="status">
+        <span>
+            <i class="ri-eye-line me-1"></i>
+            <strong>Preview of version @Model.Version</strong> — @Model.PreviewStatusLabel.
+            @(Model.PreviewCanApprove
+                ? "This is not the approved wording until you approve it."
+                : "")
+        </span>
+        <span class="ms-auto d-inline-flex gap-2">
+            @if (Model.PreviewCanApprove)
+            {
+                <a class="btn btn-sm btn-primary radius-8"
+                   asp-page="/Contracts/Positions"
+                   asp-route-contractId="@Model.ContractId"
+                   asp-fragment="version-@Model.Version">
+                    Approve on the builder
+                </a>
+            }
+            <a class="btn btn-sm btn-outline-primary radius-8"
+               asp-page="/Contracts/Details" asp-route-id="@Model.ContractId">
+                Show the approved wording
+            </a>
+        </span>
+    </div>
+}
+
 <div class="contractPage">
 
     <div class="contractPage__container">
         <div class="contractPage__paper" id="paper">
-            <div class="contractPage__contractHtml">
-                @Html.Raw(Model.ContractHtml)
-            </div>
+            @if (!Model.IsPreview && string.IsNullOrEmpty(Model.ContractHtml))
+            {
+                @* Wording exists as versions and none is approved — or there is
+                   none at all. The old single not-generated message was the
+                   wrong diagnosis for the first case and a dead end for both. *@
+                @if (Model.Versions.Count > 0)
+                {
+                    <div class="alert alert-info radius-8">
+                        No version has been approved yet, so there is no active contract wording.
+                        Read a version below, then approve the one that is right.
+                    </div>
+
+                    <ul class="list-group list-group-flush">
+                        @foreach (var v in Model.Versions)
+                        {
+                            <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2 px-0">
+                                <span>
+                                    <strong>Version @v.Version</strong>
+                                    <span class="badge bg-neutral-200 text-neutral-600 px-12 py-2 radius-4 ms-2">@v.KindLabel</span>
+                                    <span class="text-secondary-light text-sm ms-2">@Format.DateTime(v.GeneratedAt)</span>
+                                </span>
+                                <a class="btn btn-sm btn-outline-primary radius-8"
+                                   asp-page="/Contracts/Details"
+                                   asp-route-id="@Model.ContractId"
+                                   asp-route-version="@v.Version">
+                                    <i class="ri-eye-line"></i> Preview
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <div class="alert alert-info radius-8">
+                        This contract has no wording yet. Generate it from the positions, or paste a
+                        document you already have —
+                        <a asp-page="/Contracts/Positions" asp-route-contractId="@Model.ContractId">both live on the builder</a>.
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="contractPage__contractHtml">
+                    @Html.Raw(Model.ContractHtml)
+                </div>
+            }
         </div>
     </div>
 

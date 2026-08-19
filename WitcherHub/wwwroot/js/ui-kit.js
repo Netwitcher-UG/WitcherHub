@@ -106,8 +106,67 @@
         error(msg, title) { return notify('error', msg, title ?? 'Error'); },
         warning(msg, title) { return notify('warning', msg, title ?? 'Warning'); },
         info(msg, title) { return notify('info', msg, title ?? 'Info'); },
+
+        // timeout: 0 keeps the toast until it is closed by hand. Long-running
+        // work needs that: its result arrives minutes after the click, when the
+        // user is usually in another tab, and a message that removes itself has
+        // already gone by the time they come back.
         show({ type = 'default', msg = '', title = '', timeout = 3500 } = {}) {
             return notify(type, msg, title, timeout);
+        }
+    };
+
+    // ---------- Notification sound ----------
+    //
+    // For work that finishes minutes after the click — asked for by the owner
+    // for the AI actions specifically, because they switch tabs while the model
+    // reads a contract and a silent toast in a hidden tab tells nobody anything.
+    //
+    // Two rules the Web Audio API imposes shape this:
+    //   * an AudioContext only starts inside a user gesture, so prime() must be
+    //     called from the click that starts the work;
+    //   * a context primed while the tab was visible keeps playing when the tab
+    //     is hidden, which is the whole point.
+    //
+    // The chime is synthesised — two soft sine notes, a major third apart —
+    // so there is no audio file to fetch, cache or fail on.
+    let audioCtx = null;
+
+    UI.sound = {
+        /// Call from the click that starts long work. Without a gesture the
+        /// browser refuses to start audio, and a chime requested later from a
+        /// background tab would stay silent.
+        prime() {
+            try {
+                audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+            } catch { /* no audio on this browser; the toast still shows */ }
+        },
+
+        chime() {
+            try {
+                if (!audioCtx || audioCtx.state !== 'running') return;
+
+                const now = audioCtx.currentTime;
+
+                [[523.25, 0], [659.25, 0.14]].forEach(([freq, delay]) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+
+                    // A fast rise and a slow fall reads as a chime; equal ramps
+                    // read as a beep from a machine that wants something.
+                    gain.gain.setValueAtTime(0, now + delay);
+                    gain.gain.linearRampToValueAtTime(0.12, now + delay + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.6);
+
+                    osc.connect(gain).connect(audioCtx.destination);
+                    osc.start(now + delay);
+                    osc.stop(now + delay + 0.7);
+                });
+            } catch { /* never let a sound break the message it decorates */ }
         }
     };
 
