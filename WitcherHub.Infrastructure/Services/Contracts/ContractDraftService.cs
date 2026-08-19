@@ -36,6 +36,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         private readonly ILogger<ContractDraftService> _logger;
         private readonly IBackgroundAnalysisRunner? _background;
         private readonly ContractContextBuilder _contextBuilder;
+        private readonly ContractGenerationPipeline _pipeline;
 
         public ContractDraftService(
             AppDbContext db,
@@ -65,6 +66,11 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             // a registered dependency would break every test that constructs this
             // service directly for no benefit.
             _contextBuilder = new ContractContextBuilder(db, _template);
+
+            // Same reasoning: a stage runner over the assistant and the options
+            // this service already holds. Registering it would mean rewriting
+            // every test that constructs this service by hand.
+            _pipeline = new ContractGenerationPipeline(ai, _openAi, logger);
         }
 
         public async Task<ContractSource> GetSourceAsync(Guid contractId, CancellationToken ct = default)
@@ -196,10 +202,19 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 options.Language,
                 ct);
 
-            string document;
+            ContractGenerationOutcome outcome;
             try
             {
-                document = await _ai.GenerateTextAsync(ContractGeneratorPrompt.Build(context));
+                // Not one call any more. The sources are enumerated into a coverage
+                // ledger, a plan assigns every entry of it to a section, the
+                // sections are written a few at a time, and what comes back is
+                // measured against the ledger before any of it is saved.
+                //
+                // One call with a fixed list of seven headings is what produced the
+                // one-page contract: the same seven short clauses whether three
+                // things had been agreed or thirty, with nothing anywhere comparing
+                // the document to what was in the record.
+                outcome = await _pipeline.RunAsync(context, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -261,28 +276,12 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                     transient: true);
             }
 
-            // The model returns clause content as JSON; the document is composed
-            // here. It used to return the finished Markdown, which meant it chose
-            // the heading levels, the numbering and whether the parties appeared at
-            // all — so two contracts generated a minute apart did not look like the
-            // same company's contracts.
-            if (!GeneratedContractContent.TryParse(document, out var content, out var parseError))
-            {
-                _logger.LogWarning(
-                    "Contract generation for {ContractId} returned unusable content: {Error}",
-                    contractId, parseError);
-
-                return ContractDraftResult.Failed(
-                    "The assistant's answer could not be read as a contract. Everything you entered is " +
-                    "saved — try again, or write the contract text by hand.",
-                    transient: true);
-            }
-
+            var content = outcome.Content;
             var parties = await BuildPartyDetailsAsync(contract, ct);
 
             // One contract, from all the sources. Nothing is appended to it: the
             // pasted document informed the clauses and is not part of them.
-            document = GermanContractDocument.Compose(
+            var document = GermanContractDocument.Compose(
                 title: string.IsNullOrWhiteSpace(content.ContractType)
                     ? GeneratedContractTitle
                     : content.ContractType!.Trim(),
@@ -314,7 +313,16 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 // reference rather than as content. It is what makes "generated
                 // with the pasted text in mind" answerable without the pasted text
                 // being in the contract.
-                SourceDraftId = LatestSupplied(contract)?.Id
+                SourceDraftId = LatestSupplied(contract)?.Id,
+
+                // How this version was produced, and how much of what was agreed
+                // it accounts for. Numbers and internal ids; nothing from the
+                // prompt, the answer or the customer's data.
+                GenerationReport = JsonSerializer.SerializeToDocument(new
+                {
+                    generation = outcome.Telemetry.ToRecord(),
+                    coverage = outcome.Audit.ToRecord()
+                })
             };
 
             _db.Set<ContractDraft>().Add(draft);
@@ -346,11 +354,22 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             _logger.LogInformation(
                 "Generated draft v{Version} for contract {ContractId} from {Mode} using {Model}. " +
-                "Source document {Source} informed it without being copied into it.",
+                "Source document {Source} informed it without being copied into it. Coverage {Coverage}.",
                 draft.Version, contractId, source.Mode, _openAi.Model,
-                draft.SourceDraftId is null ? "was absent" : "v" + LatestSupplied(contract)?.Version);
+                draft.SourceDraftId is null ? "was absent" : "v" + LatestSupplied(contract)?.Version,
+                outcome.Audit.Summary);
 
-            return new ContractDraftResult { Succeeded = true, Draft = ToSummary(draft, totals) };
+            return new ContractDraftResult
+            {
+                Succeeded = true,
+                Draft = ToSummary(draft, totals),
+
+                // What the contract does not say. Shown beside the draft rather
+                // than folded into a success message, because "generated" and
+                // "generated, and three agreed points are not in it" are different
+                // things to hand somebody who is about to approve it.
+                ReviewNotes = outcome.Audit.ReviewNotes()
+            };
         }
 
         /// <summary>

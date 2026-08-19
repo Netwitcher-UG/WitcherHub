@@ -19,6 +19,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
         private readonly PlaywrightBrowserInstaller _browserInstaller;
         private readonly ILogger<PlaywrightPdfGenerator> _logger;
         private readonly IWebHostEnvironment _env;
+        private readonly BrandingOptions _branding;
 
         private readonly SemaphoreSlim _launchGate = new(1, 1);
         private IPlaywright? _playwright;
@@ -28,11 +29,13 @@ namespace WitcherHub.Infrastructure.Services.Pdf
         public PlaywrightPdfGenerator(
             PlaywrightBrowserInstaller browserInstaller,
             ILogger<PlaywrightPdfGenerator> logger,
-            IWebHostEnvironment env)
+            IWebHostEnvironment env,
+            Microsoft.Extensions.Options.IOptions<BrandingOptions> branding)
         {
             _browserInstaller = browserInstaller;
             _logger = logger;
             _env = env;
+            _branding = branding.Value;
         }
 
         /// <summary>
@@ -135,16 +138,36 @@ namespace WitcherHub.Infrastructure.Services.Pdf
             if (_cachedLogoDataUri is not null)
                 return _cachedLogoDataUri;
 
-            var logoPath = Path.Combine(_env.WebRootPath, "theme", "assets", "images", "netwitcher-logo.png");
+            // From configuration, and combined segment by segment so the setting
+            // can be written with forward slashes on any platform.
+            var relative = (_branding.LogoPath ?? "").Replace('\\', '/').Trim('/');
+
+            var logoPath = Path.Combine(
+                new[] { _env.WebRootPath }.Concat(relative.Split('/')).ToArray());
 
             if (!File.Exists(logoPath))
             {
-                _logger.LogWarning("Logo file not found: {Path}", logoPath);
+                // Worth a warning rather than a shrug: the substitute is an empty
+                // src, which renders as nothing, so an unbranded contract went out
+                // looking like a deliberate design choice.
+                _logger.LogWarning(
+                    "No logo at {Path}; contracts and quotes will be generated without one. " +
+                    "Set {Setting} to a file under wwwroot.",
+                    logoPath, BrandingOptions.LogoPathSettingName);
+
                 return _cachedLogoDataUri = "";
             }
 
             var logoBytes = await File.ReadAllBytesAsync(logoPath, ct);
-            return _cachedLogoDataUri = $"data:image/png;base64,{Convert.ToBase64String(logoBytes)}";
+            var mediaType = Path.GetExtension(logoPath).ToLowerInvariant() switch
+            {
+                ".svg" => "image/svg+xml",
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".webp" => "image/webp",
+                _ => "image/png"
+            };
+
+            return _cachedLogoDataUri = $"data:{mediaType};base64,{Convert.ToBase64String(logoBytes)}";
         }
 
         private async Task SafeDisposeBrowserAsync()

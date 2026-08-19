@@ -609,6 +609,43 @@
         banner(type, message);
     }
 
+    /// Where the coverage notes wait out the reload that follows generation.
+    const REVIEW_NOTES_KEY = "witcherhub.contract.reviewNotes";
+
+    /// Shows what the freshly generated version does not account for.
+    ///
+    /// Generation used to report only that it had happened. A contract that had
+    /// dropped most of the agreed scope arrived with the same message as one that
+    /// covered everything, and the only way to find out was to read the whole
+    /// document against the positions by hand.
+    ///
+    /// Sticky, because this is read before somebody approves a contract, and
+    /// worded as points to check rather than as an error: the version is
+    /// perfectly usable, it just does not say everything yet.
+    function showPendingReviewNotes() {
+        let notes;
+
+        try {
+            const stored = sessionStorage.getItem(REVIEW_NOTES_KEY);
+            if (!stored) return;
+            sessionStorage.removeItem(REVIEW_NOTES_KEY);
+            notes = JSON.parse(stored);
+        } catch {
+            return;
+        }
+
+        if (!Array.isArray(notes) || notes.length === 0) return;
+
+        // Three at a time. A list of twenty in a toast is a wall nobody reads.
+        const shown = notes.slice(0, 3);
+        const rest = notes.length - shown.length;
+
+        toast("warning",
+            "Check this version before approving it — " + shown.join(" ") +
+            (rest > 0 ? ` And ${rest} more point${rest === 1 ? "" : "s"}.` : ""),
+            { sticky: true });
+    }
+
     /// The outcome of work that ran long enough to leave for another tab.
     ///
     /// The AI actions take minutes; by the time they finish, the user has
@@ -964,6 +1001,17 @@
                 // on, so nothing is lost with the toast.
                 window.UI?.sound?.chime();
                 toast("success", result.message);
+
+                // What the generated contract does not account for.
+                //
+                // It has to survive the reload below, or it announces itself to a
+                // page that is already being replaced — and this is the one
+                // message somebody must read before they approve a version.
+                if (result.reviewNotes && result.reviewNotes.length) {
+                    try {
+                        sessionStorage.setItem(REVIEW_NOTES_KEY, JSON.stringify(result.reviewNotes));
+                    } catch { /* private mode; the notes are on the version anyway */ }
+                }
 
                 // The new version is a draft awaiting review, so the user is taken
                 // to it rather than left to find it.
@@ -1596,4 +1644,8 @@
     // A stored extraction is shown straight away, so a review left half-finished
     // is still there when the page is opened again.
     if (extraction) renderExtraction();
+
+    // And what the version that was just generated does not cover. It was put
+    // aside before the reload; this is where it is read.
+    showPendingReviewNotes();
 })();

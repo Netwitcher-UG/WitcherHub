@@ -169,6 +169,12 @@
             }
             else
             {
+                @* The company's mark and the document's reference at the head of
+                   the sheet. Outside the stored document on purpose: the contract
+                   text carries the Vertragsnummer because that is part of the
+                   contract, while the logo is the paper it is printed on. *@
+                <partial name="_ContractLetterhead" model="Model.Letterhead" />
+
                 <div class="contractPage__contractHtml">
                     @Html.Raw(Model.ContractHtml)
                 </div>
@@ -180,6 +186,10 @@
 </div>
 
 @section Scripts {
+    @* Draws where the page breaks fall and counts the sheets. It measures; it
+       does not scale, clip or resize anything — a contract is as long as it is. *@
+    <script src="~/js/pages/contracts/contract-pages.js" asp-append-version="true"></script>
+
     <script>
         (function () {
             document.getElementById('btnPrint')?.addEventListener('click', function () {

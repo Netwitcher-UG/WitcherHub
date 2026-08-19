@@ -54,6 +54,26 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
         public int RetryBaseDelayMilliseconds { get; set; } = 2000;
 
         /// <summary>
+        /// How much room one answer may take, in tokens.
+        ///
+        /// Nothing set this before, so the provider's own default decided how long
+        /// a generated contract could be — an invisible ceiling with no setting
+        /// behind it and no sign in the output that it had been reached. 16000 is
+        /// comfortably more than a long contract section batch needs; it is a
+        /// ceiling, not a target, and a short contract costs the same as it always
+        /// did because unused room is not billed.
+        ///
+        /// Clamped to 256..128000 where it is applied, because a value below the
+        /// length of a single clause turns every generation into a truncation.
+        /// </summary>
+        public int MaxOutputTokens { get; set; } = 16000;
+
+        public const string MaxOutputTokensSettingName = "OpenAI__MaxOutputTokens";
+
+        /// <summary>The budget actually used, with the clamp applied.</summary>
+        public int EffectiveMaxOutputTokens => Math.Clamp(MaxOutputTokens, 256, 128_000);
+
+        /// <summary>
         /// The name of the setting to quote at an administrator when there is no
         /// key. Written once here so every message agrees.
         /// </summary>

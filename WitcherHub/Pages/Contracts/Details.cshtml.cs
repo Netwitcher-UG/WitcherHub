@@ -22,18 +22,32 @@ namespace WitcherHub.Pages.Contracts
         private readonly IContractDocumentGenerator _generator;
         private readonly ContractTemplateOptions _opt;
         private readonly IContractDraftService _drafts;
+        private readonly IOptions<WitcherHub.Infrastructure.Services.Pdf.BrandingOptions> _branding;
+        private readonly IWebHostEnvironment _env;
 
         public DetailsModel(
             AppDbContext db,
             IContractDocumentGenerator generator,
             IContractDraftService drafts,
-            IOptions<ContractTemplateOptions> opt)
+            IOptions<ContractTemplateOptions> opt,
+            IOptions<WitcherHub.Infrastructure.Services.Pdf.BrandingOptions> branding,
+            IWebHostEnvironment env)
         {
             _db = db;
             _generator = generator;
             _drafts = drafts;
             _opt = opt.Value;
+            _branding = branding;
+            _env = env;
         }
+
+        /// <summary>
+        /// The company's mark and the document's reference, for the top of the
+        /// sheet. Built here rather than in the view so the view does not have to
+        /// know where the logo file lives, or whether it is there at all.
+        /// </summary>
+        public WitcherHub.Pages.Models.UI.ContractLetterheadVm Letterhead { get; private set; } =
+            new();
 
         [BindProperty(SupportsGet = true)]
         public Guid Id { get; set; }
@@ -91,6 +105,14 @@ namespace WitcherHub.Pages.Contracts
             if (contract is null) return NotFound();
             ProjectId = contract.ProjectId;
             Contract = contract;
+
+            Letterhead = WitcherHub.Pages.Models.UI.ContractLetterheadVm.Build(
+                _branding,
+                _env.WebRootPath,
+                Request.PathBase,
+                companyName: FirstLine(_opt.ProviderBlock),
+                contractNo: contract.ContractNo,
+                issuedOn: contract.CreatedAt);
             // Generate terms once if missing (نفس Sign)
             // Generate terms once if missing (same as Sign, but must have line items)
             // ✅ بدل التوليد التلقائي:
@@ -169,6 +191,13 @@ namespace WitcherHub.Pages.Contracts
         /// <summary>Markdown to sanitised HTML, one way for every path on this page.</summary>
         private static string RenderMarkdown(string markdown) =>
             ContractMarkdown.ToHtml(markdown);
+
+        /// <summary>
+        /// The company's name out of the configured provider block, which is the
+        /// name and then the address on the lines below it.
+        /// </summary>
+        private static string FirstLine(string? block) =>
+            (block ?? "").Replace("\r\n", "\n").Split('\n').FirstOrDefault()?.Trim() ?? "";
 
         private GenerateContractDocumentRequest BuildRequestFromDb(Contract contract)
         {

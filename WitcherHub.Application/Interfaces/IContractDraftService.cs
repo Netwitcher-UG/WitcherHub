@@ -297,6 +297,22 @@ namespace WitcherHub.Application.Interfaces
         /// </summary>
         public ContractMoneyDto? Money { get; init; }
 
+        /// <summary>
+        /// Things the generated contract does not account for, in the reviewer's
+        /// words.
+        ///
+        /// Generation used to be silent about its own gaps: whatever came back was
+        /// saved, and a contract missing most of the agreed scope looked exactly
+        /// like one that had covered everything. Every version is now measured
+        /// against the list of things it had to cover, and what it missed is said
+        /// out loud before anybody approves it.
+        ///
+        /// Never ids — those are internal. Never a claim that something is wrong
+        /// with the customer's data; only that a point is not stated and should be
+        /// checked.
+        /// </summary>
+        public IReadOnlyList<string> ReviewNotes { get; init; } = Array.Empty<string>();
+
         public static ContractDraftResult Failed(string reason, bool transient = false) =>
             new() { Succeeded = false, FailureReason = reason, IsTransientFailure = transient };
 

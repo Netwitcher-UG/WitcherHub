@@ -36,10 +36,15 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
             _logger = logger;
         }
 
-        public async Task<string> GenerateTextAsync(string prompt)
+        public async Task<string> GenerateTextAsync(string prompt) =>
+            (await CompleteAsync(new AiRequest(prompt))).Text;
+
+        public async Task<AiCompletion> CompleteAsync(AiRequest request, CancellationToken ct = default)
         {
+            var prompt = request.Prompt;
+
             if (string.IsNullOrWhiteSpace(prompt))
-                return string.Empty;
+                return new AiCompletion(string.Empty, AiFinishReason.Stop);
 
             var correlationId = NewCorrelationId();
 
@@ -70,18 +75,70 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
 
             try
             {
-                ChatCompletion completion = await client.CompleteChatAsync(prompt);
+                var messages = new List<ChatMessage>();
 
-                var text = completion.Content.Count > 0 ? completion.Content[0].Text : string.Empty;
+                // The system instruction used to have nowhere to go, so the rules
+                // that constrain what the model may invent travelled as ordinary
+                // prompt text or, in the contract generator's case, not at all —
+                // ContractGeneratorPrompt.SystemInstruction was written, reviewed
+                // and never sent.
+                if (!string.IsNullOrWhiteSpace(request.SystemInstruction))
+                    messages.Add(new SystemChatMessage(request.SystemInstruction));
+
+                messages.Add(new UserChatMessage(prompt));
+
+                var options = new ChatCompletionOptions();
+
+                // No budget was set at all before this, so the provider's default
+                // decided how long an answer could be. For a contract that is a
+                // silent ceiling on the document's length that nobody could see or
+                // configure.
+                if (request.MaxOutputTokens is > 0)
+                    options.MaxOutputTokenCount = request.MaxOutputTokens;
+
+                ChatCompletion completion = await client.CompleteChatAsync(messages, options, ct);
+
+                // Every part, not the first. A model that answers in several
+                // content parts had all but the first thrown away here, which
+                // truncates the answer before anything else has a chance to.
+                var text = string.Concat(completion.Content.Select(part => part.Text ?? ""));
+
+                var finish = Translate(completion.FinishReason);
 
                 _logger.LogInformation(
-                    "AI call {CorrelationId} succeeded in {Elapsed}ms using {Model}. Response length {Length}.",
+                    "AI call {CorrelationId} [{Purpose}] finished {Finish} in {Elapsed}ms using {Model}. " +
+                    "Characters {Length}, input tokens {In}, output tokens {Out}, budget {Budget}.",
                     correlationId,
+                    request.Purpose ?? "-",
+                    finish,
                     (int)Stopwatch.GetElapsedTime(started).TotalMilliseconds,
                     _options.Model,
-                    text.Length);
+                    text.Length,
+                    completion.Usage?.InputTokenCount,
+                    completion.Usage?.OutputTokenCount,
+                    request.MaxOutputTokens?.ToString() ?? "provider default");
 
-                return text;
+                if (finish == AiFinishReason.Length)
+                {
+                    // Logged as a warning rather than swallowed: an answer that ran
+                    // out of room is a capacity problem with a setting behind it,
+                    // and it looks exactly like a badly-written prompt from the
+                    // outside. The caller decides what to do; it is told, which is
+                    // the part that was missing.
+                    _logger.LogWarning(
+                        "AI call {CorrelationId} [{Purpose}] was cut off at the output limit ({Budget} tokens). " +
+                        "The answer is incomplete. Raise {Setting} if this recurs.",
+                        correlationId,
+                        request.Purpose ?? "-",
+                        request.MaxOutputTokens?.ToString() ?? "provider default",
+                        OpenAIOptions.MaxOutputTokensSettingName);
+                }
+
+                return new AiCompletion(
+                    text,
+                    finish,
+                    completion.Usage?.InputTokenCount,
+                    completion.Usage?.OutputTokenCount);
             }
             catch (Exception ex)
             {
@@ -103,6 +160,21 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
                 throw new AiInvocationException(kind, ex.GetType().Name, correlationId, status, ex);
             }
         }
+
+        /// <summary>
+        /// The provider's stop reason, in terms this application acts on.
+        ///
+        /// Only <see cref="ChatFinishReason.Length"/> matters much: it is the one
+        /// that means the text is incomplete while looking perfectly well-formed
+        /// up to where it stops.
+        /// </summary>
+        internal static AiFinishReason Translate(ChatFinishReason reason) => reason switch
+        {
+            ChatFinishReason.Stop => AiFinishReason.Stop,
+            ChatFinishReason.Length => AiFinishReason.Length,
+            ChatFinishReason.ContentFilter => AiFinishReason.ContentFilter,
+            _ => AiFinishReason.Other
+        };
 
         /// <summary>
         /// Turns whatever the client threw into something a person can act on.

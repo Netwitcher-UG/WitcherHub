@@ -90,7 +90,40 @@ namespace WitcherHub.Application.Services.Contracts
                 }
             }
 
-            return md.ToString().TrimEnd() + "\n";
+            return StripCoverageIds(md.ToString().TrimEnd()) + "\n";
+        }
+
+        /// <summary>
+        /// Removes the internal coverage references, wherever they got in.
+        ///
+        /// The ids exist so the application can check its own work; they mean
+        /// nothing to a customer and printing one in a contract would be an
+        /// obvious defect in a document somebody signs. The prompt says not to
+        /// write them, which is worth saying and not worth relying on — a model
+        /// asked to state which entries a paragraph covers will sometimes state it
+        /// in the paragraph.
+        ///
+        /// Deliberately narrow: it matches the shape this application issues
+        /// (POS-001-02, REC-004, SRC-011, TRM-002, TOT-001) and leaves anything
+        /// else alone, because a contract may perfectly well contain a customer's
+        /// own reference like "ABC-123".
+        /// </summary>
+        internal static string StripCoverageIds(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            // The id, plus any bracket, parenthesis or separator it was wrapped in,
+            // so removing it does not leave "( , )" behind.
+            var stripped = System.Text.RegularExpressions.Regex.Replace(
+                text,
+                @"[\[\(]?\s*\b(?:POS|REC|SRC|TRM|TOT)-\d{3}(?:-\d{2})?\b(?:\s*[,;]\s*\b(?:POS|REC|SRC|TRM|TOT)-\d{3}(?:-\d{2})?\b)*\s*[\]\)]?",
+                "");
+
+            // Tidy the punctuation the removal can strand.
+            stripped = System.Text.RegularExpressions.Regex.Replace(stripped, @"[ \t]{2,}", " ");
+            stripped = System.Text.RegularExpressions.Regex.Replace(stripped, @" +([,.;:])", "$1");
+
+            return stripped;
         }
 
         /// <summary>
@@ -168,7 +201,7 @@ namespace WitcherHub.Application.Services.Contracts
         /// The outermost {...} in the answer. Balanced rather than greedy, so a
         /// trailing explanation after the object does not swallow the parse.
         /// </summary>
-        private static string? ExtractJson(string raw)
+        internal static string? ExtractJson(string raw)
         {
             var start = raw.IndexOf('{');
             if (start < 0) return null;
@@ -204,6 +237,16 @@ namespace WitcherHub.Application.Services.Contracts
 
         [JsonPropertyName("items")]
         public List<string> Items { get; set; } = new();
+
+        /// <summary>
+        /// The coverage ids this section says it accounts for.
+        ///
+        /// A declaration, not a fact. It is checked against the text for anything
+        /// with a figure in it, and taken at its word for topics — which is why an
+        /// unclaimed topic counts as a gap even when the section reads well.
+        /// </summary>
+        [JsonPropertyName("covers")]
+        public List<string> Covers { get; set; } = new();
 
         public bool HasContent =>
             Paragraphs.Any(p => !string.IsNullOrWhiteSpace(p)) ||

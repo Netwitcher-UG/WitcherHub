@@ -3,6 +3,88 @@ namespace WitcherHub.Application.Interfaces
     public interface IAiTextGenerator
     {
         Task<string> GenerateTextAsync(string prompt);
+
+        /// <summary>
+        /// A call that says what it is for, how much room the answer may take,
+        /// and — on the way back — whether the answer actually finished.
+        ///
+        /// <see cref="GenerateTextAsync"/> could express none of that. It sent one
+        /// user message with no system instruction and no token budget, and
+        /// returned a bare string, so a reply the provider had cut off mid-sentence
+        /// was indistinguishable from a complete one. For a contract that is the
+        /// difference between a document and half a document, and the half was
+        /// being saved as a finished version.
+        ///
+        /// Implemented as a default so that the many stubs which only answer
+        /// prompts keep working; they report <see cref="AiFinishReason.Stop"/>,
+        /// which is what a stub that returns a whole answer means.
+        /// </summary>
+        async Task<AiCompletion> CompleteAsync(AiRequest request, CancellationToken ct = default)
+        {
+            var text = await GenerateTextAsync(request.Prompt);
+            return new AiCompletion(text, AiFinishReason.Stop);
+        }
+    }
+
+    /// <summary>
+    /// One model call, described.
+    /// </summary>
+    /// <param name="Prompt">The request itself.</param>
+    public sealed record AiRequest(string Prompt)
+    {
+        /// <summary>
+        /// What the model is and what it must never do — the same on every call
+        /// of a given kind, which is why it does not belong in the request text.
+        /// </summary>
+        public string? SystemInstruction { get; init; }
+
+        /// <summary>
+        /// The ceiling on the answer, in tokens.
+        ///
+        /// Left unset the provider applies its own, which for a long contract is
+        /// the difference between seven clauses and thirty. It is a ceiling and
+        /// not a target: asking for room does not make the model use it.
+        /// </summary>
+        public int? MaxOutputTokens { get; init; }
+
+        /// <summary>
+        /// A short label for the log — "contract.outline", "contract.sections".
+        /// Lets one slow or truncated stage be found without the prompt, which
+        /// is never logged because it carries customer data.
+        /// </summary>
+        public string? Purpose { get; init; }
+    }
+
+    /// <summary>Why the model stopped writing.</summary>
+    public enum AiFinishReason
+    {
+        /// <summary>It finished what it had to say.</summary>
+        Stop = 0,
+
+        /// <summary>It ran out of room. The answer is incomplete.</summary>
+        Length = 1,
+
+        /// <summary>The provider withheld part of the answer.</summary>
+        ContentFilter = 2,
+
+        /// <summary>Something else, including a reason we do not recognise.</summary>
+        Other = 3
+    }
+
+    /// <summary>
+    /// What came back, with enough to tell a finished answer from a cut-off one.
+    /// </summary>
+    public sealed record AiCompletion(
+        string Text,
+        AiFinishReason FinishReason,
+        int? InputTokens = null,
+        int? OutputTokens = null)
+    {
+        /// <summary>
+        /// The answer stops mid-thought because the budget ran out. Nothing built
+        /// on it may be presented, or saved, as complete.
+        /// </summary>
+        public bool IsTruncated => FinishReason == AiFinishReason.Length;
     }
 
     /// <summary>
