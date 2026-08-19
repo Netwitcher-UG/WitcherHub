@@ -689,3 +689,298 @@
     .quotePdfScope .meta {
         max-width: 275px;
     }
+
+/* ==========================================================================
+   Deutscher Vertragsstil — how the document itself is set
+   --------------------------------------------------------------------------
+   Reported plainly: "the contract shows in the right and correct form and
+   style. I wanted it as a German contract style. because so is not a German
+   contact style."
+
+   It was rendered as bare Markdown at 14px in the UI's own sans-serif: the
+   title looked like a page heading, the sections like a web article, and the
+   text ran ragged-right. Correct enough as data, wrong as a document — and
+   this document gets printed, sent to a customer and signed.
+
+   What a German contract actually looks like, and what is set below:
+     * A4 with the margins a Vertrag is set to, not a web page's padding
+     * a serif face, because that is what these documents are set in
+     * Blocksatz with hyphenation — ragged-right reads as a draft
+     * § headings on their own line, spaced away from the text above
+     * (1) (2) paragraphs with a hanging indent, so the numbers align
+     * a party block with the standard „nachfolgend ... genannt" lines
+     * an Unterschriften block with real signature rules
+     * page numbers when printed, because a contract is cited by page
+   ========================================================================== */
+
+.contractPage__contractHtml {
+    /* Georgia is on every platform this is opened on; the stack falls back
+       through the usual serifs rather than to the UI sans-serif. */
+    font-family: Georgia, "Times New Roman", "Liberation Serif", serif;
+    font-size: 11pt;
+    line-height: 1.65;
+    color: #111;
+
+    /* Blocksatz. German legal text is justified; hyphenation is what keeps
+       justification from opening rivers of white space in long compounds
+       like "Umsatzsteuerbehandlung". */
+    text-align: justify;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+    hyphenation-language: "de";
+
+    /* Overrides the ragged fallback further up this file. */
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+/* The document sets its own type and colour throughout.
+ *
+ * Inheriting was not enough: the admin theme colours headings #111827 and
+ * gives them its UI sans-serif, so a contract came out with navy §§ in the
+ * dashboard's font — a web page wearing a document's layout. A contract is
+ * black on white in one face, so that is stated here rather than hoped for. */
+.contractPage__contractHtml h1,
+.contractPage__contractHtml h2,
+.contractPage__contractHtml h3,
+.contractPage__contractHtml h4,
+.contractPage__contractHtml p,
+.contractPage__contractHtml li,
+.contractPage__contractHtml td,
+.contractPage__contractHtml th,
+.contractPage__contractHtml strong,
+.contractPage__contractHtml em {
+    font-family: inherit;
+    color: #111;
+}
+
+/* ---- the document title ------------------------------------------------- */
+
+.contractPage__contractHtml h1 {
+    font-size: 15pt;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-align: center;
+    text-transform: uppercase;
+    margin: 0 0 2rem;
+    padding-bottom: .6rem;
+    border-bottom: 1.5pt solid #111;
+
+    /* A centred title is not justified. */
+    hyphens: manual;
+}
+
+/* Vertragsnummer, Projekt and the date, under the title. Deliberately the one
+   thing on the page that is not full black: it is a reference, not a term. */
+.contractPage__contractHtml h1 + p {
+    text-align: center;
+    font-size: 9.5pt;
+    color: #444;
+    margin: -1.4rem 0 2.2rem;
+}
+
+/* ---- § sections -------------------------------------------------------- */
+
+.contractPage__contractHtml h2 {
+    font-size: 11.5pt;
+    font-weight: 700;
+    text-align: left;
+    margin: 1.9rem 0 .7rem;
+
+    /* A § heading must not be the last line on a page. */
+    break-after: avoid;
+    page-break-after: avoid;
+    hyphens: manual;
+}
+
+.contractPage__contractHtml h3 {
+    font-size: 11pt;
+    font-weight: 700;
+    text-align: left;
+    margin: 1.2rem 0 .5rem;
+    break-after: avoid;
+    page-break-after: avoid;
+    hyphens: manual;
+}
+
+/* The party block: „zwischen ... und ..." set apart from the clauses. */
+.contractPage__contractHtml .vertrag-parteien {
+    margin: 0 0 2rem;
+    text-align: left;
+}
+
+.contractPage__contractHtml .vertrag-partei {
+    margin: .5rem 0 1.2rem 2rem;
+    line-height: 1.45;
+}
+
+.contractPage__contractHtml .vertrag-partei strong {
+    display: block;
+}
+
+/* „– nachfolgend „Auftragnehmer" genannt –" */
+.contractPage__contractHtml .vertrag-rolle {
+    display: block;
+    margin-top: .35rem;
+    font-style: italic;
+    color: #333;
+}
+
+.contractPage__contractHtml .vertrag-konjunktion {
+    margin: 0;
+    text-align: left;
+}
+
+/* ---- numbered paragraphs ----------------------------------------------- */
+
+.contractPage__contractHtml p {
+    margin: 0 0 .7rem;
+    orphans: 2;
+    widows: 2;
+}
+
+/* (1), (2), (3) — the number hangs left of the text it introduces, so a
+   paragraph that wraps stays aligned under its own first word. */
+.contractPage__contractHtml .vertrag-absatz {
+    padding-left: 2.1rem;
+    text-indent: -2.1rem;
+}
+
+.contractPage__contractHtml ol,
+.contractPage__contractHtml ul {
+    margin: .4rem 0 .9rem;
+    padding-left: 2.6rem;
+}
+
+.contractPage__contractHtml li {
+    margin-bottom: .3rem;
+}
+
+/* a) b) c) — the German convention inside a clause. */
+.contractPage__contractHtml .vertrag-absatz + ol,
+.contractPage__contractHtml ol.vertrag-buchstaben {
+    list-style-type: lower-alpha;
+}
+
+/* ---- figures ----------------------------------------------------------- */
+
+.contractPage__contractHtml table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: .9rem 0 1.3rem;
+    font-size: 10pt;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.contractPage__contractHtml th,
+.contractPage__contractHtml td {
+    border: .5pt solid #999;
+    padding: .35rem .5rem;
+    text-align: left;
+    hyphens: manual;
+}
+
+.contractPage__contractHtml th {
+    background: #f2f2f2;
+    font-weight: 700;
+}
+
+/* Money reads down a column, so amounts are right-aligned and tabular. */
+.contractPage__contractHtml td + td,
+.contractPage__contractHtml th + th {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Unterschriften ---------------------------------------------------- */
+
+.contractPage__contractHtml .vertrag-unterschriften {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2.5rem;
+    margin-top: 3.5rem;
+
+    /* A signature block split across two pages is not signable. */
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.contractPage__contractHtml .vertrag-unterschrift {
+    flex: 1 1 40%;
+    min-width: 13rem;
+}
+
+.contractPage__contractHtml .vertrag-unterschrift-linie {
+    border-bottom: .75pt solid #111;
+    height: 2.6rem;
+    margin-bottom: .4rem;
+}
+
+.contractPage__contractHtml .vertrag-unterschrift-name {
+    font-size: 9.5pt;
+    line-height: 1.4;
+    color: #222;
+}
+
+.contractPage__contractHtml .vertrag-ort-datum {
+    margin-top: 2.6rem;
+    font-size: 10pt;
+}
+
+/* ---- the sheet --------------------------------------------------------- */
+
+.contractPage__paper {
+    /* A4 at the margins a contract is set to, rather than a web page's
+       padding. 25mm all round is the German norm for a business document. */
+    max-width: 210mm;
+    padding: 25mm 25mm 30mm;
+
+    /* Paper has corners. The rounded card radius further up this file is right
+       for a UI panel and wrong for a document somebody will print. */
+    border-radius: 2px;
+}
+
+/* ---- printing ---------------------------------------------------------- */
+
+@media print {
+    @page {
+        size: A4;
+        margin: 20mm 20mm 22mm;
+    }
+
+    .contractPage,
+    .contractPage__container {
+        background: #fff;
+        padding: 0;
+        margin: 0;
+        max-width: none;
+        min-height: 0;
+    }
+
+    .contractPage__paper {
+        /* The page's own margins do this work now; a second set of paper
+           margins inside them left the text in a narrow column. */
+        max-width: none;
+        min-height: 0;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .contractPage__contractHtml {
+        font-size: 10.5pt;
+    }
+
+    /* Nothing interactive belongs on paper. */
+    .contractPage__langFab,
+    .contractPage__toast,
+    .ui-notify-container,
+    .sidebar,
+    .navbar-header,
+    .dashboard-footer {
+        display: none !important;
+    }
+}

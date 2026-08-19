@@ -1,4 +1,5 @@
-using Ganss.Xss;
+﻿using Ganss.Xss;
+using WitcherHub.Rendering;
 using Markdig;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -1052,13 +1053,7 @@ namespace WitcherHub.Pages.Contracts
             if (string.IsNullOrWhiteSpace(markdown))
                 return fallbackHtml ?? "<p>—</p>";
 
-            var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
-            var html = Markdown.ToHtml(markdown, pipeline);
-
-            var sanitizer = new HtmlSanitizer();
-            sanitizer.AllowedSchemes.Add("mailto");
-
-            return sanitizer.Sanitize(html);
+            return ContractMarkdown.ToHtml(markdown);
         }
 
         private static string BuildName(string? first, string? last, string? fallback)
