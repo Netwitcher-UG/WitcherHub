@@ -27,8 +27,6 @@ namespace WitcherHub.Infrastructure.Services.Contracts
     /// </summary>
     public sealed class ContractDraftService : IContractDraftService
     {
-        public const string CurrentPromptVersion = "contract-draft-v1";
-
         private readonly AppDbContext _db;
         private readonly IContractPositions _positions;
         private readonly IAiTextGenerator _ai;
@@ -37,6 +35,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         private readonly ContractTemplateOptions _template;
         private readonly ILogger<ContractDraftService> _logger;
         private readonly IBackgroundAnalysisRunner? _background;
+        private readonly ContractContextBuilder _contextBuilder;
 
         public ContractDraftService(
             AppDbContext db,
@@ -60,6 +59,12 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             _template = template.Value;
             _logger = logger;
             _background = background;
+
+            // Built here rather than injected: it is a pure assembler over the
+            // same context and options this service already holds, and making it
+            // a registered dependency would break every test that constructs this
+            // service directly for no benefit.
+            _contextBuilder = new ContractContextBuilder(db, _template);
         }
 
         public async Task<ContractSource> GetSourceAsync(Guid contractId, CancellationToken ct = default)
@@ -115,6 +120,28 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             var contract = await LoadAsync(contractId, ct);
 
+            // One click is one version, checked before anything else happens.
+            //
+            // This check used to live inside the supplied-text path, which was the
+            // only path that could be reached twice. Once every generation went
+            // through the model, a double click became two model calls and two
+            // versions — so the guard belongs here, above every path, where the
+            // request is what is being de-duplicated rather than the route it
+            // happens to take.
+            if (TryFindAlreadyGenerated(contract, options.IdempotencyKey) is { } repeated)
+            {
+                _logger.LogInformation(
+                    "Generation request {Key} for contract {ContractId} was already carried out as v{Version}.",
+                    options.IdempotencyKey, contractId, repeated.Version);
+
+                return new ContractDraftResult
+                {
+                    Succeeded = true,
+                    Draft = ToSummary(repeated, null),
+                    WasAlreadyPrepared = true
+                };
+            }
+
             // Producing a version never touches an approved one.
             //
             // This used to refuse outright and ask the user to confirm replacing
@@ -143,17 +170,36 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             var totals = _positions.CalculateTotals(positions, contract.Currency);
 
-            // With supplied text, the document is the contract. Preparing it means
-            // putting the current parties into it — deterministically, with no
-            // model involved — so a contract can be produced, approved and signed
-            // even when the assistant is unreachable.
-            if (source.Mode is ContractSourceMode.SuppliedText)
-                return await PrepareSuppliedAsync(contract, options, ct);
+            // Pasted text is an input to generation, never the output of it.
+            //
+            // This is the bug the owner reported as two stacked contracts. There
+            // were three paths and two of them put the pasted document into the
+            // contract body: Hybrid concatenated `source + "---" + generated`, and
+            // SuppliedText copied the merged source and appended a terms block. So
+            // the preview showed a wall of somebody's old agreement and then, below
+            // a rule, the actual contract.
+            //
+            // There is now one path. Whatever sources exist — positions, the
+            // record, confirmed terms, and the pasted text if there is any — are
+            // assembled into one context and produce one contract. Preparation
+            // without a model is still available and is still deterministic, but it
+            // is reached only when generation is impossible, not whenever a
+            // document happens to have been pasted.
+            var sourceText = LatestSupplied(contract)?.DocumentMarkdown;
+
+            var context = await _contextBuilder.BuildAsync(
+                contract,
+                positions,
+                totals,
+                sourceText,
+                options.AdditionalInstructions,
+                options.Language,
+                ct);
 
             string document;
             try
             {
-                document = await _ai.GenerateTextAsync(BuildPrompt(contract, positions, totals, options));
+                document = await _ai.GenerateTextAsync(ContractGeneratorPrompt.Build(context));
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -161,9 +207,46 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             }
             catch (AiInvocationException ex)
             {
+                // A fault the assistant will not recover from on its own — no API
+                // key, no credit, an unusable model — produces a contract anyway,
+                // composed from the record with no model involved. Otherwise the
+                // work stops until somebody fixes billing, which is the thing that
+                // must not happen.
+                //
+                // A transient fault does not take this path on purpose. A rate
+                // limit clears in seconds, and quietly substituting a plainer
+                // contract there risks somebody approving and sending it without
+                // noticing they got the lesser version. Those are reported and
+                // retried instead — and nothing about them blocks editing details,
+                // positions, the source, or the wording by hand.
+                if (ex.NeedsOwnerAction)
+                {
+                    _logger.LogWarning(
+                        "Falling back to a composed contract for {ContractId}: {Kind} ({CorrelationId}).",
+                        contractId, ex.Kind, ex.CorrelationId);
+
+                    var fallback = await ComposeWithoutAiAsync(contract, options, ct);
+
+                    if (fallback.Succeeded)
+                    {
+                        // Succeeded, but with something worth saying: the contract
+                        // exists and is plainer than it would have been.
+                        return new ContractDraftResult
+                        {
+                            Succeeded = true,
+                            Draft = fallback.Draft,
+                            Money = fallback.Money,
+                            ComposedWithoutAi = true,
+                            FailureReason =
+                                ex.UserMessage + " A contract was composed from your positions and details " +
+                                "instead — review it, and regenerate once the assistant is working."
+                        };
+                    }
+                }
+
                 // Everything the user entered is already saved; only the wording
-                // step failed. The message now says which failure it was and
-                // carries the reference that finds it in the log.
+                // step failed. The message says which failure it was and carries
+                // the reference that finds it in the log.
                 return ContractDraftResult.Failed(
                     ex.UserMessage + " Your positions and contract text are saved — you can write or paste the " +
                     "wording by hand, or try again.",
@@ -178,26 +261,31 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                     transient: true);
             }
 
-            if (string.IsNullOrWhiteSpace(document))
+            // The model returns clause content as JSON; the document is composed
+            // here. It used to return the finished Markdown, which meant it chose
+            // the heading levels, the numbering and whether the parties appeared at
+            // all — so two contracts generated a minute apart did not look like the
+            // same company's contracts.
+            if (!GeneratedContractContent.TryParse(document, out var content, out var parseError))
             {
+                _logger.LogWarning(
+                    "Contract generation for {ContractId} returned unusable content: {Error}",
+                    contractId, parseError);
+
                 return ContractDraftResult.Failed(
-                    "The assistant returned an empty document. Your positions are saved.",
+                    "The assistant's answer could not be read as a contract. Everything you entered is " +
+                    "saved — try again, or write the contract text by hand.",
                     transient: true);
             }
 
-            // The model writes clauses; the document around them is composed here.
-            //
-            // Asked for directly: what came back was not a German contract. It had
-            // a title like a page heading, sections numbered "1." "2." "3.", and
-            // neither a party block nor a signature block — so it could not be
-            // printed and signed as it stood. None of that frame is a matter of
-            // wording, so none of it is left to a model that might phrase it
-            // differently on every run. It comes from the record, the same way
-            // every time.
             var parties = await BuildPartyDetailsAsync(contract, ct);
 
+            // One contract, from all the sources. Nothing is appended to it: the
+            // pasted document informed the clauses and is not part of them.
             document = GermanContractDocument.Compose(
-                title: GeneratedContractTitle,
+                title: string.IsNullOrWhiteSpace(content.ContractType)
+                    ? GeneratedContractTitle
+                    : content.ContractType!.Trim(),
                 contractNo: contract.ContractNo,
                 projectTitle: contract.Project?.Title,
                 parties: new GermanContractDocument.Parties(
@@ -205,25 +293,9 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                     parties.CompanyAddress,
                     parties.CustomerName,
                     parties.CustomerAddress),
-                clauses: StripComposedParts(document),
+                clauses: content.ToClauseMarkdown(),
                 start: contract.StartDate,
                 end: contract.EndDate);
-
-            // A hybrid contract keeps the supplied wording and appends the service
-            // schedule generated from the positions, rather than replacing one
-            // with the other: both were supplied on purpose.
-            if (source.Mode is ContractSourceMode.Hybrid)
-            {
-                var supplied = LatestSupplied(contract);
-
-                if (supplied is not null)
-                {
-                    document =
-                        supplied.DocumentMarkdown.TrimEnd() +
-                        "\n\n---\n\n" +
-                        document.Trim();
-                }
-            }
 
             var draft = new ContractDraft
             {
@@ -231,41 +303,79 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 Version = await NextVersionAsync(contractId, ct),
                 DocumentMarkdown = document.Trim(),
                 PositionsSnapshot = JsonSerializer.SerializeToDocument(positions),
-                PromptVersion = CurrentPromptVersion,
+                PromptVersion = ContractGeneratorPrompt.Version,
                 TemplateVersion = _template.BaseDePath,
                 Model = _openAi.Model,
                 GeneratedBy = "openai",
                 GeneratedAt = DateTimeOffset.UtcNow,
                 Kind = ContractDraftKind.Generated,
-                SourceDraftId = source.Mode is ContractSourceMode.Hybrid ? LatestSupplied(contract)?.Id : null
+
+                // Which source document informed this contract, recorded as a
+                // reference rather than as content. It is what makes "generated
+                // with the pasted text in mind" answerable without the pasted text
+                // being in the contract.
+                SourceDraftId = LatestSupplied(contract)?.Id
             };
 
             _db.Set<ContractDraft>().Add(draft);
+
+            // Recorded so the guard at the top of this method can recognise a
+            // repeat. Without this the guard could never match on the generated
+            // path, and only the composed path was ever de-duplicated.
+            contract.LastPreparationKey = options.IdempotencyKey;
+            contract.LastPreparedDraftId = draft.Id;
+
+            // A draft exists, whichever path produced it.
+            //
+            // These two used to be written only by the supplied-text path, so once
+            // every contract went through generation the workflow state stopped
+            // advancing and the party record stopped being kept. Both belong to
+            // "a version was produced", not to how it was produced.
+            contract.PreparationState = ContractPreparationState.PreparedDraft;
+
+            contract.PartySnapshot = JsonSerializer.SerializeToDocument(new
+            {
+                companyName = parties.CompanyName,
+                companyAddress = parties.CompanyAddress,
+                customerName = parties.CustomerName,
+                customerAddress = parties.CustomerAddress,
+                takenAt = DateTimeOffset.UtcNow
+            });
+
             await _db.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Generated draft v{Version} for contract {ContractId} from {Mode} using {Model}.",
-                draft.Version, contractId, source.Mode, _openAi.Model);
+                "Generated draft v{Version} for contract {ContractId} from {Mode} using {Model}. " +
+                "Source document {Source} informed it without being copied into it.",
+                draft.Version, contractId, source.Mode, _openAi.Model,
+                draft.SourceDraftId is null ? "was absent" : "v" + LatestSupplied(contract)?.Version);
 
             return new ContractDraftResult { Succeeded = true, Draft = ToSummary(draft, totals) };
         }
 
         /// <summary>
-        /// Produces the customer-specific version of a supplied contract.
+        /// Composes a contract from the record, with no model involved.
         ///
-        /// Deterministic on purpose. The source document is the agreement; all
-        /// that is needed is to put the current parties into it, and doing that
-        /// with string replacement rather than a model means it cannot reword a
-        /// clause, and it still works when the assistant is down. The original is
-        /// never touched: this writes a new version that points back at it.
+        /// The path that keeps the work moving when the assistant cannot be used:
+        /// a missing API key, an empty account, a model the account cannot reach.
+        /// Everything in the document comes from the positions, the confirmed terms
+        /// and the parties, so it claims nothing that is not in the record — and it
+        /// needs no pasted document, because a contract built from positions and
+        /// details is a perfectly ordinary contract.
+        ///
+        /// This used to require a supplied document and merge the parties into it,
+        /// which made the pasted text the contract body. Both of those are gone:
+        /// pasted text is a source for generation, and this composes rather than
+        /// copies.
         /// </summary>
-        private async Task<ContractDraftResult> PrepareSuppliedAsync(
+        private async Task<ContractDraftResult> ComposeWithoutAiAsync(
             Contract contract, GenerateDraftOptions options, CancellationToken ct)
         {
+            // Referenced when there is one, not required. Requiring it meant a
+            // contract with positions and no pasted document could not be composed
+            // at all — so an unusable API key blocked exactly the case that needs
+            // no assistant.
             var supplied = LatestSupplied(contract);
-
-            if (supplied is null)
-                return ContractDraftResult.Failed("There is no supplied contract text to prepare.");
 
             // A repeat of a request already carried out returns what it produced
             // the first time. Two clicks on one button are one intention, and
@@ -292,38 +402,45 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             }
 
             var parties = await BuildPartyDetailsAsync(contract, ct);
-            var confirmed = options.ConfirmedReplacements
-                .Select(r => new PartyReplacement(r.Field, r.OldValue, r.NewValue, IsPlaceholder: false))
-                .ToList();
 
-            var merge = ContractPartyMerge.Merge(supplied.DocumentMarkdown, parties, confirmed);
-
-            if (merge.MissingFields.Count > 0 && merge.Applied.Count == 0)
+            if (string.IsNullOrWhiteSpace(parties.CompanyName) ||
+                string.IsNullOrWhiteSpace(parties.CustomerName))
             {
-                // Only blocking when there was a placeholder to fill and nothing to
-                // fill it with; a document that already names the parties needs
-                // nothing from us.
-                if (ContainsPlaceholder(supplied.DocumentMarkdown))
-                {
-                    contract.PreparationState = ContractPreparationState.PreparationFailed;
-                    await _db.SaveChangesAsync(ct);
+                contract.PreparationState = ContractPreparationState.PreparationFailed;
+                await _db.SaveChangesAsync(ct);
 
-                    return ContractDraftResult.Failed(
-                        "The contract has placeholders to fill in, but this information is missing: " +
-                        string.Join(", ", merge.MissingFields) +
-                        ". Add it to the company settings or the customer record and prepare the contract again.");
-                }
+                return ContractDraftResult.Failed(
+                    "A contract needs both parties named. Check the company settings and the customer " +
+                    "record, then try again.");
             }
 
-            // The confirmed values are folded in as a terms summary, so a prepared
-            // draft is more than a copy of the pasted text: it carries what a
-            // person actually agreed, next to the wording it was read from.
-            var confirmedTerms = await BuildConfirmedTermsBlockAsync(contract, supplied, ct);
+            // Composed from the record, not copied from the pasted document.
+            //
+            // This path used to merge the current parties into the supplied text
+            // and call the result the contract, so whatever somebody pasted became
+            // the contract body. That is the behaviour the owner ruled out: pasted
+            // text is a source for generation and never the output of it. The
+            // clauses here come from the positions and the confirmed terms — the
+            // things a person entered or agreed to — which is also why this path
+            // needs no model and works when the assistant is unreachable.
+            var positions = await _positions.GetPositionsAsync(contract.Id, ct);
+            var totals = _positions.CalculateTotals(positions, contract.Currency);
 
-            var document = merge.Document.TrimEnd();
+            var clauses = BuildDeterministicClauses(contract, positions, totals,
+                await BuildConfirmedTermListAsync(contract, ct));
 
-            if (!string.IsNullOrWhiteSpace(confirmedTerms))
-                document = document + "\n\n---\n\n" + confirmedTerms;
+            var document = GermanContractDocument.Compose(
+                title: GeneratedContractTitle,
+                contractNo: contract.ContractNo,
+                projectTitle: contract.Project?.Title,
+                parties: new GermanContractDocument.Parties(
+                    parties.CompanyName,
+                    parties.CompanyAddress,
+                    parties.CustomerName,
+                    parties.CustomerAddress),
+                clauses: clauses,
+                start: contract.StartDate,
+                end: contract.EndDate);
 
             var draft = new ContractDraft
             {
@@ -340,8 +457,8 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 GeneratedAt = DateTimeOffset.UtcNow,
                 Kind = ContractDraftKind.Prepared,
                 Status = ContractDraftStatus.Draft,
-                SourceDraftId = supplied.Id,
-                SourceLanguage = supplied.SourceLanguage
+                SourceDraftId = supplied?.Id,
+                SourceLanguage = supplied?.SourceLanguage
             };
 
             _db.Set<ContractDraft>().Add(draft);
@@ -362,11 +479,31 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             await _db.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Prepared supplied contract v{Version} for contract {ContractId} from source v{Source}. " +
-                "{Applied} placeholder(s) filled, {Missing} field(s) missing.",
-                draft.Version, contract.Id, supplied.Version, merge.Applied.Count, merge.MissingFields.Count);
+                "Composed contract v{Version} for {ContractId} without a model from {Positions} position(s) " +
+                "and {Terms} confirmed term(s). Source document v{Source} was referenced, not copied.",
+                draft.Version, contract.Id, positions.Count, clauses.Length,
+                supplied is null ? "(none)" : "v" + supplied.Version);
 
             return new ContractDraftResult { Succeeded = true, Draft = ToSummary(draft, null) };
+        }
+
+        /// <summary>
+        /// The version an identical earlier request already produced, or null.
+        ///
+        /// Keyed on what the caller sent rather than on what the contract looks
+        /// like now, so a retry after a timeout returns the version the first
+        /// attempt made instead of adding a second one.
+        /// </summary>
+        private static ContractDraft? TryFindAlreadyGenerated(Contract contract, string? idempotencyKey)
+        {
+            if (string.IsNullOrWhiteSpace(idempotencyKey)) return null;
+
+            if (!string.Equals(contract.LastPreparationKey, idempotencyKey, StringComparison.Ordinal))
+                return null;
+
+            return contract.LastPreparedDraftId is { } id
+                ? contract.Drafts.FirstOrDefault(d => d.Id == id)
+                : null;
         }
 
         /// <summary>
@@ -1265,101 +1402,118 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             return highest + 1;
         }
 
-        private static string BuildPrompt(
+        // The old free-form prompt lived here.
+        //
+        // It asked the model for the finished document as Markdown, which is why
+        // the model decided the heading levels, the numbering and whether the
+        // parties appeared at all — and why its output had to be stapled to a
+        // pasted document to look complete. Generation is now one prompt in one
+        // place, ContractGeneratorPrompt, returning structured clauses that this
+        // service composes into the document.
+        /// <summary>
+        /// The clauses of a contract, written without a model.
+        ///
+        /// Plain and factual on purpose. This is what a contract looks like when
+        /// the assistant is unreachable or not configured: every figure comes from
+        /// the positions and the confirmed terms, and no sentence claims anything
+        /// that is not in the record. It is a usable contract that a person can
+        /// then edit, which is the point — the work must not stop because OpenAI
+        /// is down.
+        /// </summary>
+        private static string BuildDeterministicClauses(
             Contract contract,
             IReadOnlyList<ManualPositionDto> positions,
             PositionTotalsDto totals,
-            GenerateDraftOptions options)
+            IReadOnlyList<(string Label, string Value)> confirmedTerms)
         {
-            // Deliberately excludes customer identity: the contract template fills
-            // the parties in, and the model does not need personal data to write the
-            // service sections.
-            var payload = positions.Select(p => new
+            var md = new StringBuilder();
+            var german = System.Globalization.CultureInfo.GetCultureInfo("de-DE");
+
+            md.Append("## § 1 Gegenstand des Vertrags\n\n");
+            md.Append("Der Auftragnehmer erbringt für den Auftraggeber die nachstehend aufgeführten Leistungen.\n\n");
+
+            if (positions.Count > 0)
             {
-                position = p.Position,
-                title = p.Title,
-                serviceType = p.ServiceType,
-                description = p.Description,
-                scope = p.Scope,
-                deliverables = p.Deliverables,
-                quantity = p.Quantity,
-                unit = p.Unit,
-                pricingModel = p.PricingModel.ToString(),
-                unitPrice = p.UnitPrice,
-                currency = p.Currency,
-                vatRate = p.VatRate,
-                discountType = p.DiscountType?.ToString(),
-                discountValue = p.DiscountValue,
-                netTotal = p.NetTotal,
-                billingCycle = p.BillingCycle.ToString(),
-                durationPeriods = p.DurationPeriods,
-                deliveryMethod = p.DeliveryMethod,
-                activationMethod = p.ActivationMethod.ToString(),
-                startDate = p.StartDate?.ToString("yyyy-MM-dd"),
-                deliveryDate = p.DeliveryDate?.ToString("yyyy-MM-dd"),
-                acceptanceCriteria = p.AcceptanceCriteria,
-                customerResponsibilities = p.CustomerResponsibilities,
-                assumptions = p.Assumptions,
-                exclusions = p.Exclusions,
-                notes = p.Notes
-            });
+                md.Append("## § 2 Leistungsumfang\n\n");
 
-            return $$"""
-                Write the clauses of a German service contract (Dienstleistungsvertrag),
-                in {{options.Language}}, as Markdown.
+                var n = 0;
 
-                FORM — this is a German contract and must be set like one:
-                - Each clause is a level-2 heading in the form "## § 1 Gegenstand des Vertrags",
-                  numbered from 1 upwards with no gaps.
-                - Inside a clause, each paragraph begins with its number in round
-                  brackets: "(1) ", "(2) ". A clause with a single paragraph needs no
-                  number.
-                - Where a paragraph lists items, use a lettered list: a), b), c).
-                - Use the formal register these documents are written in: "Der
-                  Auftragnehmer erbringt …", not "Wir machen …".
-                - Refer to the parties only as "der Auftragnehmer" and "der
-                  Auftraggeber". Never write the company names into the clauses.
-                - German number format throughout: 1.234,56 EUR.
+                foreach (var p in positions.OrderBy(p => p.Position))
+                {
+                    n++;
 
-                Produce these clauses, in this order, as §§:
-                1. Gegenstand des Vertrags — what is being delivered, in prose.
-                2. Leistungsumfang — one paragraph per position, using its scope and
-                   deliverables.
-                3. Mitwirkungspflichten des Auftraggebers — customer responsibilities.
-                4. Abnahme — acceptance criteria.
-                5. Annahmen und Ausschlüsse — assumptions and exclusions.
-                6. Vergütung und Zahlung — restate the figures below exactly.
-                7. Laufzeit und Aktivierung — billing cycle, duration, activation.
+                    var line = new StringBuilder();
+                    line.Append('(').Append(n).Append(") ").Append(p.Title?.Trim());
 
-                Rules:
-                - Restate every number exactly as given. Do not recalculate, round or
-                  convert anything, and do not add a figure that is not below.
-                - Do not add legal clauses, liability terms, warranties or payment
-                  obligations beyond the figures given. Haftung, Gerichtsstand,
-                  Datenschutz and Schlussbestimmungen are not yours to write.
-                - Do not invent services, dates or parties.
-                - Do NOT write the document title, the "zwischen … und …" party block,
-                  or a signature block. Those are composed from the customer record
-                  and would be wrong if you wrote them.
-                - If information is missing, write "wird noch festgelegt" rather than
-                  inventing a value.
-                - Output only the clauses as Markdown, starting with "## § 1". No
-                  commentary, no preamble, no closing remark.
+                    if (!string.IsNullOrWhiteSpace(p.Description))
+                        line.Append(" — ").Append(p.Description.Trim());
 
-                Currency: {{totals.Currency}}
-                Net total: {{totals.Subtotal}}
-                Discount: {{totals.Discount}}
-                VAT: {{totals.Vat}}
-                Gross total: {{totals.Total}}
-                Contract period: {{contract.StartDate?.ToString("yyyy-MM-dd") ?? "not set"}} to {{contract.EndDate?.ToString("yyyy-MM-dd") ?? "not set"}}
+                    md.Append(line).Append("\n\n");
 
-                Positions:
-                {{JsonSerializer.Serialize(payload)}}
+                    if (!string.IsNullOrWhiteSpace(p.Scope))
+                        md.Append(p.Scope.Trim()).Append("\n\n");
+                }
 
-                {{(string.IsNullOrWhiteSpace(options.AdditionalInstructions)
-                    ? ""
-                    : "Additional guidance for the wording only:\n" + options.AdditionalInstructions)}}
-                """;
+                md.Append("## § 3 Vergütung und Zahlung\n\n");
+
+                var money = 0;
+
+                foreach (var p in positions.OrderBy(p => p.Position))
+                {
+                    money++;
+
+                    var amount = p.IsFree
+                        ? "ohne Berechnung"
+                        : p.UnitPrice is null
+                            ? "wird noch festgelegt"
+                            : $"{p.UnitPrice.Value.ToString("N2", german)} {p.Currency ?? contract.Currency ?? "EUR"}";
+
+                    md.Append('(').Append(money).Append(") ")
+                      .Append(p.Title?.Trim()).Append(": ").Append(amount)
+                      .Append(BillingCycleText(p.BillingCycle))
+                      .Append(".\n\n");
+                }
+
+                md.Append('(').Append(money + 1).Append(") Nettosumme: ")
+                  .Append(totals.Subtotal.ToString("N2", german)).Append(' ').Append(totals.Currency)
+                  .Append(", Umsatzsteuer: ").Append(totals.Vat.ToString("N2", german))
+                  .Append(", Gesamtbetrag: ").Append(totals.Total.ToString("N2", german))
+                  .Append(' ').Append(totals.Currency).Append(".\n\n");
+            }
+
+            if (confirmedTerms.Count > 0)
+            {
+                md.Append("## § 4 Vereinbarte Konditionen\n\n");
+
+                foreach (var (label, value) in confirmedTerms)
+                    md.Append("- ").Append(label).Append(": ").Append(value).Append('\n');
+
+                md.Append('\n');
+            }
+
+            return md.ToString().TrimEnd() + "\n";
+        }
+
+        private static string BillingCycleText(BillingCycle cycle) => cycle switch
+        {
+            BillingCycle.Monthly => " monatlich",
+            BillingCycle.Quarterly => " vierteljährlich",
+            BillingCycle.SemiAnnual => " halbjährlich",
+            BillingCycle.Annual => " jährlich",
+            _ => ""
+        };
+
+        /// <summary>
+        /// The confirmed commercial terms as label/value pairs, for the
+        /// deterministic path. Same source as the generator's context.
+        /// </summary>
+        private async Task<IReadOnlyList<(string Label, string Value)>> BuildConfirmedTermListAsync(
+            Contract contract, CancellationToken ct)
+        {
+            var context = await _contextBuilder.BuildAsync(
+                contract, Array.Empty<ManualPositionDto>(), null, null, null, "de", ct);
+
+            return context.ConfirmedTerms.Select(t => (t.Label, t.Value)).ToList();
         }
 
         /// <summary>

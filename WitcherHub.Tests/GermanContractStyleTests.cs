@@ -179,13 +179,29 @@ namespace WitcherHub.Tests
                 TestPaths.Repository, "WitcherHub.Infrastructure", "Services", "Contracts",
                 "ContractDraftService.cs"));
 
-            // § headings with (1) paragraphs, which is what makes it read as a
-            // contract rather than as an article.
-            Assert.Contains("## § 1 Gegenstand des Vertrags", service);
-            Assert.Contains("(1) \", \"(2) \"", service.Replace("\"(1) \", \"(2) \"", "\"(1) \", \"(2) \""));
+            // The prompt no longer lives in the service: generation behaviour is
+            // controlled in one place, ContractGeneratorPrompt, and asserting
+            // against a copy of it in the service was how two prompts came to
+            // exist in the first place.
+            Assert.DoesNotContain("Write the clauses of a German service contract", service);
 
-            // And explicitly not the frame, which is composed from the record.
-            Assert.Contains("Do NOT write the document title", service);
+            var prompt = File.ReadAllText(Path.Combine(
+                TestPaths.Repository, "WitcherHub.Application", "Services", "Contracts",
+                "ContractGeneratorPrompt.cs"));
+
+            // Structured sections, numbered by the application.
+            Assert.Contains("Return JSON only", prompt);
+            Assert.Contains("Do not number the headings", prompt);
+
+            // German clause form, and the parties named only by role.
+            Assert.Contains("der Auftragnehmer", prompt);
+            Assert.Contains("Never write either company name into", prompt);
+
+            // The frame is composed from the record, never asked for.
+            Assert.Contains("Do not put the party", prompt);
+
+            // And no legal content is invented.
+            Assert.Contains("Do not write liability", prompt);
         }
 
         [Fact]
