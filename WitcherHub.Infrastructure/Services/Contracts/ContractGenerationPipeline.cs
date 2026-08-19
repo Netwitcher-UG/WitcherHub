@@ -61,6 +61,25 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         /// </summary>
         private const string LeftoverHeading = "Weitere Vereinbarungen";
 
+        /// <summary>
+        /// How many section calls may be in flight together.
+        ///
+        /// Enough that a long contract is not written one batch at a time while
+        /// somebody watches; few enough that generating one does not open a dozen
+        /// simultaneous requests and earn a rate limit — which would cost more
+        /// time than it saved.
+        /// </summary>
+        private const int ParallelCalls = 3;
+
+        /// <summary>
+        /// Below this share of the ledger, a repair pass is worth another call.
+        ///
+        /// Above it the document already says nearly everything, and the gaps are
+        /// reported to the reviewer rather than chased with a model call the user
+        /// is waiting on. Anything critical is repaired at any coverage.
+        /// </summary>
+        private const double RepairBelowCoverage = 0.9;
+
         public async Task<ContractGenerationOutcome> RunAsync(
             ContractGenerationContext context,
             CancellationToken ct = default)
@@ -106,12 +125,20 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             telemetry.PlannedSections = outline.Sections.Count;
 
-            // ---- 4. the clauses, a few at a time ----------------------------
+            // ---- 4. the clauses, a few at a time and all at once -------------
 
-            var written = new List<ContractSectionContent>();
+            // The batches do not depend on one another: each was given its own
+            // headings and its own ledger entries by the plan. Run one after the
+            // other, a twelve-section contract cost three model calls end to end
+            // and the user watched all three — which is most of why generation
+            // went from slow to unusable. They go together now, bounded so a
+            // large contract cannot open an unlimited number of calls at once.
+            var batches = outline.InBatches(ContractGeneratorPrompt.SectionsPerCall).ToList();
 
-            foreach (var batch in outline.InBatches(ContractGeneratorPrompt.SectionsPerCall))
-                written.AddRange(await WriteBatchAsync(context, ledger, batch, telemetry, ct));
+            var written = (await WhenAll(batches, batch =>
+                    WriteBatchAsync(context, ledger, batch, telemetry, ct)))
+                .SelectMany(sections => sections)
+                .ToList();
 
             if (written.Count == 0)
             {
@@ -126,15 +153,28 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             var audit = Measure(ledger, outline, written);
 
-            // ---- 6. one repair pass -----------------------------------------
+            // ---- 6. one repair pass, when it is worth a call -----------------
 
-            if (!audit.IsComplete)
+            // Not on any gap at all. A repair is another whole model call on the
+            // end of a generation the user is waiting for, and a contract that
+            // covers everything agreed except one position's notes does not need
+            // one. It runs when something that may never be dropped is missing, or
+            // when enough is missing that the document is genuinely thin.
+            if (audit.CriticalGaps.Count > 0 || audit.Ratio < RepairBelowCoverage)
             {
                 _logger.LogInformation("Contract coverage before repair: {Summary}", audit.Summary);
 
                 written = await RepairAsync(context, ledger, audit, written, telemetry, ct);
                 audit = Measure(ledger, outline, written, written);
                 telemetry.Repaired = true;
+            }
+            else if (!audit.IsComplete)
+            {
+                // Left alone, but not left unsaid: the gaps still reach the
+                // reviewer, they simply do not cost another call to chase.
+                _logger.LogInformation(
+                    "Contract coverage {Summary}; close enough that a repair pass is not worth a further call.",
+                    audit.Summary);
             }
 
             telemetry.WrittenSections = written.Count(s => s.HasContent);
@@ -337,13 +377,39 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 Purpose = purpose
             }, ct);
 
-            telemetry.ModelCalls++;
-            telemetry.InputTokens += answer.InputTokens ?? 0;
-            telemetry.OutputTokens += answer.OutputTokens ?? 0;
-
-            if (answer.IsTruncated) telemetry.TruncatedCalls++;
+            // The section calls run together, so these are written from several
+            // threads. Counting without this loses calls and tokens, which would
+            // make the one measurement of how long generation costs unreliable
+            // exactly when it matters.
+            telemetry.Record(answer);
 
             return answer;
+        }
+
+        /// <summary>
+        /// Runs the work together, a few at a time.
+        ///
+        /// Results come back in the order the inputs were given, whatever order
+        /// they finish in — the plan decides the order of the sections, and a
+        /// contract whose §§ arrived in completion order would be a different
+        /// document each run.
+        /// </summary>
+        private static async Task<IReadOnlyList<T>> WhenAll<TItem, T>(
+            IReadOnlyList<TItem> items, Func<TItem, Task<T>> work)
+        {
+            if (items.Count <= 1)
+                return items.Count == 0 ? Array.Empty<T>() : [await work(items[0])];
+
+            using var gate = new SemaphoreSlim(ParallelCalls, ParallelCalls);
+
+            var tasks = items.Select(async item =>
+            {
+                await gate.WaitAsync();
+                try { return await work(item); }
+                finally { gate.Release(); }
+            });
+
+            return await Task.WhenAll(tasks);
         }
 
         private static ContractCoverageAudit Measure(
@@ -454,6 +520,27 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         public int OutputTokens { get; set; }
         public int TruncatedCalls { get; set; }
         public bool Repaired { get; set; }
+
+        /// <summary>
+        /// Adds one call to the tally, safely.
+        ///
+        /// The section calls run together now, and <c>count++</c> from several
+        /// threads loses some of them — which would understate the very thing
+        /// these numbers exist to measure.
+        /// </summary>
+        public void Record(AiCompletion answer)
+        {
+            lock (_tally)
+            {
+                ModelCalls++;
+                InputTokens += answer.InputTokens ?? 0;
+                OutputTokens += answer.OutputTokens ?? 0;
+
+                if (answer.IsTruncated) TruncatedCalls++;
+            }
+        }
+
+        private readonly object _tally = new();
         public double CoverageRatio { get; set; }
         public int CriticalGaps { get; set; }
         public int ElapsedMs { get; set; }

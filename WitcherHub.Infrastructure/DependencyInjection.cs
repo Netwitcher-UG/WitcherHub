@@ -42,7 +42,7 @@ using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Infrastructure.Services.OpenAI;
 using WitcherHub.Infrastructure.Services.Pdf;
 using WitcherHub.Infrastructure.Services.Quotes;
-using QueuedHostedService = WitcherHub.Infrastructure.Services.BackgroundTasks.QueuedHostedService;
+using QueuedHostedService = WitcherHub.Infrastructure.Services.HostedServices.QueuedHostedService;
 
 namespace WitcherHub.Infrastructure
 {
