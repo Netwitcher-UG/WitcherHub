@@ -101,7 +101,7 @@ public class SuppliedContractPreparationTests : IAsyncLifetime
 
         _projectId = project.Id;
         _positions = new ManageContractPositions(db, NullLogger<ManageContractPositions>.Instance);
-        _sut = BuildService(new StubAi("## Wording"));
+        _sut = BuildService(new StubAi(AGeneratorAnswer.Minimal));
     }
 
     public async Task DisposeAsync()
@@ -275,16 +275,18 @@ public class SuppliedContractPreparationTests : IAsyncLifetime
         var prepared = await _sut.GenerateAsync(contractId, new GenerateDraftOptions());
 
         Assert.True(prepared.Succeeded, prepared.FailureReason);
-        Assert.Equal(ContractDraftKind.Prepared, prepared.Draft!.Kind);
-        Assert.Equal(ContractDraftStatus.Draft, prepared.Draft.Status);
-        Assert.Equal("Prepared draft", prepared.Draft.KindLabel);
+        Assert.Equal(ContractDraftStatus.Draft, prepared.Draft!.Status);
 
-        // More than a copy of the pasted text: the party placeholders are filled
-        // in and the confirmed terms are carried with it.
+        // A contract, not a copy of the pasted text.
+        //
+        // This used to assert the opposite: that the supplied wording came through
+        // with placeholders filled and a confirmed-terms block bolted on. Pasted
+        // text is a source for generation now, so what is asserted is that the
+        // customer is named from the record and the source wording is absent.
         Assert.DoesNotContain("[CUSTOMER_NAME]", prepared.Draft.DocumentMarkdown);
         Assert.Contains("LS harbring", prepared.Draft.DocumentMarkdown);
-        Assert.Contains("Bestätigte Vertragsdaten", prepared.Draft.DocumentMarkdown);
-        Assert.Contains("2500,00", prepared.Draft.DocumentMarkdown);
+        Assert.DoesNotContain("§ 1 Vertragsgegenstand", prepared.Draft.DocumentMarkdown);
+        Assert.StartsWith("# Dienstleistungsvertrag", prepared.Draft.DocumentMarkdown);
 
         var contract = await _db!.Contracts.AsNoTracking().FirstAsync(c => c.Id == contractId);
         Assert.Equal(ContractPreparationState.PreparedDraft, contract.PreparationState);
@@ -302,11 +304,19 @@ public class SuppliedContractPreparationTests : IAsyncLifetime
 
         var result = await BuildService(ai).GenerateAsync(contractId, new GenerateDraftOptions());
 
-        // Merging parties into a document is string replacement. Making it depend
-        // on the assistant would mean an invalid API key blocked a contract that
-        // needs no assistant.
+        // An invalid API key must not block a contract.
+        //
+        // It used to not block one because supplied text never went near the model.
+        // It now goes to the model first — that is how a pasted document becomes a
+        // proper contract rather than being copied — and an authentication failure
+        // falls back to composing from the record, so a contract still exists.
         Assert.True(result.Succeeded, result.FailureReason);
-        Assert.Equal(0, ai.Calls);
+        Assert.True(result.ComposedWithoutAi);
+        Assert.Equal(1, ai.Calls);
+
+        // Composed from the record, with the pasted wording still out of it.
+        Assert.DoesNotContain("§ 1 Vertragsgegenstand", result.Draft!.DocumentMarkdown);
+        Assert.StartsWith("# Dienstleistungsvertrag", result.Draft.DocumentMarkdown);
     }
 
     // =================================================================== 4
@@ -565,10 +575,17 @@ public class SuppliedContractPreparationTests : IAsyncLifetime
         var prepared = await _sut.GenerateAsync(contractId, new GenerateDraftOptions());
         var text = prepared.Draft!.DocumentMarkdown;
 
-        // Figures appear exactly as confirmed; the original wording is intact.
-        Assert.Contains("2500,00", text);
-        Assert.Contains("§ 1 Vertragsgegenstand", text);
-        Assert.Contains("2.500,00 EUR monatlich", text);
+        // The confirmed figures reach the contract; the source wording does not.
+        //
+        // "§ 1 Vertragsgegenstand" and "2.500,00 EUR monatlich" are the pasted
+        // document's own words, and this test used to require them in the contract
+        // body. That was the two-stacked-contracts behaviour. What must survive is
+        // the figure a person confirmed, which is stored on the contract itself.
+        Assert.DoesNotContain("§ 1 Vertragsgegenstand", text);
+        Assert.DoesNotContain("2.500,00 EUR monatlich", text);
+
+        var contract = await _db!.Contracts.AsNoTracking().FirstAsync(c => c.Id == contractId);
+        Assert.Equal(2500.00m, contract.AgreedTotalNet);
 
         // The unconfirmed end date is nowhere in it.
         Assert.DoesNotContain("31.01.2027", text);
@@ -617,10 +634,16 @@ public class SuppliedContractPreparationTests : IAsyncLifetime
             .OrderBy(d => d.Version)
             .ToListAsync();
 
+        // The source stays the source, and it stays untouchable.
         Assert.Equal(ContractDraftKind.Supplied, versions[0].Kind);
         Assert.True(versions[0].IsImmutableSource);
-        Assert.Equal(ContractDraftKind.Prepared, versions[1].Kind);
+
+        // The contract is generated from it rather than prepared out of it, which
+        // is the whole change: Prepared meant "the pasted document with our parties
+        // substituted in", and that is no longer what a contract is.
+        Assert.Equal(ContractDraftKind.Generated, versions[1].Kind);
         Assert.Equal(ContractDraftStatus.Approved, versions[1].Status);
+        Assert.False(versions[1].IsImmutableSource);
     }
 
     // =================================================================== extras

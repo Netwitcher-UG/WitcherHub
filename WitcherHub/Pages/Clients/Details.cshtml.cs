@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using System.Globalization;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
+using WitcherHub.Pages.Models.UI;
 
 namespace WitcherHub.Pages.Clients;
 
@@ -81,7 +82,33 @@ public class DetailsModel : PageModel
         return new JsonResult(new
         {
             customer = client,
-            projects
+
+            // The status arrives already worded, from the one vocabulary the whole
+            // application uses.
+            //
+            // The browser used to translate the enum itself, with a map of
+            // {0:Draft, 1:Active, 2:Closed, 3:Canceled} — which missed OnHold=4
+            // entirely, so a paused project rendered as the bare number "4", and
+            // spelled Cancelled with one L so that status found no colour either.
+            // Two copies of an enum is one copy too many; this page now shows what
+            // the Projects list and the workspace show because it is told.
+            projects = projects.Select(p => new
+            {
+                p.Id,
+                p.Title,
+                p.StartDate,
+                p.EndDate,
+                // The view type has this nullable although a project always has a
+                // status, so a missing one is reported as unknown rather than
+                // quietly shown as Draft — which would be a different project.
+                Status = p.Status?.ToString(),
+                StatusLabel = p.Status is { } s
+                    ? DocumentStatusPresentation.ForProject(s).Label
+                    : "Unknown",
+                StatusTone = p.Status is { } t
+                    ? DocumentStatusPresentation.ForProject(t).Tone
+                    : "secondary"
+            })
         });
     }
 }

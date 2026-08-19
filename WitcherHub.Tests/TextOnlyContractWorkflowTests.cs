@@ -97,7 +97,7 @@ public class TextOnlyContractWorkflowTests : IAsyncLifetime
         _projectId = project.Id;
 
         _positions = new ManageContractPositions(db, NullLogger<ManageContractPositions>.Instance);
-        _sut = BuildService(new StubAi("## Generated wording\n\nLeistungen laut Positionen."));
+        _sut = BuildService(new StubAi(AGeneratorAnswer.Complete));
     }
 
     public async Task DisposeAsync()
@@ -318,7 +318,7 @@ public class TextOnlyContractWorkflowTests : IAsyncLifetime
         var generated = await _sut.GenerateAsync(contractId, new GenerateDraftOptions());
 
         Assert.True(generated.Succeeded, generated.FailureReason);
-        Assert.Contains("Generated wording", generated.Draft!.DocumentMarkdown);
+        Assert.Contains("§ 1 Gegenstand des Vertrags", generated.Draft!.DocumentMarkdown);
 
         // Position contracts still snapshot what they were generated from.
         var draft = await _db!.Set<ContractDraft>().AsNoTracking()
@@ -345,9 +345,28 @@ public class TextOnlyContractWorkflowTests : IAsyncLifetime
 
         Assert.True(generated.Succeeded, generated.FailureReason);
 
-        // Neither source replaces the other: both were supplied on purpose.
-        Assert.Contains("AGENTURVERTRAG", generated.Draft!.DocumentMarkdown);
-        Assert.Contains("Generated wording", generated.Draft.DocumentMarkdown);
+        // The pasted document informed the contract and is not in it.
+        //
+        // This test used to assert the opposite — that both the source and the
+        // generated wording appeared — which is the behaviour the owner reported
+        // as two stacked contracts. Source text is an input to generation now, so
+        // asserting its absence is the point.
+        var document = generated.Draft!.DocumentMarkdown;
+
+        Assert.DoesNotContain("AGENTURVERTRAG", document);
+        Assert.DoesNotContain("Vertragsgegenstand", document);
+        Assert.DoesNotContain("\n---\n", document);
+
+        // One coherent contract, composed around the generated clauses.
+        Assert.StartsWith("# Dienstleistungsvertrag", document);
+        Assert.Contains("§ 1 Gegenstand des Vertrags", document);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(document, @"^# ",
+            System.Text.RegularExpressions.RegexOptions.Multiline));
+
+        // And it still records which document informed it.
+        var row = await _db!.Set<ContractDraft>().AsNoTracking()
+            .FirstAsync(d => d.Id == generated.Draft.Id);
+        Assert.NotNull(row.SourceDraftId);
     }
 
     // =================================================================== 9
@@ -363,10 +382,19 @@ public class TextOnlyContractWorkflowTests : IAsyncLifetime
         var broken = BuildService(new StubAi(_ => throw new AiInvocationException(
             AiFailureKind.Network, "no route to host", "DEADBEEF")));
 
-        // Supplied text needs no model at all: preparing it is deterministic, so
-        // the contract can still be produced with the assistant down.
+        // A network fault is transient, so it is reported rather than answered
+        // with a plainer contract: a rate limit or a blip clears in seconds, and
+        // silently substituting the lesser version risks somebody approving and
+        // sending it without noticing. What must not happen is being blocked from
+        // working, and nothing here blocks that.
         var prepared = await broken.GenerateAsync(contractId, new GenerateDraftOptions());
-        Assert.True(prepared.Succeeded, prepared.FailureReason);
+
+        Assert.False(prepared.Succeeded);
+        Assert.True(prepared.IsTransientFailure);
+        Assert.Contains("DEADBEEF", prepared.FailureReason!);
+
+        // The pasted document is untouched and still editable — the work goes on.
+        Assert.Contains("saved", prepared.FailureReason!, StringComparison.OrdinalIgnoreCase);
 
         // The source document is untouched and still the first version.
         var original = await _db!.Set<ContractDraft>().AsNoTracking()
@@ -423,16 +451,23 @@ public class TextOnlyContractWorkflowTests : IAsyncLifetime
 
         Assert.True(prepared.Succeeded, prepared.FailureReason);
 
-        // The customer's real name replaced the placeholder…
+        // The customer is named from the customer record.
+        //
+        // This used to be placeholder substitution inside the pasted document —
+        // "[CUSTOMER_NAME]" replaced in place, with the result kept as the
+        // contract. The document is composed from the record now, so the customer
+        // appears because the record says so, and a placeholder in the source is
+        // simply never carried across.
         Assert.Contains("Musterfirma GmbH", prepared.Draft!.DocumentMarkdown);
         Assert.DoesNotContain("[CUSTOMER_NAME]", prepared.Draft.DocumentMarkdown);
 
-        // …in a new version. The supplied original still has its placeholders.
+        // The supplied original is untouched, placeholders and all: it is the
+        // source, and a source that changed when it was read would not be one.
         var original = await _db!.Set<ContractDraft>().AsNoTracking()
             .FirstAsync(d => d.ContractId == contractId && d.Version == 1);
 
         Assert.Contains("[CUSTOMER_NAME]", original.DocumentMarkdown);
-        Assert.Equal(prepared.Draft.Id, prepared.Draft.Id);
+        Assert.True(original.IsImmutableSource);
         Assert.NotEqual(original.Id, prepared.Draft.Id);
 
         // The prepared version points back at what it was prepared from.

@@ -257,6 +257,17 @@ namespace WitcherHub.Application.Interfaces
         /// </summary>
         public bool WasAlreadyPrepared { get; init; }
 
+        /// <summary>
+        /// True when the contract was composed from the record without a model,
+        /// because the assistant could not be used.
+        ///
+        /// Succeeding is the point — the work must not stop because OpenAI is
+        /// down — but the result is plainer than a generated one, so the screen
+        /// says so and offers to regenerate rather than letting the user assume
+        /// this is the best the system can do.
+        /// </summary>
+        public bool ComposedWithoutAi { get; init; }
+
         /// <summary>How many reviewed values a person ticked, for the message.</summary>
         public int ConfirmedFieldCount { get; init; }
 
