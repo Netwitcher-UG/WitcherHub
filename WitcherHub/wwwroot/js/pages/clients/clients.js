@@ -512,31 +512,35 @@
 
         if (!tbody) return;
 
+        // An empty state that offers the next step, instead of a table row
+        // reading "No projects." with three empty cells beside it.
+        const empty = document.getElementById("vc-projectsEmpty");
+        const wrap = document.getElementById("vc-projectsTableWrap");
+
+        empty?.classList.toggle("d-none", list.length > 0);
+        wrap?.classList.toggle("d-none", list.length === 0);
+
         if (list.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" class="text-muted">No projects.</td></tr>`;
+            tbody.innerHTML = "";
             return;
         }
 
-        const normStatusText = (v) => {
-            if (v === null || v === undefined) return "";
-            if (typeof v === "number") {
-                const map = {
-                    0: "Draft",
-                    1: "Active",
-                    2: "Closed",
-                    3: "Canceled"
-                };
-                return map[v] ?? String(v);
-            }
-            return String(v);
-        };
+        /// The status as the server worded it, or the project vocabulary as a
+        /// fallback for a payload that predates the label being sent.
+        ///
+        /// This used to translate the enum here, from a map of {0:Draft, 1:Active,
+        /// 2:Closed, 3:Canceled}. The enum is Draft=0, Active=1, Closed=2,
+        /// Cancelled=3, OnHold=4 — so a paused project fell off the end of the map
+        /// and rendered as the bare number "4", and "Canceled" with one L matched
+        /// no colour. A second copy of an enum is a second thing to keep in step,
+        /// and this one was not in step.
+        const statusBadge = (p) => {
+            if (p.statusLabel)
+                return window.UI.badge.html(p.statusLabel, p.statusTone || 'secondary');
 
-        // These are project statuses, so they read from the project vocabulary.
-        // Matching on substrings ("closed" also matched "done" and "complete")
-        // meant this quietly disagreed with the projects list about both the
-        // wording and the colour of the same project.
-        const statusBadge = (status) =>
-            window.UI.badge.status('project', normStatusText(status));
+            const raw = p.status ?? p.Status ?? '';
+            return window.UI.badge.status('project', String(raw));
+        };
 
         const fmtDateOnly = (d) => {
             if (!d) return "—";
@@ -566,7 +570,7 @@
             return `
             <tr class="vc-project-row" data-open="${openUrl}" style="cursor:pointer;">
                 <td class="fw-semibold">${esc(title)}</td>
-                <td>${statusBadge(status)}</td>
+                <td>${statusBadge(p)}</td>
                 <td class="text-muted">${esc(datesText)}</td>
                 <td class="text-end">
                     ${id
@@ -1059,19 +1063,34 @@
 
 
 
+    /// How a client stands with the accounting export, in words.
+    ///
+    /// This printed the enum name straight onto the page — "NotExported" next to
+    /// the customer's name, which reads as an error and is not something anybody
+    /// outside the codebase should have to decode. The state is unchanged; only
+    /// what it is called on screen is.
+    const LEXWARE_LABELS = {
+        Imported: { label: 'From accounting', tone: 'neutral' },
+        Exported: { label: 'In accounting', tone: 'success' },
+        NotExported: { label: 'Not in accounting yet', tone: 'warning' }
+    };
+
+    function lexwareState(status) {
+        if (status === null || status === undefined || status === '') return null;
+
+        if (typeof status === 'number')
+            return status === 0 ? 'Imported' : status === 1 ? 'Exported' : 'NotExported';
+
+        return status;
+    }
+
     function lexwareBadgeHtml(status) {
-        if (!status) return '';
-        const isNum = typeof status === 'number';
-        const s = isNum
-            ? (status === 0 ? 'Imported' : status === 1 ? 'Exported' : 'NotExported')
-            : status;
+        const state = lexwareState(status);
+        if (!state) return '';
 
-        const tone =
-            s === 'Exported' ? 'primary' :
-                s === 'Imported' ? 'neutral' :
-                    'warning';
+        const shown = LEXWARE_LABELS[state] || { label: state, tone: 'neutral' };
 
-        return window.UI.badge.html(s, tone);
+        return window.UI.badge.html(shown.label, shown.tone);
     }
 
 
@@ -1188,6 +1207,10 @@
         setText('vc-lx-archived', fmtBool(client?.lexwareArchived));
         setText('vc-lx-taxFree', fmtBool(client?.lexwareAllowTaxFreeInvoices));
         setText('vc-lx-syncedAt', fmtDate(client?.lexwareSyncedAtUtc));
+
+        // The one fact worth having on the surface of the accounting section.
+        setHtml('vc-lx-status', lexwareBadgeHtml(client?.lexwareType));
+
         const fn = document.getElementById("vc-basic-firstName");
         if (fn) fn.value = client?.firstName ?? "";
 
@@ -1538,6 +1561,20 @@
         // ✅ ---- Basic actions FIRST ----
         if (action === 'edit-basic') { setBasicMode(true); return; }
         if (action === 'cancel-basic') { setBasicMode(false); return; }
+
+        // Straight into the project form with this client already chosen.
+        //
+        // Deliberately the same form on the same page as creating a project
+        // anywhere else, rather than a second creation UI living here: one flow
+        // means one set of required fields and one answer to what status a new
+        // project has. All this does is say which client.
+        if (action === 'create-project') {
+            const id = client?.id;
+            if (!id) return toastError('This client could not be identified.', 'Create project');
+
+            window.location.href = '/Projects?ForCustomerId=' + encodeURIComponent(id);
+            return;
+        }
         if (action === 'export-lexware') {
             if (client?.lexwareType !== 'NotExported') return;
 

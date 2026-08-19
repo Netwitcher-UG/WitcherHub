@@ -99,8 +99,23 @@ namespace WitcherHub.Pages
         // Create form fields
         [BindProperty] public CreateProjectDto Project { get; set; } = new();
 
+        /// <summary>
+        /// Opens the create form as the page loads, with this customer already
+        /// chosen.
+        ///
+        /// This is how "Create project" on a client works. Deliberately the same
+        /// form, the same validation, the same service call and the same redirect
+        /// as creating a project from here — a second creation path for clients
+        /// would be a second place for the two to disagree about required fields
+        /// or about what status a new project has.
+        /// </summary>
+        [BindProperty(SupportsGet = true)] public Guid? ForCustomerId { get; set; }
+
         public ModalVm CreateProjectModal { get; private set; } = new();
         public List<SelectListItem> CustomerOptions { get; private set; } = new();
+
+        /// <summary>True when the customer was chosen before the form opened.</summary>
+        public bool CustomerPreselected { get; private set; }
 
         public async Task OnGetAsync(CancellationToken ct)
         {
@@ -111,7 +126,18 @@ namespace WitcherHub.Pages
             ViewData["q"] = Search;
             await LoadCustomersAsync(ct);
             await LoadTableAsync(ct);
-            BuildCreateProjectModal(autoOpen: false);
+
+            // Arriving from a client: the customer is known, so it is filled in and
+            // the form is already open. Nobody should have to find a client they
+            // were just looking at in a dropdown.
+            if (ForCustomerId is { } customerId && customerId != Guid.Empty &&
+                CustomerOptions.Any(o => o.Value == customerId.ToString()))
+            {
+                Project.CustomerId = customerId;
+                CustomerPreselected = true;
+            }
+
+            BuildCreateProjectModal(autoOpen: CustomerPreselected);
         }
 
         private object Toast(string type, string title, string message)

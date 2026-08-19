@@ -67,21 +67,46 @@
                         <div class="small text-muted mt-1" id="vc-subtitle">—</div>
                     </div>
 
-                    <div class="d-flex align-items-center gap-3">
+                    @* The actions a person actually came here to take, in the order
+                       they are wanted, and each one saying what it does.
+
+                       This was two icons with no labels: an amber upload arrow and
+                       a red bin. Nothing said what either did, the commonest action
+                       on a client — starting a project for them — was not here at
+                       all, and the destructive one had the same visual weight as
+                       the rest. *@
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
                         <button type="button"
-                                id="vc-exportBtn"
-                                class="btn p-0 border-0 bg-transparent text-warning d-none"
-                                data-vc-action="export-lexware"
-                                title="Export to Lexware">
-                            <i class="ri-upload-2-line"></i>
+                                class="btn btn-primary text-sm px-16 py-8 radius-8 d-inline-flex align-items-center gap-2"
+                                data-vc-action="create-project">
+                            <i class="ri-add-line"></i> Create project
+                        </button>
+
+                        @* Editing a client happens in place on this page, so this
+                           opens that rather than navigating to a page that does not
+                           exist. The pencil beside "Basic Information" does the
+                           same thing and stays — this is the one somebody scanning
+                           the header will find. *@
+                        <button type="button"
+                                class="btn btn-outline-primary text-sm px-16 py-8 radius-8 d-inline-flex align-items-center gap-2"
+                                data-vc-action="edit-basic">
+                            <i class="ri-edit-line"></i> Edit client
                         </button>
 
                         <button type="button"
-                                class="btn p-0 border-0 bg-transparent text-danger"
-                                title="Delete Client"
+                                id="vc-exportBtn"
+                                class="btn btn-outline-primary text-sm px-16 py-8 radius-8 d-none align-items-center gap-2"
+                                data-vc-action="export-lexware">
+                            <i class="ri-upload-2-line"></i> Send to accounting
+                        </button>
+
+                        @* Last, outlined rather than filled, and it opens the
+                           confirmation below rather than acting on the click. *@
+                        <button type="button"
+                                class="btn btn-outline-danger text-sm px-16 py-8 radius-8 d-inline-flex align-items-center gap-2"
                                 data-bs-toggle="collapse"
                                 data-bs-target="#vc-deleteClientCollapse">
-                            <i class="ri-delete-bin-line"></i>
+                            <i class="ri-delete-bin-line"></i> Delete
                         </button>
                     </div>
                 </div>
@@ -121,10 +146,13 @@
         <!-- هنا الصق نفس المحتوى الداخلي الذي كان داخل modal-body -->
         <div class="row g-4">
 
+            @* Full width now that the integration card is not beside it.
+               It was col-xl-6 to pair with the Lexware card; once that moved, this
+               sat alone at half width with an empty half beside it — and its own
+               fields then wrapped into a narrow column for no reason. *@
             <!-- 1) Basic Info -->
-            <div class="col-12 col-xl-6">
-                <div class="card rounded-4 h-100">
-                    <div class="card-body">
+            <div class="col-12">
+                <div class="card rounded-4">
 
                         <div class="d-flex align-items-center justify-content-between mb-3">
                             <div class="d-flex align-items-center gap-2">
@@ -259,51 +287,73 @@
                 </div>
             </div>
 
-            <!-- 1.5) Lexware -->
-            <div class="col-12 col-xl-6">
-                <div class="card rounded-4 h-100">
-                    <div class="card-body">
-                        <div class="d-flex align-items-center gap-2 mb-3">
-                            <i class="ri-refresh-line opacity-75"></i>
-                            <h5 class="mb-0 fw-bold">Lexware</h5>
-                        </div>
+            @* ---- Accounting (Lexware) ------------------------------------
 
-                        <div class="row g-3">
-                            <div class="col-12 col-md-6">
-                                <div class="small text-muted">Customer Number</div>
-                                <div id="vc-lx-customerNumber">—</div>
+               Was a half-width card of the same weight as Basic Information,
+               listing seven raw integration fields — ContactId, OrganizationId,
+               Version, Archived, Allow Tax Free Invoices, Synced At (UTC) — every
+               one of which reads "—" until an export has happened. So the second
+               most prominent thing about a customer was a table of empty internal
+               identifiers.
+
+               Nothing is deleted: the ids still matter when a sync goes wrong.
+               They are behind a disclosure, and what is on the surface is the one
+               fact a person needs, which is whether this client is in the
+               accounting system yet.
+            *@
+            <div class="col-12">
+                <div class="card rounded-4">
+                    <div class="card-body py-16">
+                        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="ri-calculator-line opacity-75"></i>
+                                <span class="fw-semibold">Accounting</span>
+                                <span id="vc-lx-status" class="ms-2"></span>
                             </div>
 
-                            <div class="col-12 col-md-6">
-                                <div class="small text-muted">Version</div>
-                                <div id="vc-lx-version">—</div>
-                            </div>
-
-                            <div class="col-12 col-md-6">
-                                <div class="small text-muted">ContactId</div>
-                                <div id="vc-lx-contactId" class="text-muted">—</div>
-                            </div>
-
-                            <div class="col-12 col-md-6">
-                                <div class="small text-muted">OrganizationId</div>
-                                <div id="vc-lx-organizationId" class="text-muted">—</div>
-                            </div>
-
-                            <div class="col-12 col-md-6">
-                                <div class="small text-muted">Archived</div>
-                                <div id="vc-lx-archived">—</div>
-                            </div>
-
-                            <div class="col-12 col-md-6">
-                                <div class="small text-muted">Allow Tax Free Invoices</div>
-                                <div id="vc-lx-taxFree">—</div>
-                            </div>
-
-                            <div class="col-12">
-                                <div class="small text-muted">Synced At (UTC)</div>
-                                <div id="vc-lx-syncedAt" class="text-muted">—</div>
+                            <div class="d-flex align-items-center gap-3 flex-wrap text-sm">
+                                <span class="text-secondary-light">
+                                    Customer number:
+                                    <span class="text-primary-light fw-medium" id="vc-lx-customerNumber">—</span>
+                                </span>
+                                <span class="text-secondary-light">
+                                    Last sync:
+                                    <span class="text-primary-light" id="vc-lx-syncedAt">—</span>
+                                </span>
                             </div>
                         </div>
+
+                        @* A native disclosure rather than a Bootstrap collapse:
+                           it needs no JavaScript to work, and it is closed by
+                           default because these are for the day something breaks. *@
+                        <details class="mt-12">
+                            <summary class="text-secondary-light text-sm" style="cursor:pointer">
+                                Integration details
+                            </summary>
+
+                            <div class="row g-3 mt-8 text-sm">
+                                <div class="col-6 col-md-3">
+                                    <div class="text-secondary-light">Record version</div>
+                                    <div id="vc-lx-version">—</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="text-secondary-light">Archived there</div>
+                                    <div id="vc-lx-archived">—</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="text-secondary-light">Tax-free invoices allowed</div>
+                                    <div id="vc-lx-taxFree">—</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="text-secondary-light">Contact ID</div>
+                                    <div id="vc-lx-contactId" class="text-secondary-light">—</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="text-secondary-light">Organisation ID</div>
+                                    <div id="vc-lx-organizationId" class="text-secondary-light">—</div>
+                                </div>
+                            </div>
+                        </details>
                     </div>
                 </div>
             </div>
@@ -545,23 +595,45 @@
             <div class="col-12">
                 <div class="card rounded-4">
                     <div class="card-body">
-                        <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-3 flex-wrap">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="ri-folder-line opacity-75"></i>
                                 <h5 class="mb-0 fw-bold">Projects</h5>
+                                <span class="badge bg-neutral-200 text-neutral-600 border border-neutral-400 px-12 py-2 radius-4" id="vc-projectCount">0</span>
                             </div>
-                            <span class="badge bg-neutral-200 text-neutral-600 border border-neutral-400 px-12 py-2 radius-4" id="vc-projectCount">0</span>
+
+                            @* The action next to the thing it acts on, so a client
+                               with projects does not have to be scrolled back to
+                               the top to start another. *@
+                            <button type="button"
+                                    class="btn btn-outline-primary text-sm px-16 py-8 radius-8 d-inline-flex align-items-center gap-2"
+                                    data-vc-action="create-project">
+                                <i class="ri-add-line"></i> New project
+                            </button>
                         </div>
 
-                        <div class="table-responsive">
-                            <table class="table align-middle mb-0 vc-projects-table">
-                                <colgroup>
-                                    <col style="width:38%">
-                                    <col style="width:16%">
-                                    <col style="width:28%">
-                                    <col style="width:18%">
-                                </colgroup>
+                        @* "No projects." was a table row with three empty cells
+                           beside it and nothing to do about it. An empty state that
+                           names the next step is the whole value of the section
+                           when a client is new — which is when it is emptiest. *@
+                        <div id="vc-projectsEmpty" class="text-center py-32 d-none">
+                            <i class="ri-folder-open-line text-secondary-light" style="font-size:2rem"></i>
+                            <p class="fw-medium mt-12 mb-4">No projects for this client yet</p>
+                            <p class="text-secondary-light text-sm mb-16">
+                                Quotes, contracts and invoices all belong to a project, so this is where the work starts.
+                            </p>
+                            <button type="button"
+                                    class="btn btn-primary text-sm px-20 py-11 radius-8 d-inline-flex align-items-center gap-2"
+                                    data-vc-action="create-project">
+                                <i class="ri-add-line"></i> Create the first project
+                            </button>
+                        </div>
 
+                        @* No colgroup with fixed percentages: a four-column table
+                           forced to 100% width inside a card is what produced the
+                           horizontal scrollbar on a list of three projects. *@
+                        <div id="vc-projectsTableWrap">
+                            <table class="table align-middle mb-0 vc-projects-table">
                                 <thead>
                                     <tr>
                                         <th>Name</th>
@@ -571,9 +643,7 @@
                                     </tr>
                                 </thead>
 
-                                <tbody id="vc-projects">
-                                    <tr><td colspan="4" class="text-muted">No projects.</td></tr>
-                                </tbody>
+                                <tbody id="vc-projects"></tbody>
                             </table>
                         </div>
 
