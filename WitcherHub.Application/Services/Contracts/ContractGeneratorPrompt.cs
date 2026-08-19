@@ -256,7 +256,17 @@ namespace WitcherHub.Application.Services.Contracts
 
             AppendRules(prompt);
             AppendPrecedence(prompt);
-            AppendAuthoritativeData(prompt, context);
+
+            // The parties, the project, the term and the totals — not the full
+            // position list.
+            //
+            // Every section call used to carry the whole structured record, so a
+            // contract with thirty positions sent all thirty of them three or four
+            // times over. That is a large input on every call, it is paid for
+            // every time, and it is the part of the prompt the model does not need
+            // here: the entries this batch must cover are listed below in full,
+            // and they came from those same positions.
+            AppendFrameData(prompt, context);
 
             prompt.AppendLine();
             prompt.AppendLine("=== SECTIONS TO WRITE ===");
@@ -361,7 +371,10 @@ namespace WitcherHub.Application.Services.Contracts
                 prompt.AppendLine($"  {gap.Item.Id} [{gap.Item.Topic}] ({why}) {Flatten(gap.Item.Detail)}");
             }
 
-            AppendAuthoritativeData(prompt, context);
+            // The frame only. The entries this pass has to supply are listed above
+            // with everything they say; the whole position list would be a large
+            // input for a call that is already the last thing the user waits on.
+            AppendFrameData(prompt, context);
             AppendGuidance(prompt, context);
 
             return prompt.ToString();
@@ -408,6 +421,26 @@ namespace WitcherHub.Application.Services.Contracts
                 prompt.AppendLine($"  {i + 1}. {ContractGenerationContext.Precedence[i]}");
 
             prompt.AppendLine();
+        }
+
+        /// <summary>
+        /// The document's frame: who, what project, what term, what it totals.
+        ///
+        /// What a clause-writing call needs in order to be consistent with the
+        /// rest of the contract, without the whole position list it does not.
+        /// </summary>
+        private static void AppendFrameData(StringBuilder prompt, ContractGenerationContext context)
+        {
+            prompt.AppendLine("=== AUTHORITATIVE DATA ===");
+            prompt.AppendLine(Json(new
+            {
+                provider = context.Provider,
+                customer = context.Customer,
+                project = context.Project,
+                contract = context.Contract,
+                totals = context.Totals,
+                confirmedTerms = context.ConfirmedTerms
+            }));
         }
 
         private static void AppendAuthoritativeData(StringBuilder prompt, ContractGenerationContext context)

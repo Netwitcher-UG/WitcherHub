@@ -74,10 +74,29 @@ public class SourceIsNotTheContractTests : IAsyncLifetime
         public int Calls { get; private set; }
         public string? LastPrompt { get; private set; }
 
+        /// <summary>
+        /// Every prompt of the run, joined.
+        ///
+        /// Generation is several calls with different jobs: one plans the
+        /// contract and is given the whole structured record, the rest write a
+        /// few sections each and are given only what those sections must cover.
+        /// Asserting against whichever happened to be last was a test of call
+        /// order, and the sections now run together so there is no reliable last
+        /// one at all.
+        /// </summary>
+        public string Everything => string.Join("\n\n", _prompts);
+
+        private readonly List<string> _prompts = new();
+
         public Task<string> GenerateTextAsync(string prompt)
         {
-            Calls++;
-            LastPrompt = prompt;
+            lock (_prompts)
+            {
+                Calls++;
+                LastPrompt = prompt;
+                _prompts.Add(prompt);
+            }
+
             return Task.FromResult(_answer);
         }
     }
@@ -271,7 +290,10 @@ public class SourceIsNotTheContractTests : IAsyncLifetime
         var contractId = await NewContractAsync(sut, withPositions: true, withPastedText: true);
         await sut.GenerateAsync(contractId, new GenerateDraftOptions());
 
-        var prompt = ai.LastPrompt!;
+        // Across the whole run, not whichever call happened to be last: the
+        // plan gets the structured record, the section calls get the entries
+        // they must cover, and they no longer run in a fixed order.
+        var prompt = ai.Everything;
 
         // Company master data, from settings.
         Assert.Contains("Netwitcher", prompt);
