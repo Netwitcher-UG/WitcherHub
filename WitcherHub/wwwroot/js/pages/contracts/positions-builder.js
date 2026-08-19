@@ -927,11 +927,13 @@
 
         if (action === "run-organize") {
             await guard(button, async () => {
-                const result = await post("Organize", {
+                const result = await runJob("Organize", {
                     roughInput: document.getElementById("roughInput").value,
                     currency: defaultCurrency,
                     positions: positions
-                });
+                }, button,
+                    "The assistant is taking unusually long. It is still working — " +
+                    "close this and try again in a minute.");
 
                 if (!result.ok) {
                     // The user's positions are untouched.
@@ -984,7 +986,9 @@
             preparationKey = preparationKey || cryptoId();
 
             await guard(button, async () => {
-                const result = await post("GenerateDraft", { idempotencyKey: preparationKey });
+                const result = await runJob("GenerateDraft", { idempotencyKey: preparationKey }, button,
+                    "The contract is taking unusually long to write. It is still being worked on — " +
+                    "reload the page in a minute to see the version.");
 
                 if (!result.ok) {
                     // Preparation appends a version and replaces nothing, so it
@@ -1007,9 +1011,18 @@
                 // It has to survive the reload below, or it announces itself to a
                 // page that is already being replaced — and this is the one
                 // message somebody must read before they approve a version.
-                if (result.reviewNotes && result.reviewNotes.length) {
+                const pending = (result.reviewNotes || []).slice();
+
+                // Said when the assistant could not be used at all and the contract
+                // was composed from the record instead. It succeeded — but it is
+                // plainer than a written one, and somebody about to approve it
+                // should know which they are looking at. The old handler built its
+                // own success message and dropped this entirely.
+                if (result.composedWithoutAi && result.notice) pending.unshift(result.notice);
+
+                if (pending.length) {
                     try {
-                        sessionStorage.setItem(REVIEW_NOTES_KEY, JSON.stringify(result.reviewNotes));
+                        sessionStorage.setItem(REVIEW_NOTES_KEY, JSON.stringify(pending));
                     } catch { /* private mode; the notes are on the version anyway */ }
                 }
 
@@ -1226,23 +1239,60 @@
     /// Returns the same shape the old single call did, so the two callers did
     /// not have to change how they read the answer.
     async function runAnalysis(version, button) {
-        const started = await post("Analyze", { version });
+        return waitFor(
+            () => post("Analyze", { version }),
+            () => post("AnalysisStatus", { version }),
+            button,
+            "The contract is taking unusually long to read. It is still being worked on — " +
+            "reload the page in a minute to see the result.");
+    }
+
+    /// Starts a queued assistant action and waits for it, without holding a
+    /// request open while it runs.
+    ///
+    /// Writing the contract and tidying the positions were still doing their
+    /// model calls on the request that asked for them. That request is held open
+    /// for as long as the model takes, which is longer than the platform proxy
+    /// allows — so the browser was shown "HTTP 502, the request took too long"
+    /// while the work was still going, and the answer arrived into a request
+    /// nobody was listening to. Writing the contract then became several model
+    /// calls instead of one, and an intermittent failure became a certain one.
+    ///
+    /// Returns the result the job produced, flattened into the same shape the
+    /// single call used to return, so the callers read the answer as they did.
+    async function runJob(handler, payload, button, stillGoingMessage) {
+        const answer = await waitFor(
+            () => post(handler, payload),
+            jobId => post("AiJobStatus", { jobId }),
+            button,
+            stillGoingMessage);
+
+        if (!answer.ok || !answer.result) return answer;
+
+        // The job's own result, plus the ok flag the callers check.
+        return Object.assign({ ok: true }, answer.result);
+    }
+
+    /// The waiting itself, shared by every long action on this page.
+    async function waitFor(start, status, button, stillGoingMessage) {
+        const started = await start();
         if (!started.ok) return started;
 
+        const jobId = started.jobId;
         const startedAt = Date.now();
         let waited = 0;
 
-        while (waited < ANALYSIS_GIVE_UP_MS) {
-            // Gentle at first, then slower: most readings finish in the first
-            // half-minute, and a long one does not need to be asked every second.
+        while (waited < JOB_GIVE_UP_MS) {
+            // Gentle at first, then slower: most finish in the first half-minute,
+            // and a long one does not need to be asked every second.
             const gap = waited < 30000 ? 1500 : 4000;
             await sleep(gap);
             waited = Date.now() - startedAt;
 
-            const progress = await post("AnalysisStatus", { version });
+            const progress = await status(jobId);
 
-            // A failure to ask is not a failure of the reading — the reading is
-            // still going. Only stop for an answer that says so.
+            // A failure to ask is not a failure of the work — the work is still
+            // going. Only stop for an answer that says so.
             if (progress.sessionExpired) return progress;
 
             if (progress.ok && progress.running) {
@@ -1258,17 +1308,17 @@
 
         clearProgress(button);
 
-        return {
-            ok: false,
-            transient: true,
-            message: "The contract is taking unusually long to read. It is still being worked on — " +
-                "reload the page in a minute to see the result."
-        };
+        return { ok: false, transient: true, message: stillGoingMessage };
     }
 
     /// How long to keep asking before telling the user to come back later. The
-    /// reading itself is not cancelled; only the waiting stops.
-    const ANALYSIS_GIVE_UP_MS = 5 * 60 * 1000;
+    /// work itself is not cancelled; only the waiting stops.
+    ///
+    /// Ten minutes rather than five. Writing a contract is several model calls
+    /// now — the sources are planned, the sections written in batches, and the
+    /// result audited — and a long contract legitimately takes longer than one
+    /// reading of a document ever did.
+    const JOB_GIVE_UP_MS = 10 * 60 * 1000;
 
     function sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));

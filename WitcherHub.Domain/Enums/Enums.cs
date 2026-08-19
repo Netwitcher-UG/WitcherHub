@@ -124,6 +124,37 @@ namespace WitcherHub.Infrastructure.Data.Models
         }
 
         /// <summary>
+        /// Which long-running assistant action a job is.
+        ///
+        /// Reading a supplied document was moved off the request thread when it
+        /// started returning HTTP 502; writing the contract and tidying the
+        /// positions were left on it, and both call the model. Generation became
+        /// several calls rather than one, which turned "sometimes too slow" into
+        /// "always too slow".
+        /// </summary>
+        public enum ContractAiJobKind
+        {
+            /// <summary>Writing the contract wording from the positions and the record.</summary>
+            Generation = 0,
+
+            /// <summary>Tidying rough positions into proper ones.</summary>
+            Organize = 1
+        }
+
+        /// <summary>Where a background assistant job has got to.</summary>
+        public enum ContractAiJobStatus
+        {
+            /// <summary>Queued or running. The page polls while this stands.</summary>
+            Running = 0,
+
+            /// <summary>Finished with something to show.</summary>
+            Succeeded = 1,
+
+            /// <summary>Finished without it, for a reason the user should read.</summary>
+            Failed = 2
+        }
+
+        /// <summary>
         /// How far a supplied contract text has got through analysis. Only
         /// <see cref="Confirmed"/> means a person has agreed the extracted values.
         /// </summary>

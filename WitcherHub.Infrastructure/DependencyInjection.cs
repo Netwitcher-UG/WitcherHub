@@ -243,6 +243,11 @@ namespace WitcherHub.Infrastructure
             // Reading a contract takes longer than a proxy will hold a
             // connection, so it runs off the request and the page polls.
             services.AddSingleton<IBackgroundAnalysisRunner, BackgroundAnalysisRunner>();
+
+            // Writing the contract and tidying the positions are the same kind of
+            // work and were still being done on the request thread, which is why
+            // both answered HTTP 502.
+            services.AddScoped<IContractAiJobs, ContractAiJobService>();
             
             // Where the logo lives, rather than a path compiled into the PDF
             // generator that pointed at a directory this repository does not have.
