@@ -352,21 +352,31 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
 
         /// <summary>
         /// Provider messages quote the offending request back, which can include
-        /// a key fragment. Anything that looks like one is removed.
+        /// the key. Anything that looks like one is replaced outright.
         ///
-        /// The pattern allows '*' and matches from four characters rather than
-        /// eight, because the client masks the key itself before putting it in an
-        /// exception message — as sk-AbCde**********************wxyz — and that
-        /// form slipped through the stricter pattern untouched. It is the client's
-        /// own masking and not enough to reconstruct a key, but it is still key
-        /// material in a log this application chose to say it does not write.
+        /// The whole token goes, the "sk-" and any trailing characters with it.
+        /// An earlier version left the prefix and wrote sk-***, and the client's
+        /// own masking — sk-AbCde**********************wxyz — leaves the first
+        /// few and last few characters in place. Neither is enough to reconstruct
+        /// a key, and neither is worth defending: there is no use for a fragment
+        /// of a key in a log, and "no part of the key is written" is a rule that
+        /// can be checked, where "not too much of it" is not.
+        ///
+        /// Bearer tokens go the same way. The same secret travels as an
+        /// Authorization header, and a message quoting the failed request back
+        /// can carry it in that form instead.
         /// </summary>
         internal static string Redact(string message)
         {
             if (string.IsNullOrEmpty(message)) return "";
 
+            // sk-, sk-proj-, sk-svcacct- and the masked forms in one pass: the
+            // prefix, then anything a key or its mask is made of.
+            var redacted = System.Text.RegularExpressions.Regex.Replace(
+                message, @"sk-[A-Za-z0-9_*\-]{2,}", "[REDACTED]");
+
             return System.Text.RegularExpressions.Regex.Replace(
-                message, @"sk-[A-Za-z0-9_*\-]{4,}", "sk-***");
+                redacted, @"(?i)\bBearer\s+[A-Za-z0-9._~+/*\-]+=*", "Bearer [REDACTED]");
         }
 
         private static string NewCorrelationId() =>

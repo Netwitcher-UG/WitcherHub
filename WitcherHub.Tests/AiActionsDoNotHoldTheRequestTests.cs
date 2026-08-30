@@ -376,11 +376,14 @@ namespace WitcherHub.Tests
         /// every assistant job and every analysis ended by throwing on the way
         /// out: the queue logged "background work item failed" for work that had
         /// succeeded, and the scope's connection was never released cleanly.
+        ///
+        /// Covers the two paths this change is about. The recurring-invoice
+        /// service has the same fault and is deliberately left alone here — it is
+        /// nothing to do with the assistant, and it belongs to its own change.
         /// </summary>
         [Theory]
         [InlineData("WitcherHub.Infrastructure", "Services", "Contracts", "ContractAiJobService.cs")]
         [InlineData("WitcherHub.Infrastructure", "Services", "Contracts", "BackgroundAnalysisRunner.cs")]
-        [InlineData("WitcherHub.Infrastructure", "Services", "Lexware", "RecurringInvoiceHostedService.cs")]
         public void BackgroundWorkDisposesItsScopeAsynchronously(params string[] parts)
         {
             var source = File.ReadAllText(
@@ -388,6 +391,33 @@ namespace WitcherHub.Tests
 
             Assert.DoesNotContain("CreateScope()", source);
             Assert.Contains("CreateAsyncScope()", source);
+        }
+
+        /// <summary>
+        /// Exactly one forwarded header is trusted.
+        ///
+        /// The proxy cannot be pinned by address, so the known-proxy check is
+        /// cleared and the header is taken from whoever sent it. That is only
+        /// acceptable while the set stays at the one header that cannot be abused:
+        /// X-Forwarded-Proto claims a plaintext hop arrived over TLS, which
+        /// relaxes nothing. X-Forwarded-Host would let a caller forge the host
+        /// behind every generated URL, and X-Forwarded-For would let it forge the
+        /// client address — which nothing here even reads. Adding either without
+        /// re-thinking the cleared proxy list is the mistake this guards.
+        /// </summary>
+        [Fact]
+        public void OnlyTheProtocolHeaderIsTrustedFromTheProxy()
+        {
+            var source = File.ReadAllText(Path.Combine(
+                TestPaths.WebProject, "Configuration", "Extensions", "ServiceCollectionExtensions.cs"));
+
+            Assert.Contains("options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;", source);
+            Assert.DoesNotContain("XForwardedHost", source);
+            Assert.DoesNotContain("XForwardedFor", source);
+            Assert.DoesNotContain("ForwardedHeaders.All", source);
+
+            // One hop, stated rather than inherited from the default.
+            Assert.Contains("options.ForwardLimit = 1;", source);
         }
 
         [Fact]

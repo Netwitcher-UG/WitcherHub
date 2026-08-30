@@ -28,24 +28,43 @@ namespace WitcherHub.Configuration.Extensions
         {
             services.AddLocalization();
 
-            // Railway (like every managed platform) terminates TLS at its edge and
-            // forwards plain HTTP to the container. Without this the request looks
-            // like http:// to the application, and three things quietly go wrong:
-            // the sign-in cookie is written without its Secure flag because
-            // Request.IsHttps is false, every absolute URL built from
-            // Request.Scheme goes into an email as http://, and the logo the PDF
-            // renderer fetches over http is redirected rather than served.
+            // Railway terminates TLS at its edge and forwards plain HTTP to the
+            // container. Without this the request looks like http:// to the
+            // application, and two things quietly go wrong: the sign-in cookie is
+            // written without its Secure flag because Request.IsHttps is false,
+            // and every absolute URL built from Request.Scheme — signing links in
+            // email, the logo the PDF renderer fetches — goes out as http://.
             //
-            // The proxy is not on a known network and its address is not stable,
-            // so the default KnownProxies/KnownNetworks check has to be cleared —
-            // that check is what makes the middleware ignore the headers entirely
-            // behind an unknown proxy. Only the two headers actually needed are
-            // honoured, and the host is deliberately not among them: AllowedHosts
-            // stays the thing that decides which host is acceptable.
+            // Exactly one header is trusted, and it is the only one needed to fix
+            // that: X-Forwarded-Proto.
+            //
+            //   X-Forwarded-For is NOT trusted. Trusting it would let any caller
+            //   set the address the application believes it is talking to, and
+            //   nothing here reads that address — no rate limit, no lockout, no
+            //   audit trail — so it would be spoofable surface bought for nothing.
+            //
+            //   X-Forwarded-Host is NOT trusted. It is the dangerous one: a forged
+            //   host reaches anything that builds a URL from the request. Links
+            //   that leave the application are built from WITCHERHUB_PUBLIC_BASE_URL
+            //   instead, which is configuration and cannot be forged by a caller.
+            //
+            // KnownProxies and KnownNetworks have to be cleared because Railway's
+            // proxy has no address this application can pin — that list is what
+            // makes the middleware ignore the header behind an unrecognised peer,
+            // and with it populated the fix simply would not apply. What limits
+            // the exposure instead is that the container's port is reachable only
+            // through Railway's own proxy, and that a forged X-Forwarded-Proto can
+            // do no more than tell the application a plaintext request arrived
+            // over TLS — which relaxes nothing, because the same value cannot be
+            // used to claim the reverse.
+            //
+            // ForwardLimit stays at one hop, stated rather than inherited: only
+            // the value Railway itself appended is read, so a caller cannot send a
+            // chain and have an earlier entry believed.
             services.Configure<ForwardedHeadersOptions>(options =>
             {
-                options.ForwardedHeaders =
-                    ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+                options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
+                options.ForwardLimit = 1;
 
                 options.KnownNetworks.Clear();
                 options.KnownProxies.Clear();
