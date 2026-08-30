@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
-using System.Text;
 using System.Text.Json;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Interfaces;
@@ -145,12 +144,10 @@ namespace WitcherHub.Pages.Contracts
         /// <summary>
         /// Queues the rewrite and answers at once.
         ///
-        /// This used to call the model on this very request and answer with the
-        /// finished contract. Writing a contract takes longer than the platform
-        /// proxy will hold a connection open, so the browser was shown HTTP 502
-        /// while the work was still going and the document landed in a request
-        /// nobody was listening to — the same fault that moved the positions
-        /// screen onto the job queue, still standing here until now.
+        /// This used to do the whole generation on this request and answer with
+        /// a redirect. Nothing said it was working, a second press started a
+        /// second generation, and the only way to report a failure was to replace
+        /// the screen with an error page.
         ///
         /// The form is still posted as a form, so the model binding that fills the
         /// view model is untouched; only what happens next has changed. The page

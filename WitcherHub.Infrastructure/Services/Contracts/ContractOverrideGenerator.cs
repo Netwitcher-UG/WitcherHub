@@ -15,11 +15,12 @@ namespace WitcherHub.Infrastructure.Services.Contracts
     /// Writes the contract from wording edited by hand on the override screen.
     ///
     /// The work is unchanged; where it runs is not. It used to sit in the page
-    /// model and execute on the POST that carried the form, so a generation that
-    /// takes minutes was answered with HTTP 502 by the platform proxy long before
-    /// it finished — and the document it eventually produced was saved into a
-    /// request nobody was listening to. Here it can be driven by the background
-    /// job queue the other two assistant actions already use.
+    /// model and execute on the POST that carried the form — quickly, as it
+    /// happens, because the screen always supplies StructuredOverride and that
+    /// branch never calls the model. What it had no room for was saying anything
+    /// while it ran, refusing a second press, or reporting a failure as anything
+    /// but an error page. Here it is driven by the background job queue the other
+    /// two assistant actions already use, and reported the same way they are.
     /// </summary>
     public sealed class ContractOverrideGenerator : IContractOverrideGenerator
     {

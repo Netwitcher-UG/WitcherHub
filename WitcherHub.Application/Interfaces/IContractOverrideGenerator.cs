@@ -5,15 +5,17 @@ namespace WitcherHub.Application.Interfaces
     /// <summary>
     /// Rewriting a contract from wording a person edited by hand.
     ///
-    /// This lived in the override page's model, which meant the model call
-    /// happened on the request that asked for it. A contract takes longer to write
-    /// than a platform proxy will hold a connection open, so that request came
-    /// back HTTP 502 while the work was still going, and the finished document
-    /// landed in a request nobody was listening to — the same fault that took the
-    /// positions screen off the request thread, still standing on this one.
+    /// This lived in the override page's model and ran on the POST that carried
+    /// the form. That request was not actually slow — the screen always supplies
+    /// StructuredOverride, which is the branch of ContractDocumentGenerator that
+    /// composes from the edited structure and never calls the model — but nothing
+    /// about the screen said so: no progress while it ran, no guard against a
+    /// second press, and no way to report a failure except replacing the screen
+    /// with an error page. It is also one null away from the model branch.
     ///
-    /// Lifting it here lets the background job do the work, and leaves the page
-    /// with nothing to do but collect the form and poll.
+    /// Lifting it here lets the background job own the work, so the page has
+    /// nothing to do but collect the form and poll, and reports success and
+    /// failure the same way the other two assistant actions already do.
     /// </summary>
     public interface IContractOverrideGenerator
     {

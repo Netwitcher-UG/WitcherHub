@@ -68,11 +68,11 @@
                 Save Change
             </button>
 
-            @* Generation is queued and polled, not submitted: writing a contract
-               takes longer than the platform proxy holds a connection open, so a
-               plain submit came back 502 while the work was still going. The
-               button keeps its formaction — the script posts the form to exactly
-               that handler — so with no JavaScript it still reaches the server. *@
+            @* Generation is queued and polled rather than submitted, so the
+               screen can show progress, refuse a second press and report a
+               failure in place. The button keeps its formaction — the script
+               posts the form to exactly that handler — so with no JavaScript it
+               still reaches the server. *@
             <button class="btn btn-success"
                     type="submit"
                     id="btnGenerateContract"
@@ -220,13 +220,12 @@
         // "Generate Contract" is queued and polled; every other button on this
         // form is an ordinary submit.
         //
-        // Generating used to be a plain submit that ran the model call on the
-        // request. A contract takes longer to write than the platform proxy will
-        // hold a connection open, so the browser was answered HTTP 502 while the
-        // work was still going and the finished document was saved into a request
-        // nobody was listening to. The form is still posted as a form — the model
-        // binding that fills the view model is untouched — but the answer is now a
-        // job id, and this waits on it.
+        // Generating used to be a plain submit that did the whole generation on
+        // the request and answered with a redirect: nothing on screen while it
+        // ran, a second press starting a second generation, and a failure showing
+        // up as an error page over the top of the edit. The form is still posted
+        // as a form — the model binding that fills the view model is untouched —
+        // but the answer is now a job id, and this waits on it.
         (function () {
           const form = document.querySelector('form[method="post"]');
           const generate = document.getElementById('btnGenerateContract');

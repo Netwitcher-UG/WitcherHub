@@ -266,9 +266,10 @@ namespace WitcherHub.Tests
         // ============================================ the override screen too
 
         /// <summary>
-        /// The override screen was the last one calling the model on the request
-        /// that asked for it — a plain form POST that ran a full generation before
-        /// answering, which is the same 502 with a different button on it.
+        /// The override screen ran a full generation on the request that carried
+        /// the form. Not slowly — it always supplies StructuredOverride, the
+        /// branch that never calls the model — but with nowhere to show progress,
+        /// nothing stopping a second press, and no way to report a failure.
         /// </summary>
         [Fact]
         public void TheOverrideScreenDoesNotGenerateOnTheRequest()
