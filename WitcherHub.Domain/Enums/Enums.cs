@@ -138,7 +138,21 @@ namespace WitcherHub.Infrastructure.Data.Models
             Generation = 0,
 
             /// <summary>Tidying rough positions into proper ones.</summary>
-            Organize = 1
+            Organize = 1,
+
+            /// <summary>
+            /// Rewriting the contract from wording a person edited by hand on the
+            /// override screen.
+            ///
+            /// That screen was the last one still calling the model on the request
+            /// that asked for it, long after the other two were moved off. It is
+            /// the same work with a different starting point, so it is the same
+            /// kind of job.
+            ///
+            /// Stored as text in an unconstrained column, so this value costs no
+            /// schema change.
+            /// </summary>
+            Override = 2
         }
 
         /// <summary>Where a background assistant job has got to.</summary>

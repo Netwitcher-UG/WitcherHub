@@ -23,19 +23,19 @@ namespace WitcherHub.Pages.Contracts
     {
         private readonly IContract _contracts;
         private readonly IProject _projects;
-        private readonly IContractDocumentGenerator _contractDocumentGenerator;
         private readonly IDistributedCache _cache;
+        private readonly IContractAiJobs _jobs;
         private static readonly JsonSerializerOptions _jsonOpts = new()
         {
             PropertyNameCaseInsensitive = true
         };
-        public OverrideModel(IContract contracts, IProject projects, IContractDocumentGenerator contractDocumentGenerator,
-            IDistributedCache cache)
+        public OverrideModel(IContract contracts, IProject projects,
+            IDistributedCache cache, IContractAiJobs jobs)
         {
             _contracts = contracts;
             _projects = projects;
-            _contractDocumentGenerator = contractDocumentGenerator;
             _cache = cache;
+            _jobs = jobs;
         }
 
         [BindProperty(SupportsGet = true, Name = "id")]
@@ -142,51 +142,125 @@ namespace WitcherHub.Pages.Contracts
             return RedirectToPage("/Contracts/Override", new { id = contract.Id });
         }
 
+        /// <summary>
+        /// Queues the rewrite and answers at once.
+        ///
+        /// This used to call the model on this very request and answer with the
+        /// finished contract. Writing a contract takes longer than the platform
+        /// proxy will hold a connection open, so the browser was shown HTTP 502
+        /// while the work was still going and the document landed in a request
+        /// nobody was listening to — the same fault that moved the positions
+        /// screen onto the job queue, still standing here until now.
+        ///
+        /// The form is still posted as a form, so the model binding that fills the
+        /// view model is untouched; only what happens next has changed. The page
+        /// polls <see cref="OnPostAiJobStatusAsync"/> from here.
+        /// </summary>
         public async Task<IActionResult> OnPostGenerateAsync(CancellationToken ct)
         {
             NormalizeListsFromForm();
 
-            if (Vm.ContractId == Guid.Empty) return BadRequest();
+            if (Vm.ContractId == Guid.Empty)
+                return new JsonResult(new { ok = false, transient = false, message = "No contract was given." });
 
             var contract = await _contracts.GetContractAsync(Vm.ContractId, ct);
-            if (contract is null) return NotFound();
-            if (IsContractLocked(contract)) throw new BadRequestAppException("Contract is locked.");
 
-            var prj = await _projects.GetProjectAsync(contract.ProjectId, ct);
-            if (prj is null) throw new NotFoundAppException("Project not found.");
+            if (contract is null)
+                return new JsonResult(new { ok = false, transient = false, message = "That contract no longer exists." });
 
-            var structured = MapVmToStructured(Vm);
-
-            var req = BuildGenerateRequest(prj, contract);
-            req.StructuredOverride = structured; 
-
-            var doc = await _contractDocumentGenerator.GenerateAsync(req, ct);
-
-            await SaveAiSnapshotAsync(contract.Id, doc.Structured, ct);
-
-            var update = new UpdateContractDto
+            if (IsContractLocked(contract))
             {
-                Contract = new ContractDto
+                return new JsonResult(new
                 {
-                    ProjectId = contract.ProjectId,
-                    Currency = contract.Currency,
-                    Status = DocumentStatus.Draft,
-                    StartDate = contract.StartDate,
-                    EndDate = contract.EndDate,
-                    Terms = doc.FullDocument,
-                    TermsStructured = doc.Structured,
-                    SignedAt = null
+                    ok = false,
+                    transient = false,
+                    message = "This contract has been signed, so its wording can no longer be changed."
+                });
+            }
+
+            var started = await _jobs.StartAsync(
+                Vm.ContractId,
+                ContractAiJobKind.Override,
+                new OverrideJobRequest
+                {
+                    Structured = MapVmToStructured(Vm),
+
+                    // The working copy this screen reads back is cached per user,
+                    // and the job has no signed-in user of its own.
+                    UserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
                 },
-                Items = null
-            };
 
-            await _contracts.UpdateAsync(contract.Id, update, ct);
+                // Sent by the browser, so a second press or a retry after a
+                // timeout joins the first job rather than writing the contract
+                // twice.
+                requestKey: Vm.IdempotencyKey,
+                ct);
 
-            TempData["Toast.Type"] = "success";
-            TempData["Toast.Title"] = "Generated";
-            TempData["Toast.Message"] = "Contract generated successfully.";
+            if (!started.Running)
+            {
+                return new JsonResult(new
+                {
+                    ok = false,
+                    transient = false,
+                    message = started.FailureReason
+                });
+            }
 
-            return Redirect($"/Projects?openProjectId={contract.ProjectId}&tab=contracts");
+            return new JsonResult(new
+            {
+                ok = true,
+                running = true,
+                jobId = started.JobId,
+                alreadyRunning = started.AlreadyRunning,
+                message = started.AlreadyRunning
+                    ? "This contract is already being written. Waiting for it to finish\u2026"
+                    : "Writing the contract\u2026"
+            });
+        }
+
+        /// <summary>
+        /// How the rewrite is getting on. Polled by the page while it runs.
+        ///
+        /// The same shape the positions screen polls, so both are read by the same
+        /// kind of loop and a failure is reported the same way on both.
+        /// </summary>
+        public async Task<IActionResult> OnPostAiJobStatusAsync(
+            [FromBody] AiJobRequest? request, CancellationToken ct)
+        {
+            if (request is null || request.JobId == Guid.Empty)
+                return new JsonResult(new { ok = false, transient = false, message = "No request given." });
+
+            var state = await _jobs.GetAsync(request.JobId, ct);
+
+            if (state.Running)
+            {
+                return new JsonResult(new
+                {
+                    ok = true,
+                    running = true,
+                    elapsedSeconds = (int)(state.Elapsed?.TotalSeconds ?? 0)
+                });
+            }
+
+            if (state.Failed)
+            {
+                return new JsonResult(new
+                {
+                    ok = false,
+                    running = false,
+                    transient = state.IsTransientFailure,
+                    message = state.FailureReason
+                });
+            }
+
+            return Content(
+                $"{{\"ok\":true,\"running\":false,\"result\":{state.ResultJson ?? "null"}}}",
+                "application/json");
+        }
+
+        public sealed class AiJobRequest
+        {
+            public Guid JobId { get; set; }
         }
 
         // =====================
@@ -345,54 +419,8 @@ namespace WitcherHub.Pages.Contracts
             };
         }
 
-        private GenerateContractDocumentRequest BuildGenerateRequest(
-    ProjectViews.ProjectDetailsView prj,
-    ContractViews.ContractDetailsView contract)
-        {
-            var customerName = prj.Customer?.Name ?? "";
-            var customerEmail = prj.Customer?.Email ?? "";
-
-            var customerBlockSb = new StringBuilder();
-            if (!string.IsNullOrWhiteSpace(customerName))
-                customerBlockSb.AppendLine(customerName);
-            if (!string.IsNullOrWhiteSpace(customerEmail))
-                customerBlockSb.AppendLine(customerEmail);
-
-            var customerBlock = customerBlockSb.ToString().TrimEnd();
-
-            var lines = (contract.Items ?? new List<ContractViews.ContractItemItemView>())
-                .OrderBy(x => x.Position)
-                .Select(x => new ContractServiceLineDto
-                {
-                    Position = x.Position,
-                    Title = x.Title,
-                    ServiceName = x.ServiceName,
-                    AgreedPrice = x.AgreedPrice,
-                    Config = x.Config is null
-                        ? new Dictionary<string, object>()
-                        : JsonSerializer.Deserialize<Dictionary<string, object>>(x.Config.RootElement.GetRawText()) ?? new()
-                })
-                .ToList();
-
-            return new GenerateContractDocumentRequest
-            {
-                ContractNo = contract.ContractNo,
-                ProjectTitle = prj.Title ?? "Project",
-                Currency = contract.Currency ?? "EUR",
-                StartDate = contract.StartDate ?? prj.StartDate,
-                EndDate = contract.EndDate ?? prj.EndDate,
-
-                SignerName = "",
-                SignerEmail = customerEmail,
-
-                LeaveCustomerFieldsBlank = false,
-                IncludePricesInServicesSection = true,
-                CustomerBlockOverride = customerBlock,
-
-                Services = lines,
-                ProjectId = contract.ProjectId
-            };
-        }
+        // BuildGenerateRequest moved to ContractOverrideGenerator, which is where
+        // the generation now happens: this page queues the work and polls it.
 
         private void NormalizeListsFromForm()
         {

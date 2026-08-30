@@ -57,7 +57,7 @@ namespace WitcherHub.Infrastructure.Services.BackgroundTasks
 
         private async Task RunOnceAsync(CancellationToken stoppingToken)
         {
-            using var scope = _scopeFactory.CreateScope();
+            await using var scope = _scopeFactory.CreateAsyncScope();
 
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var lex = scope.ServiceProvider.GetRequiredService<LexwareInvoiceSyncService>();

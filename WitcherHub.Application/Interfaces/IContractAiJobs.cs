@@ -15,6 +15,25 @@ namespace WitcherHub.Application.Interfaces
         public string? Language { get; set; }
     }
 
+    /// <summary>
+    /// What an override generation was asked for.
+    ///
+    /// The edited wording travels with the job rather than being re-read from the
+    /// contract: the point of the screen is to generate from what the person has
+    /// on it, which is not what the record says yet.
+    /// </summary>
+    public sealed class OverrideJobRequest
+    {
+        public ContractStructuredTermsDto? Structured { get; set; }
+
+        /// <summary>
+        /// Who pressed the button. The working copy this screen reads back is
+        /// cached per user, and a job runs with no signed-in user of its own, so
+        /// without this the job would write the snapshot where nobody looks.
+        /// </summary>
+        public string? UserId { get; set; }
+    }
+
     /// <summary>What the organizer was asked for, for the same reason.</summary>
     public sealed class OrganizeJobRequest
     {
