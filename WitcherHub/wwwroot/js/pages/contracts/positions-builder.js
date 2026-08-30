@@ -492,8 +492,24 @@
     /// The server no longer redirects these requests, so a session that has
     /// ended now arrives as readable JSON. This handles the rest: what the
     /// browser could not even send, and what arrived in the wrong shape.
+    /// How long to wait for one request before giving up on it.
+    ///
+    /// Every call on this page either starts a job or asks after one, so none of
+    /// them is legitimately slow: the waiting happens between polls, not inside
+    /// them. Sixty seconds is far longer than any of them needs and short enough
+    /// that a request which will never be answered does not hold the page.
+    const REQUEST_TIMEOUT_MS = 60000;
+
     async function post(handler, body) {
         let response;
+
+        // fetch() has no timeout of its own. A connection that is accepted and
+        // then never answered — a proxy that drops the request, a container
+        // replaced mid-flight — leaves this promise pending for ever, and with it
+        // guard()'s finally block, so the button stayed disabled and reading
+        // "Working…" until the page was reloaded. That is the stuck button.
+        const abort = new AbortController();
+        const timer = setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS);
 
         try {
             response = await fetch(`?handler=${handler}`, {
@@ -504,6 +520,7 @@
                     "RequestVerificationToken": token()
                 },
                 body: JSON.stringify(body),
+                signal: abort.signal,
 
                 // Never follow a redirect silently. Following one is exactly how
                 // an HTML login page ended up being parsed as JSON; seeing it as
@@ -511,13 +528,28 @@
                 redirect: "manual"
             });
         }
-        catch {
+        catch (error) {
+            // Told apart, because they need different advice. A timeout on a
+            // status poll does not mean the work failed — waitFor() keeps asking —
+            // whereas a connection that could not be made is worth acting on.
+            if (error?.name === "AbortError") {
+                return {
+                    ok: false,
+                    transient: true,
+                    message: "The server did not answer within a minute. The work may still be " +
+                        "going — reload the page in a moment to see where it got to."
+                };
+            }
+
             return {
                 ok: false,
                 transient: true,
                 message: "The request could not reach the server. Check your connection and try again — " +
                     "nothing on this screen has been lost."
             };
+        }
+        finally {
+            clearTimeout(timer);
         }
 
         // An opaque redirect: the session ended and the server wanted to send us

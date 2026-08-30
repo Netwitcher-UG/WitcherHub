@@ -214,6 +214,29 @@ namespace WitcherHub.Tests
             Assert.Contains("sk-***", redacted);
         }
 
+        /// <summary>
+        /// The client masks the key itself before quoting it back, and that masked
+        /// form used to travel into the log untouched: the pattern demanded eight
+        /// key characters in a row and the mask supplies five, then asterisks.
+        /// Partial key material in a log this application says it does not write
+        /// is still a broken promise, so the masked form is stripped too.
+        /// </summary>
+        [Fact]
+        public void TheClientsOwnMaskedKeyIsStrippedAsWell()
+        {
+            var redacted = OpenAiTextGenerator.Redact(
+                "Incorrect API key provided: sk-FAKEK**********************0000. " +
+                "You can find your API key at https://platform.openai.com/account/api-keys.");
+
+            Assert.DoesNotContain("FAKEK", redacted);
+            Assert.DoesNotContain("0000", redacted);
+            Assert.Contains("sk-***", redacted);
+
+            // The rest of the message is what makes the failure diagnosable, so it
+            // has to survive.
+            Assert.Contains("Incorrect API key provided", redacted);
+        }
+
         // ---------------------------------------------------------------
 
         private static ClientResultException Http(int status, string body) =>

@@ -203,6 +203,49 @@
 </form>
 @section Scripts {
     <script>
+        // Submitting this form posts the whole page and, for "Generate Contract",
+        // waits on a model call while it does. Nothing said so: the buttons stayed
+        // live and pressable, so a second press started a second generation —
+        // another model call, another version, for one intention.
+        //
+        // The state is cleared on pageshow as well as set on submit. A page
+        // restored from the back/forward cache comes back exactly as it was left,
+        // which for a disabled button means disabled for ever with no request in
+        // flight to re-enable it.
+        (function () {
+          const form = document.querySelector('form[method="post"]');
+          if (!form) return;
+
+          const buttons = () => Array.from(form.querySelectorAll('button[type="submit"]'));
+
+          form.addEventListener('submit', (event) => {
+            const pressed = event.submitter;
+
+            buttons().forEach(b => {
+              if (!b.hasAttribute('disabled')) b.dataset.whWasEnabled = '1';
+              b.disabled = true;
+            });
+
+            if (pressed) {
+              pressed.dataset.whLabel = pressed.innerHTML;
+              pressed.innerHTML = 'Working…';
+            }
+          });
+
+          window.addEventListener('pageshow', () => {
+            buttons().forEach(b => {
+              if (b.dataset.whLabel) {
+                b.innerHTML = b.dataset.whLabel;
+                delete b.dataset.whLabel;
+              }
+              if (b.dataset.whWasEnabled === '1') {
+                b.disabled = false;
+                delete b.dataset.whWasEnabled;
+              }
+            });
+          });
+        })();
+
         (function () {
           function esc(s) {
             const d = document.createElement('div');

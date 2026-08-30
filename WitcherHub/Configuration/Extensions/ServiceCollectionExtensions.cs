@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
@@ -26,6 +27,29 @@ namespace WitcherHub.Configuration.Extensions
             IConfiguration configuration)
         {
             services.AddLocalization();
+
+            // Railway (like every managed platform) terminates TLS at its edge and
+            // forwards plain HTTP to the container. Without this the request looks
+            // like http:// to the application, and three things quietly go wrong:
+            // the sign-in cookie is written without its Secure flag because
+            // Request.IsHttps is false, every absolute URL built from
+            // Request.Scheme goes into an email as http://, and the logo the PDF
+            // renderer fetches over http is redirected rather than served.
+            //
+            // The proxy is not on a known network and its address is not stable,
+            // so the default KnownProxies/KnownNetworks check has to be cleared —
+            // that check is what makes the middleware ignore the headers entirely
+            // behind an unknown proxy. Only the two headers actually needed are
+            // honoured, and the host is deliberately not among them: AllowedHosts
+            // stays the thing that decides which host is acceptable.
+            services.Configure<ForwardedHeadersOptions>(options =>
+            {
+                options.ForwardedHeaders =
+                    ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+                options.KnownNetworks.Clear();
+                options.KnownProxies.Clear();
+            });
 
             services.AddRazorPages()
                 .AddMvcOptions(options =>

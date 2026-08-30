@@ -73,8 +73,35 @@ namespace WitcherHub.Configuration.Extensions
             }
 
             Report("Lexware integration", "Lexware__AccessToken", configuration["Lexware:AccessToken"]);
-            Report("AI contract drafting", "OpenAI__ApiKey", configuration["OpenAI:ApiKey"]);
             Report("Outgoing email", "Smtp__Password", configuration["Smtp:Password"]);
+
+            // The assistant needs a key AND a model, and the client refuses to be
+            // built without either. Reporting on the key alone said "AI contract
+            // drafting is configured" to an environment that had no model, and the
+            // first sign of trouble was then a failed contract rather than a line
+            // in the start-up log naming the setting to add.
+            var aiMissing = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(configuration["OpenAI:ApiKey"]))
+                aiMissing.Add("OpenAI__ApiKey");
+
+            if (string.IsNullOrWhiteSpace(configuration["OpenAI:Model"]))
+                aiMissing.Add("OpenAI__Model");
+
+            if (aiMissing.Count > 0)
+            {
+                logger.LogWarning(
+                    "AI contract drafting is disabled: {Variables} not configured.",
+                    string.Join(", ", aiMissing));
+            }
+            else
+            {
+                // The model name is not a secret, and it is the one value that
+                // explains a "model not available" failure without a code change.
+                logger.LogInformation(
+                    "AI contract drafting is configured, using model {Model}.",
+                    configuration["OpenAI:Model"]);
+            }
 
             // Not a secret, and worth stating plainly: every link this environment
             // emails — password resets, quote and contract signing, invoices — is

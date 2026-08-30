@@ -281,12 +281,32 @@
         fd.append("SignerEmail", (customerEmail?.value || "").trim());
         fd.append("SignatureDataUrl", dataUrl);
 
-        const res = await fetch(url.toString(), {
-            method: "POST",
-            credentials: "include", 
-            headers: token ? { "RequestVerificationToken": token } : {},
-            body: fd
-        });
+        // fetch() waits for ever by default. A request that is accepted and never
+        // answered would leave the Sign button disabled on "Saving…" with no way
+        // out but a reload — on the one screen where a customer cannot be expected
+        // to know that. Sixty seconds, then it says so.
+        const abort = new AbortController();
+        const timer = setTimeout(() => abort.abort(), 60000);
+
+        let res;
+        try {
+            res = await fetch(url.toString(), {
+                method: "POST",
+                credentials: "include",
+                headers: token ? { "RequestVerificationToken": token } : {},
+                body: fd,
+                signal: abort.signal
+            });
+        }
+        catch (error) {
+            throw new Error(
+                error?.name === "AbortError"
+                    ? (i18n.timedOut || "The server did not answer in time. Your signature was not saved — please try again.")
+                    : (i18n.offline || "The signature could not be sent. Check your connection and try again."));
+        }
+        finally {
+            clearTimeout(timer);
+        }
 
         let json = null;
         let rawText = "";
