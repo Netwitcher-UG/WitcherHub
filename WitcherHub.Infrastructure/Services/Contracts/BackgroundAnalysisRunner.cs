@@ -50,7 +50,11 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
         private async Task AnalyseAsync(Guid contractId, int version)
         {
-            using var scope = _scopes.CreateScope();
+            // Async: UnitOfWork implements only IAsyncDisposable, and a
+            // synchronous scope disposal throws once the analysis has finished —
+            // after the result was stored, so the reading looked right while the
+            // scope leaked and the queue logged a failure for work that succeeded.
+            await using var scope = _scopes.CreateAsyncScope();
 
             var drafts = scope.ServiceProvider.GetRequiredService<IContractDraftService>();
 
@@ -88,7 +92,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         {
             try
             {
-                using var scope = _scopes.CreateScope();
+                await using var scope = _scopes.CreateAsyncScope();
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
                 var draft = await db.Set<ContractDraft>()

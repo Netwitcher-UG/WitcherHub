@@ -173,7 +173,12 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
         private async Task RunAsync(Guid jobId)
         {
-            using var scope = _scopes.CreateScope();
+            // An async scope, not a synchronous one. UnitOfWork implements only
+            // IAsyncDisposable, and disposing a scope that holds one synchronously
+            // throws — after the work had finished and been recorded, so the user
+            // saw the right answer while every single assistant job ended by
+            // logging "background work item failed" and leaking its scope.
+            await using var scope = _scopes.CreateAsyncScope();
             var services = scope.ServiceProvider;
             var db = services.GetRequiredService<AppDbContext>();
 
@@ -191,6 +196,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 {
                     ContractAiJobKind.Generation => await GenerateAsync(services, job),
                     ContractAiJobKind.Organize => await OrganizeAsync(services, job),
+                    ContractAiJobKind.Override => await OverrideAsync(services, job),
                     _ => Outcome.Fail("That kind of request is not supported.", transient: false)
                 };
 
@@ -290,13 +296,52 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             });
         }
 
+        /// <summary>
+        /// Rewriting the contract from wording edited by hand on the override
+        /// screen — the last assistant action that was still running on the
+        /// request that asked for it.
+        /// </summary>
+        private static async Task<Outcome> OverrideAsync(IServiceProvider services, ContractAiJob job)
+        {
+            var generator = services.GetRequiredService<IContractOverrideGenerator>();
+
+            var asked = Read<OverrideJobRequest>(job.Request);
+
+            if (asked?.Structured is null)
+            {
+                // Nothing to generate from. Not worth retrying: the same job would
+                // read the same empty request again.
+                return Outcome.Fail(
+                    "The edited wording did not reach the server. Reload the page and try again — " +
+                    "nothing on the contract has been changed.",
+                    transient: false);
+            }
+
+            var result = await generator.GenerateAsync(
+                job.ContractId, asked.Structured, asked.UserId);
+
+            if (!result.Succeeded)
+                return Outcome.Fail(
+                    result.FailureReason ?? "The contract could not be written.",
+                    result.IsTransientFailure);
+
+            // Where to go next travels with the result: the request that knew it
+            // ended minutes ago, and the page has to send the browser somewhere.
+            return Outcome.Ok(new
+            {
+                projectId = result.ProjectId,
+                redirectUrl = $"/Projects?openProjectId={result.ProjectId}&tab=contracts",
+                message = "Contract generated successfully."
+            });
+        }
+
         private async Task RecordUnexpectedFailureAsync(Guid jobId)
         {
             try
             {
                 // A clean context: the one that threw may be in no state to save,
                 // since a failed SaveChanges leaves tracked entities as they were.
-                using var scope = _scopes.CreateScope();
+                await using var scope = _scopes.CreateAsyncScope();
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
                 var job = await db.Set<ContractAiJob>().FirstOrDefaultAsync(j => j.Id == jobId);

@@ -44,6 +44,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=publish /app/publish .
 COPY WitcherHub/libs/linux/libwkhtmltox.so /app/libs/linux/libwkhtmltox.so
 
+# Fetch the PDF browser while building the image rather than while serving from
+# it. The application used to do this on its first start, before it opened its
+# port: every new container paid a ~150MB download before it could answer
+# anything, and a failed download took the whole deployment down over a feature
+# most requests never touch. Baked in here it is present the moment the process
+# starts, and the start-up path that fetches it becomes a no-op.
+#
+# Playwright's CLI is driven through the node it ships in the published output,
+# so no PowerShell and no SDK are needed in this stage. The paths are discovered
+# rather than written out because they carry the runtime identifier.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+RUN NODE_BIN="$(find /app -type f -path '*/.playwright/node/*/node' | head -n 1)" \
+ && CLI_JS="$(find /app -type f -path '*/.playwright/package/cli.js' | head -n 1)" \
+ && test -n "$NODE_BIN" && test -n "$CLI_JS" \
+ && "$NODE_BIN" "$CLI_JS" install chromium \
+ && chmod -R a+rX /ms-playwright
+
 ENV LD_LIBRARY_PATH="/app/libs/linux:${LD_LIBRARY_PATH}"
 
 ENTRYPOINT ["dotnet", "WitcherHub.dll"]

@@ -71,6 +71,63 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
                     inner: ex);
             }
 
+            var attempts = Math.Max(0, _options.MaxRetries) + 1;
+
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    return await AttemptAsync(client, request, correlationId, attempt, ct);
+                }
+                catch (AiInvocationException ex) when (
+                    attempt < attempts && IsWorthRetrying(ex.Kind) && !ct.IsCancellationRequested)
+                {
+                    // OpenAI__MaxRetries and OpenAI__RetryBaseDelayMilliseconds
+                    // were configurable, documented, and read by nothing at all:
+                    // one rate-limited call failed the whole contract and the
+                    // settings that claimed to govern that did not exist in the
+                    // code. They govern this loop now.
+                    var delay = TimeSpan.FromMilliseconds(
+                        Math.Max(0, _options.RetryBaseDelayMilliseconds) * Math.Pow(2, attempt - 1));
+
+                    _logger.LogWarning(
+                        "AI call {CorrelationId} failed with {Kind} on attempt {Attempt} of {Attempts}. " +
+                        "Retrying in {Delay}ms.",
+                        correlationId, ex.Kind, attempt, attempts, (int)delay.TotalMilliseconds);
+
+                    await Task.Delay(delay, ct);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Which failures are worth a second attempt.
+        ///
+        /// Only the ones that can pass on their own. A rejected key, a model this
+        /// account cannot use and an exhausted quota are all still true a second
+        /// later, so retrying them turns a clear permanent fault into a slow
+        /// intermittent-looking one and bills for the privilege. A timeout is
+        /// excluded on the same grounds from the other direction: it usually means
+        /// the prompt was too large for the deadline, and a second attempt pays
+        /// the full timeout again before saying so.
+        /// </summary>
+        internal static bool IsWorthRetrying(AiFailureKind kind) => kind switch
+        {
+            AiFailureKind.RateLimited => true,
+            AiFailureKind.ServiceError => true,
+            AiFailureKind.Network => true,
+            _ => false
+        };
+
+        private async Task<AiCompletion> AttemptAsync(
+            ChatClient client,
+            AiRequest request,
+            string correlationId,
+            int attempt,
+            CancellationToken ct)
+        {
+            var prompt = request.Prompt;
+
             var started = Stopwatch.GetTimestamp();
 
             try
@@ -147,9 +204,10 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
                 // Prompt and response are deliberately absent: they carry contract
                 // text and customer data, and this line goes to the platform log.
                 _logger.LogError(
-                    "AI call {CorrelationId} failed after {Elapsed}ms. Kind {Kind}, HTTP {Status}, model {Model}, " +
-                    "exception {Exception}: {Detail}",
+                    "AI call {CorrelationId} attempt {Attempt} failed after {Elapsed}ms. Kind {Kind}, HTTP {Status}, " +
+                    "model {Model}, exception {Exception}: {Detail}",
                     correlationId,
+                    attempt,
                     (int)Stopwatch.GetElapsedTime(started).TotalMilliseconds,
                     kind,
                     status?.ToString() ?? "-",
@@ -294,14 +352,31 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
 
         /// <summary>
         /// Provider messages quote the offending request back, which can include
-        /// a key fragment. Anything that looks like one is removed.
+        /// the key. Anything that looks like one is replaced outright.
+        ///
+        /// The whole token goes, the "sk-" and any trailing characters with it.
+        /// An earlier version left the prefix and wrote sk-***, and the client's
+        /// own masking — sk-AbCde**********************wxyz — leaves the first
+        /// few and last few characters in place. Neither is enough to reconstruct
+        /// a key, and neither is worth defending: there is no use for a fragment
+        /// of a key in a log, and "no part of the key is written" is a rule that
+        /// can be checked, where "not too much of it" is not.
+        ///
+        /// Bearer tokens go the same way. The same secret travels as an
+        /// Authorization header, and a message quoting the failed request back
+        /// can carry it in that form instead.
         /// </summary>
         internal static string Redact(string message)
         {
             if (string.IsNullOrEmpty(message)) return "";
 
+            // sk-, sk-proj-, sk-svcacct- and the masked forms in one pass: the
+            // prefix, then anything a key or its mask is made of.
+            var redacted = System.Text.RegularExpressions.Regex.Replace(
+                message, @"sk-[A-Za-z0-9_*\-]{2,}", "[REDACTED]");
+
             return System.Text.RegularExpressions.Regex.Replace(
-                message, @"sk-[A-Za-z0-9_\-]{8,}", "sk-***");
+                redacted, @"(?i)\bBearer\s+[A-Za-z0-9._~+/*\-]+=*", "Bearer [REDACTED]");
         }
 
         private static string NewCorrelationId() =>

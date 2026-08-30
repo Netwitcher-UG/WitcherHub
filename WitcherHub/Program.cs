@@ -40,11 +40,36 @@ var app = builder.Build();
 
 app.LogConfigurationReport();
 
-await using (var scope = app.Services.CreateAsyncScope())
+// PDF rendering needs a browser, and fetching one is not a reason to refuse to
+// start. This used to be awaited here and to rethrow, which made a cold start
+// wait on a ~150MB download before the port was ever opened, and turned any
+// hiccup fetching it into a failed deploy — taking sign-in, contracts and
+// invoices down over a feature most requests never touch. The image now carries
+// the browser (see Dockerfile), so this is a no-op there; where it is not
+// already present it is fetched in the background and only PDF generation waits
+// for it.
+_ = Task.Run(async () =>
 {
-    var playwrightBrowserInstaller = scope.ServiceProvider.GetRequiredService<PlaywrightBrowserInstaller>();
-    await playwrightBrowserInstaller.EnsureInstalledAsync();
-}
+    await using var scope = app.Services.CreateAsyncScope();
+
+    var installer = scope.ServiceProvider.GetRequiredService<PlaywrightBrowserInstaller>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("WitcherHub.Startup");
+
+    try
+    {
+        await installer.EnsureInstalledAsync();
+    }
+    catch (Exception ex)
+    {
+        // Said plainly rather than swallowed: PDF generation will fail until this
+        // succeeds, and the reason belongs in the log at the moment it happened.
+        logger.LogError(
+            ex,
+            "The PDF browser could not be prepared. The application is running and " +
+            "everything except PDF generation works; PDF generation will retry on first use.");
+    }
+});
 var supportedCultures = new[] { new CultureInfo("en"), new CultureInfo("de") };
 
 app.UseRequestLocalization(new RequestLocalizationOptions
@@ -58,6 +83,13 @@ app.UseRequestLocalization(new RequestLocalizationOptions
 await app.MigrateDatabaseAsync();
 
 await app.SeedAsync();
+// First in the pipeline, before anything reads the scheme, the client address
+// or builds a URL from them. Behind Railway's proxy the connection to this
+// process is plain HTTP; these headers are what carry the fact that the client
+// arrived over HTTPS. Placed ahead of the request log too, so the log records
+// the scheme the user actually used.
+app.UseForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();

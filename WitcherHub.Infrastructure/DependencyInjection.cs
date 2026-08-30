@@ -183,6 +183,11 @@ namespace WitcherHub.Infrastructure
             // contracts with a working API key.
             services.AddScoped<IContractTextAnalyzer, ContractTextAnalyzer>();
             services.AddScoped<ISemanticContractAnalyzer, SemanticContractAnalyzer>();
+            // Writing the contract from hand-edited wording. Registered as a
+            // service rather than left in the page model so the background job can
+            // run it, which is what gives that screen progress, a guard against a
+            // second press, and somewhere to report a failure.
+            services.AddScoped<IContractOverrideGenerator, ContractOverrideGenerator>();
             services.AddScoped<IDataSeeder, IdentityDataSeeder>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<ISignInDiagnostics, SignInDiagnostics>();

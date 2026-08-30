@@ -211,7 +211,72 @@ namespace WitcherHub.Tests
                 "Incorrect API key provided: sk-proj-AbCdEf0123456789XyZ. You can find your API key at ...");
 
             Assert.DoesNotContain("AbCdEf0123456789XyZ", redacted);
-            Assert.Contains("sk-***", redacted);
+
+            // The whole token, prefix included. A fragment of a key has no use in
+            // a log, and "none of it is written" is checkable where "not much of
+            // it" is not.
+            Assert.DoesNotContain("sk-", redacted);
+            Assert.Contains("[REDACTED]", redacted);
+        }
+
+        /// <summary>
+        /// The client masks the key itself before quoting it back, and that masked
+        /// form used to travel into the log untouched: the pattern demanded eight
+        /// key characters in a row and the mask supplies five, then asterisks.
+        /// Partial key material in a log this application says it does not write
+        /// is still a broken promise, so the masked form is stripped too.
+        /// </summary>
+        [Fact]
+        public void TheClientsOwnMaskedKeyIsStrippedAsWell()
+        {
+            var redacted = OpenAiTextGenerator.Redact(
+                "Incorrect API key provided: sk-FAKEK**********************0000. " +
+                "You can find your API key at https://platform.openai.com/account/api-keys.");
+
+            Assert.DoesNotContain("FAKEK", redacted);
+            Assert.DoesNotContain("0000", redacted);
+            Assert.DoesNotContain("sk-", redacted);
+            Assert.Contains("[REDACTED]", redacted);
+
+            // The rest of the message is what makes the failure diagnosable, so it
+            // has to survive.
+            Assert.Contains("Incorrect API key provided", redacted);
+        }
+
+        /// <summary>
+        /// No leading and no trailing characters of the key survive, in any of the
+        /// shapes the provider issues them in.
+        /// </summary>
+        [Theory]
+        [InlineData("sk-AbCdEfGhIjKlMnOpQrSt")]
+        [InlineData("sk-proj-AbCdEfGhIjKlMnOpQrSt")]
+        [InlineData("sk-svcacct-AbCdEfGhIjKlMnOpQrSt")]
+        [InlineData("sk-AbCde**********************wxyz")]
+        public void NoPartOfAKeySurvivesRedaction(string key)
+        {
+            var redacted = OpenAiTextGenerator.Redact($"Incorrect API key provided: {key}. Check your settings.");
+
+            Assert.DoesNotContain("sk-", redacted);
+            Assert.DoesNotContain("AbCd", redacted);   // leading characters
+            Assert.DoesNotContain("QrSt", redacted);   // trailing characters
+            Assert.DoesNotContain("wxyz", redacted);   // trailing characters of the masked form
+            Assert.Contains("[REDACTED]", redacted);
+            Assert.Contains("Check your settings", redacted);
+        }
+
+        /// <summary>
+        /// The same secret also travels as an Authorization header, and a message
+        /// quoting the failed request back can carry it in that form.
+        /// </summary>
+        [Fact]
+        public void ABearerTokenIsRedactedToo()
+        {
+            var redacted = OpenAiTextGenerator.Redact(
+                "Request failed. Authorization: Bearer sk-AbCdEfGhIjKlMnOpQrSt");
+
+            Assert.DoesNotContain("AbCd", redacted);
+            Assert.DoesNotContain("QrSt", redacted);
+            Assert.Contains("[REDACTED]", redacted);
         }
 
         // ---------------------------------------------------------------

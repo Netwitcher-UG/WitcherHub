@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model WitcherHub.Pages.Contracts.OverrideModel
 @{
     ViewData["Title"] = "Contract Override";
@@ -11,6 +11,11 @@
 }
 <form method="post" class="mb-3">
     @Html.AntiForgeryToken()
+
+    @* Travels with a generation so a second press, or a retry after the page
+       stops waiting, joins the job already running instead of writing the
+       contract twice. Rewritten by the script for each new generation. *@
+    <input type="hidden" asp-for="Vm.IdempotencyKey" id="generateIdempotencyKey" />
 
     <input type="hidden" asp-for="Vm.ContractId" />
     <input type="hidden" asp-for="Vm.ProjectId" />
@@ -63,13 +68,22 @@
                 Save Change
             </button>
 
+            @* Generation is queued and polled rather than submitted, so the
+               screen can show progress, refuse a second press and report a
+               failure in place. The button keeps its formaction — the script
+               posts the form to exactly that handler — so with no JavaScript it
+               still reaches the server. *@
             <button class="btn btn-success"
                     type="submit"
+                    id="btnGenerateContract"
+                    data-ai="true"
                     formaction="@Url.Page("/Contracts/Override", "Generate", new { id = Model.Vm.ContractId })"
                     disabled="@Model.Vm.IsLocked">
                 Generate Contract
             </button>
         </div>
+
+        <div id="generateStatus" class="mt-3" hidden></div>
     </div>
 
     @if (Model.Vm.IsLocked)
@@ -203,6 +217,234 @@
 </form>
 @section Scripts {
     <script>
+        // "Generate Contract" is queued and polled; every other button on this
+        // form is an ordinary submit.
+        //
+        // Generating used to be a plain submit that did the whole generation on
+        // the request and answered with a redirect: nothing on screen while it
+        // ran, a second press starting a second generation, and a failure showing
+        // up as an error page over the top of the edit. The form is still posted
+        // as a form — the model binding that fills the view model is untouched —
+        // but the answer is now a job id, and this waits on it.
+        (function () {
+          const form = document.querySelector('form[method="post"]');
+          const generate = document.getElementById('btnGenerateContract');
+          const statusBox = document.getElementById('generateStatus');
+          const keyField = document.getElementById('generateIdempotencyKey');
+          if (!form || !generate) return;
+
+          // How long one request may take before it is abandoned. Neither call is
+          // legitimately slow — one queues a job, the other asks after it — so a
+          // request still open after this will not be answered at all, and
+          // fetch() on its own would wait for ever.
+          const REQUEST_TIMEOUT_MS = 60000;
+
+          // How long to keep asking before telling the user to come back. The work
+          // is not cancelled; only the waiting stops. Matches the positions screen.
+          const GIVE_UP_MS = 10 * 60 * 1000;
+
+          let busy = false;
+
+          const submitButtons = () => Array.from(form.querySelectorAll('button[type="submit"]'));
+
+          function lock(pressedLabel) {
+            submitButtons().forEach(b => {
+              if (!b.hasAttribute('disabled')) b.dataset.whWasEnabled = '1';
+              b.disabled = true;
+            });
+            generate.dataset.whLabel = generate.innerHTML;
+            generate.innerHTML = pressedLabel;
+          }
+
+          // Always reachable: every path out of the work calls this, so the button
+          // can never be left reading "Working…" with nothing in flight.
+          function unlock() {
+            submitButtons().forEach(b => {
+              if (b.dataset.whWasEnabled === '1') {
+                b.disabled = false;
+                delete b.dataset.whWasEnabled;
+              }
+            });
+            if (generate.dataset.whLabel) {
+              generate.innerHTML = generate.dataset.whLabel;
+              delete generate.dataset.whLabel;
+            }
+            busy = false;
+          }
+
+          function say(kind, message) {
+            if (!statusBox) return;
+            statusBox.hidden = false;
+            statusBox.className = 'mt-3 alert ' +
+              (kind === 'error' ? 'alert-danger' : kind === 'success' ? 'alert-success' : 'alert-info');
+            statusBox.textContent = message;
+          }
+
+          function newKey() {
+            return (crypto.randomUUID)
+              ? crypto.randomUUID()
+              : String(Date.now()) + '-' + Math.random().toString(16).slice(2);
+          }
+
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+          /// One request, with a deadline and every failure turned into an answer
+          /// rather than a rejected promise, so no caller can hang.
+          async function post(url, init) {
+            const abort = new AbortController();
+            const timer = setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS);
+
+            let response;
+            try {
+              response = await fetch(url, Object.assign({
+                method: 'POST',
+                credentials: 'same-origin',
+                signal: abort.signal,
+                // Never follow a redirect silently: an HTML sign-in page parsed as
+                // JSON is how a session timeout became "generation is broken".
+                redirect: 'manual'
+              }, init));
+            }
+            catch (error) {
+              return (error && error.name === 'AbortError')
+                ? { ok: false, transient: true, message: 'The server did not answer within a minute. The contract may still be being written — reload this page in a moment to see.' }
+                : { ok: false, transient: true, message: 'The request could not reach the server. Check your connection and try again — nothing on this screen has been lost.' };
+            }
+            finally {
+              clearTimeout(timer);
+            }
+
+            if (response.type === 'opaqueredirect' || response.status === 0) {
+              return { ok: false, sessionExpired: true, transient: false, message: 'Your session has ended, so this could not be completed. Sign in again and retry — nothing on this screen has been lost.' };
+            }
+
+            const text = await response.text();
+
+            let result = null;
+            try { result = text ? JSON.parse(text) : null; } catch { /* reported below, with the status */ }
+
+            if (result && typeof result === 'object') {
+              if (result.ok === undefined && (result.title || result.detail)) {
+                return { ok: false, transient: response.status >= 500, message: (result.detail || result.title) + ' (HTTP ' + response.status + ')' };
+              }
+              return result;
+            }
+
+            if (response.status === 401 || response.status === 403) {
+              return { ok: false, sessionExpired: true, transient: false, message: 'Your session has ended, so this could not be completed. Sign in again and retry — nothing on this screen has been lost.' };
+            }
+
+            return {
+              ok: false,
+              transient: response.status >= 500,
+              message: 'The server answered HTTP ' + response.status + ' in a form this page could not read. Reload the page and try again; if it keeps happening, the server log for this moment has the detail.'
+            };
+          }
+
+          form.addEventListener('submit', async (event) => {
+            if (event.submitter !== generate) return;   // every other button submits normally
+            event.preventDefault();
+
+            if (busy) return;                            // one generation at a time
+            busy = true;
+
+            // A fresh key per intentional press; the same key travels with every
+            // retry of that press, so joining beats duplicating.
+            if (keyField) keyField.value = newKey();
+
+            lock('Working…');
+            say('info', 'Writing the contract…');
+
+            try {
+              const started = await post(generate.getAttribute('formaction'), {
+                body: new FormData(form)
+              });
+
+              if (!started.ok || !started.jobId) {
+                say('error', started.message || 'The contract could not be written.');
+                return;
+              }
+
+              say('info', started.message || 'Writing the contract…');
+
+              const answer = await waitFor(started.jobId);
+
+              if (answer.ok && answer.result && answer.result.redirectUrl) {
+                say('success', answer.result.message || 'Contract generated successfully.');
+                window.location.assign(answer.result.redirectUrl);
+                return;                                  // navigating; leave it locked
+              }
+
+              say('error', answer.message || 'The contract could not be written.');
+            }
+            catch (error) {
+              // Nothing above is expected to throw; if it does, it surfaces as a
+              // message rather than as a button that never comes back.
+              say('error', 'Something failed before the server answered. Nothing on this screen has been lost.');
+              if (window.console) console.error(error);
+            }
+            finally {
+              unlock();
+            }
+          });
+
+          /// The waiting. Always ends: on an answer, or on the deadline.
+          async function waitFor(jobId) {
+            const startedAt = Date.now();
+            let waited = 0;
+
+            while (waited < GIVE_UP_MS) {
+              await sleep(waited < 30000 ? 1500 : 4000);
+              waited = Date.now() - startedAt;
+
+              const progress = await post(statusUrl(), {
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Requested-With': 'XMLHttpRequest',
+                  'RequestVerificationToken': token()
+                },
+                body: JSON.stringify({ jobId })
+              });
+
+              if (progress.sessionExpired) return progress;
+
+              if (progress.ok && progress.running) {
+                say('info', 'Writing the contract… ' + (progress.elapsedSeconds || Math.round(waited / 1000)) + 's');
+                continue;
+              }
+
+              // A failure to ask is not a failure of the work — a dropped poll
+              // leaves the job running, so only an answer that says so stops this.
+              if (progress.ok || progress.running === false) return progress;
+            }
+
+            return {
+              ok: false,
+              transient: true,
+              message: 'The contract is taking unusually long to write. It is still being worked on — reload this page in a minute to see the result.'
+            };
+          }
+
+          /// The page is addressed by ?id=, so a bare '?handler=…' would drop it.
+          /// The status handler does not read it, but a URL that silently loses
+          /// the thing the page is about is a trap for the next change.
+          function statusUrl() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('handler', 'AiJobStatus');
+            return url.pathname + url.search;
+          }
+
+          function token() {
+            const el = form.querySelector('input[name="__RequestVerificationToken"]');
+            return el ? el.value : '';
+          }
+
+          // A page restored from the back/forward cache comes back exactly as it
+          // was left, which for a disabled button means disabled with no request
+          // in flight to release it.
+          window.addEventListener('pageshow', unlock);
+        })();
+
         (function () {
           function esc(s) {
             const d = document.createElement('div');
