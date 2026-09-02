@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using System.Net;
 using System.Text;
+using System.Security.Cryptography;
 using System.Text.Json;
 using WitcherHub.Application.Common.Exceptions;
 using WitcherHub.Application.Interfaces;
@@ -34,6 +35,12 @@ namespace WitcherHub.Pages.Quotes
         private readonly QuotePublicLinkService _quotePublicLinkService;
                 private readonly LexwareInvoiceSyncService _lexwareInvoiceSyncService;
 
+        /// <summary>
+        /// Where the detail of a failed PDF goes. The screen gets a reference; the
+        /// log gets the exception, so a screenshot is enough to find it.
+        /// </summary>
+        private readonly ILogger<DetailsModel> _logger;
+
         public DetailsModel(
                 IQuote quotes,
                 AppDbContext db,
@@ -42,7 +49,8 @@ namespace WitcherHub.Pages.Quotes
                 IEmailTemplateRenderer emailRenderer,
                 IConfiguration cfg,
                      LexwareInvoiceSyncService lexwareInvoiceSyncService,
-                QuotePublicLinkService quotePublicLinkService)
+                QuotePublicLinkService quotePublicLinkService,
+                ILogger<DetailsModel> logger)
         {
             _quotes = quotes;
             _db = db;
@@ -52,6 +60,7 @@ namespace WitcherHub.Pages.Quotes
             _lexwareInvoiceSyncService = lexwareInvoiceSyncService;
             _cfg = cfg;
             _quotePublicLinkService = quotePublicLinkService;
+            _logger = logger;
         }
 
         [BindProperty(SupportsGet = true)]
@@ -333,6 +342,62 @@ namespace WitcherHub.Pages.Quotes
                 TempData["Toast.Message"] = ex.Message;
                 return RedirectToPage("./Details", new { id = Id });
             }
+            catch (Exception ex)
+            {
+                // Everything the two above do not cover: rendering the document,
+                // and the browser that renders it.
+                //
+                // Only BadRequest and NotFound were caught, so a failure in the
+                // PDF pipeline escaped to the global handler and reached the user
+                // as ProblemDetails — "An unexpected error occurred", status 500,
+                // no reason and nothing to quote. Which is what happened: the
+                // image installed Chromium's shared libraries but never Chromium,
+                // so the first request downloaded a browser into the running
+                // container, and when that could not be done the button simply
+                // broke.
+                //
+                // The detail belongs in the log, not on the screen. The reference
+                // is what ties the two together.
+                var reference = Convert.ToHexString(RandomNumberGenerator.GetBytes(4));
+
+                _logger.LogError(ex,
+                    "Quote PDF generation failed for {QuoteId}. Reference {Reference}.", Id, reference);
+
+                var message = IsRendererUnavailable(ex)
+                    ? "The PDF renderer is not available on this environment, so the document could not be " +
+                      $"produced. The quote itself is unaffected. Reference {reference}."
+                    : $"The PDF could not be generated. The quote itself is unaffected. Reference {reference}.";
+
+                if (RequestFormat.WantsJson(HttpContext))
+                {
+                    return new JsonResult(new { ok = false, message })
+                    {
+                        StatusCode = StatusCodes.Status500InternalServerError
+                    };
+                }
+
+                TempData["Toast.Type"] = "error";
+                TempData["Toast.Title"] = "PDF not created";
+                TempData["Toast.Message"] = message;
+                return RedirectToPage("./Details", new { id = Id });
+            }
+        }
+
+        /// <summary>
+        /// Whether the failure was the headless browser rather than the document.
+        ///
+        /// Worth separating: one is a deployment problem an administrator fixes
+        /// once, the other is about this quote. Telling somebody to check their
+        /// quote when the container has no browser sends them to the wrong place.
+        /// </summary>
+        private static bool IsRendererUnavailable(Exception ex)
+        {
+            for (var current = ex; current is not null; current = current.InnerException)
+            {
+                if (current is Microsoft.Playwright.PlaywrightException) return true;
+            }
+
+            return false;
         }
 
         // =========================
