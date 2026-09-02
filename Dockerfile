@@ -46,4 +46,26 @@ COPY WitcherHub/libs/linux/libwkhtmltox.so /app/libs/linux/libwkhtmltox.so
 
 ENV LD_LIBRARY_PATH="/app/libs/linux:${LD_LIBRARY_PATH}"
 
+# Chromium, baked into the image.
+#
+# The shared libraries above are Chromium's dependencies — they were installed
+# and Chromium itself never was. Nothing in this repository put a browser in the
+# image and PLAYWRIGHT_BROWSERS_PATH was never set, so the first request for a
+# PDF downloaded a browser from Playwright's CDN into the running container. On
+# a platform with a read-only or ephemeral filesystem, restricted egress, or a
+# non-root runtime user, that download fails — and the failure surfaced as an
+# unexplained HTTP 500 on the PDF button.
+#
+# Downloading it here instead makes it part of the image: no network at request
+# time, no first-PDF-after-deploy delay, and no repeat after every restart.
+#
+# Installed with the CLI that ships inside the published output, so this needs
+# no PowerShell and no global tool. The path is fixed rather than $HOME-relative
+# so it does not depend on which user the container ends up running as, and it
+# is made world-readable for the same reason.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+RUN /app/.playwright/node/linux-x64/node /app/.playwright/package/cli.js install chromium \
+    && chmod -R a+rX /ms-playwright
+
 ENTRYPOINT ["dotnet", "WitcherHub.dll"]

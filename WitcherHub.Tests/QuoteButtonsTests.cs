@@ -79,6 +79,78 @@ namespace WitcherHub.Tests
             Assert.Contains("window.location.href = url;", page);
         }
 
+        [Fact]
+        public void APdfThatFailsForAnyOtherReasonIsStillAnswered()
+        {
+            var handler = Between(
+                PageModel(), "public async Task<IActionResult> OnGetPdfAsync", "IsRendererUnavailable(Exception");
+
+            // Only BadRequest and NotFound were caught, so a failure in the PDF
+            // pipeline itself escaped to the global handler and reached the user
+            // as ProblemDetails: {"title":"Server Error","status":500,"detail":
+            // "An unexpected error occurred."} — no reason, nothing to quote.
+            Assert.Contains("catch (Exception ex)", handler);
+
+            // The detail goes to the log with a reference; the screen gets the
+            // reference. Never the exception itself.
+            Assert.Contains("_logger.LogError(ex", handler);
+            Assert.Contains("Reference {Reference}", handler);
+            Assert.DoesNotContain("ex.ToString()", handler);
+            Assert.DoesNotContain("ex.StackTrace", handler);
+        }
+
+        [Fact]
+        public void ABrowserThatIsNotThereIsNotReportedAsAProblemWithTheQuote()
+        {
+            var model = PageModel();
+
+            // One is a deployment problem an administrator fixes once; the other
+            // is about this quote. Sending somebody to check their quote when the
+            // container has no browser points them at the wrong thing.
+            Assert.Contains("Microsoft.Playwright.PlaywrightException", model);
+            Assert.Contains("The PDF renderer is not available on this environment", model);
+            Assert.Contains("The quote itself is unaffected", model);
+        }
+
+        // ================================================ the browser it needs
+
+        [Fact]
+        public void TheImageShipsWithChromiumRatherThanDownloadingItOnDemand()
+        {
+            var dockerfile = File.ReadAllText(Path.Combine(TestPaths.Repository, "Dockerfile"));
+
+            // Chromium's shared libraries were installed and Chromium was not, so
+            // the first request for a PDF downloaded a browser into the running
+            // container. That needs egress and a writable filesystem at request
+            // time, and when it could not be done the button returned HTTP 500.
+            Assert.Contains("PLAYWRIGHT_BROWSERS_PATH=/ms-playwright", dockerfile);
+            Assert.Contains("cli.js install chromium", dockerfile);
+
+            // Installed with the CLI that ships inside the published output, so no
+            // PowerShell and no global tool are needed in the image.
+            Assert.Contains(".playwright/node/linux-x64/node", dockerfile);
+
+            // Readable whichever user the container ends up running as.
+            Assert.Contains("chmod -R a+rX /ms-playwright", dockerfile);
+        }
+
+        [Fact]
+        public void AnInstalledBrowserIsNotDownloadedAgainOnEveryProcess()
+        {
+            var installer = File.ReadAllText(Path.Combine(
+                TestPaths.Repository, "WitcherHub.Infrastructure", "Services", "Pdf",
+                "PlaywrightBrowserInstaller.cs"));
+
+            // Without this every process still shelled out to the installer on its
+            // first PDF, which is the network call this fix exists to remove.
+            Assert.Contains("AlreadyInstalled()", installer);
+            Assert.Contains("PLAYWRIGHT_BROWSERS_PATH", installer);
+
+            // An empty directory means the variable is set and the install never
+            // happened — that has to count as "not installed".
+            Assert.Contains("EnumerateDirectories(path, \"chromium*\")", installer);
+        }
+
         // =============================================== the Copy Link button
 
         [Fact]
