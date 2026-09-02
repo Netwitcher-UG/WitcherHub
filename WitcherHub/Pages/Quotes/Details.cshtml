@@ -278,6 +278,67 @@
             alert((title ? title + ': ' : '') + (message || ''));
         }
 
+        // What the server said went wrong, when it answered a fetch.
+        //
+        // Three different failures used to arrive as one blank "Failed to ...":
+        // the handler refusing with a reason, the session having ended, and the
+        // request never reaching the handler at all.
+        async function readQuoteFailure(res, fallback) {
+            // Followed all the way to a page means the session ended: a redirect
+            // is transparent to fetch, so the script is handed 200 and HTML.
+            const contentType = (res.headers.get('Content-Type') || '').toLowerCase();
+
+            if (res.redirected || contentType.includes('text/html')) {
+                return 'Your session has ended, so this could not be completed. ' +
+                       'Sign in again and try once more.';
+            }
+
+            if (contentType.includes('application/json')) {
+                const data = await res.json().catch(() => null);
+                if (data?.message) return data.message;
+            }
+
+            return fallback;
+        }
+
+        // Marks a request as script's, so an expired session is answered with a
+        // 401 rather than with the sign-in page.
+        const QUOTE_FETCH_HEADERS = { 'X-Requested-With': 'XMLHttpRequest' };
+
+        /// Puts text on the clipboard, and says whether it got there.
+        ///
+        /// The modern API is not always available: it is undefined outside a
+        /// secure context, and writeText rejects when the document has lost focus
+        /// or the permission is denied. The old execCommand path still works in
+        /// those cases, and the caller shows the text when neither does.
+        async function copyQuoteText(text) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                }
+            } catch (err) {
+                console.warn('Clipboard API refused the write; falling back.', err);
+            }
+
+            try {
+                const scratch = document.createElement('textarea');
+                scratch.value = text;
+                scratch.setAttribute('readonly', '');
+                scratch.style.position = 'fixed';
+                scratch.style.opacity = '0';
+                document.body.appendChild(scratch);
+                scratch.select();
+
+                const copied = document.execCommand('copy');
+                scratch.remove();
+                return copied;
+            } catch (err) {
+                console.warn('Fallback copy failed.', err);
+                return false;
+            }
+        }
+
                 (function () {
             const form = document.getElementById('sendQuoteForm');
             const btn = document.getElementById('sendQuoteConfirmBtn');
@@ -305,24 +366,39 @@
 
                     const res = await fetch(urlEl.value, {
                         method: 'POST',
+                        credentials: 'same-origin',
                         headers: {
                             'Accept': 'application/json',
-                            'RequestVerificationToken': tokenEl.value
+                            'RequestVerificationToken': tokenEl.value,
+                            ...QUOTE_FETCH_HEADERS
                         }
                     });
 
-                    const data = await res.json().catch(() => null);
+                    const data = res.ok ? await res.json().catch(() => null) : null;
 
                     if (!res.ok || !data?.ok || !data?.data?.url) {
-                        showQuoteToast('error', 'Error', data?.message || 'Failed to create public link.');
+                        showQuoteToast('error', 'Error',
+                            await readQuoteFailure(res, 'Failed to create public link.'));
                         return;
                     }
 
-                    await navigator.clipboard.writeText(data.data.url);
-                    showQuoteToast('success', 'Copied', 'Public quote link copied.');
+                    // The link exists on the server from here on — a token has been
+                    // issued and the customer can use it. Failing to put it on the
+                    // clipboard must not lose it.
+                    //
+                    // navigator.clipboard is absent outside a secure context, and
+                    // writeText rejects when the document is not focused or the
+                    // permission is refused. That used to land in the catch below
+                    // and report "Server error", which was wrong twice over: the
+                    // server had succeeded, and the user was left with no link.
+                    if (await copyQuoteText(data.data.url)) {
+                        showQuoteToast('success', 'Copied', 'Public quote link copied.');
+                    } else {
+                        window.prompt('Copy the public quote link:', data.data.url);
+                    }
                 } catch (err) {
                     console.error(err);
-                    showQuoteToast('error', 'Server error', 'Failed to copy public link.');
+                    showQuoteToast('error', 'Server error', 'Failed to create the public link.');
                 } finally {
                     delete btn.dataset.busy;
                     btn.disabled = false;
@@ -386,16 +462,21 @@
                 try {
                     const res = await fetch(url, {
                         method: 'GET',
-                        credentials: 'same-origin'
+                        credentials: 'same-origin',
+                        headers: QUOTE_FETCH_HEADERS
                     });
 
-                    if (!res.ok) {
-                        throw new Error('Failed to generate PDF.');
-                    }
+                    const contentType = (res.headers.get('Content-Type') || '').toLowerCase();
 
-                    const contentType = res.headers.get('Content-Type') || '';
-                    if (!contentType.toLowerCase().includes('application/pdf')) {
-                        throw new Error('Response is not a PDF file.');
+                    // Anything that is not the file: the handler refused with a
+                    // reason, or the session ended and a page came back instead.
+                    // Both used to end here as "Failed to download PDF." with no
+                    // reason at all, because the handler answered this fetch with
+                    // a redirect and the browser followed it to an HTML page.
+                    if (!res.ok || !contentType.includes('application/pdf')) {
+                        showQuoteToast('error', 'PDF not created',
+                            await readQuoteFailure(res, 'The PDF could not be generated.'));
+                        return;
                     }
 
                     const blob = await res.blob();
@@ -413,8 +494,14 @@
 
                     window.URL.revokeObjectURL(blobUrl);
                 } catch (err) {
+                    // The request itself did not complete — offline, a dropped
+                    // connection, a gateway giving up. The link still points at
+                    // the handler, so let the browser fetch it the ordinary way
+                    // rather than leaving the user with nothing.
                     console.error(err);
-                    alert('Failed to download PDF.');
+                    showQuoteToast('warning', 'Downloading directly',
+                        'The download could not be prepared here, so it was opened directly.');
+                    window.location.href = url;
                 } finally {
                     setPdfLoading(false);
                 }

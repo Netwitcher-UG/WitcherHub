@@ -13,6 +13,7 @@ using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Quotes;
 using WitcherHub.Application.Models.Email;
 using WitcherHub.Application.Services.Email;
+using WitcherHub.Configuration.Http;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Infrastructure.Services.Pdf;
@@ -309,6 +310,24 @@ namespace WitcherHub.Pages.Quotes
             }
             catch (Exception ex) when (ex is BadRequestAppException or NotFoundAppException)
             {
+                // The PDF button fetches this handler rather than navigating to it,
+                // so it can show a spinner and name the downloaded file. A redirect
+                // is the wrong answer to a fetch: the browser follows it silently,
+                // the script is handed 200 and a complete HTML page, and all it can
+                // say is "Response is not a PDF file". The reason set below was
+                // never seen — worse, the swallowed request consumed the TempData,
+                // so reloading the page did not show it either.
+                //
+                // Script gets the reason it can display; a plain navigation, which
+                // can show a page, still gets the redirect and the toast.
+                if (RequestFormat.WantsJson(HttpContext))
+                {
+                    return new JsonResult(new { ok = false, message = ex.Message })
+                    {
+                        StatusCode = StatusCodes.Status400BadRequest
+                    };
+                }
+
                 TempData["Toast.Type"] = "error";
                 TempData["Toast.Title"] = "Error";
                 TempData["Toast.Message"] = ex.Message;
