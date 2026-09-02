@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.BackgroundTasks;
 using WitcherHub.Application.Interfaces.ManageData;
@@ -342,7 +343,27 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         private static readonly JsonSerializerOptions Json = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
+
+            // Enums as their names, the way every other JSON this application
+            // sends does it.
+            //
+            // These results used to be returned straight from the page handler,
+            // so MVC serialised them — and MVC is configured with this converter.
+            // Moving the work onto the queue moved the serialising here, and the
+            // status handler writes the stored JSON through verbatim, so the
+            // browser started receiving "pricingModel": 0 where it had always
+            // received "pricingModel": "Fixed".
+            //
+            // Nothing threw. The page compares those values as strings: a
+            // position whose pricing model no longer equals "Fixed" is priced as
+            // quantity times rate rather than as a fixed amount, and every
+            // <select> built from a list of names matches none of them. The
+            // review showed the wrong money and empty dropdowns.
+            //
+            // The converter also reads numbers, so a job queued before this
+            // change is still readable after it.
+            Converters = { new JsonStringEnumConverter() }
         };
 
         private static T? Read<T>(JsonDocument? document) where T : class =>
