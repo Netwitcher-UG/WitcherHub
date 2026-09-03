@@ -50,7 +50,7 @@
     }
 
     function normalise(p) {
-        return Object.assign({
+        const merged = Object.assign({
             clientId: cryptoId(),
             contractItemId: null,
             sourceType: "Manual",
@@ -83,6 +83,21 @@
             exclusions: [],
             notes: ""
         }, p || {});
+
+        // A position has to have an identity, and the default above does not
+        // survive being merged over.
+        //
+        // Object.assign copies every own property of p, a null clientId included,
+        // straight over the generated one. The assistant returns clientId null for
+        // work it read out of your text, so after applying its proposal those rows
+        // carried no id at all: the card wrote data-client-id="null", the click
+        // handler looked for a position whose clientId equalled the string "null",
+        // found none, and returned. Delete, duplicate, move up and move down all
+        // did nothing, silently — and worked perfectly after a reload, because the
+        // saved positions come back with ids.
+        if (!merged.clientId) merged.clientId = cryptoId();
+
+        return merged;
     }
 
     function cryptoId() {
