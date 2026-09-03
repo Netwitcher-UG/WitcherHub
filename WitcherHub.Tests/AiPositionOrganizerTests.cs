@@ -128,8 +128,22 @@ public class AiPositionOrganizerTests
     }
 
     [Fact]
-    public async Task APositionTheModelInventedArrivesWithNoPrice()
+    public async Task APositionReadOutOfTheNotesArrivesWithThePriceTheNotesGave()
     {
+        // This test used to assert the opposite — that a position the user had not
+        // already entered arrived with UnitPrice null, because "the model does not
+        // get to price work".
+        //
+        // That rule protects a figure the user typed into the form from being
+        // rewritten by the model, which is right. It was being applied to a case
+        // it does not fit: a position that exists only because the user described
+        // it in the box, price and all. There the prose is what the user typed, and
+        // discarding the figure in it is what made "monthly maintenance, 250 EUR"
+        // produce a position with an empty Price. Reported, and reversed here.
+        //
+        // Nothing is saved by this: the proposal is still reviewed and applied by
+        // hand, and a position the user already entered still keeps its own figures
+        // — the test below this one holds that line.
         var ai = new StubAi("""
             [{"clientId":"pos-1","title":"Website","quantity":2,"unitPrice":1500,
               "currency":"EUR","vatRate":19,"billingCycle":"OneTime","pricingModel":"Unit","isFree":false},
@@ -140,15 +154,35 @@ public class AiPositionOrganizerTests
         var result = await Organizer(ai).OrganizeAsync(new OrganizePositionsRequest
         {
             ExistingPositions = { UserPosition() },
-            RoughInput = "website"
+            RoughInput = "website, plus monthly maintenance at 250 EUR"
         });
 
-        var invented = result.Positions.Single(p => p.Title == "Monthly maintenance");
+        var added = result.Positions.Single(p => p.Title == "Monthly maintenance");
 
-        // Proposed for review, but the model does not get to price work.
-        Assert.Null(invented.UnitPrice);
-        Assert.False(invented.IsFree);
+        Assert.Equal(250m, added.UnitPrice);
+        Assert.Equal(12m, added.Quantity);
+        Assert.Equal(BillingCycle.Monthly, added.BillingCycle);
+        Assert.False(added.IsFree);
+
+        // Still a proposal, not a saved position.
         Assert.Contains(result.Changes, c => c.Kind == PositionChangeKind.AddedPosition);
+    }
+
+    [Fact]
+    public async Task APositionWithNoPriceInTheNotesStillArrivesWithoutOne()
+    {
+        // The other half of the same rule: read what is there, invent nothing.
+        var ai = new StubAi("""
+            [{"title":"SEO monitoring","quantity":1,"currency":"EUR","billingCycle":"Monthly"}]
+            """);
+
+        var result = await Organizer(ai).OrganizeAsync(new OrganizePositionsRequest
+        {
+            ExistingPositions = { UserPosition() },
+            RoughInput = "please add SEO monitoring"
+        });
+
+        Assert.Null(result.Positions.Single(p => p.Title == "SEO monitoring").UnitPrice);
     }
 
     [Fact]

@@ -198,14 +198,39 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
                 deliverables, acceptance criteria, customer responsibilities,
                 assumptions and exclusions that follow from the notes.
 
-                YOU MUST NOT change any of these, for any reason, not even to correct
-                what looks like a mistake — copy them exactly as given:
+                There are two kinds of position, and they are treated differently.
+
+                A position that is ALREADY ENTERED — one you return carrying a
+                clientId from the list below, or with the same title as one in it.
+                Its commercial values are the user's and are final. Copy these
+                exactly as given, for any reason, not even to correct what looks
+                like a mistake:
                 quantity, unitPrice, currency, vatRate, discountType, discountValue,
                 billingCycle, durationPeriods, isFree, startDate, deliveryDate.
 
+                A NEW position — one the notes describe and the list does not
+                contain. Return it with "clientId": null. Here the notes are the
+                only thing the user has told you, so read the figures out of them:
+
+                  * unitPrice — the amount stated for this work. "2.380 EUR",
+                    "2380€", "EUR 2.380,00" are all 2380. German notation: a full
+                    stop groups thousands and a comma is the decimal separator.
+                  * quantity and unit — "8 Stunden" is quantity 8, unit "Stunde".
+                    Leave quantity 1 when the notes state no count.
+                  * pricingModel — "Hourly" for an hourly rate, "Unit" for a price
+                    per item, otherwise "Fixed".
+                  * billingCycle — "monatlich" is Monthly, "jährlich" is Annual,
+                    "einmalig" is OneTime. Use OneTime when the notes do not say.
+                  * vatRate, discountType, discountValue, durationPeriods,
+                    startDate, deliveryDate — only when the notes state them.
+                  * isFree — true only if the notes say the work is free of charge.
+
+                Leave a figure null when the notes do not give it. Never invent one,
+                and never copy a figure from another position onto a new one.
+
                 Do not invent services that are not described. Do not add legal or
                 payment obligations. Write descriptive text in {{request.Language}}.
-                Currency is {{request.Currency}}.
+                Currency is {{request.Currency}} unless the notes name another.
 
                 Positions already entered (their commercial values are final):
                 {{JsonSerializer.Serialize(existing)}}
@@ -323,16 +348,38 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
 
                 if (original is null)
                 {
-                    // A position the user did not enter. Kept for review, but with
-                    // no price attached: the model does not get to price work.
+                    // A position the user described rather than entered.
+                    //
+                    // Its price used to be discarded here — "the model does not get
+                    // to price work" — which is the right rule applied to the wrong
+                    // case. It protects a figure the user typed into the form from
+                    // being rewritten by the model. On a position that exists only
+                    // because the user described it in prose there is no such
+                    // figure to protect: the prose is what they typed, and a price
+                    // in it is their price. Throwing it away is why writing "monthly
+                    // support, 2.380 EUR" produced a position with an empty Price.
+                    //
+                    // So what the notes stated is kept, and only what they did not
+                    // state stays empty. It still arrives as a proposal the user
+                    // reviews and applies by hand.
                     candidate.SourceType = ContractItemSource.Manual;
                     candidate.CatalogServiceId = null;
-                    candidate.UnitPrice = null;
-                    candidate.IsFree = false;
-                    candidate.Currency = request.Currency;
+
+                    // A price the model invented as zero or negative is not a price.
+                    if (candidate.UnitPrice is <= 0m) candidate.UnitPrice = null;
+
+                    // Free and priced are contradictory; the stated price wins,
+                    // because a figure is a clearer statement than a flag.
+                    if (candidate.UnitPrice is > 0m) candidate.IsFree = false;
+
+                    if (candidate.Quantity <= 0m) candidate.Quantity = 1m;
+
+                    if (string.IsNullOrWhiteSpace(candidate.Currency))
+                        candidate.Currency = request.Currency;
 
                     changes.Add(new PositionChange(
-                        candidate.Title, "position", null, candidate.Title, PositionChangeKind.AddedPosition));
+                        candidate.Title, "position", null,
+                        Describe(candidate), PositionChangeKind.AddedPosition));
 
                     result.Add(candidate);
                     continue;
@@ -424,6 +471,41 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
         }
 
         private static string Join(IEnumerable<string> values) => string.Join(" | ", values);
+
+        /// <summary>
+        /// A new position as one line, so the review says what was read out of the
+        /// notes rather than only that something was added.
+        ///
+        /// The old message was the title and "(no price set — you must price it)",
+        /// which was true then and would be wrong now.
+        /// </summary>
+        private static string Describe(ManualPositionDto p)
+        {
+            var german = CultureInfo.GetCultureInfo("de-DE");
+            var parts = new List<string> { p.Title };
+
+            if (p.IsFree)
+            {
+                parts.Add("ohne Berechnung");
+            }
+            else if (p.UnitPrice is { } price)
+            {
+                var amount = price.ToString("#,##0.00", german) + " " + (p.Currency ?? "EUR");
+
+                parts.Add(p.PricingModel == PricingModel.Fixed
+                    ? amount
+                    : $"{p.Quantity.ToString("0.##", german)} × {amount}");
+            }
+            else
+            {
+                parts.Add("no price in the text — set one");
+            }
+
+            if (p.BillingCycle != BillingCycle.OneTime)
+                parts.Add(p.BillingCycle.ToString());
+
+            return string.Join(", ", parts);
+        }
 
         private static string? Format<T>(T value) => value switch
         {

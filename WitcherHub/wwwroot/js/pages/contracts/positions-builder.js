@@ -1676,8 +1676,12 @@
 
         result.changes.forEach(c => {
             const li = document.createElement("li");
+            // What was read out of the notes, not just that something was added.
+            // The old line said "(no price set — you must price it)" of every new
+            // position, which was true while the price was being discarded and is
+            // misleading now that it is read from the text.
             li.innerHTML = c.kind === "AddedPosition"
-                ? `<strong>New position proposed:</strong> ${esc(c.after)} <span class="text-secondary">(no price set — you must price it)</span>`
+                ? `<strong>New position proposed:</strong> ${esc(c.after)}`
                 : `<strong>${esc(c.positionTitle)}</strong> — ${esc(c.field)} updated`;
             changesList.appendChild(li);
         });
