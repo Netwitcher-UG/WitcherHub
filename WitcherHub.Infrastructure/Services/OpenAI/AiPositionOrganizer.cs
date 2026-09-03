@@ -365,6 +365,14 @@ namespace WitcherHub.Infrastructure.Services.OpenAI
                     candidate.SourceType = ContractItemSource.Manual;
                     candidate.CatalogServiceId = null;
 
+                    // An identity of its own, because the builder finds every row
+                    // by it — delete, duplicate and the two move buttons all look
+                    // the position up by clientId. The model is told to return null
+                    // here (it has no id to give), and a position that reached the
+                    // page without one could not be acted on at all.
+                    if (string.IsNullOrWhiteSpace(candidate.ClientId))
+                        candidate.ClientId = Guid.NewGuid().ToString("n");
+
                     // A price the model invented as zero or negative is not a price.
                     if (candidate.UnitPrice is <= 0m) candidate.UnitPrice = null;
 

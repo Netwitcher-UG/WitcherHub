@@ -163,6 +163,61 @@ namespace WitcherHub.Tests
             Assert.Equal(0m, added.NetTotal);
         }
 
+        // ============================================ it has to be identifiable
+
+        [Fact]
+        public void ADescribedPositionArrivesWithAnIdentityOfItsOwn()
+        {
+            // Reported as: after applying the proposal, delete, duplicate, move up
+            // and move down all do nothing — and work perfectly on a fresh page.
+            //
+            // The builder finds every row by clientId. The model is told to return
+            // null for a position it read out of the notes, because it has no id to
+            // give, and nothing here filled one in. On the page the card wrote
+            // data-client-id="null" while the position's own clientId stayed null,
+            // so the click handler looked for a position equal to the string "null",
+            // found none and returned. Silently, four times over.
+            var (positions, _, _) = AiPositionOrganizer.Reconcile(
+                Request(), [Proposed("Monatliche Betreuung", unitPrice: 2380m)]);
+
+            Assert.False(string.IsNullOrWhiteSpace(Assert.Single(positions).ClientId));
+        }
+
+        [Fact]
+        public void TwoDescribedPositionsDoNotShareOneIdentity()
+        {
+            // Sharing one is as bad as having none: every row action would act on
+            // whichever matched first.
+            var (positions, _, _) = AiPositionOrganizer.Reconcile(
+                Request(),
+                [
+                    Proposed("Monatliche Betreuung", unitPrice: 2380m),
+                    Proposed("SEO-Einrichtung", unitPrice: 1500m),
+                    Proposed("Schulung", unitPrice: 120m, quantity: 8m)
+                ]);
+
+            var ids = positions.Select(p => p.ClientId).ToList();
+
+            Assert.Equal(3, ids.Count);
+            Assert.Equal(3, ids.Distinct(StringComparer.Ordinal).Count());
+        }
+
+        [Fact]
+        public void ThePageAlsoRefusesToRenderAPositionWithoutOne()
+        {
+            var script = Unwrapped(File.ReadAllText(Path.Combine(
+                TestPaths.WebProject, "wwwroot", "js", "pages", "contracts", "positions-builder.js")));
+
+            // Object.assign copies an incoming null clientId straight over the
+            // generated default, so the default alone was never enough. Belt and
+            // braces: the server gives every proposed position an id, and the page
+            // gives one to anything that still arrives without.
+            Assert.Contains("if (!merged.clientId) merged.clientId = cryptoId();", script);
+
+            // And the lookup those buttons depend on is unchanged.
+            Assert.Contains("positions.findIndex(x => x.clientId === wrap.dataset.clientId)", script);
+        }
+
         // ================================ a position the user already entered
 
         [Fact]
