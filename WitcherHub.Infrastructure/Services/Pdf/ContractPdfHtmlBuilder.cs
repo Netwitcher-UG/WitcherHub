@@ -38,6 +38,14 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 
             public string ContractIntroHtml { get; init; } = "";
             public string ServicesSectionHtml { get; init; } = "";
+
+            /// <summary>
+            /// The contract's clauses — term, payment, liability, data protection
+            /// and the rest. Empty renders no section, so a document that has no
+            /// clauses beyond its subject matter does not grow an empty heading.
+            /// </summary>
+            public string TermsSectionHtml { get; init; } = "";
+
             public string PriceBoxHtml { get; init; } = "";
 
             public bool ShowSignaturePlaceholder { get; init; } = true;
@@ -75,6 +83,33 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 </div>
 """
                 : string.Empty;
+            // The banner used to repeat the sentence printed under the title, word
+            // for word. A contract that says the same thing twice on its opening
+            // screen reads as a template nobody proofread, so the banner names the
+            // parties instead — which is the one thing the first screen was missing.
+            var bannerSubtitle = E($"Zwischen {m.Provider.Name} und {m.Customer.Name}");
+            if (!string.IsNullOrWhiteSpace(m.ContractNo))
+                bannerSubtitle += " &middot; " + E($"Vertragsnummer {m.ContractNo}");
+
+            // The clauses being signed. Given an id so the consent sentence at the
+            // bottom of the signing page can point at it.
+            var termsSection = !string.IsNullOrWhiteSpace(m.TermsSectionHtml)
+                ? $$"""
+<div class="section" id="vertragsbedingungen">
+  <div class="section-head">
+    <div>
+      <h2>Vertragsbedingungen</h2>
+      <p>Die nachstehenden Bestimmungen sind Bestandteil dieses Vertrages.</p>
+    </div>
+  </div>
+
+  <div class="rich-text rich-text--terms">
+    {{m.TermsSectionHtml}}
+  </div>
+</div>
+"""
+                : string.Empty;
+
             var notesSection = !string.IsNullOrWhiteSpace(m.NotesText)
     ? $$"""
 <div class="section">
@@ -116,7 +151,14 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     html, body {
       margin: 0;
       padding: 0;
-      font-family: "Inter", "Segoe UI", Tahoma, Arial, sans-serif;
+
+      /* Every face here exists somewhere this document is rendered: the
+         customer's browser, and the Linux container that prints the PDF. The
+         previous stack led with two fonts neither of those has installed and
+         fell through to Tahoma, which is not a face to set a contract in. */
+      font-family: "Segoe UI", Roboto, "Helvetica Neue", "Liberation Sans",
+                   "DejaVu Sans", Arial, sans-serif;
+      font-size: 15px;
       background:
         radial-gradient(circle at top left, #f3e8ff 0, transparent 30%),
         radial-gradient(circle at bottom right, #ede9fe 0, transparent 26%),
@@ -152,22 +194,29 @@ namespace WitcherHub.Infrastructure.Services.Pdf
       padding: 22mm 16mm 16mm;
     }
 
-    .header {
-  position: relative;
-  margin-bottom: 20px;
-  min-height: 138px;
-  padding-top: 4px;
-  padding-right: 258px;
-}
+    /* Two columns, the document on the left and its reference data on the right.
 
-.header-left {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  min-width: 0;
-  max-width: 100%;
-  padding-right: 8px;
-}
+       This used to be a relatively positioned box with the meta card absolutely
+       placed on top of it and a 258px right padding reserved by hand. The
+       reserved gutter did not match the card (242px wide, pulled 28px further
+       out), so the title ran underneath it: "AGENTURVERTRAG" was delivered to
+       the customer reading "AGENTURVERTR". The print rules below already
+       replaced this with a grid; the screen now uses the same shape. */
+    .header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 250px;
+      gap: 24px;
+      align-items: start;
+      margin-bottom: 24px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      min-width: 0;
+      max-width: 100%;
+    }
 
     .logo-box {
       width: 78px;
@@ -210,14 +259,17 @@ namespace WitcherHub.Infrastructure.Services.Pdf
       font-size: 13px;
     }
 
+    /* The chips wrap. Held on one line they ran off the end of the title column
+       and the last one — the contract's term — was cut in half. The print rules
+       below already had to override this to wrap; now there is nothing to
+       override. */
     .chip-row {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 8px;
-  margin-top: 14px;
-  white-space: nowrap;
-  max-width: 100%;
-}
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+      max-width: 100%;
+    }
 
     .chip {
       display: inline-flex;
@@ -246,17 +298,14 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     }
 
     .meta {
-  position: absolute;
-  top: -58px;
-right: -28px;
-  display: grid;
-  gap: 8px;
-  width: 242px;
-  padding: 14px 16px;
-  border: 1px solid var(--line-strong);
-  border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff, #fcfaff);
-}
+      display: grid;
+      gap: 8px;
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid var(--line-strong);
+      border-radius: 18px;
+      background: linear-gradient(180deg, #ffffff, #fcfaff);
+    }
 
     .meta-row {
   display: flex;
@@ -366,8 +415,9 @@ right: -28px;
     .info-list {
       display: grid;
       gap: 5px;
-      color: #4b5563;
-      font-size: 13px;
+      color: #3f4756;
+      font-size: 14px;
+      line-height: 1.55;
     }
 
     .section {
@@ -410,20 +460,53 @@ right: -28px;
       margin-top: 0;
     }
 
+    /* Contract prose. This is the text the customer has to read and agree to,
+       so it is set at a reading size rather than at the caption size the cards
+       and chips around it use.
+
+       `overflow-wrap: anywhere` used to be on here, which let the browser break
+       a long German compound anywhere at all — "Umsatzsteuer|behandlung" split
+       across lines mid-word. Hyphenation does that properly, at the syllable. */
     .rich-text p {
-      margin: 0 0 10px;
-      color: #31263f;
-      font-size: 13px;
-      white-space: pre-wrap;
-      word-break: break-word;
-      overflow-wrap: anywhere;
+      margin: 0 0 11px;
+      color: #26203a;
+      font-size: 15px;
+      line-height: 1.72;
+      overflow-wrap: break-word;
+      hyphens: auto;
+      -webkit-hyphens: auto;
     }
 
     .rich-text ul,
     .rich-text ol {
-      margin: 0 0 12px 18px;
-      color: #31263f;
-      font-size: 13px;
+      margin: 0 0 12px 22px;
+      padding-left: 4px;
+      color: #26203a;
+      font-size: 15px;
+      line-height: 1.72;
+    }
+
+    .rich-text li {
+      margin-bottom: 5px;
+    }
+
+    /* The clauses. Numbered paragraphs read as a column of "(1) (2) (3)", so a
+       little more air between them than between lines within one. */
+    .rich-text--terms h2,
+    .rich-text--terms h3 {
+      font-size: 16px;
+      margin: 20px 0 8px;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    .rich-text--terms h2:first-child,
+    .rich-text--terms h3:first-child {
+      margin-top: 0;
+    }
+
+    .rich-text--terms p {
+      margin-bottom: 13px;
     }
 
     .contract-pos {
@@ -490,10 +573,10 @@ right: -28px;
 
     .price-box th,
     .price-box td {
-      padding: 9px 8px;
+      padding: 10px 8px;
       border-bottom: 1px dashed #e9d5ff;
-      font-size: 13px;
-      color: #31263f;
+      font-size: 14px;
+      color: #26203a;
       vertical-align: top;
     }
 
@@ -529,8 +612,9 @@ right: -28px;
 
     .contract-note p {
       margin: 0;
-      color: #5b556a;
-      font-size: 13px;
+      color: #4a4459;
+      font-size: 14px;
+      line-height: 1.65;
       white-space: pre-wrap;
     }
 
@@ -867,7 +951,7 @@ right: -28px;
         <div class="summary-banner">
           <div>
             <h2>{{E(m.ProjectTitle)}}</h2>
-            <p>Dieser Vertrag regelt die vereinbarten Leistungen, Zuständigkeiten und Konditionen für das genannte Projekt.</p>
+            <p>{{bannerSubtitle}}</p>
           </div>
 
           <div class="summary-badge">
@@ -924,6 +1008,7 @@ right: -28px;
             {{m.PriceBoxHtml}}
           </div>
         </div>
+{{termsSection}}
 {{notesSection}}
 
         {{signaturePlaceholder}}

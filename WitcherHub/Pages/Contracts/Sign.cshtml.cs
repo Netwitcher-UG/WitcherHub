@@ -70,6 +70,16 @@ namespace WitcherHub.Pages.Contracts
         public string ProviderName { get; private set; } = "";
         public string ProviderAddress { get; private set; } = "";
 
+        /// <summary>
+        /// Where the "Vertrag" link in the consent sentence points.
+        ///
+        /// It used to point at the public privacy policy — a link labelled
+        /// "Vertrag" that opened the Datenschutzerklärung. The contract's own
+        /// clauses are now on this page, so it points at them; if a contract has
+        /// no clauses beyond its subject matter, it points at the document.
+        /// </summary>
+        public string ContractTermsAnchor { get; private set; } = "#paper";
+
         public bool IsSigned { get; private set; }
         public string? SignedAtIso { get; private set; }
         public string? SignatureDataUrl { get; private set; }
@@ -227,6 +237,9 @@ namespace WitcherHub.Pages.Contracts
             fullHtml = fullHtml.Replace("__NETWITCHER_LOGO__", logoUrl, StringComparison.OrdinalIgnoreCase);
 
             ContractHtml = ExtractRenderableHtml(fullHtml);
+
+            if (ContractHtml.Contains("id=\"vertragsbedingungen\"", StringComparison.Ordinal))
+                ContractTermsAnchor = "#vertragsbedingungen";
 
             return Page();
         }
@@ -731,6 +744,17 @@ namespace WitcherHub.Pages.Contracts
                     ExtractMarkdownSection(contract.Terms, "## Anlage A", "## Preisübersicht"),
                     "<p>Die vereinbarten Leistungen sind in den Vertragspositionen festgehalten.</p>");
 
+            // The clauses the three sections above do not cover. Without this the
+            // page shows what is being bought and what it costs, and none of the
+            // terms the signature is actually given on.
+            var termsHtml = MarkdownToSafeHtml(
+                ExtractRemainingTermsMarkdown(
+                    contract.Terms,
+                    "Vertragsgegenstand",
+                    "Anlage A",
+                    "Preisübersicht"),
+                fallbackHtml: "");
+
             var priceBoxHtml = BuildPriceBoxHtml(contract);
 
             var (netTotal, taxTotal, grossTotal) = CalculateContractTotals(contract);
@@ -765,6 +789,7 @@ namespace WitcherHub.Pages.Contracts
                 },
                 ContractIntroHtml = introHtml,
                 ServicesSectionHtml = servicesHtml,
+                TermsSectionHtml = termsHtml,
                 PriceBoxHtml = priceBoxHtml,
                 ShowSignaturePlaceholder = showSignaturePlaceholder
             };
@@ -1020,6 +1045,55 @@ namespace WitcherHub.Pages.Contracts
             return string.Equals(currency, "EUR", StringComparison.OrdinalIgnoreCase)
                 ? value.ToString("N2", de) + " €"
                 : value.ToString("N2", de) + " " + currency;
+        }
+
+        /// <summary>
+        /// Everything in the contract that the sections above do not already show.
+        ///
+        /// The page was built from three named slices of the document —
+        /// Vertragsgegenstand, Anlage A and Preisübersicht — and silently dropped
+        /// the rest. The rest is the contract: term and notice period, payment
+        /// terms, liability, confidentiality, data protection, rights of use,
+        /// governing law. The customer was asked to tick "I have read the terms"
+        /// on a page those terms were not on.
+        ///
+        /// So the document is split on its own "## " headings and every section
+        /// that is not one of the three already rendered is returned, in the order
+        /// the contract sets them. Nothing is filtered by content: a clause this
+        /// method does not recognise is still a clause, and it is shown.
+        /// </summary>
+        private static string ExtractRemainingTermsMarkdown(string? markdown, params string[] alreadyShown)
+        {
+            markdown = NormalizeNewLines(markdown ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(markdown)) return "";
+
+            var lines = markdown.Split('\n');
+            var kept = new StringBuilder();
+
+            // Text before the first "## " heading is the document title block. It
+            // is the page's own header here, so it is not repeated in the body.
+            var keeping = false;
+            var seenFirstSection = false;
+
+            foreach (var line in lines)
+            {
+                if (line.StartsWith("## ", StringComparison.Ordinal))
+                {
+                    seenFirstSection = true;
+
+                    var heading = line[3..].Trim();
+                    keeping = !alreadyShown.Any(shown =>
+                        heading.StartsWith(shown, StringComparison.OrdinalIgnoreCase));
+
+                    if (keeping) kept.Append(line).Append('\n');
+                    continue;
+                }
+
+                if (!seenFirstSection) continue;
+                if (keeping) kept.Append(line).Append('\n');
+            }
+
+            return kept.ToString().Trim();
         }
 
         private static string ExtractMarkdownSection(string? markdown, string startHeading, string? nextHeading)

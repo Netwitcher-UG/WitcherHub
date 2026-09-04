@@ -57,10 +57,10 @@
                 @T["contractPage_AgreeTermsLink"]
             </a>
             @T["contractPage_AgreeMiddle"]
-            <a id="contractLink"
-               href="https://netwitcher.com/de/datenschutzerklaerung"
-               target="_blank"
-               rel="noopener noreferrer">
+            @* Points at the contract's own clauses, above on this page. It used
+               to open the public privacy policy in a new tab, under a link that
+               says "Vertrag". *@
+            <a id="contractLink" href="@Model.ContractTermsAnchor">
                 @T["contractPage_AgreeContractLink"]
             </a>@T["contractPage_AgreeSuffix"]
         </span>
