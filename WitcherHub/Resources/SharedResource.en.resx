@@ -120,6 +120,9 @@
   <data name="contractPage_AcceptSignature" xml:space="preserve">
     <value>Accept Signature</value>
   </data>
+  <data name="contractPage_AcceptTermsLine" xml:space="preserve">
+    <value>I accept the terms and conditions of this contract.</value>
+  </data>
   <data name="contractPage_AgreeContractLink" xml:space="preserve">
     <value>Contract</value>
   </data>
@@ -176,6 +179,9 @@
   </data>
   <data name="contractPage_ErrInvalidEmail" xml:space="preserve">
     <value>Please enter a valid email address.</value>
+  </data>
+  <data name="contractPage_ErrMustAcceptTerms" xml:space="preserve">
+    <value>Please accept the terms and conditions before signing</value>
   </data>
   <data name="contractPage_ErrMustAgree" xml:space="preserve">
     <value>Please confirm agreement before signing</value>

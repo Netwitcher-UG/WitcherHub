@@ -44,32 +44,45 @@
             </div>
 
             <div class="contractActions" id="contractActions">
+                @* Two confirmations, each its own box.
+
+                   The second one used to be the sentence "Please review both
+                   documents carefully before signing" — advice, sitting where a
+                   decision belongs. Accepting the terms is now something the
+                   signer does rather than something they are told to do, and
+                   Sign & Accept stays disabled until both boxes are ticked. *@
                 <label class="contractActions__agree" for="chkAgree">
-    <input type="checkbox" id="chkAgree" />
+                    <input type="checkbox" id="chkAgree" />
 
-    <span class="contractActions__agreeBody">
-        <span class="contractActions__agreeLine">
-            @T["contractPage_AgreePrefix"]
-            <a id="termsLink"
-               href="https://netwitcher.com/de/agb-fuer-agenturen"
-               target="_blank"
-               rel="noopener noreferrer">
-                @T["contractPage_AgreeTermsLink"]
-            </a>
-            @T["contractPage_AgreeMiddle"]
-            @* Points at the contract's own clauses, above on this page. It used
-               to open the public privacy policy in a new tab, under a link that
-               says "Vertrag". *@
-            <a id="contractLink" href="@Model.ContractTermsAnchor">
-                @T["contractPage_AgreeContractLink"]
-            </a>@T["contractPage_AgreeSuffix"]
-        </span>
+                    <span class="contractActions__agreeBody">
+                        <span class="contractActions__agreeLine">
+                            @T["contractPage_AgreePrefix"]
+                            <a id="termsLink"
+                               href="https://netwitcher.com/de/agb-fuer-agenturen"
+                               target="_blank"
+                               rel="noopener noreferrer">
+                                @T["contractPage_AgreeTermsLink"]
+                            </a>
+                            @T["contractPage_AgreeMiddle"]
+                            @* Points at the contract's own clauses, above on this
+                               page. It used to open the public privacy policy in
+                               a new tab, under a link that says "Vertrag". *@
+                            <a id="contractLink" href="@Model.ContractTermsAnchor">
+                                @T["contractPage_AgreeContractLink"]
+                            </a>@T["contractPage_AgreeSuffix"]
+                        </span>
+                    </span>
+                </label>
 
-        <span class="contractActions__text">
-            @T["contractPage_AgreeHelp"]
-        </span>
-    </span>
-</label>
+                <label class="contractActions__agree" for="chkTerms">
+                    <input type="checkbox" id="chkTerms" />
+
+                    <span class="contractActions__agreeBody">
+                        <span class="contractActions__agreeLine">
+                            @T["contractPage_AcceptTermsLine"]
+                        </span>
+                    </span>
+                </label>
 
                 <div class="contractActions__right">
                     <div class="contractActions__badge" id="signedBadge">@T["contractPage_Unsigned"]</div>
@@ -190,6 +203,7 @@
             invalidEmail: "@T["contractPage_ErrInvalidEmail"]",
             emptyCanvas: "@T["contractPage_ErrEmptyCanvas"]",
             mustAgree: "@T["contractPage_ErrMustAgree"]",
+            mustAcceptTerms: "@T["contractPage_ErrMustAcceptTerms"]",
             cleared: "@T["contractPage_Cleared"]",
             signedOk: "@T["contractPage_SignedOk"]",
             signed: "@T["contractPage_Signed"]",
