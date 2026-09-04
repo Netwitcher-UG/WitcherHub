@@ -310,6 +310,14 @@
 
 .contractSign__title {
     margin: 10px 0 18px;
+
+    /* Explicit, and !important, for the same reason the document's headings are:
+       the theme sets every h2 on the page to var(--h2) with !important, which
+       printed "Signatures" at 60px above the name and e-mail fields — a caption
+       three times the size of the thing it captions. */
+    font-size: 20px !important;
+    line-height: 1.3;
+    font-weight: 700;
 }
 
 .contractSign__grid {
@@ -626,6 +634,18 @@
     border: 0;
     border-radius: 28px;
     overflow: hidden;
+
+    /* Out to the edge of the sheet.
+
+       The paper sets 25mm document margins, which is right for a contract
+       rendered as bare Markdown. This document is not bare Markdown — it is the
+       letterhead template, and it carries its own margins in `.content`. Both
+       applied at once left it about 485px wide on a 794px sheet, which is what
+       squeezed the two-column header until the title ran under the reference
+       card. The blocks below it — the consent line, the signature panel — keep
+       the paper's margins, because those are page furniture, not document. */
+    margin-left: -12mm;
+    margin-right: -12mm;
 }
 
 .contractPdfScope,
@@ -689,6 +709,158 @@
     .quotePdfScope .meta {
         max-width: 275px;
     }
+
+/* ==========================================================================
+   The document's own type sizes, defended against the admin theme
+   --------------------------------------------------------------------------
+   Reported as: the contract sent to the customer is not readable and does not
+   look professional.
+
+   It was not a matter of taste. The signing layout loads the WowDash theme
+   (_ThemeHead), and that theme carries:
+
+       h1, .h1 { font-size: var(--h1) !important; }   -- resolves to 72px
+       h2, .h2 { font-size: var(--h2) !important; }   -- resolves to 60px
+       ... through h6
+
+   Six blanket !important rules on bare element selectors. The document template
+   sets its own sizes — .title-block h1 is 30px, .section-head h2 is 20px — but
+   a declaration without !important never beats one with it, however specific.
+   So on the customer's screen every heading in the contract rendered at the
+   dashboard's display scale:
+
+       .title-block h1   30px  ->  72px   "AGENTURVERTRAG" clipped to "AGENT"
+       .section-head h2  20px  ->  60px   "Anlage A – Leistungsbeschreib..."
+       .card h3          19px  ->  60px   party names wrapped over four lines
+
+   while the contract's actual prose stayed at 13px. The one thing the customer
+   has to read was the smallest text on a page of clipped billboard headlines.
+
+   These rules take that decision back for the document, and only for the
+   document: the selectors are scoped to the two PDF scopes, so nothing else the
+   theme styles is touched. !important is used because it is the only thing the
+   theme's !important yields to.
+   ========================================================================== */
+
+.contractPdfScope h1,
+.contractPdfScope h2,
+.contractPdfScope h3,
+.contractPdfScope h4,
+.contractPdfScope h5,
+.contractPdfScope h6,
+.quotePdfScope h1,
+.quotePdfScope h2,
+.quotePdfScope h3,
+.quotePdfScope h4,
+.quotePdfScope h5,
+.quotePdfScope h6 {
+    /* A document's headings are set in the document's face and weight, not in
+       the dashboard's. */
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+/* The document title.
+
+   The "Deutscher Vertragsstil" block further down this file dresses every h1 in
+   .contractPage__contractHtml as the title of a bare-Markdown contract: centred,
+   uppercase, letter-spaced, with a rule under it. That is right for the editor's
+   preview, where the document really is bare Markdown. It is wrong here, where
+   the document arrives as the letterhead template and already has a title
+   treatment of its own — and the uppercasing plus the tracking is what pushed
+   "AGENTURVERTRAG" past the edge of the space it had. */
+.contractPdfScope .title-block h1,
+.quotePdfScope .title-block h1 {
+    font-size: 27px !important;
+    line-height: 1.15 !important;
+    text-align: left;
+    text-transform: none;
+    letter-spacing: -0.01em;
+    border-bottom: 0;
+    padding-bottom: 0;
+    margin: 0 0 8px;
+}
+
+/* The sentence under the title.
+
+   Same block, same problem: it styles "the paragraph after the contract's title"
+   as the small centred reference line a Markdown contract carries there, and
+   pulls it up by -1.4rem to sit tight under the rule. Here there is no rule, so
+   the negative margin dragged the sentence on top of the title and the two
+   printed over each other. */
+.contractPdfScope .title-block h1 + p,
+.quotePdfScope .title-block h1 + p {
+    margin: 0;
+    text-align: left;
+    font-size: 14px;
+}
+
+/* Section headings — Vertragsgegenstand, Anlage A, Vertragsbedingungen. */
+.contractPdfScope .section-head h2,
+.quotePdfScope .section-head h2 {
+    font-size: 19px !important;
+}
+
+/* The party cards, the position headings, the price box, the notes and the
+   signature block all sit at one step below a section heading. */
+.contractPdfScope .card h3,
+.contractPdfScope .price-box h3,
+.contractPdfScope .contract-note h3,
+.contractPdfScope .signature-placeholder h3,
+.contractPdfScope .contract-pos__head h3,
+.quotePdfScope .card h3,
+.quotePdfScope .price-box h3,
+.quotePdfScope .contract-note h3,
+.quotePdfScope .signature-placeholder h3 {
+    font-size: 16.5px !important;
+}
+
+.contractPdfScope .summary-banner h2,
+.quotePdfScope .summary-banner h2 {
+    font-size: 21px !important;
+}
+
+.contractPdfScope .contract-pos section h4,
+.quotePdfScope .contract-pos section h4 {
+    font-size: 14px !important;
+}
+
+/* Headings that came out of the contract's own Markdown — the § clauses and
+   the service names under Anlage A. They are part of the prose, so they are
+   sized against it rather than against the page furniture. */
+.contractPdfScope .rich-text h1,
+.quotePdfScope .rich-text h1 {
+    font-size: 19px !important;
+}
+
+.contractPdfScope .rich-text h2,
+.quotePdfScope .rich-text h2 {
+    font-size: 17px !important;
+}
+
+.contractPdfScope .rich-text h3,
+.contractPdfScope .rich-text h4,
+.contractPdfScope .rich-text h5,
+.contractPdfScope .rich-text h6,
+.quotePdfScope .rich-text h3,
+.quotePdfScope .rich-text h4,
+.quotePdfScope .rich-text h5,
+.quotePdfScope .rich-text h6 {
+    font-size: 15.5px !important;
+}
+
+/* Bullets. The theme's reset strips the marker and the indent from every list
+   on the page, which turned the service lists in Anlage A into loose lines of
+   text with no relationship to each other. */
+.contractPdfScope .rich-text ul,
+.quotePdfScope .rich-text ul {
+    list-style: disc outside;
+}
+
+.contractPdfScope .rich-text ol,
+.quotePdfScope .rich-text ol {
+    list-style: decimal outside;
+}
 
 /* ==========================================================================
    Deutscher Vertragsstil — how the document itself is set
