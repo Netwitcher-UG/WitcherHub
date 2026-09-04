@@ -5,6 +5,13 @@
     const $ = (id) => document.getElementById(id);
 
     const chkAgree = $("chkAgree");
+
+    // The second confirmation: the signer accepts the contract's terms. It is
+    // deliberately optional to find — this script also drives the quote signing
+    // page, which asks for one confirmation, not two. A page without the box is
+    // not a page whose box is unticked.
+    const chkTerms = $("chkTerms");
+
     const btnOpen = $("btnOpen");
     const btnPrint = $("btnPrint");
     const btnReset = $("btnReset");
@@ -106,10 +113,14 @@
         modalStatus.style.background = isError ? "#fff5f5" : "#fafafa";
     }
 
+    function termsAccepted() {
+        return !chkTerms || chkTerms.checked;
+    }
+
     function canSignNow() {
         const nameOk = (customerName.value || "").trim().length > 0;
         const emailOk = (customerEmail?.value || "").trim().length > 0;
-        return chkAgree.checked && nameOk && emailOk && !serverState.isSigned;
+        return chkAgree.checked && termsAccepted() && nameOk && emailOk && !serverState.isSigned;
     }
 
     function refreshSignButton() {
@@ -137,6 +148,11 @@
 
         chkAgree.checked = true;
         chkAgree.disabled = true;
+
+        if (chkTerms) {
+            chkTerms.checked = true;
+            chkTerms.disabled = true;
+        }
 
         if (btnOpen) btnOpen.style.display = "none";
         if (btnReset) btnReset.style.display = "none";
@@ -169,6 +185,7 @@
         if (customerEmail) customerEmail.readOnly = false;
 
         chkAgree.disabled = false;
+        if (chkTerms) chkTerms.disabled = false;
 
         if (btnOpen) btnOpen.style.display = "";
         if (btnReset) btnReset.style.display = "";
@@ -222,6 +239,12 @@
 
         if (!chkAgree.checked) {
             showToast(i18n.mustAgree || "Please confirm agreement before signing", true);
+            return;
+        }
+
+        if (!termsAccepted()) {
+            showToast(i18n.mustAcceptTerms || "Please accept the terms and conditions before signing", true);
+            chkTerms?.focus();
             return;
         }
 
@@ -325,6 +348,11 @@
         if (chkAgree.checked) hideToast();
     });
 
+    chkTerms?.addEventListener("change", () => {
+        refreshSignButton();
+        if (chkTerms.checked) hideToast();
+    });
+
     customerName.addEventListener("input", refreshSignButton);
     if (customerEmail) customerEmail.addEventListener("input", refreshSignButton);
 
@@ -425,6 +453,8 @@
         if (customerEmail) customerEmail.value = serverState.signerEmail || "";
 
         chkAgree.checked = false;
+        if (chkTerms) chkTerms.checked = false;
+
         setUnsignedUI();
         hideToast();
         clearCanvas();
@@ -441,6 +471,7 @@
 
         if (serverState.isSigned && serverState.signatureDataUrl && serverState.signedAtIso) {
             chkAgree.checked = true;
+            if (chkTerms) chkTerms.checked = true;
             setSignedUI(serverState.signedAtIso, serverState.signatureDataUrl);
         } else {
             setUnsignedUI();

@@ -210,10 +210,37 @@
     color: #111;
 }
 
+    /* A box the signer can see.
+
+       The theme's reset applies `appearance: none` and `padding: 0` to every
+       `input` on the page, checkboxes included, on the assumption that its own
+       `.form-check-input` will draw one. Nothing draws one here, so both
+       confirmations rendered at 0 x 0: the signer saw a sentence with no box
+       beside it, and could only tick it by clicking the text and hoping.
+       Measured on the page rather than inferred — width 0, height 0.
+
+       `appearance: auto` hands the drawing back to the browser, which gives a
+       real checkbox with a real tick, keyboard focus and the platform's own
+       checked state. */
     .contractActions__agree input[type="checkbox"] {
-        margin-top: 4px;
+        -webkit-appearance: auto;
+        appearance: auto;
+        width: 18px;
+        height: 18px;
+        margin-top: 3px;
         flex: 0 0 auto;
+        accent-color: #6d28d9;
+        cursor: pointer;
     }
+
+    .contractActions__agree input[type="checkbox"]:disabled {
+        cursor: default;
+    }
+
+/* Two confirmations, one under the other, each reading as its own decision. */
+.contractActions__agree + .contractActions__agree {
+    margin-top: -4px;
+}
 
 .contractActions__agreeBody {
     display: block;

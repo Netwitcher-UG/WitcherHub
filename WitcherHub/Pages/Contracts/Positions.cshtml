@@ -742,16 +742,22 @@
                     @if (!Model.IsLocked)
                     {
                         <div class="d-grid gap-2 mt-20">
-                            @* Offered only when there are positions to save. On a
-                               supplied-text contract with none, it is an action
-                               with nothing to act on — and the builder used to
-                               insist on it before it would do anything else. *@
-                            @if (Model.HasPositions)
-                            {
-                                <button type="button" class="btn btn-outline-primary radius-8" data-action="save">
-                                    <i class="ri-save-line me-1"></i> Save positions
-                                </button>
-                            }
+                            @* Offered while there are positions to save, and only
+                               then — on a supplied-text contract with none it is
+                               an action with nothing to act on.
+
+                               "While", not "when the page loaded". It used to be
+                               rendered server-side from the saved positions, so a
+                               new contract never got the button at all: you could
+                               add a position and then had no way to save it. The
+                               builder shows and hides it as the list changes; the
+                               class here is only the state the page opens in. *@
+                            <button type="button"
+                                    id="savePositionsBtn"
+                                    class="btn btn-outline-primary radius-8 @(Model.HasPositions ? "" : "d-none")"
+                                    data-action="save">
+                                <i class="ri-save-line me-1"></i> Save positions
+                            </button>
 
                             @* The action names what it will actually do, which
                                depends on what the contract is built from. It is

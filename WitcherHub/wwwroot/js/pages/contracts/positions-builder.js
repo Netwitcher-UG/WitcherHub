@@ -18,6 +18,9 @@
     const listEl = document.getElementById("positionList");
     const emptyEl = document.getElementById("emptyState");
 
+    // Absent on a locked contract, where nothing is saved from this page.
+    const saveBtn = document.getElementById("savePositionsBtn");
+
     const catalog = readJson("catalogServices") || [];
     const suppliedDraftId = app.dataset.suppliedDraftId || null;
     const hasSuppliedText = app.dataset.hasText === "true";
@@ -133,6 +136,12 @@
     function render() {
         listEl.innerHTML = "";
         emptyEl.classList.toggle("d-none", positions.length > 0);
+
+        // Save follows the list. The button used to be rendered from the saved
+        // positions when the page was built, so a new contract never had one:
+        // you could add a position and then had nothing to save it with. It
+        // appears with the first position and goes away again with the last.
+        if (saveBtn) saveBtn.classList.toggle("d-none", positions.length === 0);
 
         positions.forEach((p, index) => {
             p.position = index + 1;
