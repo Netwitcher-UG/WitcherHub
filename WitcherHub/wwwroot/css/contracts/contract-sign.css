@@ -1287,13 +1287,94 @@
         display: none !important;
     }
 
+    /* ------------------------------------------------------------------
+       What reaches the paper is the contract, and nothing else.
+
+       Printing Contract details produced a sheet that opened with the
+       administrator's view of the record before it reached a word of the
+       document. Read off the printed page, in order:
+
+           All contracts
+           C-2026-000002
+           Awaiting signature
+           Unsigned
+           Musterfirma GmbH · Online Verkauf
+           Positions
+           Edit
+           Print
+           ...and then the contract
+
+       and it closed with "© 2026 Netwitcher UG. All rights reserved. /
+       WitcherHub" — the application's own footer, on a customer's contract.
+
+       None of that is the contract. The back link, the record's status, who
+       it is with and the three command buttons are how an administrator
+       works with the row; the person holding the printout is reading an
+       agreement. So the page furniture is taken off the paper.
+
+       These rules sit in this stylesheet, which only the contract and quote
+       pages load, so no other screen's printing is changed by them.
+       ------------------------------------------------------------------ */
+
+    /* The record's header: back link, number, status badges, the customer and
+       project links, and the command buttons. */
+    .wh-page-header {
+        display: none !important;
+    }
+
+    /* The application's footer. The rule here named `.dashboard-footer`, which
+       is not what the layout renders — the class is `.d-footer` — so the
+       copyright line printed under every contract. */
+    .d-footer,
+    .dashboard-footer {
+        display: none !important;
+    }
+
+    /* Anything that can be pressed. The version list on a contract with no
+       approved wording carries Preview buttons; they are navigation, and
+       navigation does not print. */
+    .dashboard-main-body .btn,
+    .contractPage .btn {
+        display: none !important;
+    }
+
+    /* An administrator's notice keeps its words and loses its panel: still
+       readable if it says something the reader needs — that this sheet is a
+       preview of a version, say — but set as a line of text rather than as a
+       coloured box of interface. */
+    .dashboard-main-body > .alert,
+    .contractPage .alert {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        padding: 0 0 6mm !important;
+        margin: 0 !important;
+        color: #444 !important;
+        font-size: 9pt !important;
+    }
+
+    /* The sidebar is hidden, but the room reserved for it was not given back:
+       `.dashboard-main` keeps a 275px left margin, measured in print media,
+       which pushed the whole contract to the right and cut its right edge. */
+    .dashboard-main {
+        margin-left: 0 !important;
+        padding: 0 !important;
+    }
+
+    .dashboard-main-body {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
     /* Nothing interactive belongs on paper. */
     .contractPage__langFab,
     .contractPage__toast,
     .ui-notify-container,
     .sidebar,
+    .sidebar-overlay,
     .navbar-header,
-    .dashboard-footer {
+    #appLoading,
+    #appModal {
         display: none !important;
     }
 }
