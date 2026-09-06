@@ -792,10 +792,10 @@
 
                         </div>
 
-                        <div class="d-flex align-items-start gap-3">
+                        <div class="d-flex align-items-start gap-3 vc-row-actions">
 
                             <button type="button"
-                                    class="btn p-0 border-0 bg-transparent text-primary"
+                                    class="btn vc-icon-btn bg-transparent text-primary"
                                     title="Set default"
                                     data-vc-action="set-default-location"
                                     data-index="${idx}">
@@ -803,7 +803,7 @@
                             </button>
 
                             <button type="button"
-                                    class="btn p-0 border-0 bg-transparent text-info ${isEditing ? 'd-none' : ''}"
+                                    class="btn vc-icon-btn bg-transparent text-info ${isEditing ? 'd-none' : ''}"
                                     title="Edit"
                                     data-vc-action="edit-location"
                                     data-index="${idx}">
@@ -811,7 +811,7 @@
                             </button>
 
                             <button type="button"
-                                    class="btn p-0 border-0 bg-transparent text-success ${isEditing ? '' : 'd-none'}"
+                                    class="btn vc-icon-btn bg-transparent text-success ${isEditing ? '' : 'd-none'}"
                                     title="Save"
                                     data-vc-action="save-location"
                                     data-index="${idx}">
@@ -819,7 +819,7 @@
                             </button>
 
                             <button type="button"
-                                    class="btn p-0 border-0 bg-transparent text-muted ${isEditing ? '' : 'd-none'}"
+                                    class="btn vc-icon-btn bg-transparent text-muted ${isEditing ? '' : 'd-none'}"
                                     title="Cancel"
                                     data-vc-action="cancel-location"
                                     data-index="${idx}">
@@ -827,7 +827,7 @@
                             </button>
 
                             <button type="button"
-                                    class="btn p-0 border-0 bg-transparent ${deleteBtnClass}"
+                                    class="btn vc-icon-btn bg-transparent ${deleteBtnClass}"
                                     title="${esc(deleteTitle)}"
                                     data-vc-action="delete-location"
                                     data-index="${idx}"
@@ -988,10 +988,10 @@
                         </div>
 
                         <!-- Actions -->
-                        <div class="d-flex align-items-start gap-3">
+                        <div class="d-flex align-items-start gap-3 vc-row-actions">
 
                             <button type="button"
-                                    class="btn p-0 border-0 bg-transparent text-primary"
+                                    class="btn vc-icon-btn bg-transparent text-primary"
                                     title="Set primary"
                                     data-vc-action="set-primary-contact"
                                     data-index="${idx}">
@@ -999,7 +999,7 @@
                             </button>
 
                             <button type="button"
-                                    class="btn p-0 border-0 bg-transparent text-info ${isEditing ? 'd-none' : ''}"
+                                    class="btn vc-icon-btn bg-transparent text-info ${isEditing ? 'd-none' : ''}"
                                     title="Edit"
                                     data-vc-action="edit-contact"
                                     data-index="${idx}">
@@ -1007,7 +1007,7 @@
                             </button>
 
                             <button type="button"
-                                    class="btn p-0 border-0 bg-transparent text-success ${isEditing ? '' : 'd-none'}"
+                                    class="btn vc-icon-btn bg-transparent text-success ${isEditing ? '' : 'd-none'}"
                                     title="Save"
                                     data-vc-action="save-contact"
                                     data-index="${idx}">
@@ -1015,7 +1015,7 @@
                             </button>
 
                             <button type="button"
-                                    class="btn p-0 border-0 bg-transparent text-muted ${isEditing ? '' : 'd-none'}"
+                                    class="btn vc-icon-btn bg-transparent text-muted ${isEditing ? '' : 'd-none'}"
                                     title="Cancel"
                                     data-vc-action="cancel-contact"
                                     data-index="${idx}">
@@ -1023,7 +1023,7 @@
                             </button>
 
                             <button type="button"
-                                    class="btn p-0 border-0 bg-transparent text-danger"
+                                    class="btn vc-icon-btn bg-transparent text-danger"
                                     title="Delete"
                                     data-vc-action="delete-contact"
                                     data-index="${idx}">
@@ -1316,7 +1316,7 @@
 
             <div class="col-12 col-md-1 d-flex justify-content-end">
                 <button type="button"
-                        class="btn p-0 border-0 bg-transparent text-danger vc-basic-email-remove"
+                        class="btn vc-icon-btn bg-transparent text-danger vc-basic-email-remove"
                         title="Remove"
                         ${emails.length === 1 ? 'disabled' : ''}>
                     <i class="ri-delete-bin-line"></i>
@@ -2478,7 +2478,15 @@
         if (!v) return '—';
         const d = new Date(v);
         if (isNaN(d.getTime())) return String(v);
-        return d.toISOString().replace('T', ' ').replace('Z', ' UTC');
+
+        // Was the raw ISO string with the T and the Z swapped for spaces, which
+        // put "2026-09-03 07:59:36.957 UTC" on the page — milliseconds and all —
+        // as the answer to "when did this last sync". Date and time, in the
+        // reader's own locale and time zone.
+        return d.toLocaleString(undefined, {
+            year: 'numeric', month: 'short', day: '2-digit',
+            hour: '2-digit', minute: '2-digit'
+        });
     }
     function emailChipHtml(kind, email) {
         const k = (kind || 'other').toLowerCase();

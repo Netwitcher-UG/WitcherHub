@@ -753,16 +753,38 @@ details[open] > summary::before {
     border: 0 !important;
 }
 
+/* Borderless, but still something you can hit.
+
+   `padding: 0` made the button exactly the size of the glyph inside it:
+   measured in a browser, the star, pencil and bin on every address and contact
+   row were 16px tall, and the row actions 25px. That is under any usable touch
+   target — a thumb on a phone is about 9mm — and it is why these controls read
+   as decoration rather than as buttons. The look does not change; the area
+   around the glyph does. */
 .btn.vc-icon-btn {
     padding: 0 !important;
     line-height: 1 !important;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-width: 36px;
+    min-height: 36px;
+    border-radius: 8px !important;
 }
 
 .btn.vc-icon-btn i {
     pointer-events: none;
+}
+
+/* Borderless does not mean invisible on hover: the row action needs to say it
+   is a control before it is pressed. */
+.btn.vc-icon-btn:hover {
+    background: var(--primary-50, rgba(13, 110, 253, .08)) !important;
+}
+
+.btn.vc-icon-btn:focus-visible {
+    outline: 2px solid rgba(13, 110, 253, .55) !important;
+    outline-offset: 1px;
 }
 
 .vc-actions-wrap {
@@ -771,6 +793,102 @@ details[open] > summary::before {
     width: 100%;
     white-space: nowrap;
     min-width: 80px;
+}
+
+/* ==========================================================================
+   Client details — what a real client record does to the layout
+   --------------------------------------------------------------------------
+   Measured at 360, 390, 768, 1024 and 1440 with a client that has three
+   addresses, three contacts, three e-mail addresses and projects with real
+   German titles. Thin seed data hid all of this.
+   ========================================================================== */
+
+/* The internal id. Reference material, so it is set as such — and it never
+   drags the header wider than the screen. */
+.vc-client-id {
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+}
+
+/* An e-mail address is one long unbreakable token as far as the browser is
+   concerned. Inside a chip inside a card on a 360px screen it wrapped, but the
+   wrapped text was still painted past the chip's own border — the address ran
+   out of the box drawn around it.
+
+   The chip is a flex row of [kind badge][address]. A flex item will not shrink
+   below its content's intrinsic width unless it is told it may, which is what
+   min-width: 0 on the address does; the chip then stops at the card's edge and
+   the address breaks inside it. */
+#vc-emailList > span {
+    max-width: 100%;
+    min-width: 0;
+}
+
+#vc-emailList > span > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* Same for the addresses and street lines printed in the location and contact
+   cards, which are built in the browser and carry no classes of their own. */
+#vc-addressList,
+#vc-contactList {
+    overflow-wrap: anywhere;
+}
+
+/* The projects table.
+
+   Names and date ranges are what make it wide. The name may wrap — it is prose
+   — but a date range broken into "2026-\n01-15\n→\n2026-\n09-30" is five lines
+   for one fact, and the status pill and the action are single objects that
+   should never be split at all. */
+.vc-projects-table th,
+.vc-projects-table td {
+    vertical-align: middle;
+}
+
+.vc-projects-table td:nth-child(2),
+.vc-projects-table td:nth-child(3),
+.vc-projects-table th:nth-child(2),
+.vc-projects-table th:nth-child(3),
+.vc-projects-table td:last-child,
+.vc-projects-table th:last-child {
+    white-space: nowrap;
+}
+
+.vc-projects-table td:first-child {
+    min-width: 12rem;
+}
+
+/* The star / edit / save / cancel / delete group on a location or contact row.
+
+   Four buttons at a usable 36px is 140px of controls. Beside a German street
+   address on a 360px screen there is not room for both on one line, and the
+   group was pushed off the edge — the tap-target fix bought with a sideways
+   scrolling page. It wraps instead, and the text beside it is allowed to give
+   up its intrinsic minimum width so it wraps rather than shoves. */
+.vc-row-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    flex-shrink: 0;
+}
+
+#vc-addressList .flex-grow-1,
+#vc-contactList .flex-grow-1 {
+    min-width: 0;
+}
+
+/* Below the phone breakpoint the actions sit under the row they belong to,
+   which gives the address the full width of the card. */
+@media (max-width: 400px) {
+    #vc-addressList > .card > .card-body > .d-flex,
+    #vc-contactList > .card > .card-body > .d-flex {
+        flex-wrap: wrap;
+    }
+
+    .vc-row-actions {
+        width: 100%;
+    }
 }
 
 /* ==========================================================================
