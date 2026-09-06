@@ -60,9 +60,14 @@
                             <span id="vc-lexwareBadge"></span>
                         </h3>
 
-                        <div class="d-flex align-items-center gap-2">
+                        @* The internal id is reference material, not a heading.
+                           Set at body size beside the name it was the second
+                           loudest thing on the page, and on a phone the 36
+                           characters broke across two lines around the type
+                           badge. Small, muted, and kept on one line of its own. *@
+                        <div class="d-flex align-items-center flex-wrap gap-2">
                             <span id="vc-typeBadge"></span>
-                            <span class="text-muted" id="vc-idText">—</span>
+                            <span class="small text-muted vc-client-id" id="vc-idText">—</span>
                         </div>
                         <div class="small text-muted mt-1" id="vc-subtitle">—</div>
                     </div>
@@ -152,7 +157,13 @@
                fields then wrapped into a narrow column for no reason. *@
             <!-- 1) Basic Info -->
             <div class="col-12">
+                @* The card body was missing here, and only here — every other
+                   card on the page has one. Without it the section's content is
+                   laid on the card's own edge with no padding at all, which is
+                   why Basic Information ran flush into the cards above and below
+                   it and read as one broken panel rather than three. *@
                 <div class="card rounded-4">
+                    <div class="card-body">
 
                         <div class="d-flex align-items-center justify-content-between mb-3">
                             <div class="d-flex align-items-center gap-2">
@@ -162,7 +173,7 @@
 
                             <div class="d-flex gap-3">
                                 <button type="button"
-                                        class="btn p-0 border-0 bg-transparent text-info"
+                                        class="btn vc-icon-btn bg-transparent text-info"
                                         title="Edit"
                                         data-vc-action="edit-basic">
                                     <i class="ri-edit-line"></i>
@@ -284,6 +295,7 @@
                         </div>
 
                     </div>
+                    </div>
                 </div>
             </div>
 
@@ -371,7 +383,7 @@
                             </div>
 
                             <button type="button"
-                                    class="btn p-0 border-0 bg-transparent text-primary"
+                                    class="btn vc-icon-btn bg-transparent text-primary"
                                     title="Add Location"
                                     data-bs-toggle="collapse"
                                     data-bs-target="#vc-addLocationCollapse">
@@ -501,7 +513,7 @@
                             </div>
 
                             <button type="button"
-                                    class="btn p-0 border-0 bg-transparent text-primary"
+                                    class="btn vc-icon-btn bg-transparent text-primary"
                                     title="Add Contact"
                                     data-bs-toggle="collapse"
                                     data-bs-target="#vc-addContactCollapse">
@@ -632,7 +644,13 @@
                         @* No colgroup with fixed percentages: a four-column table
                            forced to 100% width inside a card is what produced the
                            horizontal scrollbar on a list of three projects. *@
-                        <div id="vc-projectsTableWrap">
+                        @* The table scrolls inside its own box rather than taking
+                           the page with it. Four columns of real project data —
+                           a title like "Relaunch Onlineshop und Migration auf die
+                           neue Warenwirtschaft" and a date range — measured 361px
+                           on a 360px phone, so the whole page scrolled sideways
+                           and the Action column was cut off the screen. *@
+                        <div id="vc-projectsTableWrap" class="table-responsive">
                             <table class="table align-middle mb-0 vc-projects-table">
                                 <thead>
                                     <tr>

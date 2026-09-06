@@ -112,11 +112,28 @@ namespace WitcherHub.Tests
             var page = Page();
 
             // A four-column colgroup of fixed percentages inside a card is what
-            // produced a scrollbar on a list of three projects.
+            // produced a scrollbar on a list of three projects. That is still
+            // banned, and it was always the actual cause.
             var section = Between(page, "<!-- 4) Projects -->", "</table>");
 
             Assert.DoesNotContain("<colgroup>", section);
-            Assert.DoesNotContain("table-responsive", section);
+
+            // This test also banned `table-responsive` outright, which went too
+            // far: the wrapper does not create a scrollbar, it only offers one
+            // when the content genuinely does not fit. Measured in a browser on
+            // a client with real project titles:
+            //
+            //     1440  wrapper scrolls: false   page scrolls sideways: false
+            //     1024  wrapper scrolls: false   page scrolls sideways: false
+            //      768  wrapper scrolls: false   page scrolls sideways: false
+            //      390  wrapper scrolls: true    page scrolls sideways: false
+            //      360  wrapper scrolls: true    page scrolls sideways: false
+            //
+            // Without it the table was 361px wide on a 360px phone and took the
+            // whole page sideways with it, cutting the Action column off the
+            // screen. The wrapper is how the table keeps that to itself, and
+            // ClientDetailsFitsTheScreenTests holds the phone case.
+            Assert.Contains("table-responsive", section);
         }
 
         // ========================================================== integration
