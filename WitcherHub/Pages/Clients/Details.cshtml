@@ -47,12 +47,17 @@
     @Html.Raw(JsonSerializer.Serialize(Model.CountryOptions.Select(x => new { code = x.Value, name = x.Text })))
 </script>
 
-<div class="row">
+@* The page's cards get their rhythm from one place — see .vc-client-details
+   in site.css — rather than from spacing utilities sprinkled per card. The
+   utilities were the problem: this theme redefines Bootstrap's spacing scale
+   in pixels, so `p-4` on a card body is 4px and `mb-4` under a card is 4px,
+   which is how the summary card ended up with its content on its own edge. *@
+<div class="row vc-client-details">
     <div class="col-12">
 
         <!-- Top Summary -->
-        <div class="card rounded-4 mb-4">
-            <div class="card-body p-4">
+        <div class="card rounded-4">
+            <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
                     <div>
                         <h3 class="mb-1 d-flex align-items-center gap-2 flex-wrap">
@@ -295,7 +300,6 @@
                         </div>
 
                     </div>
-                    </div>
                 </div>
             </div>
 
@@ -397,7 +401,7 @@
 
                         <div class="collapse mt-3" id="vc-addLocationCollapse">
                             <div class="card rounded-4 border-top border-4 border-primary border-gradient-1 mb-0">
-                                <div class="card-body p-4">
+                                <div class="card-body">
                                     <div class="d-flex align-items-center justify-content-between mb-2">
                                         <div class="fw-bold">Add Location</div>
                                     </div>
@@ -527,7 +531,7 @@
 
                         <div class="collapse mt-3" id="vc-addContactCollapse">
                             <div class="card rounded-4 border-top border-4 border-primary border-gradient-1 mb-0">
-                                <div class="card-body p-4">
+                                <div class="card-body">
                                     <div class="d-flex align-items-center justify-content-between mb-2">
                                         <div class="fw-bold">Add Contact</div>
                                         <button type="button" class="btn btn-sm btn-light"
