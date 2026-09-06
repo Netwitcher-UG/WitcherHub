@@ -803,6 +803,78 @@ details[open] > summary::before {
    German titles. Thin seed data hid all of this.
    ========================================================================== */
 
+/* --------------------------------------------------------------------------
+   The rhythm of the page: space between the cards, space inside them
+   --------------------------------------------------------------------------
+   Measured in a browser before this block. Every card on the page touched the
+   next one:
+
+       gap  Musterfirma GmbH   -> Basic Information     4px
+       gap  Basic Information  -> Accounting            0px
+       gap  Accounting         -> Locations             0px
+       gap  Locations          -> Company Contacts      0px
+       gap  Company Contacts   -> Projects              0px
+
+   and the summary card's body had 4px of padding while every other card had
+   24px, so the client's name very nearly touched the card's edge.
+
+   Both come from the same thing. This theme redefines Bootstrap's spacing
+   scale in pixels, so on this page:
+
+       p-4  ->   4px          (Bootstrap: 24px)
+       p-3  ->  16px
+       p-24 ->  24px
+
+   `card-body p-4` therefore asked for 4px, and `mb-4` under the summary card
+   asked for 4px. The gaps between the rest were 0 for a related reason: the
+   row declares --bs-gutter-y: 1.5rem and carries the matching margin-top of
+   -24px, but the theme zeroes the column padding that is supposed to pay it
+   back — measured: colPaddingTop 0px. The row gave up 24px and handed none of
+   it out.
+
+   So the spacing is stated here once, for this page, instead of being spelled
+   in utilities whose meaning is not what it looks like.
+   -------------------------------------------------------------------------- */
+
+/* The row's own gutter does the spacing between the cards — `g-4`, which is
+   24px — now that the row actually contains them. Nothing here overrides it:
+   a page that also declared a row-gap would get both.
+
+   The summary card sits outside that row, so it is the one that carries its
+   own bottom margin. `mb-4` used to, and meant 4px. */
+.vc-client-details > .col-12 > .card {
+    margin-bottom: 1.5rem;
+}
+
+/* Card padding is not restated here on purpose.
+ *
+ * The application already has one — `.dashboard-main-body .card > .card-body`,
+ * set from --wh-space-5 and stepped down to --wh-space-4 on a phone. This page
+ * was not missing that rule; it was overriding it, with `card-body p-4` on
+ * three of its cards. Removing those utilities is the whole fix, and the page
+ * then has the same padding as every other screen instead of its own copy of
+ * the idea with the numbers written out by hand. */
+
+/* Between the addresses and between the contacts. 8px read as a stack of one
+   thing; these are separate records and each has its own controls. */
+#vc-addressList,
+#vc-contactList {
+    gap: .75rem !important;
+}
+
+/* A phone has less room to give away, so the same rhythm one step down. */
+@media (max-width: 575.98px) {
+    /* One step down on a phone, gutter included — there is less room to give
+       away, and the cards are already full width. */
+    .vc-client-details > .col-12 > .row {
+        --bs-gutter-y: 1rem;
+    }
+
+    .vc-client-details > .col-12 > .card {
+        margin-bottom: 1rem;
+    }
+}
+
 /* The internal id. Reference material, so it is set as such — and it never
    drags the header wider than the screen. */
 .vc-client-id {

@@ -200,6 +200,114 @@ namespace WitcherHub.Tests
             Assert.Contains("overflow-wrap: anywhere", RuleFor(".vc-client-id"));
         }
 
+        // ============================================== the rhythm of the page
+
+        /// <summary>
+        /// The page with Razor comments removed, so a &lt;div&gt; quoted inside
+        /// an explanation is not counted as markup.
+        /// </summary>
+        private static string[] MarkupLines() =>
+            Regex.Replace(Page(), @"@\*.*?\*@", "", RegexOptions.Singleline)
+                 .Replace("\r", "")
+                 .Split('\n');
+
+        [Fact]
+        public void TheCardsRowActuallyContainsTheCards()
+        {
+            // A stray closing tag inside the Basic Information column popped the
+            // row early, so Accounting, Locations, Company Contacts and Projects
+            // were columns with no row around them. A column outside a row gets
+            // no gutter, which is why every card on the page touched the next
+            // one — measured at 0px between all five.
+            var lines = MarkupLines();
+
+            var depth = 0;
+            var rowDepth = -1;
+            var columns = 0;
+
+            foreach (var line in lines)
+            {
+                var opens = Regex.Matches(line, @"<div\b").Count;
+                var closes = Regex.Matches(line, @"</div>").Count;
+
+                if (rowDepth >= 0 && depth == rowDepth + 1 &&
+                    Regex.IsMatch(line, @"<div class=""col-12"))
+                    columns++;
+
+                if (line.Contains("class=\"row g-4\"")) rowDepth = depth;
+
+                depth += opens - closes;
+
+                if (rowDepth >= 0 && depth <= rowDepth) break;
+            }
+
+            Assert.True(rowDepth >= 0, "the cards row is gone");
+            Assert.True(columns >= 5,
+                $"the cards row closes after {columns} column(s); the sections after it "
+                + "are columns with no row around them and get no spacing");
+        }
+
+        [Fact]
+        public void EveryDivOnThePageIsClosedExactlyOnce()
+        {
+            var lines = MarkupLines();
+
+            var opens = lines.Sum(l => Regex.Matches(l, @"<div\b").Count);
+            var closes = lines.Sum(l => Regex.Matches(l, @"</div>").Count);
+
+            Assert.True(opens == closes,
+                $"the page opens {opens} divs and closes {closes} — the difference lands "
+                + "somewhere in the layout, and the browser decides where");
+        }
+
+        [Fact]
+        public void TheThemesPixelSpacingIsNotMistakenForBootstraps()
+        {
+            // This theme redefines the spacing scale in pixels: p-4 is 4px here,
+            // not Bootstrap's 24px. `card-body p-4` therefore asked for four
+            // pixels of padding, and `mb-4` under the summary card asked for
+            // four pixels of separation — which is what both got.
+            var page = Page();
+
+            Assert.DoesNotContain("card-body p-4", page);
+            Assert.DoesNotContain("card rounded-4 mb-4", page);
+        }
+
+        [Fact]
+        public void ThePagesSpacingIsStatedInOnePlace()
+        {
+            var css = Regex.Replace(Styles(), @"/\*.*?\*/", "", RegexOptions.Singleline);
+
+            Assert.Contains("row vc-client-details", Page());
+
+            // The summary card is outside the cards row, so it is the one card
+            // that carries its own separation. The rest are spaced by the row's
+            // gutter, now that the row contains them.
+            Assert.Matches(
+                @"\.vc-client-details > \.col-12 > \.card \{[^}]*margin-bottom:",
+                css);
+
+            // And the page must not also declare a row-gap: both would apply.
+            Assert.DoesNotMatch(@"\.vc-client-details[^{]*\{[^}]*row-gap", css);
+        }
+
+        [Fact]
+        public void ThePageUsesTheApplicationsCardPaddingRatherThanItsOwn()
+        {
+            var css = Regex.Replace(Styles(), @"/\*.*?\*/", "", RegexOptions.Singleline);
+
+            // The application already sets card padding from its own spacing
+            // tokens. This page was not missing that rule — it was overriding
+            // it with `card-body p-4`, which in this theme is four pixels.
+            Assert.Matches(
+                @"\.dashboard-main-body \.card > \.card-body \{[^}]*padding:\s*var\(--wh-space-",
+                css);
+
+            // So the page must not restate card padding with numbers of its
+            // own; that is how a screen drifts away from the rest of the app.
+            Assert.DoesNotMatch(@"\.vc-client-details[^{]*\.card-body[^{]*\{[^}]*padding", css);
+        }
+
         [Fact]
         public void ATimestampIsWrittenForAPersonToRead()
         {
