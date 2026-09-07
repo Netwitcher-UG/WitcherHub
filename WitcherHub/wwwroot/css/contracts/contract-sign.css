@@ -735,9 +735,19 @@
 
     /* The chips too. They are labels, not prose, and the document's
        justification was stretching the word spacing inside them — a wrapped
-       project chip came out as "Relaunch   Onlineshop   und". */
+       project chip came out as "Relaunch   Onlineshop   und".
+
+       The same goes for the page furniture's own one-line captions: the line
+       under a section heading came out as "Alle   Positionen   und   Details"
+       once the column was narrow enough to wrap it. */
     .contractPdfScope .chip,
-    .quotePdfScope .chip {
+    .contractPdfScope .section-head p,
+    .contractPdfScope .title-block p,
+    .contractPdfScope .summary-banner p,
+    .quotePdfScope .chip,
+    .quotePdfScope .section-head p,
+    .quotePdfScope .title-block p,
+    .quotePdfScope .summary-banner p {
         text-align: left !important;
     }
 
@@ -1160,7 +1170,12 @@
 
 .contractPage__paper {
     /* A4 at the margins a contract is set to, rather than a web page's
-       padding. 25mm all round is the German norm for a business document. */
+       padding. 25mm all round is the German norm for a business document.
+
+       The side margins are a print measurement, so they are only spent when
+       there is a sheet's worth of room to spend them on — see the responsive
+       block below. Two 25mm margins on a 320px phone leave 160px for the
+       document, which is what they were doing. */
     width: 210mm;
     max-width: 100%;
     padding: 25mm 25mm 30mm;
@@ -1264,6 +1279,187 @@
     .contractPaper__pageNo {
         display: none;
     }
+}
+
+/* ==========================================================================
+   The sheet on a screen that is not a sheet
+   --------------------------------------------------------------------------
+   These rules are here, after the A4 block, because CSS order decides this.
+   The file already carried narrow-screen paper rules — 20px/18px sides at
+   980px and 18px/16px at 600px, written further up — and the A4 block below
+   them set `padding: 25mm 25mm 30mm` unconditionally, so it won the cascade
+   at every width and those rules never applied.
+
+   Measured on the customer's signing page before this block:
+
+       viewport   paper    side padding   the document got
+          320px    260px       94px + 94px      160px
+          360px    300px       94px + 94px      200px
+          390px    330px       94px + 94px      230px
+
+   A contract rendered in a 160px ribbon down the middle of a phone, with the
+   project chip 318px wider than the screen. It did not scroll sideways only
+   because .contractPage hides the overflow — so the parts that did not fit
+   were simply not visible.
+
+   A print margin is spent when there is a sheet to spend it on. Below that,
+   the margin becomes what a screen needs: enough to keep the text off the
+   glass, and no more.
+   ========================================================================== */
+
+@media (max-width: 1000px) {
+    .contractPage__paper {
+        width: 100%;
+        padding: 14mm 12mm 16mm;
+    }
+
+    /* The document is pulled wider than the sheet on a desktop, where the
+       sheet has 25mm to give back. Here it has not. */
+    .contractPage__contractHtml.contractPdfScope,
+    .contractPage__contractHtml.quotePdfScope {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .contractPdfScope .content,
+    .quotePdfScope .content {
+        padding: 8mm 6mm 6mm !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .contractPage {
+        padding: 12px 0 20px;
+    }
+
+    .contractPage__container {
+        padding: 56px 10px 0;
+    }
+
+    .contractPage__paper {
+        padding: 20px 16px 24px;
+        min-height: auto;
+    }
+
+    .contractPdfScope .content,
+    .quotePdfScope .content {
+        padding: 16px 12px 12px !important;
+    }
+
+    /* The document's own two-column header has nowhere to put a second column
+       on a phone. The reference card goes under the title rather than beside
+       it. */
+    .contractPdfScope .header,
+    .quotePdfScope .header {
+        display: block !important;
+    }
+
+    .contractPdfScope .meta,
+    .quotePdfScope .meta {
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        margin-top: 14px;
+    }
+
+    /* Label above value: "Name" and its box cannot share 200px. */
+    .contractSign__row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+
+    .contractSign__label {
+        margin-top: 6px;
+    }
+
+    /* A signature is drawn with a finger here, so the pad is worth the height. */
+    .contractPage__sigPad canvas {
+        height: 40vh;
+        min-height: 240px;
+    }
+
+    /* The document's title shares its line with the logo. On a phone that
+       leaves about 150px, and "Agenturvertrag" at 27px needs 190 — so the
+       title was cut to "Agenturvert". The mark gets smaller and the title
+       gets a size it fits in, and may break if a longer one does not. */
+    .contractPdfScope .logo-box,
+    .quotePdfScope .logo-box {
+        width: 56px !important;
+        height: 56px !important;
+        border-radius: 14px !important;
+    }
+
+    .contractPdfScope .title-block h1,
+    .quotePdfScope .title-block h1 {
+        font-size: 22px !important;
+        overflow-wrap: break-word;
+    }
+
+    .contractPdfScope .header-left,
+    .quotePdfScope .header-left {
+        gap: 12px !important;
+    }
+
+    /* The banner across the top of the document: its title and its total sit
+       side by side on a desktop and one under the other here. */
+    .contractPdfScope .summary-banner,
+    .quotePdfScope .summary-banner {
+        display: block !important;
+    }
+
+    .contractPdfScope .summary-badge,
+    .quotePdfScope .summary-badge {
+        width: 100% !important;
+        min-width: 0 !important;
+        margin-top: 14px;
+    }
+
+    /* Provider and customer, one above the other rather than in two columns
+       too narrow for an address. */
+    .contractPdfScope .party-grid,
+    .quotePdfScope .party-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+@media (max-width: 380px) {
+    .contractPage__paper {
+        padding: 16px 12px 20px;
+    }
+
+    .contractPdfScope .content,
+    .quotePdfScope .content {
+        padding: 12px 10px 10px !important;
+    }
+}
+
+/* A table has a width below which it stops being readable, and a narrow phone
+   is below it: the contract's price table measured 271px against 242px of
+   document at 320px, and the part that did not fit was clipped rather than
+   reachable. It scrolls inside its own box instead — the same arrangement the
+   quote's positions table uses, and the page around it stays still.
+
+   Markdown tables in the contract body get the same treatment: those come from
+   the document's own wording and carry no wrapper of their own. */
+@media (max-width: 700px) {
+    .contractPdfScope .price-box,
+    .contractPdfScope .rich-text,
+    .quotePdfScope .price-box {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .contractPdfScope .price-box table,
+    .quotePdfScope .price-box table {
+        min-width: 320px;
+    }
+}
+
+/* The language switch is a control, so it is sized like one. Measured at
+   39x30 — under the height a thumb can rely on. */
+.contractPage__langBtn {
+    min-height: 36px;
+    min-width: 40px;
 }
 
 /* ---- printing ---------------------------------------------------------- */
