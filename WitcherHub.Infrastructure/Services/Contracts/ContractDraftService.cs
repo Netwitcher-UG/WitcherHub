@@ -252,6 +252,13 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                             Draft = fallback.Draft,
                             Money = fallback.Money,
                             ComposedWithoutAi = true,
+
+                            // Carried from the composed result rather than left at
+                            // its default. This branch rebuilds the result field by
+                            // field, so anything not named here is silently dropped
+                            // — and the page would have gone on telling the user to
+                            // approve a version that was already the contract.
+                            BecameTheContract = fallback.BecameTheContract,
                             FailureReason =
                                 ex.UserMessage + " A contract was composed from your positions and details " +
                                 "instead — review it, and regenerate once the assistant is working."
@@ -327,6 +334,10 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             _db.Set<ContractDraft>().Add(draft);
 
+            // A contract, not a candidate for one. Nothing is replaced: this only
+            // takes effect while no version is approved.
+            var becameTheContract = ApproveIfFirst(contract, draft);
+
             // Recorded so the guard at the top of this method can recognise a
             // repeat. Without this the guard could never match on the generated
             // path, and only the composed path was ever de-duplicated.
@@ -354,15 +365,18 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             _logger.LogInformation(
                 "Generated draft v{Version} for contract {ContractId} from {Mode} using {Model}. " +
-                "Source document {Source} informed it without being copied into it. Coverage {Coverage}.",
+                "Source document {Source} informed it without being copied into it. Coverage {Coverage}. " +
+                "It {Became} the contract's wording.",
                 draft.Version, contractId, source.Mode, _openAi.Model,
                 draft.SourceDraftId is null ? "was absent" : "v" + LatestSupplied(contract)?.Version,
-                outcome.Audit.Summary);
+                outcome.Audit.Summary,
+                becameTheContract ? "became" : "did not become (a version is already approved)");
 
             return new ContractDraftResult
             {
                 Succeeded = true,
                 Draft = ToSummary(draft, totals),
+                BecameTheContract = becameTheContract,
 
                 // What the contract does not say. Shown beside the draft rather
                 // than folded into a success message, because "generated" and
@@ -482,6 +496,11 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             _db.Set<ContractDraft>().Add(draft);
 
+            // Finished here too. This is the path taken when the assistant cannot
+            // be reached at all, which is exactly when leaving the contract one
+            // unfindable step short of existing would be least forgivable.
+            var becameTheContract = ApproveIfFirst(contract, draft);
+
             contract.PreparationState = ContractPreparationState.PreparedDraft;
             contract.LastPreparationKey = options.IdempotencyKey;
             contract.LastPreparedDraftId = draft.Id;
@@ -499,11 +518,61 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             _logger.LogInformation(
                 "Composed contract v{Version} for {ContractId} without a model from {Positions} position(s) " +
-                "and {Terms} confirmed term(s). Source document v{Source} was referenced, not copied.",
+                "and {Terms} confirmed term(s). Source document v{Source} was referenced, not copied. " +
+                "It {Became} the contract's wording.",
                 draft.Version, contract.Id, positions.Count, clauses.Length,
-                supplied is null ? "(none)" : "v" + supplied.Version);
+                supplied is null ? "(none)" : "v" + supplied.Version,
+                becameTheContract ? "became" : "did not become (a version is already approved)");
 
-            return new ContractDraftResult { Succeeded = true, Draft = ToSummary(draft, null) };
+            return new ContractDraftResult
+            {
+                Succeeded = true,
+                Draft = ToSummary(draft, null),
+                BecameTheContract = becameTheContract
+            };
+        }
+
+        /// <summary>
+        /// Makes a freshly produced version the contract's wording, when there is
+        /// nothing it would replace. Returns true when it did.
+        ///
+        /// Producing a contract used to leave it unfinished. Generating wrote a
+        /// version and stopped; <c>contract.Terms</c> — what the details page, the
+        /// signing page and the PDF all read — stayed empty until somebody found
+        /// the version list and approved it. So the ordinary path ended on a
+        /// screen saying the contract had no wording, one step short of a
+        /// contract, while the same contract created automatically from a signed
+        /// quote arrived complete: that path writes the generated document
+        /// straight onto the contract and never had an approval step at all.
+        ///
+        /// This closes that gap from the other side. The first version a contract
+        /// gets becomes its wording as it is made, so "generate" produces a
+        /// contract rather than a candidate.
+        ///
+        /// It deliberately does nothing once a version is approved. Approving over
+        /// an approved version changes which text is active — on a contract that
+        /// may already have been sent to a customer — and that is a decision, with
+        /// a confirmation of its own in <see cref="ApproveAsync"/>. Regenerating is
+        /// not consent to publish. The line is the same one the user drew: the
+        /// first contract is made in one step, a replacement is still chosen.
+        /// </summary>
+        private static bool ApproveIfFirst(Contract contract, ContractDraft draft)
+        {
+            if (contract.Drafts.Any(d => d.IsApproved && d.Id != draft.Id))
+                return false;
+
+            draft.IsApproved = true;
+            draft.Status = ContractDraftStatus.Approved;
+            draft.SupersededAt = null;
+            draft.ApprovedAt = DateTimeOffset.UtcNow;
+            draft.DocumentHash = Sha256(draft.DocumentMarkdown);
+
+            // The same two writes approval makes. The signing page and the PDF
+            // read Terms; ApprovedDraftId is what says which version it came from.
+            contract.Terms = draft.DocumentMarkdown;
+            contract.ApprovedDraftId = draft.Id;
+
+            return true;
         }
 
         /// <summary>

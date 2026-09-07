@@ -778,9 +778,16 @@
                                depends on what the contract is built from. It is
                                disabled only when there is genuinely no source —
                                not when there happen to be no positions. *@
+                            @* Says what pressing it leaves you with. It used to say
+                               the result is "created as a draft for you to review
+                               before approval" — true of every version once, and no
+                               longer true of the first, which becomes the contract
+                               as it is written. *@
                             <button type="button" class="btn btn-primary radius-8 wh-ai-action" data-action="generate-draft"
                                     disabled="@(!Model.CanGenerate)" data-ai="true"
-                                    title="Writes the contract wording with the AI model. It is created as a draft for you to review before approval.">
+                                    title="@(Model.ApprovedVersion is null
+                                              ? "Writes the contract wording with the AI model. It becomes the contract, ready to preview and send."
+                                              : $"Writes a new version with the AI model. Version {Model.ApprovedVersion.Version} stays the contract until you approve the new one.")">
                                 <partial name="_AiMark" /> @Model.Source.PrimaryActionLabel
                             </button>
                         </div>

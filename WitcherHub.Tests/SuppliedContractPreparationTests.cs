@@ -275,7 +275,13 @@ public class SuppliedContractPreparationTests : IAsyncLifetime
         var prepared = await _sut.GenerateAsync(contractId, new GenerateDraftOptions());
 
         Assert.True(prepared.Succeeded, prepared.FailureReason);
-        Assert.Equal(ContractDraftStatus.Draft, prepared.Draft!.Status);
+
+        // The first version a contract gets is its wording. This asserted Draft
+        // when every version had to be approved separately, which left the
+        // ordinary path one unfindable step short of a contract — the automatic
+        // path from a signed quote never had that step and never needed it.
+        Assert.Equal(ContractDraftStatus.Approved, prepared.Draft!.Status);
+        Assert.True(prepared.BecameTheContract);
 
         // A contract, not a copy of the pasted text.
         //
@@ -334,7 +340,12 @@ public class SuppliedContractPreparationTests : IAsyncLifetime
         var fourth = await _sut.GenerateAsync(contractId, new GenerateDraftOptions { IdempotencyKey = "c" });
 
         Assert.Equal(4, fourth.Draft!.Version);
-        await _sut.ApproveAsync(contractId, 4, null);
+
+        // Confirmed, because version 2 — the first this contract generated — is
+        // already its wording. That is the change: the first version made is the
+        // contract, so reaching "version 4 is the approved one" now means
+        // replacing an approval rather than making the first.
+        await _sut.ApproveAsync(contractId, 4, null, confirmReplacingApproved: true);
 
         // Preparing again asks nothing and takes nothing away.
         var fifth = await _sut.GenerateAsync(contractId, new GenerateDraftOptions { IdempotencyKey = "d" });

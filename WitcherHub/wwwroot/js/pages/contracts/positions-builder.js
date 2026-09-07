@@ -167,6 +167,21 @@
         updateTotals();
     }
 
+    /// Lets the contract be written, once there is something to write it from.
+    ///
+    /// The button is drawn disabled when the contract has no source, which is
+    /// true of every contract at the moment it is created. Whether it still has
+    /// none is decided on the server and never revisited in the browser, so
+    /// saving the first position left the one button the page exists for greyed
+    /// out — with nothing saying why, and nothing to do but reload. That is the
+    /// first thing anyone meets on a new contract.
+    function releaseGenerate() {
+        if (locked || positions.length === 0) return;
+
+        const generate = document.querySelector('[data-action="generate-draft"]');
+        if (generate) generate.disabled = false;
+    }
+
     /// Makes one rendered position read-only.
     ///
     /// Applied to the finished card rather than woven through the thirty-odd
@@ -987,6 +1002,7 @@
 
                 dirty = false;
                 applyServerTotals(result.totals);
+                releaseGenerate();
                 toast("success", result.message || "Saved.");
             });
         }
@@ -1101,8 +1117,9 @@
                     } catch { /* private mode; the notes are on the version anyway */ }
                 }
 
-                // The new version is a draft awaiting review, so the user is taken
-                // to it rather than left to find it.
+                // Taken to the version either way — to read what was written when
+                // it is already the contract, or to approve it when a previous
+                // version holds that place and this one is a proposed replacement.
                 window.location.hash = "version-" + result.version;
                 window.location.reload();
             });
