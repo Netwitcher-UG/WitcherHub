@@ -48,14 +48,59 @@ public class GeneratingAContractProducesAContractTests : IAsyncLifetime
     private bool Available => _db is not null;
 
     /// <summary>
-    /// Answers every prompt with a complete generated contract, so these tests
-    /// are about what happens to the result rather than about the model.
+    /// Answers in whichever shape the caller asked for, so these tests are about
+    /// what happens to the result rather than about the model.
+    ///
+    /// Two generators are reachable and they want different answers. A contract
+    /// with positions goes through the Agenturvertrag generator, which asks for
+    /// the structured Anlage A as JSON; a contract with only pasted text goes
+    /// through the pipeline, which asks for clauses. The prompt says which.
     /// </summary>
     private sealed class StubAi : IAiTextGenerator
     {
-        public Task<string> GenerateTextAsync(string prompt) =>
-            Task.FromResult(AGeneratorAnswer.Complete);
+        public int AnlageACalls { get; private set; }
+
+        public Task<string> GenerateTextAsync(string prompt)
+        {
+            if (prompt.Contains("Anlage A", StringComparison.Ordinal) &&
+                prompt.Contains("Return JSON ONLY", StringComparison.Ordinal))
+            {
+                AnlageACalls++;
+                return Task.FromResult(AnlageAJson);
+            }
+
+            return Task.FromResult(AGeneratorAnswer.Complete);
+        }
     }
+
+    /// <summary>One position's Anlage A, in the schema the prompt sets out.</summary>
+    private const string AnlageAJson = """
+        {
+          "version": "1.0",
+          "language": "de-DE",
+          "positions": [
+            {
+              "positionNo": 1,
+              "title": "Monatliche Betreuung",
+              "quantity": 1,
+              "unitNetPrice": 2000,
+              "lineNetPrice": 2000,
+              "taxRatePercent": 19,
+              "sections": {
+                "scope": "Laufende Betreuung der Vertriebskanäle des Auftraggebers.",
+                "deliverables": ["Monatlicher Report", "Laufende Optimierung"],
+                "outOfScope": ["Mediabudget"],
+                "customerResponsibilities": ["Zugänge bereitstellen"],
+                "acceptanceCriteria": ["Report liegt bis zum 5. Werktag vor"],
+                "timeline": "Monatlich",
+                "assumptions": "Die Zugänge stehen zur Verfügung.",
+                "revisions": "Eine Korrekturschleife je Report."
+              },
+              "customClauses": []
+            }
+          ]
+        }
+        """;
 
     /// <summary>
     /// An assistant that cannot be used at all — no key, no credit, no model.
@@ -129,7 +174,106 @@ public class GeneratingAContractProducesAContractTests : IAsyncLifetime
         if (_db is not null) await _db.DisposeAsync();
     }
 
-    // ============================================ the first version is the contract
+    // ======================================= the same document a signed quote makes
+
+    [Fact]
+    public async Task AContractWithPositionsIsWrittenFromTheAgenturvertragTemplate()
+    {
+        if (!Available) return;
+
+        var ai = new StubAi();
+        var sut = BuildService(ai);
+        var contractId = await NewContractAsync(sut, withPositions: true, withPastedText: false);
+
+        var result = await sut.GenerateAsync(contractId, new GenerateDraftOptions());
+
+        Assert.True(result.Succeeded, result.FailureReason);
+        Assert.Equal(1, ai.AnlageACalls);
+
+        var document = result.Draft!.DocumentMarkdown;
+
+        // The template's own headings. This is what a contract created from a
+        // signed quote looks like, and until now the builder produced a
+        // "Dienstleistungsvertrag" of numbered paragraphs with no Anlage A at all.
+        Assert.Contains("# Agenturvertrag", document);
+        Assert.Contains("Vertragspartner", document);
+        Assert.Contains("Vertragsgegenstand", document);
+        Assert.Contains("Anlage A", document);
+        Assert.Contains("Preis", document);
+
+        Assert.DoesNotContain("Dienstleistungsvertrag", document);
+    }
+
+    [Fact]
+    public async Task WhatTheModelWroteForAnlageAIsInTheDocument()
+    {
+        if (!Available) return;
+
+        var sut = BuildService(new StubAi());
+        var contractId = await NewContractAsync(sut, withPositions: true, withPastedText: false);
+
+        var result = await sut.GenerateAsync(contractId, new GenerateDraftOptions());
+        var document = result.Draft!.DocumentMarkdown;
+
+        // The structured answer is rendered into the services section rather than
+        // merely stored, which is the whole point of the one model call.
+        Assert.Contains("Laufende Betreuung der Vertriebskanäle", document);
+        Assert.Contains("Monatlicher Report", document);
+    }
+
+    [Fact]
+    public async Task TheContractNamesTheCustomerRatherThanAPlaceholder()
+    {
+        if (!Available) return;
+
+        var sut = BuildService(new StubAi());
+        var contractId = await NewContractAsync(sut, withPositions: true, withPastedText: false);
+
+        var result = await sut.GenerateAsync(contractId, new GenerateDraftOptions());
+        var document = result.Draft!.DocumentMarkdown;
+
+        // The quote's path leaves CustomerBlockOverride unset, and the generator
+        // then fills the Kunde block with the literal string "(filled)" — a
+        // contract that does not say who it is between. The parties are known
+        // here, so they are passed.
+        Assert.Contains("Musterfirma GmbH", document);
+        Assert.DoesNotContain("(filled)", document);
+    }
+
+    [Fact]
+    public async Task AnlageAIsKeptAsDataBesideTheDocument()
+    {
+        if (!Available) return;
+
+        var sut = BuildService(new StubAi());
+        var contractId = await NewContractAsync(sut, withPositions: true, withPastedText: false);
+
+        await sut.GenerateAsync(contractId, new GenerateDraftOptions());
+
+        var contract = await Reload(contractId);
+
+        Assert.NotNull(contract.TermsStructured);
+        Assert.Contains("Monatliche Betreuung", contract.TermsStructured!.RootElement.ToString());
+    }
+
+    [Fact]
+    public async Task AContractWithOnlyPastedTextStillHasAWayToBeWritten()
+    {
+        if (!Available) return;
+
+        // The Agenturvertrag generator refuses without positions — it builds
+        // Anlage A out of them. A contract whose only source is a document must
+        // not become unwritable because of that.
+        var sut = BuildService(new StubAi());
+        var contractId = await NewContractAsync(sut, withPositions: false, withPastedText: true);
+
+        var result = await sut.GenerateAsync(contractId, new GenerateDraftOptions());
+
+        Assert.True(result.Succeeded, result.FailureReason);
+        Assert.False(string.IsNullOrWhiteSpace(result.Draft!.DocumentMarkdown));
+    }
+
+    // ======================================= the first version is the contract
 
     [Fact]
     public async Task GeneratingFromPositionsLeavesAReadableContract()

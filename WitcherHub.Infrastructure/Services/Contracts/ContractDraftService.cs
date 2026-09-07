@@ -38,6 +38,14 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         private readonly ContractContextBuilder _contextBuilder;
         private readonly ContractGenerationPipeline _pipeline;
 
+        /// <summary>
+        /// The document generator the quote's after-sign path uses: one model
+        /// call for the structured Anlage A, merged into the Agenturvertrag
+        /// template. Asked for by name so a contract written from the builder
+        /// comes out as the same document as one written from a signed quote.
+        /// </summary>
+        private readonly ContractDocumentGenerator _documents;
+
         public ContractDraftService(
             AppDbContext db,
             IContractPositions positions,
@@ -66,6 +74,12 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             // a registered dependency would break every test that constructs this
             // service directly for no benefit.
             _contextBuilder = new ContractContextBuilder(db, _template);
+
+            // The generator the quote's after-sign path uses, built here for the
+            // same reason as the two below: it takes the assistant and the
+            // template options this service already holds, and registering it
+            // would mean rewriting every test that constructs this service.
+            _documents = new ContractDocumentGenerator(ai, template);
 
             // Same reasoning: a stage runner over the assistant and the options
             // this service already holds. Registering it would mean rewriting
@@ -193,6 +207,83 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             // document happens to have been pasted.
             var sourceText = LatestSupplied(contract)?.DocumentMarkdown;
 
+            var parties = await BuildPartyDetailsAsync(contract, ct);
+
+            // The same document a signed quote produces.
+            //
+            // Two generators existed and the door you came in decided which one
+            // wrote your contract. A signed quote went through
+            // ContractDocumentGenerator — one model call for the structured
+            // Anlage A, merged into the Agenturvertrag template — and came out as
+            // "Agenturvertrag" with Vertragspartner, Vertragsgegenstand, Anlage A
+            // and a Preisübersicht. The builder went through the pipeline and came
+            // out as "Dienstleistungsvertrag" with numbered paragraphs and no
+            // Anlage A at all. Same system, same contract, two documents.
+            //
+            // The owner asked for the quote's, by name, so this is the quote's:
+            // the same call with the same options, not a copy of it.
+            //
+            // It needs positions — the generator refuses without them — so a
+            // contract whose only source is pasted text still goes through the
+            // pipeline below, which is the one that can write from a document.
+            if (positions.Count > 0)
+            {
+                try
+                {
+                    return await GenerateFromTemplateAsync(
+                        contract, positions, totals, parties, options, ct);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (AiInvocationException ex) when (ex.NeedsOwnerAction)
+                {
+                    _logger.LogWarning(
+                        "Falling back to a composed contract for {ContractId}: {Kind} ({CorrelationId}).",
+                        contractId, ex.Kind, ex.CorrelationId);
+
+                    var composed = await ComposeWithoutAiAsync(contract, options, ct);
+
+                    if (composed.Succeeded)
+                    {
+                        return new ContractDraftResult
+                        {
+                            Succeeded = true,
+                            Draft = composed.Draft,
+                            Money = composed.Money,
+                            ComposedWithoutAi = true,
+                            BecameTheContract = composed.BecameTheContract,
+                            FailureReason =
+                                ex.UserMessage + " A contract was composed from your positions and details " +
+                                "instead — review it, and regenerate once the assistant is working."
+                        };
+                    }
+
+                    return ContractDraftResult.Failed(
+                        ex.UserMessage + " Your positions and contract text are saved — you can write or paste " +
+                        "the wording by hand, or try again.", ex.IsTransient);
+                }
+                catch (AiInvocationException ex)
+                {
+                    return ContractDraftResult.Failed(
+                        ex.UserMessage + " Your positions and contract text are saved — you can write or paste " +
+                        "the wording by hand, or try again.", ex.IsTransient);
+                }
+                catch (Exception ex)
+                {
+                    // The generator's own refusals — an empty answer, JSON it
+                    // could not read, a template that is not on disk. The wording
+                    // is ours; what it actually said goes to the log.
+                    _logger.LogWarning(ex, "Contract generation failed for {ContractId}.", contractId);
+
+                    return ContractDraftResult.Failed(
+                        "The assistant could not produce a contract. Your positions are saved — you can write " +
+                        "the contract text by hand and save it.",
+                        transient: true);
+                }
+            }
+
             var context = await _contextBuilder.BuildAsync(
                 contract,
                 positions,
@@ -284,7 +375,6 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             }
 
             var content = outcome.Content;
-            var parties = await BuildPartyDetailsAsync(contract, ct);
 
             // One contract, from all the sources. Nothing is appended to it: the
             // pasted document informed the clauses and is not part of them.
@@ -384,6 +474,194 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 // things to hand somebody who is about to approve it.
                 ReviewNotes = outcome.Audit.ReviewNotes()
             };
+        }
+
+        /// <summary>
+        /// Writes the contract the way a signed quote writes one.
+        ///
+        /// The whole of the algorithm is in <see cref="ContractDocumentGenerator"/>
+        /// and is not reproduced here: this assembles the request from the
+        /// contract's own positions instead of a quote's items, and stores what
+        /// comes back as a version.
+        ///
+        /// The one deliberate difference from the quote's call is the customer.
+        /// That path leaves <c>CustomerBlockOverride</c> unset, and the generator
+        /// then fills the Kunde block with the literal placeholder
+        /// "Name/Firma: (filled)" — a contract that does not name who it is
+        /// between. The parties are already known here, so they are passed. That
+        /// is the same algorithm with the input it was asking for, not a
+        /// different one.
+        /// </summary>
+        private async Task<ContractDraftResult> GenerateFromTemplateAsync(
+            Contract contract,
+            IReadOnlyList<ManualPositionDto> positions,
+            PositionTotalsDto totals,
+            PartyDetails parties,
+            GenerateDraftOptions options,
+            CancellationToken ct)
+        {
+            var request = new GenerateContractDocumentRequest
+            {
+                ProjectId = contract.ProjectId,
+                ContractNo = contract.ContractNo,
+                ProjectTitle = string.IsNullOrWhiteSpace(contract.Project?.Title)
+                    ? "Project"
+                    : contract.Project!.Title!,
+                Currency = string.IsNullOrWhiteSpace(contract.Currency) ? "EUR" : contract.Currency!,
+                StartDate = contract.StartDate,
+                EndDate = contract.EndDate,
+
+                // Nobody has signed yet — this is the wording being written, not a
+                // signature being taken — so the signer is the customer as the
+                // record has them.
+                SignerName = parties.CustomerName ?? "",
+                SignerEmail = null,
+
+                LeaveCustomerFieldsBlank = false,
+                CustomerBlockOverride = CustomerBlock(parties),
+
+                // The quote's setting: Anlage A carries the prices.
+                IncludePricesInServicesSection = true,
+
+                // The supplied document, given to the model as context.
+                //
+                // Without this the button called "Generate from text and
+                // positions" would use only the positions: this generator builds
+                // Anlage A out of them and has no other channel for a document.
+                // The text would be stored, listed as a version, named in the
+                // button — and never read.
+                //
+                // Framed as it was for the pipeline: lowest authority, and not to
+                // be copied. Whatever is in the record wins over whatever the
+                // pasted document claims, and the document informs the clauses
+                // rather than becoming them.
+                AdditionalInstructions = WithSuppliedDocument(
+                    options.AdditionalInstructions,
+                    LatestSupplied(contract)?.DocumentMarkdown),
+
+                Services = positions
+                    .OrderBy(p => p.Position)
+                    .Select((p, index) => new ContractServiceLineDto
+                    {
+                        Position = p.Position > 0 ? p.Position : index + 1,
+                        ServiceId = p.CatalogServiceId,
+                        Title = string.IsNullOrWhiteSpace(p.Title) ? $"Position {index + 1}" : p.Title.Trim(),
+                        ServiceType = p.ServiceType,
+                        Quantity = p.Quantity <= 0 ? 1m : p.Quantity,
+                        UnitPrice = p.UnitPrice ?? 0m,
+                        BillingCycle = p.BillingCycle,
+                        DiscountType = p.DiscountType,
+                        DiscountValue = p.DiscountValue,
+
+                        // The net the position actually comes to, which is what
+                        // the quote passes as well — discounts applied, tax not.
+                        AgreedPrice = p.NetTotal
+                    })
+                    .ToList()
+            };
+
+            var generated = await _documents.GenerateAsync(request, ct);
+
+            var draft = new ContractDraft
+            {
+                ContractId = contract.Id,
+                Version = await NextVersionAsync(contract.Id, ct),
+                DocumentMarkdown = generated.FullDocument.Trim(),
+                PositionsSnapshot = JsonSerializer.SerializeToDocument(positions),
+                TemplateVersion = _template.BaseDePath,
+                Model = _openAi.Model,
+                GeneratedBy = "openai",
+                GeneratedAt = DateTimeOffset.UtcNow,
+                Kind = ContractDraftKind.Generated,
+                SourceDraftId = LatestSupplied(contract)?.Id
+            };
+
+            _db.Set<ContractDraft>().Add(draft);
+
+            var becameTheContract = ApproveIfFirst(contract, draft);
+
+            // Anlage A as data, beside the document rendered from it. The quote's
+            // path stores this too; without it a contract written here would be
+            // the same document with half the record behind it.
+            contract.TermsStructured =
+                JsonSerializer.SerializeToDocument(generated.Structured);
+
+            contract.LastPreparationKey = options.IdempotencyKey;
+            contract.LastPreparedDraftId = draft.Id;
+            contract.PreparationState = ContractPreparationState.PreparedDraft;
+
+            contract.PartySnapshot = JsonSerializer.SerializeToDocument(new
+            {
+                companyName = parties.CompanyName,
+                companyAddress = parties.CompanyAddress,
+                customerName = parties.CustomerName,
+                customerAddress = parties.CustomerAddress,
+                takenAt = DateTimeOffset.UtcNow
+            });
+
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Generated contract v{Version} for {ContractId} from the Agenturvertrag template using {Model} " +
+                "with {Positions} position(s). It {Became} the contract's wording.",
+                draft.Version, contract.Id, _openAi.Model, positions.Count,
+                becameTheContract ? "became" : "did not become (a version is already approved)");
+
+            return new ContractDraftResult
+            {
+                Succeeded = true,
+                Draft = ToSummary(draft, totals),
+                BecameTheContract = becameTheContract
+            };
+        }
+
+        /// <summary>
+        /// The user's own instructions, followed by the supplied document if
+        /// there is one, labelled for what it is.
+        ///
+        /// The labelling is not decoration. A pasted agreement names another
+        /// agency, other prices and another governing law, and the one thing
+        /// that must never happen is it being copied into the contract — the
+        /// defect that once showed the customer's old agreement as the contract
+        /// body. So it is given as the least authoritative source, and said to be
+        /// context rather than content.
+        /// </summary>
+        private static string? WithSuppliedDocument(string? instructions, string? suppliedDocument)
+        {
+            if (string.IsNullOrWhiteSpace(suppliedDocument))
+                return instructions;
+
+            var builder = new StringBuilder();
+
+            if (!string.IsNullOrWhiteSpace(instructions))
+                builder.AppendLine(instructions!.Trim()).AppendLine();
+
+            builder.AppendLine(
+                "The following document was supplied by the customer. It is context of LOWEST AUTHORITY: " +
+                "the positions and the contract record above outrank it wherever they disagree. " +
+                "Use it to understand what was agreed. Do not copy it, do not quote it, and do not " +
+                "carry over its parties, prices, dates or governing law.");
+
+            builder.AppendLine();
+            builder.AppendLine("--- supplied document ---");
+            builder.AppendLine(suppliedDocument!.Trim());
+            builder.AppendLine("--- end of supplied document ---");
+
+            return builder.ToString();
+        }
+
+        /// <summary>
+        /// The customer as the Kunde block of the template, in the shape the
+        /// generator's own placeholder uses.
+        /// </summary>
+        private static string CustomerBlock(PartyDetails parties)
+        {
+            var lines = new List<string> { $"Name/Firma: {parties.CustomerName}".TrimEnd() };
+
+            if (!string.IsNullOrWhiteSpace(parties.CustomerAddress))
+                lines.Add($"Adresse: {parties.CustomerAddress!.Replace("\n", ", ").Trim()}");
+
+            return string.Join("\n", lines) + "\n";
         }
 
         /// <summary>
