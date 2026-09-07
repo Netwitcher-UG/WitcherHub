@@ -207,7 +207,13 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     html, body {
       margin: 0;
       padding: 0;
-      font-family: "Inter", "Segoe UI", Tahoma, Arial, sans-serif;
+
+      /* Every face here exists somewhere this document is rendered: the
+         customer's browser, and the Linux container that prints the PDF. The
+         stack led with two fonts neither of those has installed and fell
+         through to Tahoma. Same change the contract template already carries. */
+      font-family: "Segoe UI", Roboto, "Helvetica Neue", "Liberation Sans",
+                   "DejaVu Sans", Arial, sans-serif;
       background:
         radial-gradient(circle at top left, #f3e8ff 0, transparent 30%),
         radial-gradient(circle at bottom right, #ede9fe 0, transparent 26%),
@@ -330,27 +336,38 @@ margin-bottom: 14px;
       color: var(--muted);
     }
 
+    /* The chips wrap. Held on one line they ran 91px past the edge of the
+       sheet — measured — so the project name and the validity date were cut
+       off the page. */
     .chip-row {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 6px;
-  margin-top: 14px;
-  white-space: nowrap;
-}
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 14px;
+      max-width: 100%;
+    }
 
+    /* `flex: 0 0 auto` refused to let a chip shrink, so the project chip —
+       which carries the whole project title — grew to whatever that title
+       needed and was cut off where it ran under the reference card. It may
+       shrink now, and its label wraps inside it. */
     .chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  border: 1px solid var(--line-strong);
-  background: #fff;
-  color: var(--text);
-  flex: 0 0 auto;
-}
+      display: inline-flex;
+      align-items: flex-start;
+      gap: 6px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      line-height: 1.4;
+      font-weight: 600;
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      color: var(--text);
+      flex: 0 1 auto;
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: break-word;
+    }
 
     .chip.project {
       background: var(--primary-soft);
@@ -478,19 +495,29 @@ margin-bottom: 14px;
       font-size: 13px;
     }
 
+    /* Nine columns need a certain amount of room before they stop being a
+       table and start being a puzzle. On the printed sheet there is enough;
+       on screen the document sits in a narrower box, and squeezing the same
+       nine columns into it produced "Warenwirtscha ft" and "Monatli ch" —
+       every column too narrow for its own contents.
+       So the table keeps a width it can actually be read at, and the box
+       around it scrolls when the screen cannot give it that. Print overrides
+       both, further down, because paper does not scroll. */
     .table-wrap {
-      overflow: hidden;
+      overflow-x: auto;
       border: 1px solid var(--line-strong);
       border-radius: 18px;
       background: #fff;
+      -webkit-overflow-scrolling: touch;
     }
 
     table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-  page-break-inside: auto;
-}
+      width: 100%;
+      min-width: 760px;
+      border-collapse: collapse;
+      table-layout: fixed;
+      page-break-inside: auto;
+    }
 thead {
   display: table-header-group;
 }
@@ -504,34 +531,56 @@ tr {
   break-inside: avoid;
   page-break-after: auto;
 }
+    /* A column heading is one or two words and must never be cut inside one.
+       `overflow-wrap: anywhere` was doing exactly that: the customer's quote
+       came with columns headed "Po s.", "Me nge" and "USt. %" stacked over
+       three lines. Headings wrap at spaces and hyphens or not at all. */
     thead th {
-  background: #faf5ff;
-  color: #6b21a8;
-  font-size: 12px;
-  font-weight: 800;
-  text-align: left;
-  padding: 12px 10px;
-  border-right: 1px solid var(--line-strong);
-  border-bottom: 1px solid var(--line-strong);
-  white-space: normal;
-  line-height: 1.25;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
+      background: #faf5ff;
+      color: #6b21a8;
+      font-size: 12.5px;
+      font-weight: 800;
+      text-align: left;
+      padding: 12px 10px;
+      border-right: 1px solid var(--line-strong);
+      border-bottom: 1px solid var(--line-strong);
+      line-height: 1.3;
+      overflow-wrap: normal;
+      word-break: normal;
+      hyphens: none;
+    }
 
     thead th:last-child {
       border-right: 0;
     }
 
+    /* Body cells break a word only when the word on its own is wider than the
+       column — which is what `break-word` means, and what `anywhere` does not:
+       `anywhere` split "Warenwirtschaft" into "Warenwirtsc haft" while there
+       was still room on the line. German compounds are long, so hyphenation is
+       allowed to do the job properly. */
     tbody td {
       padding: 12px 8px;
       border-right: 1px solid var(--line-strong);
       border-bottom: 1px solid var(--line-strong);
       vertical-align: top;
-      font-size: 12px;
-      color: #31263f;
-      word-break: break-word;
-      overflow-wrap: anywhere;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #26203a;
+      overflow-wrap: break-word;
+      word-break: normal;
+      hyphens: auto;
+      -webkit-hyphens: auto;
+    }
+
+    /* The money and count values are single tokens; they never wrap and they
+       line up under one another. Their headings are not — "USt. %" and
+       "Rabatt" held on one line grew wider than their columns and printed on
+       top of each other. */
+    tbody td.right,
+    tbody td.center {
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
     }
 
     tbody td:last-child {
@@ -550,12 +599,15 @@ tr {
       margin-bottom: 3px;
     }
 
+    /* What the position actually covers. It is the prose in the table and it
+       was the smallest text on the page, in the lightest colour. */
     .service-note {
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.45;
+      color: #4a4459;
+      font-size: 12.5px;
+      line-height: 1.5;
       white-space: pre-wrap;
-      word-break: break-word;
+      overflow-wrap: break-word;
+      word-break: normal;
     }
 
     .desc-empty {
@@ -647,15 +699,19 @@ break-inside: avoid;
       color: #2e1065;
     }
 
-    .w-pos { width: 6%; }
+    /* Nine columns across one sheet, and they used to add up to 110% — so the
+       browser rescaled all of them and the money columns, already the
+       narrowest, came out too narrow to hold "14.850,00 €". These add to 100,
+       and the amounts are given the room a five-figure sum needs. */
+    .w-pos { width: 5%; }
     .w-title { width: 18%; }
-    .w-desc { width: 25%; }
-    .w-pay { width: 14%; }
-    .w-qty { width: 7%; }
-    .w-price { width: 10%; }
-    .w-tax { width: 8%; }
-    .w-discount { width: 10%; }
-    .w-total { width: 12%; }
+    .w-desc { width: 20%; }
+    .w-pay { width: 10%; }
+    .w-qty { width: 6%; }
+    .w-price { width: 13%; }
+    .w-tax { width: 6%; }
+    .w-discount { width: 8%; }
+    .w-total { width: 14%; }
 
     @media screen and (max-width: 980px) {
       .page {
@@ -706,6 +762,13 @@ break-inside: avoid;
         border: 0;
         border-radius: 0;
       }
+      /* Paper does not scroll, and the sheet is wide enough to hold the table
+         without help — so the screen's minimum width and its scroll box are
+         both dropped here. */
+      table {
+        min-width: 0;
+      }
+
       .table-wrap {
   overflow: hidden;
   border: 1px solid var(--line-strong);

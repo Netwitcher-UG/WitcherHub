@@ -104,10 +104,16 @@
         if (!modalStatus) return;
         if (!msg) {
             modalStatus.style.display = "none";
+            modalStatus.classList.remove("is-error");
             modalStatus.textContent = "";
             return;
         }
-        modalStatus.textContent = msg;
+
+        // A reason coming back from the server may carry HTML entities from
+        // whatever encoded it on the way out; the toast already decodes them
+        // and this is now shown the same reasons, so it does too.
+        modalStatus.textContent = decodeHtmlEntities(msg);
+        modalStatus.classList.toggle("is-error", !!isError);
         modalStatus.style.display = "block";
         modalStatus.style.borderColor = isError ? "rgba(220,53,69,.25)" : "rgba(0,0,0,.10)";
         modalStatus.style.background = isError ? "#fff5f5" : "#fafafa";
@@ -329,13 +335,35 @@
 
             const code = json && json.code ? json.code : "";
 
+            // What the server said, when it said anything.
+            //
+            // It usually does, and the reason was being thrown away. A quote
+            // whose validity has run out answers 410 with a written German
+            // sentence telling the customer to contact the administrator; the
+            // customer was shown "Something went wrong. Please try again."
+            // instead, which is not true and gives them nothing to act on.
+            //
+            // The codes still win, because those have translated wording, and
+            // the generic line is kept for the case it was written for: a
+            // failure the server could not describe.
+            const fromServer = (json && typeof json.message === "string")
+                ? json.message.trim()
+                : "";
+
             const msg =
                 (code === "FIELDS_REQUIRED") ? (i18n.fillFields || "Fill fields") :
                     (code === "INVALID_EMAIL") ? (i18n.invalidEmail || "Invalid email") :
+                        // These three have wording in the reader's own language,
+                        // which beats the server's one-line English.
                         (res.status === 401) ? (i18n.unauthorized || "This signing link is invalid or expired.") :
-                            (res.status === 409) ? (i18n.alreadySigned || "This contract is already signed.") :
-                                (res.status === 404) ? (i18n.notFound || "Contract not found.") :
-                                    (i18n.genericError || "Something went wrong. Please try again.");
+                            (res.status === 409) ? (i18n.alreadySigned || "This document is already signed.") :
+                                (res.status === 404) ? (i18n.notFound || "Document not found.") :
+                                    // Everything else: what the server said, if it
+                                    // said anything. The generic line is kept for
+                                    // the case it was written for — a failure the
+                                    // server could not describe.
+                                    fromServer ? fromServer :
+                                        (i18n.genericError || "Something went wrong. Please try again.");
 
             throw new Error(msg);
         }
