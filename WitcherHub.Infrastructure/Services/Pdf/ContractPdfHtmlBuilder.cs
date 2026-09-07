@@ -271,18 +271,27 @@ namespace WitcherHub.Infrastructure.Services.Pdf
       max-width: 100%;
     }
 
+    /* `flex: 0 0 auto` refused to let a chip shrink, so the project chip —
+       which carries the whole project title — grew to whatever that title
+       needed. On a phone it was measured 318px wider than the screen. It may
+       shrink now, and its label wraps inside it. Same change the quote
+       template already carries. */
     .chip {
       display: inline-flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 6px;
       padding: 7px 10px;
       border-radius: 999px;
-      font-size: 11px;
+      font-size: 11.5px;
+      line-height: 1.4;
       font-weight: 600;
       border: 1px solid var(--line-strong);
       background: #fff;
       color: var(--text);
-      flex: 0 0 auto;
+      flex: 0 1 auto;
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: break-word;
     }
 
     .chip.project {
