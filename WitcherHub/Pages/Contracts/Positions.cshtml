@@ -101,6 +101,7 @@
      data-contract-id="@Model.ContractId"
      data-currency="@(contract.Currency ?? "EUR")"
      data-locked="@Model.IsLocked.ToString().ToLowerInvariant()"
+     data-lock-reason="@Model.LockReason"
      data-has-text="@Model.HasContractText.ToString().ToLowerInvariant()"
      data-supplied-version="@(Model.SuppliedSource?.Version ?? 0)"
      data-supplied-draft-id="@(Model.SuppliedSource?.Id.ToString() ?? "")"
@@ -134,8 +135,20 @@
                         <div class="wh-party">
                             <span class="wh-party__role">Customer</span>
                             <span class="wh-party__name">@contract.CustomerName</span>
-                            <a asp-page="/Clients/Details" asp-route-id="@contract.CustomerId"
-                               class="wh-party__detail text-primary-600">Check address and representative</a>
+                            @* The link goes to the customer record, where the address and
+                               the representative are edited. On a settled contract that is
+                               a way to change what the document says the parties were, so
+                               it is closed off with the rest of the editing. *@
+                            @if (Model.IsLocked)
+                            {
+                                <span class="wh-party__detail text-secondary-light"
+                                      title="@Model.LockReason">Check address and representative</span>
+                            }
+                            else
+                            {
+                                <a asp-page="/Clients/Details" asp-route-id="@contract.CustomerId"
+                                   class="wh-party__detail text-primary-600">Check address and representative</a>
+                            }
                         </div>
                     </div>
                 </div>
@@ -298,7 +311,9 @@
                     </div>
                     <div class="wh-actions">
                         <button type="button" class="btn btn-outline-primary text-sm px-16 py-8 radius-8 d-inline-flex align-items-center gap-2"
-                                data-action="toggle-paste">
+                                data-action="toggle-paste"
+                                disabled="@Model.IsLocked"
+                                title="@(Model.IsLocked ? Model.LockReason : null)">
                             <i class="ri-clipboard-line"></i> Paste existing text
                         </button>
                     </div>

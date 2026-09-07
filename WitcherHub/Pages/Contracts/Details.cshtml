@@ -20,6 +20,57 @@
     it, so the manual-position editor was effectively invisible.
 *@
 @{
+    @* Built as a list rather than inline, because two of the actions are
+       conditional: a signed contract gains a download and loses its editor. *@
+    var actions = new List<PageAction>
+    {
+        new PageAction
+        {
+            Label = "Positions",
+            Icon = "ri-list-check-2",
+            Page = "/Contracts/Positions",
+            RouteValues = new Dictionary<string, string?> { ["contractId"] = Model.ContractId.ToString() }
+        },
+
+        @* Still reachable when locked, and drawn disabled with the reason on it.
+           Removing it instead would leave the reader wondering where the editor
+           went; this says why it is not available. *@
+        new PageAction
+        {
+            Label = "Edit",
+            Icon = "ri-edit-line",
+            Page = "/Contracts/Edit",
+            RouteValues = new Dictionary<string, string?> { ["id"] = Model.ContractId.ToString() },
+            Disabled = Model.IsLocked,
+            DisabledReason = Model.LockReason
+        }
+    };
+
+    @* Only on a contract the customer has actually signed. This is the copy
+       they signed, rebuilt — the same document the confirmation e-mail carried. *@
+    if (Model.CanDownloadSignedPdf)
+    {
+        actions.Add(new PageAction
+        {
+            Label = "Signed PDF",
+            Icon = "ri-file-download-line",
+            Page = "/Contracts/Details",
+            RouteValues = new Dictionary<string, string?>
+            {
+                ["id"] = Model.ContractId.ToString(),
+                ["handler"] = "SignedPdf"
+            }
+        });
+    }
+
+    actions.Add(new PageAction
+    {
+        Label = T["contractPage_Print"].Value,
+        Icon = "ri-printer-line",
+        Style = PageActionStyle.Primary,
+        Id = "btnPrint"
+    });
+
     var header = new PageHeaderVm
     {
         Title = Model.Contract?.ContractNo ?? "Contract",
@@ -64,30 +115,7 @@
                 }
             ],
 
-        Actions =
-        [
-            new PageAction
-            {
-                Label = "Positions",
-                Icon = "ri-list-check-2",
-                Page = "/Contracts/Positions",
-                RouteValues = new Dictionary<string, string?> { ["contractId"] = Model.ContractId.ToString() }
-            },
-            new PageAction
-            {
-                Label = "Edit",
-                Icon = "ri-edit-line",
-                Page = "/Contracts/Edit",
-                RouteValues = new Dictionary<string, string?> { ["id"] = Model.ContractId.ToString() }
-            },
-            new PageAction
-            {
-                Label = T["contractPage_Print"].Value,
-                Icon = "ri-printer-line",
-                Style = PageActionStyle.Primary,
-                Id = "btnPrint"
-            }
-        ]
+        Actions = actions
     };
 }
 

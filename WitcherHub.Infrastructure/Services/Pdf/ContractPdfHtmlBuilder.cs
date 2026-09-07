@@ -1036,5 +1036,111 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 </html>
 """;
         }
+
+        /// <summary>
+        /// The contract with the customer's signature block appended.
+        ///
+        /// Lived as a private method on the signing page, which meant the only
+        /// way to produce a signed contract was to sign one. Contract details
+        /// needs the same document to hand back on request, and two copies of
+        /// this would be two documents that could drift apart — so it sits with
+        /// the builder that renders the contract in the first place.
+        /// </summary>
+        public static string BuildSigned(
+            ContractPdfDocumentModel model,
+            string signerName,
+            string signerEmail,
+            DateTimeOffset signedAt,
+            string signatureDataUrl,
+            string logoUrl)
+        {
+            var html = Build(model);
+
+            html = html.Replace("__NETWITCHER_LOGO__", logoUrl ?? "", StringComparison.OrdinalIgnoreCase);
+
+            var extraStyle = """
+<style>
+  .signedContractBlock{
+    margin: 24px 0 0 0;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .signedContractCard{
+    border: 1px solid #d7c7f3;
+    border-radius: 18px;
+    padding: 18px 20px;
+    background: linear-gradient(180deg, #ffffff, #faf5ff);
+  }
+
+  .signedContractTitle{
+    font-size: 18px;
+    font-weight: 800;
+    color: #2e1065;
+    margin: 0 0 14px 0;
+  }
+
+  .signedContractRow{
+    margin: 6px 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #31263f;
+  }
+
+  .signedContractRow strong{
+    display: inline-block;
+    min-width: 120px;
+    color: #6b21a8;
+  }
+
+  .signedContractImage{
+    margin-top: 14px;
+  }
+
+  .signedContractImage img{
+    max-width: 260px;
+    max-height: 120px;
+    display: block;
+  }
+
+  .signedContractLine{
+    width: 260px;
+    border-top: 1px solid #7c3aed;
+    margin-top: 8px;
+  }
+</style>
+""";
+
+            var signatureBlock = $"""
+<div class="signedContractBlock">
+  <div class="signedContractCard">
+    <h2 class="signedContractTitle">Kundenunterschrift</h2>
+    <div class="signedContractRow"><strong>Vertrag:</strong> {WebUtility.HtmlEncode(model.ContractNo)}</div>
+    <div class="signedContractRow"><strong>Projekt:</strong> {WebUtility.HtmlEncode(model.ProjectTitle)}</div>
+    <div class="signedContractRow"><strong>Name:</strong> {WebUtility.HtmlEncode(signerName ?? "")}</div>
+    <div class="signedContractRow"><strong>E-Mail:</strong> {WebUtility.HtmlEncode(signerEmail ?? "")}</div>
+    <div class="signedContractRow"><strong>Signiert am:</strong> {WebUtility.HtmlEncode(signedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))}</div>
+
+    <div class="signedContractImage">
+      <img src="{WebUtility.HtmlEncode(signatureDataUrl ?? "")}" alt="Signature" />
+      <div class="signedContractLine"></div>
+    </div>
+  </div>
+</div>
+""";
+
+            if (html.Contains("</head>", StringComparison.OrdinalIgnoreCase))
+                html = html.Replace("</head>", extraStyle + "</head>", StringComparison.OrdinalIgnoreCase);
+            else
+                html = extraStyle + html;
+
+            if (html.Contains("</body>", StringComparison.OrdinalIgnoreCase))
+                html = html.Replace("</body>", signatureBlock + "</body>", StringComparison.OrdinalIgnoreCase);
+            else
+                html += signatureBlock;
+
+            return html;
+        }
+
     }
 }

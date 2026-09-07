@@ -21,6 +21,18 @@
     // Absent on a locked contract, where nothing is saved from this page.
     const saveBtn = document.getElementById("savePositionsBtn");
 
+    // Once the customer has signed, the positions are the record of what was
+    // agreed. The page has always carried this fact — the server refuses the
+    // saves either way — but nothing here read it, so a signed contract's
+    // positions were still fully editable, with move, duplicate and delete all
+    // live. What that offered was the chance to rearrange an agreement and find
+    // out only at the save.
+    const locked = app.dataset.locked === "true";
+
+    // Said by the server, not invented here: signed and terminated are both
+    // locked and they are not the same sentence.
+    const lockReason = app.dataset.lockReason || "This contract can no longer be changed.";
+
     const catalog = readJson("catalogServices") || [];
     const suppliedDraftId = app.dataset.suppliedDraftId || null;
     const hasSuppliedText = app.dataset.hasText === "true";
@@ -145,10 +157,42 @@
 
         positions.forEach((p, index) => {
             p.position = index + 1;
-            listEl.appendChild(card(p, index));
+
+            const el = card(p, index);
+            if (locked) seal(el);
+
+            listEl.appendChild(el);
         });
 
         updateTotals();
+    }
+
+    /// Makes one rendered position read-only.
+    ///
+    /// Applied to the finished card rather than woven through the thirty-odd
+    /// field declarations that build it — one rule that cannot be forgotten on
+    /// a field added later, instead of thirty that can.
+    ///
+    /// Text stays readable and selectable, which is why the inputs are made
+    /// readonly rather than disabled: a disabled field is greyed to the point
+    /// of being hard to read, and the whole reason to open a signed contract is
+    /// to read it. The controls readonly does not apply to — selects, checkboxes
+    /// and date pickers — have to be disabled, as do the row actions.
+    function seal(el) {
+        el.querySelectorAll("input, textarea").forEach(field => {
+            if (field.type === "checkbox" || field.type === "radio" || field.type === "date") {
+                field.disabled = true;
+            } else {
+                field.readOnly = true;
+            }
+
+            field.title = lockReason;
+        });
+
+        el.querySelectorAll("select, button").forEach(control => {
+            control.disabled = true;
+            control.title = lockReason;
+        });
     }
 
     // ------------------------------------------------------------------
@@ -434,6 +478,13 @@
     listEl.addEventListener("click", function (event) {
         const op = event.target.closest("[data-op]")?.dataset.op;
         if (!op) return;
+
+        // The buttons are drawn disabled, so this should not be reachable.
+        // It is here because move, duplicate and delete rewrite the array the
+        // save posts, and a reordering that survives to the server would change
+        // a signed agreement — one line is cheap insurance against a card that
+        // some later path renders without going through seal().
+        if (locked) return;
 
         const wrap = event.target.closest("[data-client-id]");
         const index = positions.findIndex(x => x.clientId === wrap.dataset.clientId);
