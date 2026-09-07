@@ -170,15 +170,31 @@
     border-color: #111;
 }
 
+/* Where the signer is told why signing did not work.
+ *
+ * A reason from the server can be more than one line — the expired-quote
+ * message is two sentences with a break between them — so the breaks are
+ * honoured rather than collapsed into a run-on line. Sized to be read, not
+ * to be a caption: this is the only thing on screen explaining why the
+ * signature was refused. */
 .contractPage__modalStatus {
     margin-top: 10px;
-    padding: 10px 12px;
+    padding: 12px 14px;
     border-radius: 12px;
     border: 1px solid rgba(0,0,0,.10);
     background: #fafafa;
     display: none;
-    font-size: 13px;
-    font-weight: 800;
+    font-size: 14px;
+    line-height: 1.55;
+    font-weight: 600;
+    white-space: pre-line;
+    overflow-wrap: break-word;
+}
+
+.contractPage__modalStatus.is-error {
+    border-color: rgba(220, 53, 69, .30);
+    background: #fff5f5;
+    color: #8f1d2a;
 }
 
 /* Bottom actions.
@@ -715,7 +731,13 @@
     .quotePdfScope .notes p,
     .quotePdfScope .meta-row,
     .quotePdfScope td,
-    .quotePdfScope th {
+    .quotePdfScope th,
+
+    /* The chips too. They are labels, not prose, and the document's
+       justification was stretching the word spacing inside them — a wrapped
+       project chip came out as "Relaunch   Onlineshop   und". */
+    .contractPdfScope .chip,
+    .quotePdfScope .chip {
         text-align: left !important;
     }
 
@@ -838,7 +860,14 @@
 .quotePdfScope .card h3,
 .quotePdfScope .price-box h3,
 .quotePdfScope .contract-note h3,
-.quotePdfScope .signature-placeholder h3 {
+.quotePdfScope .signature-placeholder h3,
+
+/* The quote's own two panels. They were missed when these rules were written
+   for the contract, so "Hinweise" and "Finanzübersicht" were still being set
+   by the theme — measured at 48px on the customer's quote, nearly twice the
+   size of the document's own title. */
+.quotePdfScope .notes h3,
+.quotePdfScope .totals h3 {
     font-size: 16.5px !important;
 }
 

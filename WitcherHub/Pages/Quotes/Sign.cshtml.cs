@@ -274,7 +274,7 @@ namespace WitcherHub.Pages.Quotes
             if (string.IsNullOrWhiteSpace(signatureDataUrl) ||
                 !signatureDataUrl.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
             {
-                return new JsonResult(new { ok = false, message = "Invalid signature data." })
+                return new JsonResult(new { ok = false, message = "The signature could not be read. Please draw it again." })
                 {
                     StatusCode = 400
                 };

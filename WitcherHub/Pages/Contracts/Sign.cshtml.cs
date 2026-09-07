@@ -285,7 +285,7 @@ namespace WitcherHub.Pages.Contracts
                 return new JsonResult(new { ok = false, code = "INVALID_EMAIL" }) { StatusCode = 400 };
 
             if (string.IsNullOrWhiteSpace(signatureDataUrl) || !signatureDataUrl.StartsWith("data:image/"))
-                return new JsonResult(new { ok = false, message = "Invalid signature data." }) { StatusCode = 400 };
+                return new JsonResult(new { ok = false, message = "The signature could not be read. Please draw it again." }) { StatusCode = 400 };
 
             var now = DateTimeOffset.UtcNow;
 
@@ -299,8 +299,8 @@ namespace WitcherHub.Pages.Contracts
             if (updated == 0)
             {
                 var exists = await _db.Contracts.AnyAsync(c => c.Id == Id, ct);
-                if (!exists) return new JsonResult(new { ok = false, message = "Contract not found." }) { StatusCode = 404 };
-                return new JsonResult(new { ok = false, message = "Contract already signed." }) { StatusCode = 409 };
+                if (!exists) return new JsonResult(new { ok = false, message = "This contract could not be found. The link may be out of date." }) { StatusCode = 404 };
+                return new JsonResult(new { ok = false, message = "This contract has already been signed." }) { StatusCode = 409 };
             }
 
             var payload = JsonSerializer.SerializeToDocument(new
