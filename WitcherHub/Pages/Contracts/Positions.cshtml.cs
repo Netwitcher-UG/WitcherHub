@@ -8,6 +8,7 @@ using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Models.View.Contracts;
 using WitcherHub.Domain.Contracts;
+using WitcherHub.Infrastructure.Services.Contracts;
 using static WitcherHub.Infrastructure.Data.Models.Enums;
 
 namespace WitcherHub.Pages.Contracts
@@ -81,8 +82,17 @@ namespace WitcherHub.Pages.Contracts
 
         /// <summary>
         /// True once the contract is signed, when the terms must not move.
+        /// The same rule the handlers below refuse by, asked in one place so the
+        /// controls this page draws and the answers it gives cannot drift apart.
         /// </summary>
-        public bool IsLocked => Contract?.Status is DocumentStatus.Signed or DocumentStatus.Terminated;
+        public bool IsLocked => Contract is not null && ContractLock.IsLocked(Contract.Status);
+
+        /// <summary>
+        /// Why, in the reader's words. Shown on the disabled controls, so the
+        /// reason is given before the attempt rather than only after it.
+        /// </summary>
+        public string LockReason =>
+            IsLocked ? ContractLock.Reason(Contract!.Status) : "";
 
         /// <summary>
         /// What this contract is built from. The rule lives in the domain and is
@@ -212,6 +222,8 @@ namespace WitcherHub.Pages.Contracts
         {
             if (ContractId == Guid.Empty) return NotFound();
 
+            if (await RefuseIfLockedPageAsync(ct) is { } locked) return locked;
+
             try
             {
                 await _contracts.UpdateHeaderAsync(
@@ -249,6 +261,8 @@ namespace WitcherHub.Pages.Contracts
         public async Task<IActionResult> OnPostImportTextAsync(
             [FromBody] ImportTextRequest? request, CancellationToken ct)
         {
+            if (await RefuseIfLockedJsonAsync(ct) is { } locked) return locked;
+
             if (request is null || string.IsNullOrWhiteSpace(request.Text))
                 return BadRequestJson("Paste the contract text first.");
 
@@ -365,6 +379,8 @@ namespace WitcherHub.Pages.Contracts
         public async Task<IActionResult> OnPostConfirmExtractionAsync(
             [FromBody] ConfirmExtractionRequest? request, CancellationToken ct)
         {
+            if (await RefuseIfLockedJsonAsync(ct) is { } locked) return locked;
+
             if (request?.Extraction is null)
                 return BadRequestJson("There is nothing to confirm.");
 
@@ -445,6 +461,8 @@ namespace WitcherHub.Pages.Contracts
         public async Task<IActionResult> OnPostSaveAsync(
             [FromBody] List<ManualPositionDto>? positions, CancellationToken ct)
         {
+            if (await RefuseIfLockedJsonAsync(ct) is { } locked) return locked;
+
             positions ??= new List<ManualPositionDto>();
 
             // Saving zero positions is allowed. It is how a contract built from
@@ -483,6 +501,8 @@ namespace WitcherHub.Pages.Contracts
         public async Task<IActionResult> OnPostOrganizeAsync(
             [FromBody] OrganizeRequest? request, CancellationToken ct)
         {
+            if (await RefuseIfLockedJsonAsync(ct) is { } locked) return locked;
+
             if (request is null)
                 return BadRequestJson("Nothing to organize.");
 
@@ -523,6 +543,8 @@ namespace WitcherHub.Pages.Contracts
         public async Task<IActionResult> OnPostGenerateDraftAsync(
             [FromBody] GenerateRequest? request, CancellationToken ct)
         {
+            if (await RefuseIfLockedJsonAsync(ct) is { } locked) return locked;
+
             var started = await _jobs.StartAsync(
                 ContractId,
                 ContractAiJobKind.Generation,
@@ -625,6 +647,8 @@ namespace WitcherHub.Pages.Contracts
         public async Task<IActionResult> OnPostSaveDraftAsync(
             [FromBody] SaveDraftRequest? request, CancellationToken ct)
         {
+            if (await RefuseIfLockedJsonAsync(ct) is { } locked) return locked;
+
             if (request is null || string.IsNullOrWhiteSpace(request.DocumentMarkdown))
                 return BadRequestJson("The contract text cannot be empty.");
 
@@ -644,6 +668,8 @@ namespace WitcherHub.Pages.Contracts
         public async Task<IActionResult> OnPostApproveDraftAsync(
             [FromBody] ApproveRequest? request, CancellationToken ct)
         {
+            if (await RefuseIfLockedJsonAsync(ct) is { } locked) return locked;
+
             if (request is null) return BadRequestJson("No version given.");
 
             var result = await _drafts.ApproveAsync(
@@ -725,6 +751,60 @@ namespace WitcherHub.Pages.Contracts
         {
             Response.StatusCode = StatusCodes.Status400BadRequest;
             return new JsonResult(new { ok = false, message });
+        }
+
+        // ------------------------------------------------------------------
+        // The lock
+        //
+        // Everything above that changes the contract asks one of these first.
+        // The page also draws its controls disabled, but that is a courtesy to
+        // the reader, not a control: a disabled button is a class name, and the
+        // requests it would have sent can be sent without it — from a tab left
+        // open since before the customer signed, from a second window, from the
+        // address bar. The refusal has to live where the change is made.
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Refuses a <c>fetch</c> that would change a settled contract, or null
+        /// when it may go ahead. Answered as JSON because every caller here
+        /// reads the reply with <c>response.json()</c> and shows the message.
+        /// </summary>
+        private async Task<IActionResult?> RefuseIfLockedJsonAsync(CancellationToken ct)
+        {
+            var status = await LockedStatusAsync(ct);
+            if (status is null) return null;
+
+            Response.StatusCode = StatusCodes.Status409Conflict;
+            return new JsonResult(new { ok = false, message = ContractLock.Reason(status.Value) });
+        }
+
+        /// <summary>
+        /// The same refusal for a form post, which expects a page back rather
+        /// than JSON: the reason arrives as a toast on the builder.
+        /// </summary>
+        private async Task<IActionResult?> RefuseIfLockedPageAsync(CancellationToken ct)
+        {
+            var status = await LockedStatusAsync(ct);
+            if (status is null) return null;
+
+            TempData["Toast.Type"] = "error";
+            TempData["Toast.Title"] = "Contract locked";
+            TempData["Toast.Message"] = ContractLock.Reason(status.Value);
+
+            return RedirectToPage(new { contractId = ContractId });
+        }
+
+        /// <summary>
+        /// The contract's status when it is locked, null when it is not — and
+        /// null too when there is no such contract, so the handler goes on to
+        /// give its own answer rather than reporting the wrong problem.
+        /// </summary>
+        private async Task<DocumentStatus?> LockedStatusAsync(CancellationToken ct)
+        {
+            var contract = Contract ?? await _contracts.GetContractAsync(ContractId, ct);
+            if (contract is null) return null;
+
+            return ContractLock.IsLocked(contract.Status) ? contract.Status : null;
         }
     }
 }

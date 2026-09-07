@@ -62,14 +62,18 @@ Die Vergütung ergibt sich aus den vereinbarten Positionen.
 """;
 
         /// <summary>
-        /// The page model's own splitter, called directly. It is private because
-        /// nothing outside the page needs it, but what it decides is the
-        /// difference between a signature given on the contract and a signature
-        /// given on three paragraphs of it.
+        /// The document builder's own splitter, called directly. It is private
+        /// because nothing outside the builder needs it, but what it decides is
+        /// the difference between a signature given on the contract and a
+        /// signature given on three paragraphs of it.
+        ///
+        /// It used to sit on the signing page. It moved with the rest of the
+        /// document building when downloading a signed contract needed the same
+        /// ~470 lines the signing page held privately.
         /// </summary>
         private static string RemainingTerms(string? markdown)
         {
-            var method = typeof(WitcherHub.Pages.Contracts.SignModel)
+            var method = typeof(WitcherHub.Rendering.ContractPdfDocument)
                 .GetMethod(
                     "ExtractRemainingTermsMarkdown",
                     BindingFlags.NonPublic | BindingFlags.Static);
