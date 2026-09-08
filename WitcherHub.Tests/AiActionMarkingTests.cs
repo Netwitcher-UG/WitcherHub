@@ -81,17 +81,72 @@ namespace WitcherHub.Tests
             foreach (var action in AiActions)
             {
                 var button = ButtonFor(page, action);
-
-                var title = Regex.Match(button, @"title=""([^""]+)""").Groups[1].Value;
-
-                Assert.False(
-                    string.IsNullOrWhiteSpace(title),
-                    $"The '{action}' button has no tooltip explaining that it uses AI.");
+                var wordings = TooltipWordings(button);
 
                 Assert.True(
-                    title.Contains("AI", StringComparison.Ordinal),
-                    $"The '{action}' tooltip does not mention AI: \"{title}\"");
+                    wordings.Count > 0,
+                    $"The '{action}' button has no tooltip explaining that it uses AI.");
+
+                // Every wording, not just the first. A tooltip that changes with
+                // the contract's state has more than one, and a branch that forgets
+                // to say the model is involved is exactly as misleading as a button
+                // with no tooltip at all — it is simply harder to notice.
+                foreach (var wording in wordings)
+                {
+                    Assert.True(
+                        wording.Contains("AI", StringComparison.Ordinal),
+                        $"The '{action}' tooltip does not mention AI: \"{wording}\"");
+                }
             }
+        }
+
+        /// <summary>
+        /// What a button's tooltip can say — one wording for a plain attribute,
+        /// and every branch of a Razor conditional for a tooltip that varies.
+        ///
+        /// This used to read <c>title="([^"]+)"</c> and take the first match. That
+        /// works only while the attribute is a literal: the moment one became
+        /// <c>title="@(x is null ? "…" : "…")"</c> the regex stopped at the first
+        /// inner quote and the test reported a tooltip of <c>@(x is null ?</c> —
+        /// failing on a page where both wordings were perfectly correct.
+        /// </summary>
+        private static List<string> TooltipWordings(string button)
+        {
+            var at = button.IndexOf("title=\"", StringComparison.Ordinal);
+            if (at < 0) return [];
+
+            var start = at + "title=\"".Length;
+
+            // A plain attribute ends at the next quote.
+            if (start >= button.Length || button[start] != '@')
+            {
+                var end = button.IndexOf('"', start);
+                if (end < 0) return [];
+
+                var literal = button[start..end];
+
+                return string.IsNullOrWhiteSpace(literal) ? [] : [literal];
+            }
+
+            // A Razor expression ends where its parentheses balance — quotes
+            // inside it are the wordings, not the end of the attribute, which is
+            // what a quote-to-quote regex got wrong.
+            var open = button.IndexOf('(', start);
+            if (open < 0) return [];
+
+            var depth = 1;
+            var i = open + 1;
+
+            while (i < button.Length && depth > 0)
+            {
+                if (button[i] == '(') depth++;
+                else if (button[i] == ')') depth--;
+                i++;
+            }
+
+            return Regex.Matches(button[open..i], @"""(?<text>[^""]{4,})""")
+                .Select(m => m.Groups["text"].Value)
+                .ToList();
         }
 
         [Fact]

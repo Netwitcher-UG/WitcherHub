@@ -268,6 +268,18 @@ namespace WitcherHub.Application.Interfaces
         /// </summary>
         public bool ComposedWithoutAi { get; init; }
 
+        /// <summary>
+        /// True when the version this produced became the contract's wording as it
+        /// was made, rather than waiting to be approved.
+        ///
+        /// It does on the first one, which is what makes generating produce a
+        /// contract rather than a candidate for one. It does not once a version is
+        /// already approved: replacing active wording is a decision of its own.
+        /// The page says which happened, so nobody has to guess whether there is
+        /// still a step left.
+        /// </summary>
+        public bool BecameTheContract { get; init; }
+
         /// <summary>How many reviewed values a person ticked, for the message.</summary>
         public int ConfirmedFieldCount { get; init; }
 

@@ -240,10 +240,19 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 version = draft.Version,
                 draftId = draft.Id,
                 composedWithoutAi = result.ComposedWithoutAi,
+                becameTheContract = result.BecameTheContract,
 
+                // Says what actually happened rather than always "created as a
+                // draft". That wording was left over from when every version had
+                // to be approved before the contract had any: on the first one it
+                // now understated the result, and it sent people looking for a
+                // step that was already done.
                 message = result.WasAlreadyPrepared
                     ? $"{draft.KindLabel} version {draft.Version} was already created."
-                    : $"{draft.KindLabel} version {draft.Version} created as a draft.",
+                    : result.BecameTheContract
+                        ? $"Contract written. Version {draft.Version} is the contract wording."
+                        : $"{draft.KindLabel} version {draft.Version} created as a draft. "
+                          + "Approve it to make it the contract wording.",
 
                 // What the version does not account for. Carried through the job
                 // because the request that asked for it ended minutes ago.

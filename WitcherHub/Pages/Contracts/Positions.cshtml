@@ -1,6 +1,7 @@
 @page "{contractId:guid}"
 @using System.Text.Json
 @using WitcherHub.Pages.Models.UI
+@using WitcherHub.Domain.Contracts
 @using static WitcherHub.Infrastructure.Data.Models.Enums
 @model WitcherHub.Pages.Contracts.PositionsModel
 @{
@@ -105,7 +106,21 @@
      data-has-text="@Model.HasContractText.ToString().ToLowerInvariant()"
      data-supplied-version="@(Model.SuppliedSource?.Version ?? 0)"
      data-supplied-draft-id="@(Model.SuppliedSource?.Id.ToString() ?? "")"
-     data-empty-message="@Model.Source.EmptyPositionsMessage">
+     data-empty-message="@Model.Source.EmptyPositionsMessage"
+
+     @* What the primary action is called under each of the three sources, asked
+        of the domain rather than written out again in script.
+
+        The button's label is decided from the contract as it was when the page
+        was drawn, and adding a position changes which of these applies. Without
+        them the browser would have to carry its own copy of the three names —
+        the drift ContractSource exists to prevent. *@
+     data-label-positions="@ContractSource.From(1, hasSuppliedText: false).PrimaryActionLabel"
+     data-label-supplied="@ContractSource.From(0, hasSuppliedText: true).PrimaryActionLabel"
+     data-label-hybrid="@ContractSource.From(1, hasSuppliedText: true).PrimaryActionLabel"
+     data-mode-positions="@ContractSource.From(1, hasSuppliedText: false).ModeLabel"
+     data-mode-supplied="@ContractSource.From(0, hasSuppliedText: true).ModeLabel"
+     data-mode-hybrid="@ContractSource.From(1, hasSuppliedText: true).ModeLabel">
 
     <div class="col-12 col-xl-8">
 
@@ -778,9 +793,16 @@
                                depends on what the contract is built from. It is
                                disabled only when there is genuinely no source —
                                not when there happen to be no positions. *@
+                            @* Says what pressing it leaves you with. It used to say
+                               the result is "created as a draft for you to review
+                               before approval" — true of every version once, and no
+                               longer true of the first, which becomes the contract
+                               as it is written. *@
                             <button type="button" class="btn btn-primary radius-8 wh-ai-action" data-action="generate-draft"
                                     disabled="@(!Model.CanGenerate)" data-ai="true"
-                                    title="Writes the contract wording with the AI model. It is created as a draft for you to review before approval.">
+                                    title="@(Model.ApprovedVersion is null
+                                              ? "Writes the contract wording with the AI model. It becomes the contract, ready to preview and send."
+                                              : $"Writes a new version with the AI model. Version {Model.ApprovedVersion.Version} stays the contract until you approve the new one.")">
                                 <partial name="_AiMark" /> @Model.Source.PrimaryActionLabel
                             </button>
                         </div>

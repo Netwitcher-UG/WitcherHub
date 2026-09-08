@@ -53,7 +53,10 @@ public class TextOnlyContractWorkflowTests : IAsyncLifetime
     {
         private readonly Func<string, Task<string>> _respond;
 
-        public StubAi(string response) => _respond = _ => Task.FromResult(response);
+        // Routed, because a contract with positions is written by the
+        // Agenturvertrag generator now and that one asks for JSON.
+        public StubAi(string response) =>
+            _respond = prompt => Task.FromResult(AGeneratorAnswer.For(prompt, response));
         public StubAi(Func<string, Task<string>> respond) => _respond = respond;
 
         public Task<string> GenerateTextAsync(string prompt) => _respond(prompt);
@@ -318,7 +321,13 @@ public class TextOnlyContractWorkflowTests : IAsyncLifetime
         var generated = await _sut.GenerateAsync(contractId, new GenerateDraftOptions());
 
         Assert.True(generated.Succeeded, generated.FailureReason);
-        Assert.Contains("§ 1 Gegenstand des Vertrags", generated.Draft!.DocumentMarkdown);
+
+        // A contract with positions is written from the Agenturvertrag template
+        // now — the same document a signed quote produces. This asserted the
+        // composed "§ 1 Gegenstand des Vertrags", which was the builder's own
+        // shape and the reason the two paths did not match.
+        Assert.Contains("# Agenturvertrag", generated.Draft!.DocumentMarkdown);
+        Assert.Contains("Anlage A", generated.Draft.DocumentMarkdown);
 
         // Position contracts still snapshot what they were generated from.
         var draft = await _db!.Set<ContractDraft>().AsNoTracking()
@@ -353,13 +362,20 @@ public class TextOnlyContractWorkflowTests : IAsyncLifetime
         // asserting its absence is the point.
         var document = generated.Draft!.DocumentMarkdown;
 
-        Assert.DoesNotContain("AGENTURVERTRAG", document);
-        Assert.DoesNotContain("Vertragsgegenstand", document);
+        // Targets only the pasted document has. "AGENTURVERTRAG" and
+        // "Vertragsgegenstand" used to serve, because the builder's own output
+        // contained neither — but the Agenturvertrag template is titled with one
+        // and has the other as a heading, so they can no longer tell a copied
+        // document from our own. These can.
+        Assert.DoesNotContain("[COMPANY_NAME]", document);
+        Assert.DoesNotContain("[CUSTOMER_ADDRESS]", document);
+        Assert.DoesNotContain("Die Agentur erbringt Leistungen im Bereich Online-Marketing", document);
+        Assert.DoesNotContain("12.000,00", document);
         Assert.DoesNotContain("\n---\n", document);
 
-        // One coherent contract, composed around the generated clauses.
-        Assert.StartsWith("# Dienstleistungsvertrag", document);
-        Assert.Contains("§ 1 Gegenstand des Vertrags", document);
+        // One coherent contract, from the template.
+        Assert.StartsWith("# Agenturvertrag", document);
+        Assert.Contains("Anlage A", document);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(document, @"^# ",
             System.Text.RegularExpressions.RegexOptions.Multiline));
 

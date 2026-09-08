@@ -97,7 +97,7 @@ public class SourceIsNotTheContractTests : IAsyncLifetime
                 _prompts.Add(prompt);
             }
 
-            return Task.FromResult(_answer);
+            return Task.FromResult(AGeneratorAnswer.For(prompt, _answer));
         }
     }
 
@@ -213,8 +213,16 @@ public class SourceIsNotTheContractTests : IAsyncLifetime
         // And no separator rule, which is how the two were joined.
         Assert.DoesNotContain("\n---\n", document);
 
-        // § numbering starts at 1 and appears once.
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(document, @"## § 1 "));
+        // Its sections appear once each. This asserted "## § 1 " when the
+        // builder composed numbered paragraphs; a contract with positions is now
+        // written from the Agenturvertrag template, the way one made from a
+        // signed quote is, and the template's headings are these. What is being
+        // guarded is unchanged: one document, not two stacked together.
+        foreach (var heading in new[] { "## Vertragspartner", "## Vertragsgegenstand", "## Anlage A" })
+        {
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(
+                document, System.Text.RegularExpressions.Regex.Escape(heading)));
+        }
     }
 
     [Fact]
@@ -290,31 +298,52 @@ public class SourceIsNotTheContractTests : IAsyncLifetime
         var contractId = await NewContractAsync(sut, withPositions: true, withPastedText: true);
         await sut.GenerateAsync(contractId, new GenerateDraftOptions());
 
-        // Across the whole run, not whichever call happened to be last: the
-        // plan gets the structured record, the section calls get the entries
-        // they must cover, and they no longer run in a fixed order.
+        // Across the whole run, not whichever call happened to be last.
         var prompt = ai.Everything;
 
-        // Company master data, from settings.
-        Assert.Contains("Netwitcher", prompt);
+        // The provider is no longer in the prompt, and does not need to be.
+        //
+        // A contract with positions is written by the Agenturvertrag generator
+        // now — the one a signed quote uses — and that asks the model for one
+        // thing only: Anlage A, from the positions. The company block is not a
+        // question for the model; the template carries it, so it reaches the
+        // contract without ever reaching the prompt. Asserting it here would be
+        // asserting that the old pipeline still runs.
+        var contract = await _db!.Set<Contract>().AsNoTracking().FirstAsync(c => c.Id == contractId);
+        var document = contract.Terms ?? "";
 
-        // Customer master data, from the customer record.
-        Assert.Contains("Musterfirma GmbH", prompt);
-        Assert.Contains("Lorbeerplatz 28", prompt);
+        Assert.Contains("Netwitcher", document);
 
-        // Project data.
+        // Customer master data, from the customer record — carried by the
+        // template's Kunde block for the same reason.
+        Assert.Contains("Musterfirma GmbH", document);
+        Assert.Contains("Lorbeerplatz 28", document);
+
+        // Project data and the currency, which the model is given because
+        // Anlage A is written against them.
         Assert.Contains("Online Verkauf Verwaltung", prompt);
-
-        // Contract details.
         Assert.Contains("EUR", prompt);
 
         // The positions, structured rather than flattened.
         Assert.Contains("Monatliche Betreuung", prompt);
-        Assert.Contains("billingCycle", prompt);
         Assert.Contains("pricingModel", prompt);
 
-        // And the precedence order the generator must respect.
-        Assert.Contains("Where two sources disagree", prompt);
+        // Not the billing cycle. The Agenturvertrag generator's payload carries
+        // position, title, service name and type, pricing model, agreed price,
+        // currency and config — and no cycle, so a monthly retainer and a
+        // one-off fee read the same to the model writing Anlage A. It reaches
+        // the contract through the price box rather than through the wording.
+        // Recorded because it is a real limit of this generator, shared with the
+        // path that creates a contract from a signed quote.
+        Assert.DoesNotContain("billingCycle", prompt);
+
+        // And the precedence order the generator must respect, still stated —
+        // in the words this prompt uses. The pipeline said "Where two sources
+        // disagree"; the supplied document is handed to the Agenturvertrag
+        // generator as context of lowest authority, which is the same rule.
+        Assert.Contains("LOWEST AUTHORITY", prompt);
+        Assert.Contains("outrank it wherever they disagree", prompt);
+        Assert.Contains("Do not copy it", prompt);
     }
 
     [Fact]
@@ -368,7 +397,7 @@ public class SourceIsNotTheContractTests : IAsyncLifetime
         var generated = await sut.GenerateAsync(contractId, new GenerateDraftOptions());
 
         Assert.True(generated.Succeeded, generated.FailureReason);
-        Assert.StartsWith("# Dienstleistungsvertrag", generated.Draft!.DocumentMarkdown);
+        Assert.StartsWith("# Agenturvertrag", generated.Draft!.DocumentMarkdown);
 
         // Nothing in the request pretends there was source material.
         Assert.DoesNotContain("SOURCE MATERIAL", ai.LastPrompt!);

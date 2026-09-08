@@ -165,6 +165,56 @@
         });
 
         updateTotals();
+        refreshPrimaryAction();
+    }
+
+    /// Keeps the primary action describing the contract as it now stands.
+    ///
+    /// Both halves of it were decided on the server when the page was drawn and
+    /// never revisited, and adding a position changes both:
+    ///
+    ///   * whether it can be pressed. A new contract has no source, so the
+    ///     button is drawn disabled — and saving the first position left the one
+    ///     button the page exists for still greyed out, with nothing saying why
+    ///     and nothing to do but reload. That is the first thing anyone meets on
+    ///     a new contract.
+    ///
+    ///   * what it is called. On a contract with pasted text it says "Prepare
+    ///     supplied contract"; adding a position makes it a contract built from
+    ///     both, and the button went on offering the supplied-text action. Asked
+    ///     for the one that reads "Generate from text and positions", the page
+    ///     had no such button on it.
+    ///
+    /// The three names come from the server, which got them from ContractSource,
+    /// so the browser chooses between the domain's words rather than carrying a
+    /// fourth copy of them.
+    function refreshPrimaryAction() {
+        const generate = document.querySelector('[data-action="generate-draft"]');
+        if (!generate || locked) return;
+
+        const hasPositions = positions.length > 0;
+
+        // The rule itself: positions, or supplied text, or both.
+        generate.disabled = !(hasPositions || hasSuppliedText);
+
+        const which =
+            hasPositions && hasSuppliedText ? "hybrid"
+                : hasSuppliedText ? "supplied"
+                    : "positions";
+
+        const label = app.dataset["label" + which[0].toUpperCase() + which.slice(1)];
+
+        // Only the button's own text. The AI mark beside it is an element, and
+        // replacing the whole button would take it with it.
+        const text = [...generate.childNodes].reverse()
+            .find(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+
+        if (label && text) text.textContent = " " + label;
+
+        const mode = app.dataset["mode" + which[0].toUpperCase() + which.slice(1)];
+        const shown = document.querySelector("#generateHint strong");
+
+        if (mode && shown) shown.textContent = mode;
     }
 
     /// Makes one rendered position read-only.
@@ -1101,8 +1151,9 @@
                     } catch { /* private mode; the notes are on the version anyway */ }
                 }
 
-                // The new version is a draft awaiting review, so the user is taken
-                // to it rather than left to find it.
+                // Taken to the version either way — to read what was written when
+                // it is already the contract, or to approve it when a previous
+                // version holds that place and this one is a proposed replacement.
                 window.location.hash = "version-" + result.version;
                 window.location.reload();
             });

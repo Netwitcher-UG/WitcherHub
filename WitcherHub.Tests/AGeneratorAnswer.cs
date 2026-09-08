@@ -59,5 +59,56 @@ namespace WitcherHub.Tests
               ]
             }
             """;
+        /// <summary>
+        /// The structured "Anlage A – Leistungsbeschreibung", in the schema the
+        /// Agenturvertrag generator's prompt sets out.
+        ///
+        /// A contract with positions is written by that generator now — the same
+        /// one a signed quote uses — and it asks for JSON, not clauses. A stub
+        /// that answers every prompt with clause content makes it throw, and the
+        /// test then reports "the assistant could not produce a contract" when
+        /// what actually happened is that the harness spoke the wrong language.
+        /// </summary>
+        public const string AnlageA = """
+            {
+              "version": "1.0",
+              "language": "de-DE",
+              "positions": [
+                {
+                  "positionNo": 1,
+                  "title": "Monatliche Betreuung",
+                  "quantity": 1,
+                  "unitNetPrice": 2000,
+                  "lineNetPrice": 2000,
+                  "taxRatePercent": 19,
+                  "sections": {
+                    "scope": "Laufende Betreuung der Vertriebskanaele des Auftraggebers.",
+                    "deliverables": ["Monatlicher Report"],
+                    "outOfScope": ["Mediabudget"],
+                    "customerResponsibilities": ["Zugaenge bereitstellen"],
+                    "acceptanceCriteria": ["Report bis zum 5. Werktag"],
+                    "timeline": "Monatlich",
+                    "assumptions": "Die Zugaenge stehen zur Verfuegung.",
+                    "revisions": "Eine Korrekturschleife je Report."
+                  },
+                  "customClauses": []
+                }
+              ]
+            }
+            """;
+
+        /// <summary>
+        /// The answer the prompt is actually asking for.
+        ///
+        /// Two generators are reachable and they want different shapes: the
+        /// Agenturvertrag generator asks for Anlage A as JSON, the pipeline asks
+        /// for clause content. Every stub routes through this so a test says what
+        /// the model returns without also having to know which generator ran.
+        /// </summary>
+        public static string For(string prompt, string clauseAnswer) =>
+            prompt.Contains("Anlage A", StringComparison.Ordinal) &&
+            prompt.Contains("Return JSON ONLY", StringComparison.Ordinal)
+                ? AnlageA
+                : clauseAnswer;
     }
 }

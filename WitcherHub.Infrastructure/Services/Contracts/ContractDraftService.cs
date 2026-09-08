@@ -38,6 +38,14 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         private readonly ContractContextBuilder _contextBuilder;
         private readonly ContractGenerationPipeline _pipeline;
 
+        /// <summary>
+        /// The document generator the quote's after-sign path uses: one model
+        /// call for the structured Anlage A, merged into the Agenturvertrag
+        /// template. Asked for by name so a contract written from the builder
+        /// comes out as the same document as one written from a signed quote.
+        /// </summary>
+        private readonly ContractDocumentGenerator _documents;
+
         public ContractDraftService(
             AppDbContext db,
             IContractPositions positions,
@@ -66,6 +74,12 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             // a registered dependency would break every test that constructs this
             // service directly for no benefit.
             _contextBuilder = new ContractContextBuilder(db, _template);
+
+            // The generator the quote's after-sign path uses, built here for the
+            // same reason as the two below: it takes the assistant and the
+            // template options this service already holds, and registering it
+            // would mean rewriting every test that constructs this service.
+            _documents = new ContractDocumentGenerator(ai, template);
 
             // Same reasoning: a stage runner over the assistant and the options
             // this service already holds. Registering it would mean rewriting
@@ -193,6 +207,83 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             // document happens to have been pasted.
             var sourceText = LatestSupplied(contract)?.DocumentMarkdown;
 
+            var parties = await BuildPartyDetailsAsync(contract, ct);
+
+            // The same document a signed quote produces.
+            //
+            // Two generators existed and the door you came in decided which one
+            // wrote your contract. A signed quote went through
+            // ContractDocumentGenerator — one model call for the structured
+            // Anlage A, merged into the Agenturvertrag template — and came out as
+            // "Agenturvertrag" with Vertragspartner, Vertragsgegenstand, Anlage A
+            // and a Preisübersicht. The builder went through the pipeline and came
+            // out as "Dienstleistungsvertrag" with numbered paragraphs and no
+            // Anlage A at all. Same system, same contract, two documents.
+            //
+            // The owner asked for the quote's, by name, so this is the quote's:
+            // the same call with the same options, not a copy of it.
+            //
+            // It needs positions — the generator refuses without them — so a
+            // contract whose only source is pasted text still goes through the
+            // pipeline below, which is the one that can write from a document.
+            if (positions.Count > 0)
+            {
+                try
+                {
+                    return await GenerateFromTemplateAsync(
+                        contract, positions, totals, parties, options, ct);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (AiInvocationException ex) when (ex.NeedsOwnerAction)
+                {
+                    _logger.LogWarning(
+                        "Falling back to a composed contract for {ContractId}: {Kind} ({CorrelationId}).",
+                        contractId, ex.Kind, ex.CorrelationId);
+
+                    var composed = await ComposeWithoutAiAsync(contract, options, ct);
+
+                    if (composed.Succeeded)
+                    {
+                        return new ContractDraftResult
+                        {
+                            Succeeded = true,
+                            Draft = composed.Draft,
+                            Money = composed.Money,
+                            ComposedWithoutAi = true,
+                            BecameTheContract = composed.BecameTheContract,
+                            FailureReason =
+                                ex.UserMessage + " A contract was composed from your positions and details " +
+                                "instead — review it, and regenerate once the assistant is working."
+                        };
+                    }
+
+                    return ContractDraftResult.Failed(
+                        ex.UserMessage + " Your positions and contract text are saved — you can write or paste " +
+                        "the wording by hand, or try again.", ex.IsTransient);
+                }
+                catch (AiInvocationException ex)
+                {
+                    return ContractDraftResult.Failed(
+                        ex.UserMessage + " Your positions and contract text are saved — you can write or paste " +
+                        "the wording by hand, or try again.", ex.IsTransient);
+                }
+                catch (Exception ex)
+                {
+                    // The generator's own refusals — an empty answer, JSON it
+                    // could not read, a template that is not on disk. The wording
+                    // is ours; what it actually said goes to the log.
+                    _logger.LogWarning(ex, "Contract generation failed for {ContractId}.", contractId);
+
+                    return ContractDraftResult.Failed(
+                        "The assistant could not produce a contract. Your positions are saved — you can write " +
+                        "the contract text by hand and save it.",
+                        transient: true);
+                }
+            }
+
             var context = await _contextBuilder.BuildAsync(
                 contract,
                 positions,
@@ -252,6 +343,13 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                             Draft = fallback.Draft,
                             Money = fallback.Money,
                             ComposedWithoutAi = true,
+
+                            // Carried from the composed result rather than left at
+                            // its default. This branch rebuilds the result field by
+                            // field, so anything not named here is silently dropped
+                            // — and the page would have gone on telling the user to
+                            // approve a version that was already the contract.
+                            BecameTheContract = fallback.BecameTheContract,
                             FailureReason =
                                 ex.UserMessage + " A contract was composed from your positions and details " +
                                 "instead — review it, and regenerate once the assistant is working."
@@ -277,7 +375,6 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             }
 
             var content = outcome.Content;
-            var parties = await BuildPartyDetailsAsync(contract, ct);
 
             // One contract, from all the sources. Nothing is appended to it: the
             // pasted document informed the clauses and is not part of them.
@@ -327,6 +424,10 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             _db.Set<ContractDraft>().Add(draft);
 
+            // A contract, not a candidate for one. Nothing is replaced: this only
+            // takes effect while no version is approved.
+            var becameTheContract = ApproveIfFirst(contract, draft);
+
             // Recorded so the guard at the top of this method can recognise a
             // repeat. Without this the guard could never match on the generated
             // path, and only the composed path was ever de-duplicated.
@@ -354,21 +455,112 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             _logger.LogInformation(
                 "Generated draft v{Version} for contract {ContractId} from {Mode} using {Model}. " +
-                "Source document {Source} informed it without being copied into it. Coverage {Coverage}.",
+                "Source document {Source} informed it without being copied into it. Coverage {Coverage}. " +
+                "It {Became} the contract's wording.",
                 draft.Version, contractId, source.Mode, _openAi.Model,
                 draft.SourceDraftId is null ? "was absent" : "v" + LatestSupplied(contract)?.Version,
-                outcome.Audit.Summary);
+                outcome.Audit.Summary,
+                becameTheContract ? "became" : "did not become (a version is already approved)");
 
             return new ContractDraftResult
             {
                 Succeeded = true,
                 Draft = ToSummary(draft, totals),
+                BecameTheContract = becameTheContract,
 
                 // What the contract does not say. Shown beside the draft rather
                 // than folded into a success message, because "generated" and
                 // "generated, and three agreed points are not in it" are different
                 // things to hand somebody who is about to approve it.
                 ReviewNotes = outcome.Audit.ReviewNotes()
+            };
+        }
+
+        /// <summary>
+        /// Writes the contract the way a signed quote writes one.
+        ///
+        /// The whole of the algorithm is in <see cref="ContractDocumentGenerator"/>
+        /// and is not reproduced here: this assembles the request from the
+        /// contract's own positions instead of a quote's items, and stores what
+        /// comes back as a version.
+        ///
+        /// The one deliberate difference from the quote's call is the customer.
+        /// That path leaves <c>CustomerBlockOverride</c> unset, and the generator
+        /// then fills the Kunde block with the literal placeholder
+        /// "Name/Firma: (filled)" — a contract that does not name who it is
+        /// between. The parties are already known here, so they are passed. That
+        /// is the same algorithm with the input it was asking for, not a
+        /// different one.
+        /// </summary>
+        private async Task<ContractDraftResult> GenerateFromTemplateAsync(
+            Contract contract,
+            IReadOnlyList<ManualPositionDto> positions,
+            PositionTotalsDto totals,
+            PartyDetails parties,
+            GenerateDraftOptions options,
+            CancellationToken ct)
+        {
+            // The same mapping the signed-quote path uses, from this contract's
+            // own positions instead of a quote's items.
+            var request = ContractDocumentFactory.FromContract(
+                contract,
+                positions,
+                parties,
+                options.AdditionalInstructions,
+                LatestSupplied(contract)?.DocumentMarkdown);
+
+            var generated = await _documents.GenerateAsync(request, ct);
+
+            var draft = new ContractDraft
+            {
+                ContractId = contract.Id,
+                Version = await NextVersionAsync(contract.Id, ct),
+                DocumentMarkdown = generated.FullDocument.Trim(),
+                PositionsSnapshot = JsonSerializer.SerializeToDocument(positions),
+                TemplateVersion = _template.BaseDePath,
+                Model = _openAi.Model,
+                GeneratedBy = "openai",
+                GeneratedAt = DateTimeOffset.UtcNow,
+                Kind = ContractDraftKind.Generated,
+                SourceDraftId = LatestSupplied(contract)?.Id
+            };
+
+            _db.Set<ContractDraft>().Add(draft);
+
+            var becameTheContract = ApproveIfFirst(contract, draft);
+
+            // Anlage A as data, beside the document rendered from it. The quote's
+            // path stores this too; without it a contract written here would be
+            // the same document with half the record behind it.
+            contract.TermsStructured =
+                JsonSerializer.SerializeToDocument(generated.Structured);
+
+            contract.LastPreparationKey = options.IdempotencyKey;
+            contract.LastPreparedDraftId = draft.Id;
+            contract.PreparationState = ContractPreparationState.PreparedDraft;
+
+            contract.PartySnapshot = JsonSerializer.SerializeToDocument(new
+            {
+                companyName = parties.CompanyName,
+                companyAddress = parties.CompanyAddress,
+                customerName = parties.CustomerName,
+                customerAddress = parties.CustomerAddress,
+                takenAt = DateTimeOffset.UtcNow
+            });
+
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Generated contract v{Version} for {ContractId} from the Agenturvertrag template using {Model} " +
+                "with {Positions} position(s). It {Became} the contract's wording.",
+                draft.Version, contract.Id, _openAi.Model, positions.Count,
+                becameTheContract ? "became" : "did not become (a version is already approved)");
+
+            return new ContractDraftResult
+            {
+                Succeeded = true,
+                Draft = ToSummary(draft, totals),
+                BecameTheContract = becameTheContract
             };
         }
 
@@ -482,6 +674,11 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             _db.Set<ContractDraft>().Add(draft);
 
+            // Finished here too. This is the path taken when the assistant cannot
+            // be reached at all, which is exactly when leaving the contract one
+            // unfindable step short of existing would be least forgivable.
+            var becameTheContract = ApproveIfFirst(contract, draft);
+
             contract.PreparationState = ContractPreparationState.PreparedDraft;
             contract.LastPreparationKey = options.IdempotencyKey;
             contract.LastPreparedDraftId = draft.Id;
@@ -499,11 +696,61 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             _logger.LogInformation(
                 "Composed contract v{Version} for {ContractId} without a model from {Positions} position(s) " +
-                "and {Terms} confirmed term(s). Source document v{Source} was referenced, not copied.",
+                "and {Terms} confirmed term(s). Source document v{Source} was referenced, not copied. " +
+                "It {Became} the contract's wording.",
                 draft.Version, contract.Id, positions.Count, clauses.Length,
-                supplied is null ? "(none)" : "v" + supplied.Version);
+                supplied is null ? "(none)" : "v" + supplied.Version,
+                becameTheContract ? "became" : "did not become (a version is already approved)");
 
-            return new ContractDraftResult { Succeeded = true, Draft = ToSummary(draft, null) };
+            return new ContractDraftResult
+            {
+                Succeeded = true,
+                Draft = ToSummary(draft, null),
+                BecameTheContract = becameTheContract
+            };
+        }
+
+        /// <summary>
+        /// Makes a freshly produced version the contract's wording, when there is
+        /// nothing it would replace. Returns true when it did.
+        ///
+        /// Producing a contract used to leave it unfinished. Generating wrote a
+        /// version and stopped; <c>contract.Terms</c> — what the details page, the
+        /// signing page and the PDF all read — stayed empty until somebody found
+        /// the version list and approved it. So the ordinary path ended on a
+        /// screen saying the contract had no wording, one step short of a
+        /// contract, while the same contract created automatically from a signed
+        /// quote arrived complete: that path writes the generated document
+        /// straight onto the contract and never had an approval step at all.
+        ///
+        /// This closes that gap from the other side. The first version a contract
+        /// gets becomes its wording as it is made, so "generate" produces a
+        /// contract rather than a candidate.
+        ///
+        /// It deliberately does nothing once a version is approved. Approving over
+        /// an approved version changes which text is active — on a contract that
+        /// may already have been sent to a customer — and that is a decision, with
+        /// a confirmation of its own in <see cref="ApproveAsync"/>. Regenerating is
+        /// not consent to publish. The line is the same one the user drew: the
+        /// first contract is made in one step, a replacement is still chosen.
+        /// </summary>
+        private static bool ApproveIfFirst(Contract contract, ContractDraft draft)
+        {
+            if (contract.Drafts.Any(d => d.IsApproved && d.Id != draft.Id))
+                return false;
+
+            draft.IsApproved = true;
+            draft.Status = ContractDraftStatus.Approved;
+            draft.SupersededAt = null;
+            draft.ApprovedAt = DateTimeOffset.UtcNow;
+            draft.DocumentHash = Sha256(draft.DocumentMarkdown);
+
+            // The same two writes approval makes. The signing page and the PDF
+            // read Terms; ApprovedDraftId is what says which version it came from.
+            contract.Terms = draft.DocumentMarkdown;
+            contract.ApprovedDraftId = draft.Id;
+
+            return true;
         }
 
         /// <summary>
