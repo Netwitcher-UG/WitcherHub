@@ -500,65 +500,14 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             GenerateDraftOptions options,
             CancellationToken ct)
         {
-            var request = new GenerateContractDocumentRequest
-            {
-                ProjectId = contract.ProjectId,
-                ContractNo = contract.ContractNo,
-                ProjectTitle = string.IsNullOrWhiteSpace(contract.Project?.Title)
-                    ? "Project"
-                    : contract.Project!.Title!,
-                Currency = string.IsNullOrWhiteSpace(contract.Currency) ? "EUR" : contract.Currency!,
-                StartDate = contract.StartDate,
-                EndDate = contract.EndDate,
-
-                // Nobody has signed yet — this is the wording being written, not a
-                // signature being taken — so the signer is the customer as the
-                // record has them.
-                SignerName = parties.CustomerName ?? "",
-                SignerEmail = null,
-
-                LeaveCustomerFieldsBlank = false,
-                CustomerBlockOverride = CustomerBlock(parties),
-
-                // The quote's setting: Anlage A carries the prices.
-                IncludePricesInServicesSection = true,
-
-                // The supplied document, given to the model as context.
-                //
-                // Without this the button called "Generate from text and
-                // positions" would use only the positions: this generator builds
-                // Anlage A out of them and has no other channel for a document.
-                // The text would be stored, listed as a version, named in the
-                // button — and never read.
-                //
-                // Framed as it was for the pipeline: lowest authority, and not to
-                // be copied. Whatever is in the record wins over whatever the
-                // pasted document claims, and the document informs the clauses
-                // rather than becoming them.
-                AdditionalInstructions = WithSuppliedDocument(
-                    options.AdditionalInstructions,
-                    LatestSupplied(contract)?.DocumentMarkdown),
-
-                Services = positions
-                    .OrderBy(p => p.Position)
-                    .Select((p, index) => new ContractServiceLineDto
-                    {
-                        Position = p.Position > 0 ? p.Position : index + 1,
-                        ServiceId = p.CatalogServiceId,
-                        Title = string.IsNullOrWhiteSpace(p.Title) ? $"Position {index + 1}" : p.Title.Trim(),
-                        ServiceType = p.ServiceType,
-                        Quantity = p.Quantity <= 0 ? 1m : p.Quantity,
-                        UnitPrice = p.UnitPrice ?? 0m,
-                        BillingCycle = p.BillingCycle,
-                        DiscountType = p.DiscountType,
-                        DiscountValue = p.DiscountValue,
-
-                        // The net the position actually comes to, which is what
-                        // the quote passes as well — discounts applied, tax not.
-                        AgreedPrice = p.NetTotal
-                    })
-                    .ToList()
-            };
+            // The same mapping the signed-quote path uses, from this contract's
+            // own positions instead of a quote's items.
+            var request = ContractDocumentFactory.FromContract(
+                contract,
+                positions,
+                parties,
+                options.AdditionalInstructions,
+                LatestSupplied(contract)?.DocumentMarkdown);
 
             var generated = await _documents.GenerateAsync(request, ct);
 
@@ -613,55 +562,6 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 Draft = ToSummary(draft, totals),
                 BecameTheContract = becameTheContract
             };
-        }
-
-        /// <summary>
-        /// The user's own instructions, followed by the supplied document if
-        /// there is one, labelled for what it is.
-        ///
-        /// The labelling is not decoration. A pasted agreement names another
-        /// agency, other prices and another governing law, and the one thing
-        /// that must never happen is it being copied into the contract — the
-        /// defect that once showed the customer's old agreement as the contract
-        /// body. So it is given as the least authoritative source, and said to be
-        /// context rather than content.
-        /// </summary>
-        private static string? WithSuppliedDocument(string? instructions, string? suppliedDocument)
-        {
-            if (string.IsNullOrWhiteSpace(suppliedDocument))
-                return instructions;
-
-            var builder = new StringBuilder();
-
-            if (!string.IsNullOrWhiteSpace(instructions))
-                builder.AppendLine(instructions!.Trim()).AppendLine();
-
-            builder.AppendLine(
-                "The following document was supplied by the customer. It is context of LOWEST AUTHORITY: " +
-                "the positions and the contract record above outrank it wherever they disagree. " +
-                "Use it to understand what was agreed. Do not copy it, do not quote it, and do not " +
-                "carry over its parties, prices, dates or governing law.");
-
-            builder.AppendLine();
-            builder.AppendLine("--- supplied document ---");
-            builder.AppendLine(suppliedDocument!.Trim());
-            builder.AppendLine("--- end of supplied document ---");
-
-            return builder.ToString();
-        }
-
-        /// <summary>
-        /// The customer as the Kunde block of the template, in the shape the
-        /// generator's own placeholder uses.
-        /// </summary>
-        private static string CustomerBlock(PartyDetails parties)
-        {
-            var lines = new List<string> { $"Name/Firma: {parties.CustomerName}".TrimEnd() };
-
-            if (!string.IsNullOrWhiteSpace(parties.CustomerAddress))
-                lines.Add($"Adresse: {parties.CustomerAddress!.Replace("\n", ", ").Trim()}");
-
-            return string.Join("\n", lines) + "\n";
         }
 
         /// <summary>

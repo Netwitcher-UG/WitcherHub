@@ -448,7 +448,10 @@ namespace WitcherHub.Pages.Quotes
                         return;
                     }
 
-                    var request = BuildGenerateContractRequestFromQuote(
+                    // The same mapping the builder uses. It lived here privately,
+                    // which is why a contract written by hand came out as a
+                    // different document from one written from a signed quote.
+                    var request = ContractDocumentFactory.FromQuote(
                         quote,
                         signerName,
                         signerEmail);
@@ -762,117 +765,6 @@ namespace WitcherHub.Pages.Quotes
                     .ThenInclude(i => i.Service)
                 .Include(q => q.Signatures)
                 .FirstOrDefaultAsync(q => q.Id == Id, ct);
-        }
-
-        private static GenerateContractDocumentRequest BuildGenerateContractRequestFromQuote(
-            Quote quote,
-            string signerName,
-            string signerEmail)
-        {
-          
-            return new GenerateContractDocumentRequest
-            {
-                ProjectId = quote.ProjectId,
-                ContractNo = null,
-                ProjectTitle = string.IsNullOrWhiteSpace(quote.Project?.Title)
-                    ? "Project"
-                    : quote.Project.Title!,
-                Currency = string.IsNullOrWhiteSpace(quote.Currency)
-                    ? "EUR"
-                    : quote.Currency!,
-                StartDate = DateOnly.FromDateTime(DateTime.UtcNow),
-                EndDate = null,
-                SignerName = signerName,
-                SignerEmail = signerEmail,
-                LeaveCustomerFieldsBlank = false,
-                IncludePricesInServicesSection = true,
-                Services = (quote.Items ?? new List<QuoteItem>())
-    .OrderBy(x => x.Position)
-    .Select((x, index) => new ContractServiceLineDto
-    {
-        Position = x.Position > 0 ? x.Position : index + 1,
-        ServiceId = x.ServiceId,
-        Title = string.IsNullOrWhiteSpace(x.Title) ? $"Position {index + 1}" : x.Title.Trim(),
-
-        // نقل حقول التسعير كاملة
-        Quantity = x.Quantity,
-        UnitPrice = x.UnitPrice,
-        BillingCycle = x.BillingCycle,
-        DiscountType = x.DiscountType,
-        DiscountValue = x.DiscountValue,
-
-        ServiceName = x.Service?.Name,
-        ServiceType = x.Service?.ServiceType.ToString(),
-        PricingModel = x.Service?.PricingModel.ToString(),
-        AgreedPrice = ResolveQuoteItemAgreedPrice(x),
-        Config = JsonDocumentToDictionary(x.Config)
-    })
-    .ToList()
-            };
-        }
-
-        private static decimal? ResolveQuoteItemAgreedPrice(QuoteItem item)
-        {
-            var baseTotal = item.Quantity * item.UnitPrice;
-
-            // For contract creation, pass the agreed net value only.
-            // VAT remains visible on the quote/signing page, but is not sent as part of the contract input.
-            var subTotal = ReadDec(item.PriceBreakdown, "subTotal", 0m);
-            if (subTotal > 0m)
-            {
-                return subTotal;
-            }
-
-            var baseTotalFromBreakdown = ReadDec(item.PriceBreakdown, "baseTotal", baseTotal);
-            var discountAmount = ReadNestedDec(item.PriceBreakdown, "discount", "amount", 0m);
-            var netTotal = Math.Max(0m, baseTotalFromBreakdown - discountAmount);
-
-            return netTotal > 0m ? netTotal : baseTotal;
-        }
-
-        private static Dictionary<string, object> JsonDocumentToDictionary(JsonDocument? doc)
-        {
-            if (doc is null || doc.RootElement.ValueKind != JsonValueKind.Object)
-            {
-                return new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-            }
-
-            var result = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var property in doc.RootElement.EnumerateObject())
-            {
-                result[property.Name] = JsonElementToObject(property.Value) ?? string.Empty;
-            }
-
-            return result;
-        }
-
-        private static object? JsonElementToObject(JsonElement element)
-        {
-            return element.ValueKind switch
-            {
-                JsonValueKind.Object => element.EnumerateObject()
-                    .ToDictionary(
-                        x => x.Name,
-                        x => JsonElementToObject(x.Value) ?? string.Empty,
-                        StringComparer.OrdinalIgnoreCase),
-
-                JsonValueKind.Array => element.EnumerateArray()
-                    .Select(JsonElementToObject)
-                    .ToList(),
-
-                JsonValueKind.String => element.GetString(),
-
-                JsonValueKind.Number => element.TryGetDecimal(out var m)
-                    ? m
-                    : element.TryGetDouble(out var d)
-                        ? d
-                        : element.GetRawText(),
-
-                JsonValueKind.True => true,
-                JsonValueKind.False => false,
-                _ => null
-            };
         }
 
         private static QuotePdfHtmlBuilder.QuotePdfDocumentModel BuildQuotePdfModel(Quote q)
