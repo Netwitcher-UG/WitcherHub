@@ -9,6 +9,7 @@ using WitcherHub.Application.Models.DTO.Customers;
 using WitcherHub.Application.Models.Email;
 using WitcherHub.Application.Services.Email;
 using WitcherHub.Configuration.Filters;
+using WitcherHub.Infrastructure.Authentication;
 using WitcherHub.Infrastructure.Services.Lexware;
 using WitcherHub.Resources;
 
@@ -32,6 +33,9 @@ namespace WitcherHub.Controllers
         private readonly IEmailService _email;
         private readonly IStringLocalizer<SharedResource> T;
         private readonly IContractDocumentGenerator _contractDoc;
+        private readonly ILogger<TestController> _logger;
+        private readonly IWebHostEnvironment _environment;
+
         public TestController(
             ILexwareClient lexwareClient,
             IAiTextGenerator aiTextGenerator,
@@ -39,12 +43,16 @@ namespace WitcherHub.Controllers
             ILexwareSyncService sync,
             IEmailService email,
             IStringLocalizer<SharedResource> t,
+            ILogger<TestController> logger,
+            IWebHostEnvironment environment,
             IContractDocumentGenerator contractDoc)
         {
             _lexwareClient = lexwareClient;
             _aiTextGenerator = aiTextGenerator;
             _auth = auth;
             _sync = sync;
+            _logger = logger;
+            _environment = environment;
             _email = email;
             T = t;
             _contractDoc = contractDoc;
@@ -214,11 +222,24 @@ namespace WitcherHub.Controllers
             catch (Exception ex)
             {
                 // يرجّع خطأ واضح وقت التجربة
+                _logger.LogError(
+                  ex,
+                "OpenAI call failed. ExceptionType: {ExceptionType}",
+                ex.GetType().FullName);
+
                 return Problem(
                     title: "OpenAI call failed",
-                    detail: ex.Message,
-                    statusCode: StatusCodes.Status500InternalServerError
-                );
+                   detail: _environment.IsDevelopment()
+                ? $"{ex.GetType().Name}: {ex.Message} | " +
+                  $"Inner: {ex.InnerException?.Message}"
+                : "The AI service is temporarily unavailable.",
+
+                   statusCode: StatusCodes.Status502BadGateway);
+                //return Problem(
+                //    title: "OpenAI call failed",
+                //    detail: ex.Message,
+                //    statusCode: StatusCodes.Status500InternalServerError
+                //);
             }
         }
 
