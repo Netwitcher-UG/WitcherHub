@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace WitcherHub.Application.Models.View.Contracts
@@ -16,6 +16,13 @@ namespace WitcherHub.Application.Models.View.Contracts
         public string CustomerEmail { get; set; } = "";
 
         public bool IsLocked { get; set; }
+
+        /// <summary>
+        /// Sent by the browser with a generation, so a second press — or a retry
+        /// after the page gave up waiting — joins the job already running instead
+        /// of writing the contract a second time.
+        /// </summary>
+        public string? IdempotencyKey { get; set; }
 
         public List<PositionVm> Positions { get; set; } = new();
 

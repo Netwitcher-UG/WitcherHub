@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace WitcherHub.Tests
 {
     /// <summary>
@@ -30,6 +32,16 @@ namespace WitcherHub.Tests
         private static string JobService() => File.ReadAllText(Path.Combine(
             TestPaths.Repository, "WitcherHub.Infrastructure", "Services", "Contracts",
             "ContractAiJobService.cs"));
+
+        private static string OverridePage() => File.ReadAllText(Path.Combine(
+            TestPaths.WebProject, "Pages", "Contracts", "Override.cshtml.cs"));
+
+        private static string OverrideMarkup() => File.ReadAllText(Path.Combine(
+            TestPaths.WebProject, "Pages", "Contracts", "Override.cshtml"));
+
+        private static string OverrideGenerator() => File.ReadAllText(Path.Combine(
+            TestPaths.Repository, "WitcherHub.Infrastructure", "Services", "Contracts",
+            "ContractOverrideGenerator.cs"));
 
         // ================================================ nothing waits inline
 
@@ -111,7 +123,9 @@ namespace WitcherHub.Tests
             // The request's scope is disposed the moment it answers — minutes
             // before the work finishes. A captured context would throw then, in a
             // place with nobody to tell.
-            Assert.Contains("_scopes.CreateScope()", job);
+            // A scope of its own, disposed asynchronously because UnitOfWork is
+            // IAsyncDisposable-only.
+            Assert.Contains("_scopes.CreateAsyncScope()", job);
             Assert.Contains("services.GetRequiredService<AppDbContext>()", job);
 
             // And the request's cancellation token would cancel the job the
@@ -160,7 +174,7 @@ namespace WitcherHub.Tests
             // Written with a clean context: the one that threw may be in no state
             // to save.
             var recover = Between(job, "private async Task RecordUnexpectedFailureAsync", "private static void Record(");
-            Assert.Contains("_scopes.CreateScope()", recover);
+            Assert.Contains("_scopes.CreateAsyncScope()", recover);
         }
 
         [Fact]
@@ -248,6 +262,177 @@ namespace WitcherHub.Tests
             }
 
             return count;
+        }
+        // ============================================ the override screen too
+
+        /// <summary>
+        /// The override screen ran a full generation on the request that carried
+        /// the form. Not slowly — it always supplies StructuredOverride, the
+        /// branch that never calls the model — but with nowhere to show progress,
+        /// nothing stopping a second press, and no way to report a failure.
+        /// </summary>
+        [Fact]
+        public void TheOverrideScreenDoesNotGenerateOnTheRequest()
+        {
+            var page = OverridePage();
+
+            // What it used to do, inline, before answering.
+            Assert.DoesNotContain("_contractDocumentGenerator.GenerateAsync(", page);
+            Assert.DoesNotContain("_contractDocumentGenerator", page);
+
+            // What it does now.
+            Assert.Contains("_jobs.StartAsync(", page);
+            Assert.Contains("ContractAiJobKind.Override", page);
+            Assert.Contains("OnPostAiJobStatusAsync", page);
+        }
+
+        [Fact]
+        public void TheOverrideJobIsDispatchedToRealWork()
+        {
+            var service = JobService();
+
+            // A kind with no branch would fall to the default and fail every press
+            // with "that kind of request is not supported".
+            Assert.Contains("ContractAiJobKind.Override => await OverrideAsync(", service);
+            Assert.Contains("IContractOverrideGenerator", service);
+        }
+
+        /// <summary>
+        /// The generation is re-checked against the record when it runs, not only
+        /// when it was asked for: a contract can be signed in the minutes a job
+        /// spends in the queue, and rewriting a signed contract cannot be undone.
+        /// </summary>
+        [Fact]
+        public void AContractSignedWhileTheJobWaitedIsNotRewritten()
+        {
+            var generator = OverrideGenerator();
+
+            Assert.Contains("IsLocked(contract)", generator);
+            Assert.Contains("has been signed", generator);
+        }
+
+        /// <summary>
+        /// Whatever the model does, the provider's own words never reach the
+        /// screen: the failure is reported through the classified UserMessage,
+        /// which carries the cause and a reference but never the key, the prompt
+        /// or the raw response.
+        /// </summary>
+        [Fact]
+        public void AnOverrideFailureIsReportedWithoutProviderDetail()
+        {
+            var generator = OverrideGenerator();
+
+            Assert.Contains("catch (AiInvocationException", generator);
+            Assert.Contains("ex.UserMessage", generator);
+
+            // The raw exception must not be what the user is shown: its message
+            // quotes the provider's response back, and its ToString carries the
+            // stack trace with it.
+            Assert.DoesNotContain("ex.Message", generator);
+            Assert.DoesNotContain("ex.ToString()", generator);
+            Assert.DoesNotContain("StackTrace", generator);
+            Assert.DoesNotContain("GetBaseException", generator);
+        }
+
+        // ============================================ the override page script
+
+        [Fact]
+        public void TheOverrideButtonAlwaysComesBack()
+        {
+            var markup = OverrideMarkup();
+
+            // Every exit from the work runs through one release, and it is in a
+            // finally block so no failure can skip it.
+            Assert.Contains("function unlock()", markup);
+            Assert.Contains("finally {", markup);
+            Assert.Contains("unlock();", markup);
+
+            // The back/forward cache restores the page exactly as it was left,
+            // disabled button included, with no request in flight to release it.
+            Assert.Contains("pageshow", markup);
+        }
+
+        [Fact]
+        public void TheOverrideScriptCannotWaitForEver()
+        {
+            var markup = OverrideMarkup();
+
+            // A request with no deadline never settles, so the finally block that
+            // releases the button is never reached.
+            Assert.Contains("AbortController", markup);
+            Assert.Contains("REQUEST_TIMEOUT_MS", markup);
+
+            // And the polling itself ends rather than asking for ever.
+            Assert.Contains("GIVE_UP_MS", markup);
+            Assert.Contains("while (waited < GIVE_UP_MS)", markup);
+        }
+
+        /// <summary>
+        /// Every background scope is disposed asynchronously.
+        ///
+        /// UnitOfWork implements only IAsyncDisposable, and disposing a scope that
+        /// holds one with a plain `using` throws — but only after the work has
+        /// finished and been recorded. So the user saw the right answer while
+        /// every assistant job and every analysis ended by throwing on the way
+        /// out: the queue logged "background work item failed" for work that had
+        /// succeeded, and the scope's connection was never released cleanly.
+        ///
+        /// Covers the two paths this change is about. The recurring-invoice
+        /// service has the same fault and is deliberately left alone here — it is
+        /// nothing to do with the assistant, and it belongs to its own change.
+        /// </summary>
+        [Theory]
+        [InlineData("WitcherHub.Infrastructure", "Services", "Contracts", "ContractAiJobService.cs")]
+        [InlineData("WitcherHub.Infrastructure", "Services", "Contracts", "BackgroundAnalysisRunner.cs")]
+        public void BackgroundWorkDisposesItsScopeAsynchronously(params string[] parts)
+        {
+            var source = File.ReadAllText(
+                Path.Combine(new[] { TestPaths.Repository }.Concat(parts).ToArray()));
+
+            Assert.DoesNotContain("CreateScope()", source);
+            Assert.Contains("CreateAsyncScope()", source);
+        }
+
+        /// <summary>
+        /// Exactly one forwarded header is trusted.
+        ///
+        /// The proxy cannot be pinned by address, so the known-proxy check is
+        /// cleared and the header is taken from whoever sent it. That is only
+        /// acceptable while the set stays at the one header that cannot be abused:
+        /// X-Forwarded-Proto claims a plaintext hop arrived over TLS, which
+        /// relaxes nothing. X-Forwarded-Host would let a caller forge the host
+        /// behind every generated URL, and X-Forwarded-For would let it forge the
+        /// client address — which nothing here even reads. Adding either without
+        /// re-thinking the cleared proxy list is the mistake this guards.
+        /// </summary>
+        [Fact]
+        public void OnlyTheProtocolHeaderIsTrustedFromTheProxy()
+        {
+            var source = File.ReadAllText(Path.Combine(
+                TestPaths.WebProject, "Configuration", "Extensions", "ServiceCollectionExtensions.cs"));
+
+            Assert.Contains("options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;", source);
+            Assert.DoesNotContain("XForwardedHost", source);
+            Assert.DoesNotContain("XForwardedFor", source);
+            Assert.DoesNotContain("ForwardedHeaders.All", source);
+
+            // One hop, stated rather than inherited from the default.
+            Assert.Contains("options.ForwardLimit = 1;", source);
+        }
+
+        [Fact]
+        public void TheSameGenerationIsNeverSentTwice()
+        {
+            var markup = OverrideMarkup();
+            var page = OverridePage();
+
+            // In flight, a second press does nothing at all.
+            Assert.Contains("if (busy) return;", markup);
+
+            // And a retry that does reach the server joins the running job rather
+            // than writing a second contract.
+            Assert.Contains("IdempotencyKey", markup);
+            Assert.Contains("requestKey: Vm.IdempotencyKey", page);
         }
     }
 }

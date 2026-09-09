@@ -64,17 +64,47 @@ namespace WitcherHub.Configuration.Extensions
             var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("WitcherHub.Startup");
             var configuration = app.Configuration;
 
-            void Report(string feature, string variable, string? value)
+            // Takes whether the secret is set, never the secret. The log templates
+            // below never referenced the value, so nothing was being written — but
+            // that was a property of the format strings rather than of the method,
+            // and one careless "{Value}" would have leaked it. A bool cannot.
+            void Report(string feature, string variable, bool isConfigured)
             {
-                if (string.IsNullOrWhiteSpace(value))
+                if (!isConfigured)
                     logger.LogWarning("{Feature} is disabled: {Variable} is not configured.", feature, variable);
                 else
                     logger.LogInformation("{Feature} is configured.", feature);
             }
 
-            Report("Lexware integration", "Lexware__AccessToken", configuration["Lexware:AccessToken"]);
-            Report("AI contract drafting", "OpenAI__ApiKey", configuration["OpenAI:ApiKey"]);
-            Report("Outgoing email", "Smtp__Password", configuration["Smtp:Password"]);
+            bool IsSet(string key) => !string.IsNullOrWhiteSpace(configuration[key]);
+
+            Report("Lexware integration", "Lexware__AccessToken", IsSet("Lexware:AccessToken"));
+            Report("Outgoing email", "Smtp__Password", IsSet("Smtp:Password"));
+
+            // The assistant needs a key AND a model, and the client refuses to be
+            // built without either. Reporting on the key alone said "AI contract
+            // drafting is configured" to an environment that had no model, and the
+            // first sign of trouble was then a failed contract rather than a line
+            // in the start-up log naming the setting to add.
+            var aiMissing = new List<string>();
+
+            if (!IsSet("OpenAI:ApiKey")) aiMissing.Add("OpenAI__ApiKey");
+            if (!IsSet("OpenAI:Model")) aiMissing.Add("OpenAI__Model");
+
+            if (aiMissing.Count > 0)
+            {
+                logger.LogWarning(
+                    "AI contract drafting is disabled: {Variables} not configured.",
+                    string.Join(", ", aiMissing));
+            }
+            else
+            {
+                // The model name is not a secret, and it is the one value that
+                // explains a "model not available" failure without a code change.
+                logger.LogInformation(
+                    "AI contract drafting is configured, using model {Model}.",
+                    configuration["OpenAI:Model"]);
+            }
 
             // Not a secret, and worth stating plainly: every link this environment
             // emails — password resets, quote and contract signing, invoices — is
