@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 using WitcherHub.Configuration.Extensions;
 using WitcherHub.Infrastructure.Services.Pdf;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args);  
 
 // Fail fast with an actionable message when a required secret is missing,
 // instead of surfacing a null reference later inside a request.
