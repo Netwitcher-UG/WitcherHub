@@ -77,12 +77,22 @@ namespace WitcherHub.Controllers
                 .Where(x => x.ContractId == contract.Id && x.RecipientEmail == recipientEmail && x.RevokedAtUtc == null)
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.RevokedAtUtc, DateTimeOffset.UtcNow), ct);
 
+            // Which wording this link was sent for. Approving a different version
+            // later revokes it, so the customer is asked for a fresh link rather
+            // than shown a document they were never sent.
+            var issuedFor = await _db.Set<ContractDraft>()
+                .Where(d => d.ContractId == contract.Id && d.IsApproved)
+                .OrderByDescending(d => d.ApprovedAt)
+                .Select(d => (int?)d.Version)
+                .FirstOrDefaultAsync(ct);
+
             var access = new ContractAccessLink
             {
                 ContractId = contract.Id,
                 TokenHash = tokenHash,
                 RecipientEmail = recipientEmail.Trim(),
-                ExpiresAt = DateTimeOffset.UtcNow.AddDays(14)
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(14),
+                IssuedForDraftVersion = issuedFor
             };
 
             _db.ContractAccessLinks.Add(access);

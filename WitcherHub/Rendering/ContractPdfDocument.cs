@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Infrastructure.Data.Models;
 using WitcherHub.Infrastructure.Services.Contracts;
@@ -87,33 +88,59 @@ namespace WitcherHub.Rendering
 
             var structured = DeserializeStructured(contract.TermsStructured);
 
-            var introMarkdown = ExtractMarkdownSection(contract.Terms, "## Vertragsgegenstand", "## Anlage A");
-            if (string.IsNullOrWhiteSpace(introMarkdown))
+            // A document the composer wrote carries the whole contract: the
+            // description of every position, the price table computed in code,
+            // and the numbered general terms. The page's own subject-matter,
+            // services and price blocks were written for documents that did not,
+            // and drawing them over a composed one restated the services as an
+            // empty placeholder and printed the totals a second time under a
+            // different heading.
+            //
+            // So for a composed document the body is the document, and only the
+            // parts the page genuinely owns — the letterhead, the party cards and
+            // the signature block — are drawn around it.
+            var composed = IsComposedDocument(contract.Terms);
+
+            var introHtml = "";
+            var servicesHtml = "";
+            var priceBoxHtml = "";
+
+            if (!composed)
             {
-                introMarkdown =
-                    "Der Anbieter erbringt die für das genannte Projekt vereinbarten Leistungen gemäß Anlage A – Leistungsbeschreibung.";
+                var introMarkdown = ExtractMarkdownSection(contract.Terms, "## Vertragsgegenstand", "## Anlage A");
+                if (string.IsNullOrWhiteSpace(introMarkdown))
+                {
+                    introMarkdown =
+                        "Der Anbieter erbringt die für das genannte Projekt vereinbarten Leistungen gemäß Anlage A – Leistungsbeschreibung.";
+                }
+
+                introHtml = MarkdownToSafeHtml(introMarkdown);
+
+                servicesHtml = structured is not null && structured.Positions is not null && structured.Positions.Count > 0
+                    ? BuildServicesSectionHtml(structured, contract.Currency ?? "EUR")
+                    : MarkdownToSafeHtml(
+                        ExtractMarkdownSection(contract.Terms, "## Anlage A", "## Preisübersicht"),
+                        "<p>Die vereinbarten Leistungen sind in den Vertragspositionen festgehalten.</p>");
+
+                priceBoxHtml = BuildPriceBoxHtml(contract);
             }
 
-            var introHtml = MarkdownToSafeHtml(introMarkdown);
-
-            var servicesHtml = structured is not null && structured.Positions is not null && structured.Positions.Count > 0
-                ? BuildServicesSectionHtml(structured, contract.Currency ?? "EUR")
-                : MarkdownToSafeHtml(
-                    ExtractMarkdownSection(contract.Terms, "## Anlage A", "## Preisübersicht"),
-                    "<p>Die vereinbarten Leistungen sind in den Vertragspositionen festgehalten.</p>");
-
-            // The clauses the three sections above do not cover. Without this the
-            // page shows what is being bought and what it costs, and none of the
-            // terms the signature is actually given on.
+            // The clauses the sections above do not cover. Without this the page
+            // shows what is being bought and what it costs, and none of the terms
+            // the signature is actually given on.
+            //
+            // The parties and the signature block are dropped in both cases: the
+            // page draws its own, and a contract naming its parties twice on
+            // consecutive pages reads as a document nobody proofread.
             var termsHtml = MarkdownToSafeHtml(
                 ExtractRemainingTermsMarkdown(
                     contract.Terms,
-                    "Vertragsgegenstand",
-                    "Anlage A",
-                    "Preisübersicht"),
+                    "Vertragspartner",
+                    "Unterschriften",
+                    composed ? "" : "Vertragsgegenstand",
+                    composed ? "" : "Anlage A",
+                    composed ? "" : "Preisübersicht"),
                 fallbackHtml: "");
-
-            var priceBoxHtml = BuildPriceBoxHtml(contract);
 
             var (netTotal, taxTotal, grossTotal) = CalculateContractTotals(contract);
 
@@ -420,6 +447,31 @@ namespace WitcherHub.Rendering
         /// the contract sets them. Nothing is filtered by content: a clause this
         /// method does not recognise is still a clause, and it is shown.
         /// </summary>
+        /// <summary>
+        /// Whether this document was written by the composer — recognised by the
+        /// numbered sections it and nothing else produces.
+        ///
+        /// Deliberately a property of the text rather than a flag on the record:
+        /// a contract stored years ago is rendered from its own wording, and
+        /// asking the wording what shape it is keeps every stored document
+        /// readable without a migration that would rewrite it.
+        /// </summary>
+        private static bool IsComposedDocument(string? markdown) =>
+            !string.IsNullOrWhiteSpace(markdown) &&
+            Regex.IsMatch(
+                NormalizeNewLines(markdown!),
+                @"^##\s+\d+\.\s+\S",
+                RegexOptions.Multiline);
+
+        /// <summary>
+        /// Everything except the sections the page draws itself.
+        ///
+        /// A heading is matched with its number removed, so "2. Vergütung" is
+        /// recognised as the price section the same way "Preisübersicht" was
+        /// before the numbering existed — otherwise renaming the headings
+        /// silently turns every already-shown section back on and the document
+        /// states its totals twice.
+        /// </summary>
         private static string ExtractRemainingTermsMarkdown(string? markdown, params string[] alreadyShown)
         {
             markdown = NormalizeNewLines(markdown ?? "").Trim();
@@ -439,8 +491,11 @@ namespace WitcherHub.Rendering
                 {
                     seenFirstSection = true;
 
-                    var heading = line[3..].Trim();
+                    var heading = Regex.Replace(
+                        line[3..].Trim(), @"^\d+(?:\.\d+)*\.?\s*", "");
+
                     keeping = !alreadyShown.Any(shown =>
+                        !string.IsNullOrEmpty(shown) &&
                         heading.StartsWith(shown, StringComparison.OrdinalIgnoreCase));
 
                     if (keeping) kept.Append(line).Append('\n');

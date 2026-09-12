@@ -166,9 +166,16 @@ public class GeneratingAContractProducesAContractTests : IAsyncLifetime
         // description and no general terms at all.
         Assert.Contains("# Agenturvertrag", document);
         Assert.Contains("## Vertragspartner", document);
-        Assert.Contains("## Anlage A", document);
-        Assert.Contains("## Preisübersicht", document);
+        Assert.Contains("## 1. Leistungsbeschreibung", document);
+        Assert.Contains("## 2. Vergütung", document);
         Assert.Contains("## Unterschriften", document);
+
+        // Numbered, not signed. The paragraph sign is gone from every heading
+        // and the numbering runs on through the general terms rather than
+        // restarting at the clause library.
+        Assert.DoesNotContain("§", document);
+        Assert.Contains("### 1.1 Monatliche Betreuung", document);
+        Assert.Contains("## 3. ", document);
     }
 
     [Fact]

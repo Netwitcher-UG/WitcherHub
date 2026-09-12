@@ -33,7 +33,7 @@ namespace WitcherHub.Application.Services.Contracts.Clauses
         /// stays answerable which wording a given contract was built from.
         /// Bumped whenever any module's text or applicability changes.
         /// </summary>
-        public const string LibraryVersion = "1.0.0";
+        public const string LibraryVersion = "1.1.0";
 
         private static readonly ClauseModule[] Modules =
         [
@@ -148,7 +148,7 @@ namespace WitcherHub.Application.Services.Contracts.Clauses
                     "erklärt die Abnahme oder verweigert sie unter Angabe der Gründe in Textform.\n\n" +
                     "(3) Unwesentliche Abweichungen berechtigen nicht zur Verweigerung der Abnahme.",
                 LegalNote =
-                    "Eine Abnahmefiktion bei Schweigen ist hier bewusst nicht vorgesehen. § 640 Abs. 2 " +
+                    "Eine Abnahmefiktion bei Schweigen ist hier bewusst nicht vorgesehen. Paragraph 640 Abs. 2 " +
                     "BGB verlangt dafür eine Aufforderung in Textform mit Hinweis auf die Folgen; ob " +
                     "und wie das abgebildet wird, ist eine anwaltliche Entscheidung."
             },
@@ -322,7 +322,7 @@ namespace WitcherHub.Application.Services.Contracts.Clauses
                 AppliesToNatures = [ServiceNature.Service, ServiceNature.Mixed],
                 Text =
                     "(1) Die vom Anbieter erbrachten Beratungs-, Analyse-, Monitoring- und " +
-                    "Marketingleistungen sind Dienstleistungen im Sinne der §§ 611 ff. BGB. Geschuldet " +
+                    "Marketingleistungen sind Dienstleistungen im Sinne der Paragraphen 611 ff. BGB. Geschuldet " +
                     "ist die fachgerechte Erbringung der vereinbarten Tätigkeit, nicht ein bestimmter " +
                     "wirtschaftlicher Erfolg.\n\n" +
                     "(2) Ein bestimmtes Ranking, eine bestimmte Sichtbarkeit, ein bestimmter " +
@@ -604,7 +604,7 @@ namespace WitcherHub.Application.Services.Contracts.Clauses
                 LegalNote =
                     "Schriftform oder Textform ist eine bewusste Entscheidung und wird nicht geraten. " +
                     "Eine doppelte Schriftformklausel ist bewusst nicht enthalten — sie ist wegen " +
-                    "§ 305b BGB angreifbar."
+                    "Paragraph 305b BGB angreifbar."
             },
 
             new()

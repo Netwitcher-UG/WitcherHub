@@ -26,7 +26,7 @@ namespace WitcherHub.Application.Services.Contracts
     /// is measured against the ledger before it is saved. No stage has a section
     /// cap, and no stage has to fit the whole document into one answer.
     ///
-    /// It returns sections, not styling. Fonts, spacing, § numbering, the party
+    /// It returns sections, not styling. Fonts, spacing, section numbering, the party
     /// block and the signature block are WitcherHub's, so that every contract
     /// looks like the same company's contract.
     /// </summary>
@@ -81,6 +81,22 @@ namespace WitcherHub.Application.Services.Contracts
             The document is as long as its content requires. You never shorten a
             contract to make it fit, and you never pad one to make it look
             substantial. Every agreed item gets the words it needs and no more.
+
+            Every word you write is German, in professional contract register.
+            The data you are given may be in Arabic, English or another language;
+            you translate all descriptive content fully into German without
+            altering scope, figures, deadlines, obligations or legal meaning, and
+            you translate for sense rather than word by word.
+
+            Company names, personal names, trademarks, product names, domains,
+            e-mail addresses, URLs, contract numbers, registry entries and
+            technical identifiers are never translated or altered. Where a phrase
+            cannot be translated unambiguously you say so with "wird noch
+            festgelegt" instead of inventing a wording.
+
+            You never write the paragraph sign. A section of this contract is
+            "Ziffer 4"; a statute is "Paragraph 126a BGB" or "Paragraphen 611 ff.
+            BGB", spelled out.
             """;
 
         // ================================================== stage 1: the source
@@ -137,7 +153,7 @@ namespace WitcherHub.Application.Services.Contracts
         // ================================================== stage 2: the plan
 
         /// <summary>
-        /// Plans the contract: which §§ it has, in what order, and which ledger
+        /// Plans the contract: which sections it has, in what order, and which ledger
         /// entry each one is responsible for.
         ///
         /// The plan is what replaced the fixed list of seven headings. It has no
@@ -160,7 +176,7 @@ namespace WitcherHub.Application.Services.Contracts
                   "sections": [
                     {
                       "heading": "Gegenstand des Vertrags",
-                      "intent": "what this § has to establish, one sentence",
+                      "intent": "what this section has to establish, one sentence",
                       "covers": ["POS-001-01", "REC-001"]
                     }
                   ]
@@ -185,7 +201,10 @@ namespace WitcherHub.Application.Services.Contracts
                   delivered, how, what each side must do, what is assumed and
                   excluded, what it costs, when it is paid, how long it runs.
                 - Do not number the headings: the application numbers them. Write
-                  "Vergütung und Zahlung", not "§ 4 Vergütung und Zahlung".
+                  "Vergütung und Zahlung", not "4. Vergütung und Zahlung".
+                - Never write the paragraph sign. Refer to a section of this
+                  contract as "Ziffer 4"; cite a statute as "Paragraph 126a BGB"
+                  or "Paragraphen 611 ff. BGB", spelled out.
                 - Do not plan a section for the party block, the term summary, the
                   signatures or the annexes. The application composes those.
                 - Do not plan a liability, warranty, jurisdiction, data protection,
@@ -239,7 +258,7 @@ namespace WitcherHub.Application.Services.Contracts
             prompt.AppendLine("""
                 - Return one entry per requested section, with the heading exactly as
                   given. Do not add sections, do not drop sections, do not reorder.
-                - "paragraphs" are the numbered paragraphs of that §, in order,
+                - "paragraphs" are the numbered paragraphs of that section, in order,
                   without their numbers — the application adds (1), (2), (3).
                 - "items" is an optional lettered list belonging to the last
                   paragraph, without the a) b) c) markers.
@@ -400,8 +419,8 @@ namespace WitcherHub.Application.Services.Contracts
                 - Restate every figure exactly as given. Do not recalculate, round,
                   convert, or introduce a figure that is not in the data below.
                 - Do not write liability, warranty, jurisdiction, data protection,
-                  termination rights or final provisions. Do not cite laws or §§ of
-                  legislation.
+                  termination rights or final provisions. Do not cite laws or
+                  sections of legislation.
                 - Do not set acceptance deadlines in days, weeks or months.
                 - One line per list item, no line breaks inside an item.
                 - Where information is missing, write "wird noch festgelegt". Never

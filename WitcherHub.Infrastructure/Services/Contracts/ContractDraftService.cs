@@ -1075,14 +1075,51 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             contract.Terms = draft.DocumentMarkdown;
             contract.ApprovedDraftId = draft.Id;
 
+            var revoked = await RevokeLinksForReplacedWordingAsync(contractId, version, ct);
+
             await _db.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Draft v{Version} approved for contract {ContractId}. Hash {Hash}. Superseded: {Superseded}.",
+                "Draft v{Version} approved for contract {ContractId}. Hash {Hash}. Superseded: {Superseded}. " +
+                "Signing links revoked: {Revoked}.",
                 version, contractId, draft.DocumentHash,
-                previouslyApproved.Count == 0 ? "none" : string.Join(", ", previouslyApproved.Select(d => d.Version)));
+                previouslyApproved.Count == 0 ? "none" : string.Join(", ", previouslyApproved.Select(d => d.Version)),
+                revoked);
 
             return new ContractDraftResult { Succeeded = true, Draft = ToSummary(draft, null) };
+        }
+
+        /// <summary>
+        /// Revokes the signing links that were issued for wording this contract no
+        /// longer has.
+        ///
+        /// A signing link points at the contract rather than at a document, so it
+        /// shows whatever the contract says when it is opened. While the wording
+        /// could not change that was harmless; approving a new version changes it.
+        /// The customer sent "please sign this" for one document would open the
+        /// link and sign a different one, with nothing on the page to say so —
+        /// which is not a formatting problem but a signature on text nobody
+        /// showed them.
+        ///
+        /// Links issued for the version being approved are left alone: that is
+        /// the same document they were sent for. So are links from before this
+        /// was recorded — their version is unknown, and revoking a customer's
+        /// working link on a guess is its own kind of wrong.
+        /// </summary>
+        private async Task<int> RevokeLinksForReplacedWordingAsync(
+            Guid contractId, int approvedVersion, CancellationToken ct)
+        {
+            var now = DateTimeOffset.UtcNow;
+
+            return await _db.Set<ContractAccessLink>()
+                .Where(l => l.ContractId == contractId
+                            && l.RevokedAtUtc == null
+                            && l.IssuedForDraftVersion != null
+                            && l.IssuedForDraftVersion != approvedVersion)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(l => l.RevokedAtUtc, now)
+                    .SetProperty(l => l.RevokedBecauseWordingChanged, true),
+                    ct);
         }
 
         // -------------------------------------------------------------------
@@ -1743,12 +1780,12 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             var md = new StringBuilder();
             var german = System.Globalization.CultureInfo.GetCultureInfo("de-DE");
 
-            md.Append("## § 1 Gegenstand des Vertrags\n\n");
+            md.Append("## 1. Gegenstand des Vertrags\n\n");
             md.Append("Der Auftragnehmer erbringt für den Auftraggeber die nachstehend aufgeführten Leistungen.\n\n");
 
             if (positions.Count > 0)
             {
-                md.Append("## § 2 Leistungsumfang\n\n");
+                md.Append("## 2. Leistungsumfang\n\n");
 
                 var n = 0;
 
@@ -1768,7 +1805,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                         md.Append(p.Scope.Trim()).Append("\n\n");
                 }
 
-                md.Append("## § 3 Vergütung und Zahlung\n\n");
+                md.Append("## 3. Vergütung und Zahlung\n\n");
 
                 var money = 0;
 
@@ -1797,7 +1834,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
             if (confirmedTerms.Count > 0)
             {
-                md.Append("## § 4 Vereinbarte Konditionen\n\n");
+                md.Append("## 4. Vereinbarte Konditionen\n\n");
 
                 foreach (var (label, value) in confirmedTerms)
                     md.Append("- ").Append(label).Append(": ").Append(value).Append('\n');
@@ -1846,16 +1883,17 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         /// The prompt tells it not to, and mostly it does not — but a document
         /// with two titles is the sort of thing a customer notices, and dropping
         /// a stray heading costs nothing. Only a leading level-1 heading and the
-        /// lines around it are touched; the §§ are never altered.
+        /// lines around it are touched; the clauses themselves are never altered.
         /// </summary>
         internal static string StripComposedParts(string clauses)
         {
             var lines = clauses.Replace("\r\n", "\n").Split('\n').ToList();
 
-            // Anything before the first § heading is frame the model was asked
-            // not to write. Kept only if there is no § at all, because then this
-            // is all we have and showing it beats showing nothing.
-            var firstClause = lines.FindIndex(l => l.TrimStart().StartsWith("## §", StringComparison.Ordinal));
+            // Anything before the first clause heading is frame the model was
+            // asked not to write. Kept only if there is no clause heading at all,
+            // because then this is all we have and showing it beats showing
+            // nothing.
+            var firstClause = lines.FindIndex(IsClauseHeading);
 
             if (firstClause > 0)
                 lines.RemoveRange(0, firstClause);
@@ -1865,10 +1903,31 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 l.Contains("Ort, Datum", StringComparison.OrdinalIgnoreCase) ||
                 l.Contains("Unterschrift", StringComparison.OrdinalIgnoreCase));
 
-            if (signature > 0 && !lines[signature].TrimStart().StartsWith("## §", StringComparison.Ordinal))
+            if (signature > 0 && !IsClauseHeading(lines[signature]))
                 lines.RemoveRange(signature, lines.Count - signature);
 
             return string.Join("\n", lines).Trim();
+        }
+
+        /// <summary>
+        /// A clause heading, in either shape this application has written.
+        ///
+        /// Clauses are numbered "## 3. Vergütung" now. Documents stored before
+        /// that are headed "## § 3 Vergütung", and they are still read, edited
+        /// and previewed — a helper that recognised only the new form would treat
+        /// an existing contract as having no clauses at all and throw away
+        /// everything above the first one.
+        /// </summary>
+        private static bool IsClauseHeading(string line)
+        {
+            var text = line.TrimStart();
+
+            if (!text.StartsWith("## ", StringComparison.Ordinal)) return false;
+
+            text = text[3..].TrimStart();
+
+            return text.StartsWith('§') ||
+                   System.Text.RegularExpressions.Regex.IsMatch(text, @"^\d+(?:\.\d+)*\.?\s");
         }
 
         private static ContractDraftSummary ToSummary(ContractDraft d, PositionTotalsDto? totals) =>

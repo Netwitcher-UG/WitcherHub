@@ -35,6 +35,58 @@ namespace WitcherHub.Application.Services.Contracts.Clauses
 
         [JsonPropertyName("canGenerateFinalContract")]
         public bool CanGenerateFinalContract { get; set; }
+
+        /// <summary>
+        /// The language the descriptive content came back in. Always "de" — the
+        /// model is asked to state it so that a run which quietly answered in the
+        /// input's language is a parse this application can see rather than a
+        /// contract a customer cannot read.
+        /// </summary>
+        [JsonPropertyName("outputLanguage")]
+        public string OutputLanguage { get; set; } = "de";
+
+        /// <summary>
+        /// What the model translated, and from what. Administrative: it is used
+        /// to check the work and to show a reviewer which passages were not
+        /// written by the person who entered them, and it never reaches the
+        /// contract itself.
+        /// </summary>
+        [JsonPropertyName("translatedFields")]
+        public List<TranslatedFieldDto> TranslatedFields { get; set; } = [];
+
+        /// <summary>
+        /// What the model deliberately left in its original language, and why.
+        ///
+        /// This is the half that stops the language check from being hostile: a
+        /// customer whose company name is written in Arabic script must be able
+        /// to receive a contract, and the name in it must be their name. Anything
+        /// declared here is excluded before any script is counted.
+        /// </summary>
+        [JsonPropertyName("preservedTerms")]
+        public List<PreservedTermDto> PreservedTerms { get; set; } = [];
+    }
+
+    public sealed class TranslatedFieldDto
+    {
+        [JsonPropertyName("field")]
+        public string Field { get; set; } = "";
+
+        /// <summary>ar | en | other | unknown</summary>
+        [JsonPropertyName("sourceLanguage")]
+        public string SourceLanguage { get; set; } = "unknown";
+
+        [JsonPropertyName("translatedText")]
+        public string TranslatedText { get; set; } = "";
+    }
+
+    public sealed class PreservedTermDto
+    {
+        [JsonPropertyName("value")]
+        public string Value { get; set; } = "";
+
+        /// <summary>company_name | person_name | brand | product | url | identifier</summary>
+        [JsonPropertyName("reason")]
+        public string Reason { get; set; } = "";
     }
 
     public sealed class ContractClassificationDto

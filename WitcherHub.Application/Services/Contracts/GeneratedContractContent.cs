@@ -32,12 +32,16 @@ namespace WitcherHub.Application.Services.Contracts
         public bool HasContent => Sections.Any(s => s.HasContent);
 
         /// <summary>
-        /// Renders the clauses as the §§ of a German contract.
+        /// Renders the clauses as the numbered sections of a German contract.
         ///
         /// The numbering is applied here, not asked for: a model told to write
-        /// "§ 4" will eventually write two of them, or skip one, and a contract
-        /// with two § 4s is a contract somebody has to explain. Same for the (1)
-        /// (2) paragraph numbers and the a) b) c) items.
+        /// "4." will eventually write two of them, or skip one, and a contract
+        /// with two section fours is a contract somebody has to explain. Same for
+        /// the (1) (2) paragraph numbers and the a) b) c) items.
+        ///
+        /// The paragraph sign is gone from the headings, and spelled out in the
+        /// prose — see <see cref="GermanLegalText"/> for why a statutory
+        /// reference is converted rather than dropped.
         /// </summary>
         public string ToClauseMarkdown()
         {
@@ -56,19 +60,19 @@ namespace WitcherHub.Application.Services.Contracts
             {
                 number++;
 
-                md.Append("## § ").Append(number).Append(' ')
-                  .Append(CleanHeading(section.Heading, number))
+                md.Append("## ")
+                  .Append(GermanLegalText.Heading(number, section.Heading))
                   .Append("\n\n");
 
                 var paragraphs = section.Paragraphs
                     .Where(p => !string.IsNullOrWhiteSpace(p))
-                    .Select(p => p.Trim())
+                    .Select(p => GermanLegalText.SpellOutParagraphSigns(p).Trim())
                     .ToList();
 
                 for (var i = 0; i < paragraphs.Count; i++)
                 {
-                    // A § with one paragraph needs no number: "(1)" alone reads
-                    // as though a "(2)" went missing.
+                    // A section with one paragraph needs no number: "(1)" alone
+                    // reads as though a "(2)" went missing.
                     var prefix = paragraphs.Count > 1 ? $"({i + 1}) " : "";
 
                     md.Append(prefix).Append(paragraphs[i]).Append("\n\n");
@@ -76,7 +80,7 @@ namespace WitcherHub.Application.Services.Contracts
 
                 var items = section.Items
                     .Where(i => !string.IsNullOrWhiteSpace(i))
-                    .Select(i => i.Trim())
+                    .Select(i => GermanLegalText.SpellOutParagraphSigns(i).Trim())
                     .ToList();
 
                 if (items.Count > 0)
@@ -124,23 +128,6 @@ namespace WitcherHub.Application.Services.Contracts
             stripped = System.Text.RegularExpressions.Regex.Replace(stripped, @" +([,.;:])", "$1");
 
             return stripped;
-        }
-
-        /// <summary>
-        /// Strips a number the model added anyway, so "§ 4 § 4 Vergütung" cannot
-        /// happen, and falls back to something honest when the heading is empty.
-        /// </summary>
-        private static string CleanHeading(string? heading, int number)
-        {
-            var text = (heading ?? "").Trim();
-
-            if (text.Length == 0) return $"Abschnitt {number}";
-
-            // "§ 4 Vergütung", "§4 Vergütung", "4. Vergütung", "4 Vergütung"
-            text = System.Text.RegularExpressions.Regex.Replace(
-                text, @"^\s*(§\s*)?\d+\s*[\.\)]?\s*", "");
-
-            return text.Length == 0 ? $"Abschnitt {number}" : text;
         }
 
         private static char Letter(int index) => (char)('a' + (index % 26));

@@ -219,7 +219,8 @@ public class SourceIsNotTheContractTests : IAsyncLifetime
         // is being guarded is unchanged: one document, not two stacked together.
         foreach (var heading in new[]
                  {
-                     "## Vertragspartner", "## Anlage A", "## Preisübersicht", "## Unterschriften"
+                     "## Vertragspartner", "## 1. Leistungsbeschreibung",
+                     "## 2. Vergütung", "## Unterschriften"
                  })
         {
             Assert.Single(System.Text.RegularExpressions.Regex.Matches(
@@ -434,7 +435,11 @@ public class SourceIsNotTheContractTests : IAsyncLifetime
         // Composed from the record — and still not a copy of the pasted document.
         Assert.StartsWith("# Dienstleistungsvertrag", document);
         Assert.Contains("Musterfirma GmbH", document);
-        Assert.Contains("§ 1 Gegenstand des Vertrags", document);
+
+        // Numbered rather than signed, on this path too. The fallback writes
+        // its own clauses, so it had its own copy of the old convention.
+        Assert.Contains("1. Gegenstand des Vertrags", document);
+        Assert.DoesNotContain("§", document);
         Assert.DoesNotContain("Fremdagentur", document);
         Assert.DoesNotContain("9.999,00", document);
 

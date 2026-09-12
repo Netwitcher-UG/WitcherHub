@@ -87,6 +87,59 @@ namespace WitcherHub.Pages.Contracts
         public string? SignerNamePrefill { get; private set; }
         public string? SignerEmailPrefill { get; private set; }
 
+        /// <summary>
+        /// Why a signing link stopped working, to the person holding it.
+        ///
+        /// A bare 401 was the same answer for a mistyped link, an expired one and
+        /// one that was deliberately revoked — and the third case is now the
+        /// common one: approving new wording revokes the links issued for the old
+        /// text, on purpose, so that nobody signs a document they were not sent.
+        /// Telling the customer "not authorised" when the truth is "this contract
+        /// has been revised, ask for a new link" leaves them believing something
+        /// is broken.
+        ///
+        /// Nothing about the contract is disclosed: the reason is the same
+        /// sentence whether or not the link ever existed.
+        /// </summary>
+        private async Task<IActionResult> LinkRefusedAsync(string tokenHash, CancellationToken ct)
+        {
+            var revised = await _db.ContractAccessLinks
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.ContractId == Id &&
+                    x.TokenHash == tokenHash &&
+                    x.RevokedBecauseWordingChanged, ct);
+
+            if (!revised) return Unauthorized();
+
+            const string body = """
+                <!doctype html><html lang="de"><head><meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <title>Vertrag überarbeitet</title>
+                <style>
+                  body{margin:0;padding:48px 16px;background:#fff;color:#111;
+                       font:16px/1.5 Arial,"Liberation Sans",sans-serif}
+                  main{max-width:34rem;margin:0 auto}
+                  h1{font-size:1.4rem;margin:0 0 1rem}
+                  p{margin:0 0 1rem}
+                </style></head><body><main>
+                <h1>Dieser Vertrag wurde überarbeitet</h1>
+                <p>Der Vertragstext, für den dieser Link versendet wurde, ist nicht mehr
+                   die aktuelle Fassung. Der Link wurde deshalb deaktiviert, damit keine
+                   Fassung unterschrieben wird, die Ihnen nicht zugesendet wurde.</p>
+                <p>Bitte fordern Sie einen neuen Signaturlink an. Ihr bisheriger Stand
+                   bleibt unverändert; es wurde nichts unterschrieben.</p>
+                </main></body></html>
+                """;
+
+            return new ContentResult
+            {
+                Content = body,
+                ContentType = "text/html; charset=utf-8",
+                StatusCode = StatusCodes.Status410Gone
+            };
+        }
+
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             // ✅ MUST have id + token
@@ -103,7 +156,7 @@ namespace WitcherHub.Pages.Contracts
                     x.RevokedAtUtc == null &&
                     x.ExpiresAt > DateTimeOffset.UtcNow, ct);
 
-            if (link is null) return Unauthorized();
+            if (link is null) return await LinkRefusedAsync(tokenHash, ct);
 
             // update last opened (best-effort)
             try

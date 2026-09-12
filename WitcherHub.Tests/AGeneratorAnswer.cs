@@ -135,7 +135,10 @@ namespace WitcherHub.Tests
               ],
               "missingInformation": [],
               "reviewFlags": [],
-              "canGenerateFinalContract": true
+              "canGenerateFinalContract": true,
+              "outputLanguage": "de",
+              "translatedFields": [],
+              "preservedTerms": []
             }
             """;
 

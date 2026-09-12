@@ -70,13 +70,17 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 
     <div class="signature-grid">
       <div class="signature-box">
-        <strong>Anbieter</strong><br />
-        {{E(m.Provider.Name)}}
+        <span class="signature-role">Anbieter</span>
+        <span class="signature-party">{{E(m.Provider.Name)}}</span>
+        <span class="signature-rule"></span>
+        <span class="signature-caption">Ort, Datum, Unterschrift</span>
       </div>
 
       <div class="signature-box">
-        <strong>Kunde</strong><br />
-        {{E(m.Customer.Name)}}
+        <span class="signature-role">Kunde</span>
+        <span class="signature-party">{{E(m.Customer.Name)}}</span>
+        <span class="signature-rule"></span>
+        <span class="signature-caption">Ort, Datum, Unterschrift</span>
       </div>
     </div>
   </div>
@@ -90,6 +94,63 @@ namespace WitcherHub.Infrastructure.Services.Pdf
             var bannerSubtitle = E($"Zwischen {m.Provider.Name} und {m.Customer.Name}");
             if (!string.IsNullOrWhiteSpace(m.ContractNo))
                 bannerSubtitle += " &middot; " + E($"Vertragsnummer {m.ContractNo}");
+
+            // The template's own subject-matter and services blocks, drawn only
+            // when there is something to put in them.
+            //
+            // They were unconditional, and the contract's own document now
+            // carries both — a numbered "1. Leistungsbeschreibung" with the
+            // scope under it, and a "2. Vergütung" with the price table. Drawn
+            // regardless, the template restated the services as an empty
+            // placeholder and printed the totals a second time, so the PDF
+            // showed the same figures twice under two different headings. A
+            // contract that states its own total twice is the same defect as a
+            // contract that contains two documents.
+            var introSection = !string.IsNullOrWhiteSpace(m.ContractIntroHtml)
+                ? $$"""
+<div class="section">
+  <div class="section-head">
+    <div>
+      <h2>Vertragsgegenstand</h2>
+      <p>Die nachfolgenden Leistungen und Projektbestandteile wurden zwischen den Parteien vereinbart.</p>
+    </div>
+  </div>
+
+  <div class="rich-text">
+    {{m.ContractIntroHtml}}
+  </div>
+</div>
+"""
+                : string.Empty;
+
+            var priceBox = !string.IsNullOrWhiteSpace(m.PriceBoxHtml)
+                ? $$"""
+<div class="price-box">
+  <h3>Preisübersicht</h3>
+  {{m.PriceBoxHtml}}
+</div>
+"""
+                : string.Empty;
+
+            var servicesSection =
+                !string.IsNullOrWhiteSpace(m.ServicesSectionHtml) || !string.IsNullOrWhiteSpace(m.PriceBoxHtml)
+                ? $$"""
+<div class="section">
+  <div class="section-head">
+    <div>
+      <h2>Anlage A – Leistungsbeschreibung</h2>
+      <p>Alle vereinbarten Positionen, Leistungsumfänge und Ergebnisse im Überblick.</p>
+    </div>
+  </div>
+
+  <div class="rich-text">
+    {{m.ServicesSectionHtml}}
+  </div>
+
+  {{priceBox}}
+</div>
+"""
+                : string.Empty;
 
             // The clauses being signed. Given an id so the consent sentence at the
             // bottom of the signing page can point at it.
@@ -126,24 +187,37 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 <head>
   <meta charset="utf-8" />
   <style>
+    /* Margins of a German business letter rather than of a web page: a wider
+       binding edge on the left, even top and bottom. DIN 5008 puts the binding
+       margin at 25mm; 22mm keeps a hole-punched copy readable without pushing
+       the text block visibly off-centre. */
     @page {
       size: A4;
-      margin: 14mm;
+      margin: 20mm 18mm 20mm 22mm;
     }
 
+    /* A contract is not a brochure.
+     *
+     * These tokens used to carry a violet accent, a lilac page ground and a
+     * 50px drop shadow, and the document they produced read as marketing
+     * material with a price in it. The palette is now ink on paper with grey
+     * rules, which is what a German B2B contract looks like and what survives
+     * being printed, photocopied and faxed to somebody's accountant.
+     *
+     * The names are kept so every rule that references them keeps working. */
     :root {
-      --bg: #f7f4ff;
+      --bg: #ffffff;
       --card: #ffffff;
-      --text: #1f1630;
-      --muted: #746a86;
-      --line: #e7def7;
-      --line-strong: #d7c7f3;
-      --primary: #7c3aed;
-      --primary-dark: #5b21b6;
-      --primary-soft: #f3e8ff;
-      --primary-soft-2: #faf5ff;
-      --shadow: 0 18px 50px rgba(91, 33, 182, 0.10);
-      --radius: 22px;
+      --text: #111111;
+      --muted: #555555;
+      --line: #d9d9d9;
+      --line-strong: #b8b8b8;
+      --primary: #111111;
+      --primary-dark: #000000;
+      --primary-soft: #f2f2f2;
+      --primary-soft-2: #fafafa;
+      --shadow: none;
+      --radius: 3px;
     }
 
     * { box-sizing: border-box; }
@@ -152,19 +226,18 @@ namespace WitcherHub.Infrastructure.Services.Pdf
       margin: 0;
       padding: 0;
 
-      /* Every face here exists somewhere this document is rendered: the
-         customer's browser, and the Linux container that prints the PDF. The
-         previous stack led with two fonts neither of those has installed and
-         fell through to Tahoma, which is not a face to set a contract in. */
-      font-family: "Segoe UI", Roboto, "Helvetica Neue", "Liberation Sans",
-                   "DejaVu Sans", Arial, sans-serif;
-      font-size: 15px;
-      background:
-        radial-gradient(circle at top left, #f3e8ff 0, transparent 30%),
-        radial-gradient(circle at bottom right, #ede9fe 0, transparent 26%),
-        var(--bg);
+      /* Arial first, and only faces that actually exist on the Linux container
+         that prints the PDF behind it. Liberation Sans is metric-compatible
+         with Arial, so the fallback sets to the same measure rather than
+         reflowing the document, and both cover ä ö ü Ä Ö Ü ß. DejaVu Sans is
+         last because it also carries Arabic, which matters while a customer's
+         own name is in the document even though the contract text is German. */
+      font-family: Arial, "Helvetica Neue", Helvetica, "Liberation Sans",
+                   "DejaVu Sans", sans-serif;
+      font-size: 10.5pt;
+      background: var(--bg);
       color: var(--text);
-      line-height: 1.55;
+      line-height: 1.45;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -178,16 +251,16 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 
     .sheet {
       background: var(--card);
-      border: 1px solid rgba(91, 33, 182, 0.08);
-      border-radius: 28px;
-      box-shadow: var(--shadow);
-      overflow: hidden;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      overflow: visible;
     }
 
     .top-bar {
-      height: 8px;
-      background: linear-gradient(90deg, #6d28d9, #7c3aed, #8b5cf6, #a855f7);
-      margin-bottom: 14px;
+      height: 0;
+      background: none;
+      margin-bottom: 0;
     }
 
     .content {
@@ -221,15 +294,15 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     .logo-box {
       width: 78px;
       height: 78px;
-      border-radius: 18px;
-      background: linear-gradient(180deg, #ffffff, #faf5ff);
-      border: 1px solid var(--line-strong);
+      border-radius: 0;
+      background: #ffffff;
+      border: 0;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
       flex-shrink: 0;
-      box-shadow: 0 8px 24px rgba(91, 33, 182, 0.05);
+      box-shadow: none;
     }
 
     .logo-box img {
@@ -250,7 +323,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
       font-size: 30px;
       line-height: 1.1;
       letter-spacing: -0.02em;
-      color: #24163f;
+      color: #111111;
     }
 
     .title-block p {
@@ -297,13 +370,13 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     .chip.project {
       background: var(--primary-soft);
       color: var(--primary-dark);
-      border-color: #d8b4fe;
+      border-color: #b8b8b8;
     }
 
     .chip.validity {
-      background: #faf5ff;
-      color: #6b21a8;
-      border-color: #e9d5ff;
+      background: #fafafa;
+      color: #333333;
+      border-color: #d9d9d9;
     }
 
     .meta {
@@ -312,8 +385,8 @@ namespace WitcherHub.Infrastructure.Services.Pdf
       width: 100%;
       padding: 14px 16px;
       border: 1px solid var(--line-strong);
-      border-radius: 18px;
-      background: linear-gradient(180deg, #ffffff, #fcfaff);
+      border-radius: 0;
+      background: #ffffff;
     }
 
     .meta-row {
@@ -340,36 +413,43 @@ namespace WitcherHub.Infrastructure.Services.Pdf
       justify-content: space-between;
       gap: 16px;
       align-items: center;
-      background: linear-gradient(135deg, #4c1d95, #6d28d9 55%, #7c3aed);
-      color: #fff;
-      border-radius: 22px;
-      padding: 18px 20px;
-      margin-bottom: 24px;
+      /* Ink on a light ground. The banner used to be a dark violet gradient,
+         so everything in it was set in white; neutralising the background
+         without the text left the project name, the parties and the contract
+         total as white on near-white — present in the PDF and invisible on
+         paper. */
+      background: #f7f7f7;
+      color: #111111;
+      border: 0.5pt solid #d9d9d9;
+      border-radius: 0;
+      padding: 14px 18px;
+      margin-bottom: 22px;
       flex-wrap: nowrap;
-      box-shadow: 0 16px 36px rgba(109, 40, 217, 0.20);
+      box-shadow: none;
+      break-inside: avoid;
     }
 
     .summary-banner h2 {
       margin: 0 0 5px;
-      font-size: 20px;
-      color: #fff;
+      font-size: 14pt;
+      color: #111111;
     }
 
     .summary-banner p {
       margin: 0;
-      color: rgba(255,255,255,0.86);
+      color: #333333;
       max-width: 520px;
-      font-size: 13px;
+      font-size: 9.5pt;
     }
 
     .summary-badge {
-  background: rgba(255,255,255,0.14);
-  border: 1px solid rgba(255,255,255,0.24);
-  border-radius: 16px;
+  background: #ffffff;
+  border: 0.5pt solid #b8b8b8;
+  border-radius: 0;
   padding: 12px 16px;
   min-width: 220px;
   text-align: center;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
+  box-shadow: none;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -379,16 +459,17 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 
     .summary-badge .label {
       display: block;
-      font-size: 11px;
-      color: rgba(255,255,255,0.75);
+      font-size: 8.5pt;
+      color: #555555;
       margin-bottom: 4px;
     }
 
     .summary-badge .value {
-      font-size: 24px;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      color: #fff;
+      font-size: 16pt;
+      font-weight: bold;
+      letter-spacing: 0;
+      color: #111111;
+      white-space: nowrap;
     }
 
     .party-grid {
@@ -399,9 +480,9 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     }
 
     .card {
-      background: linear-gradient(180deg, #ffffff, #fcfaff);
+      background: #ffffff;
       border: 1px solid var(--line-strong);
-      border-radius: 20px;
+      border-radius: 0;
       padding: 16px;
     }
 
@@ -418,7 +499,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
       margin: 0 0 10px;
       font-size: 19px;
       line-height: 1.25;
-      color: #2e1065;
+      color: #111111;
     }
 
     .info-list {
@@ -445,7 +526,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     .section-head h2 {
       margin: 0;
       font-size: 20px;
-      color: #2e1065;
+      color: #111111;
     }
 
     .section-head p {
@@ -456,7 +537,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 
     .rich-text {
       border: 1px solid var(--line-strong);
-      border-radius: 18px;
+      border-radius: 0;
       background: #fff;
       padding: 18px;
     }
@@ -465,7 +546,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     .rich-text h2,
     .rich-text h3,
     .rich-text h4 {
-      color: #2e1065;
+      color: #111111;
       margin-top: 0;
     }
 
@@ -520,9 +601,9 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 
     .contract-pos {
       border: 1px solid var(--line-strong);
-      border-radius: 16px;
+      border-radius: 0;
       padding: 14px;
-      background: #fcfaff;
+      background: #fafafa;
       margin-bottom: 14px;
     }
 
@@ -541,14 +622,14 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     .contract-pos__head h3 {
       margin: 0;
       font-size: 16px;
-      color: #2e1065;
+      color: #111111;
     }
 
     .contract-pos__price {
       white-space: nowrap;
       font-size: 13px;
       font-weight: 800;
-      color: #5b21b6;
+      color: #111111;
     }
 
     .contract-pos section {
@@ -558,13 +639,13 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     .contract-pos section h4 {
       margin: 0 0 6px;
       font-size: 13px;
-      color: #6b21a8;
+      color: #333333;
     }
 
     .price-box {
       border: 1px solid var(--line-strong);
-      border-radius: 18px;
-      background: linear-gradient(180deg, #ffffff, #faf5ff);
+      border-radius: 0;
+      background: #ffffff;
       padding: 16px;
       margin-top: 18px;
     }
@@ -572,7 +653,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     .price-box h3 {
       margin: 0 0 10px;
       font-size: 16px;
-      color: #2e1065;
+      color: #111111;
     }
 
     .price-box table {
@@ -583,7 +664,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     .price-box th,
     .price-box td {
       padding: 10px 8px;
-      border-bottom: 1px dashed #e9d5ff;
+      border-bottom: 1px dashed #d9d9d9;
       font-size: 14px;
       color: #26203a;
       vertical-align: top;
@@ -591,7 +672,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 
     .price-box th {
       text-align: left;
-      color: #6b21a8;
+      color: #333333;
       font-weight: 800;
     }
 
@@ -608,7 +689,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     .contract-note {
       margin-top: 18px;
       border: 1px solid var(--line-strong);
-      border-radius: 18px;
+      border-radius: 0;
       padding: 16px;
       background: #fff;
     }
@@ -616,7 +697,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     .contract-note h3 {
       margin: 0 0 10px;
       font-size: 16px;
-      color: #2e1065;
+      color: #111111;
     }
 
     .contract-note p {
@@ -630,9 +711,9 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     .signature-placeholder {
       margin-top: 24px;
       border: 1px dashed #c4b5fd;
-      border-radius: 18px;
+      border-radius: 0;
       padding: 16px;
-      background: #fcfaff;
+      background: #fafafa;
       page-break-inside: avoid;
       break-inside: avoid;
     }
@@ -640,7 +721,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     .signature-placeholder h3 {
       margin: 0 0 10px;
       font-size: 16px;
-      color: #2e1065;
+      color: #111111;
     }
 
     .signature-grid {
@@ -650,7 +731,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     }
 
     .signature-box {
-      border-top: 1px solid #7c3aed;
+      border-top: 1px solid var(--line-strong);
       padding-top: 10px;
       min-height: 70px;
       color: #5b556a;
@@ -690,9 +771,19 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     }
 
    @media print {
+  /* The margins the PDF actually gets.
+   *
+   * Chromium takes the page box from the document's own @page rule here — the
+   * renderer asks for the CSS page size, and the margins come with it — so
+   * this block, being the last @page in the sheet, is what every sheet of the
+   * contract is set inside. Measured rather than assumed: a 90-paragraph
+   * document paginates identically whether or not the renderer is also given
+   * margins of its own, which it would not if these were being ignored.
+   *
+   * The wider left edge is the binding margin of a German business document. */
   @page {
     size: A4;
-    margin: 16mm 12mm 16mm 12mm;
+    margin: 20mm 18mm 20mm 22mm;
   }
 
   html, body {
@@ -718,8 +809,12 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     overflow: visible !important;
   }
 
+  /* The accent bar is gone, so the space it used to need is gone with it.
+     Left as a rule rather than removed so the element keeps a home if the
+     letterhead ever wants one again. */
   .top-bar {
-    margin: 0 0 9mm 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
   }
 
   .content {
@@ -789,7 +884,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     padding: 12px 14px !important;
     display: grid !important;
     gap: 8px !important;
-    border: 1px solid #d7c7f3 !important;
+    border: 1px solid #b8b8b8 !important;
     border-radius: 16px !important;
     background: #fff !important;
     align-self: start !important;
@@ -803,7 +898,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     align-items: center !important;
     gap: 10px !important;
     font-size: 12px !important;
-    border-bottom: 1px dashed #d7c7f3 !important;
+    border-bottom: 1px dashed #b8b8b8 !important;
     padding-bottom: 7px !important;
   }
 
@@ -911,6 +1006,174 @@ namespace WitcherHub.Infrastructure.Services.Pdf
     box-shadow: none !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Geschäftsdokument — typography and pagination
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Last in the sheet on purpose. Everything above sets a layout; this sets the
+   text, and the two questions it answers are the ones a printed contract is
+   actually judged on: can it be read, and does it break in sensible places.
+
+   Sizes are in points because the destination is paper. A heading that is
+   17.5px on a screen is a heading whose size nobody chose on an A4 page.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.rich-text,
+.rich-text--terms {
+  font-size: 10.5pt;
+  line-height: 1.45;
+  color: #111;
+
+  /* Not justified. Chromium justifies by stretching word spaces only — it has
+     no hyphenation dictionary loaded for German here — and German compounds
+     are long enough that a justified column opens rivers of white down the
+     page. Ragged right is the lesser fault. */
+  text-align: left;
+}
+
+.rich-text h1 { font-size: 16pt;   line-height: 1.25; margin: 0 0 18pt; }
+.rich-text h2 { font-size: 12.5pt; line-height: 1.3;  margin: 18pt 0 7pt; }
+.rich-text h3 { font-size: 11pt;   line-height: 1.35; margin: 12pt 0 5pt; }
+.rich-text h4 { font-size: 10.5pt; line-height: 1.35; margin: 10pt 0 4pt; }
+
+.rich-text p  { margin: 0 0 7pt; }
+.rich-text ul,
+.rich-text ol { margin: 0 0 7pt; padding-left: 16pt; }
+.rich-text li { margin: 0 0 3pt; }
+
+/* A heading is never the last thing on a page.
+ *
+ * "break-after: avoid" alone is not enough in Chromium: it keeps the heading
+ * with the next box, but a paragraph whose first line lands alone at the foot
+ * is the same defect one line later. The orphan and widow counts are what stop
+ * that, and they apply to every paragraph rather than only to the first. */
+.rich-text h1,
+.rich-text h2,
+.rich-text h3,
+.rich-text h4 {
+  break-after: avoid;
+  page-break-after: avoid;
+  break-inside: avoid;
+}
+
+.rich-text p,
+.rich-text li {
+  orphans: 3;
+  widows: 3;
+}
+
+/* Price tables.
+ *
+ * The header repeats on every page the table reaches, which is what makes a
+ * continued table readable rather than a grid of unlabelled numbers; a row is
+ * never split down the middle. */
+.rich-text table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10pt 0 12pt;
+  font-size: 10pt;
+}
+
+.rich-text thead { display: table-header-group; }
+.rich-text tfoot { display: table-footer-group; }
+.rich-text tr    { break-inside: avoid; page-break-inside: avoid; }
+
+.rich-text th,
+.rich-text td {
+  border: 0.5pt solid #b8b8b8;
+  padding: 4pt 6pt;
+  vertical-align: top;
+  text-align: left;
+}
+
+.rich-text th {
+  background: #f2f2f2;
+  font-weight: bold;
+}
+
+/* Money right, and never broken.
+ *
+ * Markdown's ---: alignment reaches the cell as an inline style or an align
+ * attribute depending on the renderer, so the last column is aligned here by
+ * position as well. A figure and its currency belong on one line: "1.900,00"
+ * at the end of one line and "EUR" at the start of the next is a number a
+ * reader has to reassemble. */
+.rich-text td:last-child,
+.rich-text th:last-child,
+.rich-text td[align="right"],
+.rich-text th[align="right"] {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Short logical units that must not be torn across a page. A signature block
+   split so the lines are on one sheet and the names on the next is not a
+   signature block. */
+.signature-placeholder,
+.signature-grid,
+.signature-box,
+.contract-note,
+.price-box,
+.meta {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* The signature block, in the order a person signs it.
+ *
+ * It used to draw the rule above the names, with the empty space under it: a
+ * line at the top of the box, a gap, and then "Anbieter / Netwitcher UG" —
+ * which asks somebody to sign above a line they have not read the label of
+ * yet, and leaves the blank space below the signature rather than above it.
+ * Name first, then the space to sign in, then the rule, then what the rule is
+ * for, which is how every German Vertrag ends. */
+.signature-placeholder {
+  margin-top: 16pt;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.signature-placeholder h3 {
+  font-size: 12.5pt;
+  margin: 0 0 14pt;
+}
+
+.signature-box {
+  display: block;
+  border: 0;
+  padding: 0;
+}
+
+.signature-role {
+  display: block;
+  font-size: 9pt;
+  font-weight: bold;
+  color: #555;
+}
+
+.signature-party {
+  display: block;
+  font-size: 10.5pt;
+}
+
+/* The space to sign in. 20mm is a signature's worth of room; the rule under it
+   is what a pen is aimed at. */
+.signature-rule {
+  display: block;
+  margin-top: 20mm;
+  border-top: 0.5pt solid #111;
+}
+
+.signature-caption {
+  display: block;
+  margin-top: 3pt;
+  font-size: 8.5pt;
+  color: #555;
+}
+
   </style>
 </head>
 <body>
@@ -987,36 +1250,8 @@ namespace WitcherHub.Infrastructure.Services.Pdf
           </div>
         </div>
 
-        <div class="section">
-          <div class="section-head">
-            <div>
-              <h2>Vertragsgegenstand</h2>
-              <p>Die nachfolgenden Leistungen und Projektbestandteile wurden zwischen den Parteien vereinbart.</p>
-            </div>
-          </div>
-
-          <div class="rich-text">
-            {{m.ContractIntroHtml}}
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="section-head">
-            <div>
-              <h2>Anlage A – Leistungsbeschreibung</h2>
-              <p>Alle vereinbarten Positionen, Leistungsumfänge und Ergebnisse im Überblick.</p>
-            </div>
-          </div>
-
-          <div class="rich-text">
-            {{m.ServicesSectionHtml}}
-          </div>
-
-          <div class="price-box">
-            <h3>Preisübersicht</h3>
-            {{m.PriceBoxHtml}}
-          </div>
-        </div>
+{{introSection}}
+{{servicesSection}}
 {{termsSection}}
 {{notesSection}}
 
@@ -1067,16 +1302,16 @@ namespace WitcherHub.Infrastructure.Services.Pdf
   }
 
   .signedContractCard{
-    border: 1px solid #d7c7f3;
-    border-radius: 18px;
+    border: 1px solid #b8b8b8;
+    border-radius: 0;
     padding: 18px 20px;
-    background: linear-gradient(180deg, #ffffff, #faf5ff);
+    background: #ffffff;
   }
 
   .signedContractTitle{
     font-size: 18px;
     font-weight: 800;
-    color: #2e1065;
+    color: #111111;
     margin: 0 0 14px 0;
   }
 
@@ -1090,7 +1325,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
   .signedContractRow strong{
     display: inline-block;
     min-width: 120px;
-    color: #6b21a8;
+    color: #333333;
   }
 
   .signedContractImage{
@@ -1105,7 +1340,7 @@ namespace WitcherHub.Infrastructure.Services.Pdf
 
   .signedContractLine{
     width: 260px;
-    border-top: 1px solid #7c3aed;
+    border-top: 1px solid var(--line-strong);
     margin-top: 8px;
   }
 </style>

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Models.DTO.Contracts;
+using WitcherHub.Application.Services.Contracts;
 using WitcherHub.Application.Services.Contracts.Clauses;
 using WitcherHub.Infrastructure.Data.Models;
 
@@ -87,8 +88,11 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 plan, structuredFields, _template.ClauseLibraryApprovedVersion);
 
             selection = WithUndescribedPositions(selection, positions, plan);
+            selection = WithUntranslatedContent(selection, plan, parties, contract);
 
             var document = Render(contract, positions, totals, parties, plan, selection, structuredFields);
+
+            selection = WithRemainingParagraphSigns(selection, document);
 
             _logger.LogInformation(
                 "Composed contract {ContractNo} with {Clauses} clause module(s), {Rejected} rejected, " +
@@ -141,6 +145,110 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                         "Für folgende Positionen liegt keine Leistungsbeschreibung vor: " +
                         string.Join(", ", undescribed) + ".")
                     .ToList()
+            };
+        }
+
+        /// <summary>
+        /// Descriptive content that is not German.
+        ///
+        /// The service was entered in whatever language the person entering it
+        /// speaks, and the contract is German, so the model is translating. A
+        /// translation nobody checked is a promise nobody checked: a contract
+        /// that reaches a customer with a line of Arabic or English left in the
+        /// scope is not untidy, it is wording somebody may be asked to sign
+        /// without being able to read it.
+        ///
+        /// Names are the opposite case and are excluded first. A customer whose
+        /// company is registered in Arabic script must be able to receive a
+        /// contract, and the name on it must be their name — so everything the
+        /// model declared as a preserved term, and both parties' own names, are
+        /// taken out of the text before any script is counted.
+        /// </summary>
+        private static ClauseSelection WithUntranslatedContent(
+            ClauseSelection selection,
+            ContractGenerationPlan plan,
+            PartyDetails parties,
+            Contract contract)
+        {
+            var described = new List<KeyValuePair<string, string?>>();
+
+            var position = 0;
+
+            foreach (var s in plan.ServiceSections)
+            {
+                position++;
+                var at = $"Leistungsbeschreibung {position}";
+
+                described.Add(new($"{at} – Leistungsumfang", s.Scope));
+
+                Add(described, $"{at} – Liefergegenstände", s.Deliverables);
+                Add(described, $"{at} – Nicht geschuldete Leistungen", s.OutOfScope);
+                Add(described, $"{at} – Mitwirkungspflichten", s.CustomerObligations);
+                Add(described, $"{at} – Abnahmekriterien", s.AcceptanceCriteria);
+                Add(described, $"{at} – Annahmen", s.Assumptions);
+                Add(described, $"{at} – Abhängigkeiten", s.Dependencies);
+                Add(described, $"{at} – Überarbeitungen", s.RevisionRules);
+            }
+
+            described.Add(new("Vertragsklassifizierung – Begründung", plan.Classification.Reason));
+
+            var preserved = plan.PreservedTerms
+                .Select(t => t.Value)
+                .Concat(GermanOnlyCheck.IdentifiersIn(
+                    parties.CustomerName, parties.CompanyName, contract.ContractNo))
+                .ToList();
+
+            var untranslated = GermanOnlyCheck.Inspect(described, preserved);
+
+            var issues = new List<string>();
+
+            if (untranslated.Count > 0)
+                issues.Add(GermanOnlyCheck.Describe(untranslated));
+
+            // The model states the language it answered in. A run that quietly
+            // answered in the input's language is then something this can see,
+            // rather than a contract somebody discovers is in the wrong language
+            // after it has been sent.
+            if (!string.Equals(plan.OutputLanguage?.Trim(), "de", StringComparison.OrdinalIgnoreCase))
+            {
+                issues.Add(
+                    "Das Modell hat die Ausgabesprache nicht als Deutsch bestätigt " +
+                    $"(outputLanguage: „{plan.OutputLanguage}“).");
+            }
+
+            return issues.Count == 0
+                ? selection
+                : selection with { BlockingIssues = [.. selection.BlockingIssues, .. issues] };
+
+            static void Add(
+                List<KeyValuePair<string, string?>> into, string field, IReadOnlyList<string> values)
+            {
+                for (var i = 0; i < values.Count; i++)
+                    into.Add(new($"{field} [{i + 1}]", values[i]));
+            }
+        }
+
+        /// <summary>
+        /// A paragraph sign that survived everything.
+        ///
+        /// Free text goes through the speller on the way in, so reaching here
+        /// means something produced a sign the conversion could not read. That is
+        /// reported with the line it is on rather than stripped: deleting a
+        /// character out of a legal reference is how "Paragraphen 611 ff. BGB"
+        /// silently becomes "611 ff. BGB", which says something different.
+        /// </summary>
+        private static ClauseSelection WithRemainingParagraphSigns(
+            ClauseSelection selection, string document)
+        {
+            var lines = GermanLegalText.FindParagraphSigns(document);
+
+            if (lines.Count == 0) return selection;
+
+            return selection with
+            {
+                BlockingIssues = [.. selection.BlockingIssues,
+                    "Der Vertragstext enthält weiterhin Paragraphenzeichen: " +
+                    string.Join(" | ", lines) + "."]
             };
         }
 
@@ -334,38 +442,51 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             doc.AppendLine(Block(parties.CustomerName, parties.CustomerAddress)).AppendLine();
             doc.AppendLine("nachfolgend gemeinsam „Parteien“.").AppendLine();
 
-            // ── Leistungsbeschreibung, aus der Antwort des Modells ───────────
-            doc.AppendLine("## Anlage A – Leistungsbeschreibung").AppendLine();
+            // ── Abschnittsnummerierung ───────────────────────────────────────
+            //
+            // One counter for the whole document, incremented here and nowhere
+            // else. The numbering is what every cross-reference in the contract
+            // points at, so it is the application's to keep sequential — the
+            // model is told not to write numbers at all, and any it writes
+            // anyway is stripped off the title before it is set.
+            var section = 0;
 
-            var index = 1;
+            // ── Leistungsbeschreibung, aus der Antwort des Modells ───────────
+            section++;
+            doc.AppendLine($"## {GermanLegalText.Heading(section, "Leistungsbeschreibung")}").AppendLine();
+
+            var index = 0;
 
             foreach (var position in positions.OrderBy(p => p.Position))
             {
-                var section = plan.ServiceSections.FirstOrDefault(
+                var described = plan.ServiceSections.FirstOrDefault(
                     s => string.Equals(s.ServiceItemId, position.ClientId, StringComparison.Ordinal));
 
-                doc.AppendLine($"### Position {index}: {position.Title}").AppendLine();
+                index++;
 
-                if (!string.IsNullOrWhiteSpace(section?.Scope))
-                    doc.AppendLine("**Leistungsumfang**").AppendLine().AppendLine(section!.Scope).AppendLine();
+                doc.AppendLine(
+                    $"### {GermanLegalText.Heading(section, index, position.Title)}").AppendLine();
 
-                AppendList(doc, "Liefergegenstände", section?.Deliverables);
-                AppendList(doc, "Nicht geschuldete Leistungen", section?.OutOfScope);
-                AppendList(doc, "Mitwirkungspflichten des Kunden", section?.CustomerObligations);
+                if (!string.IsNullOrWhiteSpace(described?.Scope))
+                    doc.AppendLine("**Leistungsumfang**").AppendLine().AppendLine(Clean(described!.Scope)).AppendLine();
+
+                AppendList(doc, "Liefergegenstände", described?.Deliverables);
+                AppendList(doc, "Nicht geschuldete Leistungen", described?.OutOfScope);
+                AppendList(doc, "Mitwirkungspflichten des Kunden", described?.CustomerObligations);
 
                 // Only where there is something objectively acceptable. An empty
                 // list on advisory work is correct, not a gap.
-                AppendList(doc, "Abnahmekriterien", section?.AcceptanceCriteria);
+                AppendList(doc, "Abnahmekriterien", described?.AcceptanceCriteria);
 
-                AppendList(doc, "Annahmen", section?.Assumptions);
-                AppendList(doc, "Abhängigkeiten", section?.Dependencies);
-                AppendList(doc, "Überarbeitungen", section?.RevisionRules);
-
-                index++;
+                AppendList(doc, "Annahmen", described?.Assumptions);
+                AppendList(doc, "Abhängigkeiten", described?.Dependencies);
+                AppendList(doc, "Überarbeitungen", described?.RevisionRules);
             }
 
             // ── Preisübersicht, im Code gerechnet ────────────────────────────
-            doc.AppendLine("## Preisübersicht").AppendLine();
+            section++;
+            doc.AppendLine($"## {GermanLegalText.Heading(section, "Vergütung")}").AppendLine();
+
             doc.AppendLine("| Pos. | Bezeichnung | Netto |");
             doc.AppendLine("|---|---|---:|");
 
@@ -392,13 +513,12 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 "sofern nicht anders ausgewiesen.").AppendLine();
 
             // ── Allgemeine Bestimmungen, aus der Bibliothek ──────────────────
-            var paragraph = 1;
-
             foreach (var module in selection.Modules)
             {
-                doc.AppendLine($"## § {paragraph} {module.Title}").AppendLine();
-                doc.AppendLine(ClauseSelector.Render(module, fields)).AppendLine();
-                paragraph++;
+                section++;
+
+                doc.AppendLine($"## {GermanLegalText.Heading(section, module.Title)}").AppendLine();
+                doc.AppendLine(Clean(ClauseSelector.Render(module, fields))).AppendLine();
             }
 
             // ── Unterschriften ───────────────────────────────────────────────
@@ -417,10 +537,28 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             doc.AppendLine($"**{heading}**").AppendLine();
 
             foreach (var item in items.Where(i => !string.IsNullOrWhiteSpace(i)))
-                doc.AppendLine($"- {item.Trim()}");
+                doc.AppendLine($"- {Clean(item)}");
 
             doc.AppendLine();
         }
+
+        /// <summary>
+        /// Free text on its way into the document.
+        ///
+        /// The paragraph sign is spelled out here rather than deleted: the model
+        /// is told not to write one, and told what to write instead, and this is
+        /// what happens when it writes one anyway. "§ 640 Abs. 2 BGB" becomes
+        /// "Paragraph 640 Abs. 2 BGB" and "§ 4 dieses Vertrags" becomes "Ziffer 4
+        /// dieses Vertrags" — the reference survives in both cases, which is the
+        /// difference between removing a symbol and removing a statement about
+        /// which law applies.
+        ///
+        /// It is a conversion and not a cover-up: what it cannot convert is left
+        /// alone and reported, so a sign that reaches the document blocks
+        /// approval rather than being hidden.
+        /// </summary>
+        private static string Clean(string? text) =>
+            GermanLegalText.SpellOutParagraphSigns(text).Trim();
 
         private static string Block(string? name, string? address)
         {
