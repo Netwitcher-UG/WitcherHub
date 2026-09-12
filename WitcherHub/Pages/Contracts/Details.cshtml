@@ -63,11 +63,35 @@
         });
     }
 
+    @* Rendered on the server, not printed by the browser.
+
+       Printing this page to PDF stamped the browser's own furniture into every
+       sheet — the print date and the tab title across the head, the full URL of
+       this page across the foot. Both are drawn by the browser in the page
+       margin, where no stylesheet reaches, so the export is produced by the
+       renderer the signed copy already uses instead. Print stays for paper. *@
+    actions.Add(new PageAction
+    {
+        Label = T["contractPage_DownloadPdf"].Value,
+        Icon = "ri-file-download-line",
+        Style = PageActionStyle.Primary,
+        Page = "/Contracts/Details",
+        RouteValues = new Dictionary<string, string?>
+        {
+            ["id"] = Model.ContractId.ToString(),
+            ["handler"] = "Pdf",
+
+            @* What downloads is what is on screen. Without this, previewing a
+               version and pressing PDF quietly exported the approved wording
+               instead — two different documents under one button. *@
+            ["version"] = Model.Version?.ToString()
+        }
+    });
+
     actions.Add(new PageAction
     {
         Label = T["contractPage_Print"].Value,
         Icon = "ri-printer-line",
-        Style = PageActionStyle.Primary,
         Id = "btnPrint"
     });
 

@@ -309,6 +309,102 @@ namespace WitcherHub.Pages.Contracts
         }
 
         /// <summary>
+        /// The contract as a PDF, rendered here rather than by the reader's
+        /// browser.
+        ///
+        /// Printing the page to PDF produced a document with the browser's own
+        /// furniture stamped into every sheet: the print date and the browser
+        /// tab's title across the top, and the full URL of this page — id, query
+        /// string and all — across the foot. Neither is part of the contract,
+        /// and both are drawn in the page margin by the browser itself, where no
+        /// stylesheet can reach them. A site cannot switch them off; only the
+        /// person printing can, in a checkbox most people never see.
+        ///
+        /// So the PDF is produced by the same renderer the signed copy already
+        /// uses, which puts nothing in the header and the page count in the
+        /// foot. The Print button is still there for paper.
+        ///
+        /// A version asked for by number is rendered instead of the approved
+        /// wording, so that what downloads is what the reader is looking at.
+        /// </summary>
+        public async Task<IActionResult> OnGetPdfAsync(CancellationToken ct)
+        {
+            if (Id == Guid.Empty) return NotFound();
+
+            var contract = await _db.Contracts
+                .Include(c => c.Project)
+                    .ThenInclude(p => p.Customer)
+                        .ThenInclude(cu => cu.Addresses)
+                .Include(c => c.Items)
+                    .ThenInclude(i => i.Service)
+                .Include(c => c.Signatures)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == Id, ct);
+
+            if (contract is null) return NotFound();
+
+            // The wording to render. Untracked above, so putting the previewed
+            // version on the instance changes nothing in the database.
+            if (Version is int version)
+            {
+                var draft = await _drafts.GetDraftAsync(contract.Id, version, ct);
+
+                if (draft is null || string.IsNullOrWhiteSpace(draft.DocumentMarkdown))
+                    return PdfUnavailable($"Version {version} has no wording to show.");
+
+                contract.Terms = draft.DocumentMarkdown;
+            }
+
+            if (string.IsNullOrWhiteSpace(contract.Terms))
+                return PdfUnavailable("This contract has no wording yet, so there is nothing to export.");
+
+            try
+            {
+                var model = ContractPdfDocument.Build(
+                    contract,
+                    _opt,
+                    showSignaturePlaceholder: true,
+                    notesText: "");
+
+                var html = ContractPdfHtmlBuilder.Build(model);
+
+                var bytes = await _pdf.FromHtmlAsync(html, $"Vertrag {contract.ContractNo}", ct);
+
+                var name = Version is int v
+                    ? $"{contract.ContractNo}-v{v}.pdf"
+                    : $"{contract.ContractNo}.pdf";
+
+                return File(bytes, "application/pdf", name);
+            }
+            catch (Exception ex)
+            {
+                // The renderer's own words are for the log, not for the screen.
+                var reference = Guid.NewGuid().ToString("n")[..8];
+
+                _logger.LogError(ex,
+                    "Contract PDF failed. ContractId={ContractId} Version={Version} Reference={Reference}",
+                    Id, Version, reference);
+
+                return PdfUnavailable($"The PDF could not be produced. Reference {reference}.");
+            }
+        }
+
+        /// <summary>
+        /// Says why there is no PDF, on the page the reader came from. Same
+        /// reasoning as <see cref="SignedPdfUnavailable"/>: the download is an
+        /// ordinary link, and a bare status code leaves the browser showing its
+        /// own error screen with our reason nowhere on it.
+        /// </summary>
+        private IActionResult PdfUnavailable(string message)
+        {
+            TempData["Toast.Type"] = "error";
+            TempData["Toast.Title"] = "PDF unavailable";
+            TempData["Toast.Message"] = message;
+
+            return RedirectToPage("./Details", new { id = Id });
+        }
+
+        /// <summary>
         /// Says why there is no signed PDF, in the way the caller can hear it.
         ///
         /// The button is an ordinary link, so the browser is here expecting a

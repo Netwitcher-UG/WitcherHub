@@ -207,6 +207,9 @@
   <data name="contractPage_ModalTitle" xml:space="preserve">
     <value>Vertrag unterschreiben</value>
   </data>
+  <data name="contractPage_DownloadPdf" xml:space="preserve">
+    <value>PDF</value>
+  </data>
   <data name="contractPage_Print" xml:space="preserve">
     <value>Drucken</value>
   </data>
