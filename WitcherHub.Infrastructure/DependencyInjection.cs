@@ -16,6 +16,8 @@ using WitcherHub.Application.Interfaces.BackgroundTasks;
 using WitcherHub.Application.Interfaces.Email;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Services.Email;
+using WitcherHub.Application.Services.Contracts.Language;
+using WitcherHub.Infrastructure.Services.Contracts.Language;
 using WitcherHub.Infrastructure.Authentication;
 using WitcherHub.Infrastructure.Common.Caching;
 using WitcherHub.Infrastructure.Data.Context;
@@ -183,6 +185,12 @@ namespace WitcherHub.Infrastructure
             // contracts with a working API key.
             services.AddScoped<IContractTextAnalyzer, ContractTextAnalyzer>();
             services.AddScoped<ISemanticContractAnalyzer, SemanticContractAnalyzer>();
+
+            // Puts the descriptive content of a contract into German whatever
+            // language it was entered in. Registered against the interface so the
+            // translation step can be replaced or stubbed without the composer
+            // knowing which model is behind it.
+            services.AddScoped<IContractLanguageNormalizer, OpenAiContractLanguageNormalizer>();
             services.AddScoped<IDataSeeder, IdentityDataSeeder>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<ISignInDiagnostics, SignInDiagnostics>();

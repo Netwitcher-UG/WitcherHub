@@ -10,6 +10,7 @@ using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Services.Contracts;
 using WitcherHub.Application.Services.Contracts.Clauses;
+using WitcherHub.Application.Services.Contracts.Language;
 using WitcherHub.Domain.Commercial;
 using WitcherHub.Domain.Contracts;
 using WitcherHub.Infrastructure.Data.Context;
@@ -58,7 +59,13 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             // Optional so the many tests that construct this service directly keep
             // working. Without it StartAnalysisAsync runs the reading inline,
             // which is what a test wants anyway.
-            IBackgroundAnalysisRunner? background = null)
+            IBackgroundAnalysisRunner? background = null,
+
+            // Optional for the same reason, and null in the tests that do not
+            // care about language. Absent, the composer skips the translation
+            // pass and the deterministic German check behaves exactly as it did
+            // before — detect and block, rather than translate.
+            IContractLanguageNormalizer? normalizer = null)
         {
             _db = db;
             _positions = positions;
@@ -80,7 +87,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             // assistant and the template options this service already holds, and
             // registering it would mean rewriting every test that constructs
             // this service by hand.
-            _composer = new ContractComposer(ai, _template, logger);
+            _composer = new ContractComposer(ai, _template, logger, normalizer);
 
             // Same reasoning: a stage runner over the assistant and the options
             // this service already holds. Registering it would mean rewriting
@@ -548,6 +555,26 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 clauseLibraryVersion = ContractClauseLibrary.LibraryVersion,
                 clauseLibraryApprovedVersion = _template.ClauseLibraryApprovedVersion,
                 model = _openAi.Model,
+
+                // Which instructions, which schema and which model put this
+                // contract into German, and what each field was written in
+                // before. Administrative and traceable: none of it reaches the
+                // document, and it is the only way to answer a year from now why
+                // a given clause reads the way it does.
+                translation = composed.Normalization is null ? null : new
+                {
+                    composed.Normalization.Provenance.PromptVersion,
+                    composed.Normalization.Provenance.SchemaVersion,
+                    composed.Normalization.Provenance.Model,
+                    composed.Normalization.Provenance.At,
+                    composed.Normalization.Provenance.FieldCount,
+                    composed.Normalization.Provenance.BatchCount,
+                    composed.Normalization.Succeeded,
+                    composed.Normalization.FailureReason,
+                    detectedSourceLanguages = composed.Normalization.DetectedLanguages,
+                    blockingIssues = composed.Normalization.BlockingIssues,
+                    warnings = composed.Normalization.Warnings
+                },
                 classification = composed.Plan.Classification,
                 clauseModules = composed.Clauses.Modules
                     .Select(m => new { m.Id, m.Version, m.Title, status = m.ReviewStatus.ToString() }),

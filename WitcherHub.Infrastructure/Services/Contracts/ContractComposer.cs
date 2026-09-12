@@ -6,6 +6,7 @@ using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Services.Contracts;
 using WitcherHub.Application.Services.Contracts.Clauses;
+using WitcherHub.Application.Services.Contracts.Language;
 using WitcherHub.Infrastructure.Data.Models;
 
 namespace WitcherHub.Infrastructure.Services.Contracts
@@ -19,6 +20,13 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         public required ContractGenerationPlan Plan { get; init; }
         public required ClauseSelection Clauses { get; init; }
         public required PositionTotalsDto Totals { get; init; }
+
+        /// <summary>
+        /// What the translation pass did, or null where no normalizer is wired
+        /// in. Administrative throughout: it records which prompt, schema and
+        /// model produced the German, and it never reaches the document.
+        /// </summary>
+        public ContractNormalizationResult? Normalization { get; init; }
 
         /// <summary>
         /// True when nothing blocks: no missing structured data, no invented
@@ -55,15 +63,18 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         private readonly IAiTextGenerator _ai;
         private readonly ContractTemplateOptions _template;
         private readonly ILogger _logger;
+        private readonly IContractLanguageNormalizer? _normalizer;
 
         public ContractComposer(
             IAiTextGenerator ai,
             ContractTemplateOptions template,
-            ILogger logger)
+            ILogger logger,
+            IContractLanguageNormalizer? normalizer = null)
         {
             _ai = ai;
             _template = template;
             _logger = logger;
+            _normalizer = normalizer;
         }
 
         private static readonly CultureInfo De = CultureInfo.GetCultureInfo("de-DE");
@@ -84,15 +95,28 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             var plan = await AskForThePlanAsync(
                 contract, positions, structuredFields, additionalInstructions, suppliedDocument, ct);
 
+            // Into German, before anything is rendered or checked.
+            //
+            // The planner is asked for German and mostly produces it, but "mostly"
+            // is not a property a contract can be built on: a service entered in
+            // Arabic, English, French, Turkish or Kurdish comes back in whatever
+            // the model settled on, and the old behaviour was to detect that and
+            // stop — leaving the owner to retype the scope by hand. Translation
+            // happens here instead, and the language check below now only sees
+            // what translation could not fix.
+            var normalization = await NormalizeToGermanAsync(plan, parties, contract, ct);
+
             var selection = ClauseSelector.Select(
                 plan, structuredFields, _template.ClauseLibraryApprovedVersion);
 
             selection = WithUndescribedPositions(selection, positions, plan);
+            selection = WithNormalizationOutcome(selection, normalization);
             selection = WithUntranslatedContent(selection, plan, parties, contract);
 
             var document = Render(contract, positions, totals, parties, plan, selection, structuredFields);
 
             selection = WithRemainingParagraphSigns(selection, document);
+            selection = WithLeakedPlaceholders(selection, document);
 
             _logger.LogInformation(
                 "Composed contract {ContractNo} with {Clauses} clause module(s), {Rejected} rejected, " +
@@ -106,7 +130,8 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 DocumentMarkdown = document,
                 Plan = plan,
                 Clauses = selection,
-                Totals = totals
+                Totals = totals,
+                Normalization = normalization
             };
         }
 
@@ -145,6 +170,219 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                         "Für folgende Positionen liegt keine Leistungsbeschreibung vor: " +
                         string.Join(", ", undescribed) + ".")
                     .ToList()
+            };
+        }
+
+        /// <summary>
+        /// Puts the plan's descriptive content into German, and writes it back.
+        ///
+        /// Only the prose goes: the scope, the deliverables, the exclusions, the
+        /// obligations, the assumptions — the fields a person typed in their own
+        /// language. Prices, dates, parties, notice periods and clause ids never
+        /// leave this method, because they are not translated anywhere in this
+        /// system; they are computed in code or read from the record, and a
+        /// translator that never sees them cannot change them.
+        ///
+        /// What it does see has the remaining immutable values masked out first,
+        /// so a customer's company name travels as a marker rather than as text a
+        /// model might improve.
+        /// </summary>
+        private async Task<ContractNormalizationResult?> NormalizeToGermanAsync(
+            ContractGenerationPlan plan,
+            PartyDetails parties,
+            Contract contract,
+            CancellationToken ct)
+        {
+            if (_normalizer is null) return null;
+
+            var fields = TranslatableFieldsOf(plan);
+
+            if (fields.Count == 0) return null;
+
+            var protectedValues = ProtectedValuesOf(plan, parties, contract);
+
+            var result = await _normalizer.NormalizeAsync(
+                new ContractNormalizationRequest
+                {
+                    Fields = fields,
+                    ProtectedValues = protectedValues,
+                    Terminology = ContractTerminology.Standard
+                },
+                ct);
+
+            // A failed translation leaves the plan exactly as it was. It does not
+            // fall back to the source: the blocking issue stops the contract, and
+            // the reader sees the wording that needs fixing rather than a document
+            // that silently went out in the wrong language.
+            if (result.Succeeded) WriteBack(plan, result.Text);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Every piece of the plan a person wrote, with a stable id.
+        ///
+        /// The ids encode where the text came from, so an answer can be written
+        /// back without matching anything up by position — which is the failure
+        /// mode when a model reorders a list.
+        /// </summary>
+        private static IReadOnlyList<TranslatableField> TranslatableFieldsOf(ContractGenerationPlan plan)
+        {
+            var fields = new List<TranslatableField>();
+
+            for (var i = 0; i < plan.ServiceSections.Count; i++)
+            {
+                var s = plan.ServiceSections[i];
+                var section = $"Leistungsbeschreibung {i + 1}";
+
+                Add($"service.{i}.scope", section, s.Scope, TranslatableContentType.Paragraph);
+
+                AddList($"service.{i}.deliverables", section, s.Deliverables);
+                AddList($"service.{i}.outOfScope", section, s.OutOfScope);
+                AddList($"service.{i}.customerObligations", section, s.CustomerObligations);
+                AddList($"service.{i}.acceptanceCriteria", section, s.AcceptanceCriteria);
+                AddList($"service.{i}.assumptions", section, s.Assumptions);
+                AddList($"service.{i}.dependencies", section, s.Dependencies);
+                AddList($"service.{i}.revisionRules", section, s.RevisionRules);
+                AddList($"service.{i}.riskNotes", section, s.RiskNotes);
+            }
+
+            Add("classification.reason", "Vertragsklassifizierung",
+                plan.Classification.Reason, TranslatableContentType.Paragraph);
+
+            return fields;
+
+            void Add(string id, string section, string? text, TranslatableContentType type)
+            {
+                if (string.IsNullOrWhiteSpace(text)) return;
+
+                fields.Add(new TranslatableField(
+                    id, section, Clip(text!.Trim(), ContractTranslationPrompt.MaxSourceTextLength), type));
+            }
+
+            void AddList(string prefix, string section, IReadOnlyList<string> values)
+            {
+                for (var i = 0; i < values.Count; i++)
+                    Add($"{prefix}.{i}", section, values[i], TranslatableContentType.ListItem);
+            }
+        }
+
+        /// <summary>
+        /// The values that must come back exactly as they went in.
+        ///
+        /// Both parties' names and the contract number, which are the immutable
+        /// values that actually appear inside descriptive prose. Everything else
+        /// on the owner's protected list — prices, dates, notice periods, tax
+        /// numbers, IBANs — is never in these fields to begin with, because the
+        /// planner is not given them.
+        /// </summary>
+        private static IReadOnlyList<ProtectedValue> ProtectedValuesOf(
+            ContractGenerationPlan plan, PartyDetails parties, Contract contract)
+        {
+            var vault = new ProtectedValueVault();
+
+            vault.Protect(parties.CompanyName ?? "", ProtectedValueKind.LegalCompanyName);
+            vault.Protect(parties.CustomerName ?? "", ProtectedValueKind.LegalCompanyName);
+            vault.Protect(contract.ContractNo ?? "", ProtectedValueKind.Identifier);
+
+            // Whatever the planner itself declared untranslatable — brands,
+            // product names, people. It is the half of the language rules that
+            // keeps a customer with an Arabic company name able to receive a
+            // contract with their own name on it.
+            foreach (var term in plan.PreservedTerms)
+            {
+                vault.Protect(term.Value, term.Reason switch
+                {
+                    "person_name" => ProtectedValueKind.PersonName,
+                    "brand" => ProtectedValueKind.Brand,
+                    "product" => ProtectedValueKind.Product,
+                    "url" => ProtectedValueKind.Url,
+                    "identifier" => ProtectedValueKind.Identifier,
+                    _ => ProtectedValueKind.LegalCompanyName
+                });
+            }
+
+            return vault.Values;
+        }
+
+        /// <summary>
+        /// Puts the German back where the source came from, by id.
+        /// </summary>
+        private static void WriteBack(ContractGenerationPlan plan, IReadOnlyDictionary<string, string> text)
+        {
+            for (var i = 0; i < plan.ServiceSections.Count; i++)
+            {
+                var s = plan.ServiceSections[i];
+
+                if (text.TryGetValue($"service.{i}.scope", out var scope)) s.Scope = scope;
+
+                s.Deliverables = Replace($"service.{i}.deliverables", s.Deliverables);
+                s.OutOfScope = Replace($"service.{i}.outOfScope", s.OutOfScope);
+                s.CustomerObligations = Replace($"service.{i}.customerObligations", s.CustomerObligations);
+                s.AcceptanceCriteria = Replace($"service.{i}.acceptanceCriteria", s.AcceptanceCriteria);
+                s.Assumptions = Replace($"service.{i}.assumptions", s.Assumptions);
+                s.Dependencies = Replace($"service.{i}.dependencies", s.Dependencies);
+                s.RevisionRules = Replace($"service.{i}.revisionRules", s.RevisionRules);
+                s.RiskNotes = Replace($"service.{i}.riskNotes", s.RiskNotes);
+            }
+
+            if (text.TryGetValue("classification.reason", out var reason))
+                plan.Classification.Reason = reason;
+
+            List<string> Replace(string prefix, List<string> values)
+            {
+                var updated = new List<string>(values.Count);
+
+                for (var i = 0; i < values.Count; i++)
+                {
+                    updated.Add(text.TryGetValue($"{prefix}.{i}", out var translated)
+                        ? translated
+                        : values[i]);
+                }
+
+                return updated;
+            }
+        }
+
+        /// <summary>
+        /// What the translation pass found, as review notes.
+        ///
+        /// A translation that could not be completed blocks the contract. It is
+        /// never treated as "carry on without it": the whole reason this runs is
+        /// that a contract in a language the customer's counsel cannot read must
+        /// not be the one they are asked to sign.
+        /// </summary>
+        private static ClauseSelection WithNormalizationOutcome(
+            ClauseSelection selection, ContractNormalizationResult? normalization)
+        {
+            if (normalization is null) return selection;
+
+            if (normalization.BlockingIssues.Count == 0 && normalization.Warnings.Count == 0)
+                return selection;
+
+            return selection with
+            {
+                BlockingIssues = [.. selection.BlockingIssues, .. normalization.BlockingIssues],
+                Warnings = [.. selection.Warnings, .. normalization.Warnings]
+            };
+        }
+
+        /// <summary>
+        /// A protection marker that reached the document.
+        ///
+        /// It means a restore did not happen, and what is printed where a company
+        /// name belongs is this application's internal machinery. Blocking, and
+        /// separately from the language rules, because the cause is different and
+        /// so is the fix.
+        /// </summary>
+        private static ClauseSelection WithLeakedPlaceholders(ClauseSelection selection, string document)
+        {
+            if (!ProtectedValueVault.ContainsToken(document)) return selection;
+
+            return selection with
+            {
+                BlockingIssues = [.. selection.BlockingIssues,
+                    "Der Vertragstext enthält interne Platzhalter für geschützte Werte."]
             };
         }
 
