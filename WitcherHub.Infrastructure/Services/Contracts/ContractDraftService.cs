@@ -9,6 +9,7 @@ using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Services.Contracts;
+using WitcherHub.Application.Services.Contracts.Clauses;
 using WitcherHub.Domain.Commercial;
 using WitcherHub.Domain.Contracts;
 using WitcherHub.Infrastructure.Data.Context;
@@ -38,13 +39,12 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         private readonly ContractContextBuilder _contextBuilder;
         private readonly ContractGenerationPipeline _pipeline;
 
+
         /// <summary>
-        /// The document generator the quote's after-sign path uses: one model
-        /// call for the structured Anlage A, merged into the Agenturvertrag
-        /// template. Asked for by name so a contract written from the builder
-        /// comes out as the same document as one written from a signed quote.
+        /// Builds the contract document from the released clause library, with
+        /// the model confined to the description of the work.
         /// </summary>
-        private readonly ContractDocumentGenerator _documents;
+        private readonly ContractComposer _composer;
 
         public ContractDraftService(
             AppDbContext db,
@@ -75,11 +75,12 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             // service directly for no benefit.
             _contextBuilder = new ContractContextBuilder(db, _template);
 
-            // The generator the quote's after-sign path uses, built here for the
-            // same reason as the two below: it takes the assistant and the
-            // template options this service already holds, and registering it
-            // would mean rewriting every test that constructs this service.
-            _documents = new ContractDocumentGenerator(ai, template);
+            // What the builder's Generate goes through. Built here rather than
+            // injected for the same reason as the two below: it takes the
+            // assistant and the template options this service already holds, and
+            // registering it would mean rewriting every test that constructs
+            // this service by hand.
+            _composer = new ContractComposer(ai, _template, logger);
 
             // Same reasoning: a stage runner over the assistant and the options
             // this service already holds. Registering it would mean rewriting
@@ -500,22 +501,32 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             GenerateDraftOptions options,
             CancellationToken ct)
         {
-            // The same mapping the signed-quote path uses, from this contract's
-            // own positions instead of a quote's items.
-            var request = ContractDocumentFactory.FromContract(
+            // The clause library, not a document the model wrote end to end.
+            //
+            // The contract this used to produce described a service and a price
+            // and stopped: no liability, no term, no notice period, no
+            // confidentiality, no data protection, no governing law, no
+            // jurisdiction — and, on a yearly SEO engagement, nothing saying
+            // that no ranking is owed. The composer confines the model to
+            // describing the work and picking clauses from a closed list, and
+            // assembles the rest from the record and the released wording.
+            var fields = ContractStructuredFields.From(contract, _template, positions);
+
+            var composed = await _composer.ComposeAsync(
                 contract,
                 positions,
+                totals,
                 parties,
+                fields,
                 options.AdditionalInstructions,
-                LatestSupplied(contract)?.DocumentMarkdown);
-
-            var generated = await _documents.GenerateAsync(request, ct);
+                LatestSupplied(contract)?.DocumentMarkdown,
+                ct);
 
             var draft = new ContractDraft
             {
                 ContractId = contract.Id,
                 Version = await NextVersionAsync(contract.Id, ct),
-                DocumentMarkdown = generated.FullDocument.Trim(),
+                DocumentMarkdown = composed.DocumentMarkdown.Trim(),
                 PositionsSnapshot = JsonSerializer.SerializeToDocument(positions),
                 TemplateVersion = _template.BaseDePath,
                 Model = _openAi.Model,
@@ -525,15 +536,42 @@ namespace WitcherHub.Infrastructure.Services.Contracts
                 SourceDraftId = LatestSupplied(contract)?.Id
             };
 
+            // How this version was produced and what it is waiting on, kept with
+            // it. A year from now the only way to know which instructions and
+            // which released wording made a given contract is to have recorded
+            // it at the time.
+            draft.PromptVersion = ContractPlannerPrompt.Version;
+
+            draft.GenerationReport = JsonSerializer.SerializeToDocument(new
+            {
+                promptVersion = ContractPlannerPrompt.Version,
+                clauseLibraryVersion = ContractClauseLibrary.LibraryVersion,
+                clauseLibraryApprovedVersion = _template.ClauseLibraryApprovedVersion,
+                model = _openAi.Model,
+                classification = composed.Plan.Classification,
+                clauseModules = composed.Clauses.Modules
+                    .Select(m => new { m.Id, m.Version, m.Title, status = m.ReviewStatus.ToString() }),
+                rejectedModules = composed.Clauses.Rejected,
+                blockingIssues = composed.Clauses.BlockingIssues,
+                warnings = composed.Clauses.Warnings,
+                reviewFlags = composed.Plan.ReviewFlags,
+                missingInformation = composed.Plan.MissingInformation,
+                missingContractFields = ContractStructuredFields.Missing(fields)
+            });
+
             _db.Set<ContractDraft>().Add(draft);
 
-            var becameTheContract = ApproveIfFirst(contract, draft);
+            // The gate. A version carrying a blocking issue is written, stored
+            // and readable — and does not become the contract's active wording.
+            //
+            // That is the whole point of the missing-data rules: a contract with
+            // no agreed notice period should not quietly become the text a
+            // customer is asked to sign. Regenerating after the gaps are filled
+            // produces a version that can.
+            var becameTheContract = composed.CanApprove && ApproveIfFirst(contract, draft);
 
-            // Anlage A as data, beside the document rendered from it. The quote's
-            // path stores this too; without it a contract written here would be
-            // the same document with half the record behind it.
-            contract.TermsStructured =
-                JsonSerializer.SerializeToDocument(generated.Structured);
+            // Anlage A as data, beside the document rendered from it.
+            contract.TermsStructured = JsonSerializer.SerializeToDocument(composed.Plan);
 
             contract.LastPreparationKey = options.IdempotencyKey;
             contract.LastPreparedDraftId = draft.Id;
@@ -551,16 +589,26 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             await _db.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Generated contract v{Version} for {ContractId} from the Agenturvertrag template using {Model} " +
-                "with {Positions} position(s). It {Became} the contract's wording.",
+                "Generated contract v{Version} for {ContractId} using {Model} with {Positions} " +
+                "position(s) and {Clauses} clause module(s). {Blocking} blocking issue(s). " +
+                "It {Became} the contract's wording.",
                 draft.Version, contract.Id, _openAi.Model, positions.Count,
-                becameTheContract ? "became" : "did not become (a version is already approved)");
+                composed.Clauses.Modules.Count, composed.Clauses.BlockingIssues.Count,
+                becameTheContract ? "became" : "did not become");
 
             return new ContractDraftResult
             {
                 Succeeded = true,
                 Draft = ToSummary(draft, totals),
-                BecameTheContract = becameTheContract
+                BecameTheContract = becameTheContract,
+
+                // What stands between this version and being the contract. Shown
+                // beside the draft rather than folded into a success message:
+                // "written" and "written, and four things have to be decided
+                // before anyone signs it" are different things to hand somebody.
+                ReviewNotes = composed.Clauses.BlockingIssues
+                    .Concat(composed.Clauses.Warnings)
+                    .ToList()
             };
         }
 

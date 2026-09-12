@@ -222,6 +222,37 @@ namespace WitcherHub.Tests
                 m => Assert.Equal(ClauseReviewStatus.PendingLegalReview, m.ReviewStatus));
         }
 
+        [Fact]
+        public void ReleasingTheLibraryIsHowTheReviewIsRecorded()
+        {
+            // With every module shipping unreviewed and no way to say otherwise,
+            // the rule above is not caution but a dead end: no contract this
+            // system generates could ever become a contract. The owner declares
+            // the review by naming the version their lawyer read.
+            var selection = ClauseSelector.Select(
+                APlan(), AllFields(), ContractClauseLibrary.LibraryVersion);
+
+            Assert.True(selection.CanApprove);
+
+            // Still said, in the report, rather than disappearing: the modules
+            // carry that status in the code and the release is a statement about
+            // them, not a change to them.
+            Assert.Contains(selection.Warnings, w => w.Contains("zur Prüfung"));
+        }
+
+        [Fact]
+        public void AReleaseOfAnEarlierVersionDoesNotCoverTheCurrentWording()
+        {
+            // The point of naming a version. Changing a clause bumps the
+            // library, this no longer matches, and approval blocks again until
+            // the new wording has been through the same review — which a blanket
+            // "legal approved it" flag would silently lose.
+            var selection = ClauseSelector.Select(APlan(), AllFields(), "0.9.0");
+
+            Assert.False(selection.CanApprove);
+            Assert.Contains(selection.BlockingIssues, i => i.Contains("anwaltlich freigegeben"));
+        }
+
         // ============================================ blocking issues stop approval
 
         [Fact]

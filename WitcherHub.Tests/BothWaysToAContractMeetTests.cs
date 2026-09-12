@@ -391,15 +391,37 @@ namespace WitcherHub.Tests
             {
                 var source = Source(parts);
 
-                Assert.True(
-                    source.Contains("ContractDocumentFactory.", StringComparison.Ordinal),
-                    $"{file} does not go through the shared mapping.");
-
                 Assert.False(
                     source.Contains("new GenerateContractDocumentRequest", StringComparison.Ordinal),
                     $"{file} builds its own request again — which is how the two paths came to " +
                     "produce different documents in the first place.");
             }
+        }
+
+        [Fact]
+        public void TheTwoPathsCurrentlyBuildTheirDocumentsDifferently()
+        {
+            // Recorded, not approved of.
+            //
+            // The builder's Generate now goes through ContractComposer: the model
+            // describes the work, the clause library supplies the law, and the
+            // totals are computed in code. The signed-quote path still goes
+            // through ContractDocumentGenerator, which asks the model for Anlage
+            // A and merges it into a 22-line template with no legal clauses at
+            // all.
+            //
+            // So the two doors produce different documents again — the very
+            // thing that was fixed a few commits ago. This test exists so that
+            // divergence is visible and deliberate rather than discovered by a
+            // customer, and it should be deleted the moment the signing path is
+            // moved onto the composer too.
+            var builder = Source(
+                ["WitcherHub.Infrastructure", "Services", "Contracts", "ContractDraftService.cs"]);
+
+            var signing = Source(["WitcherHub", "Pages", "Quotes", "Sign.cshtml.cs"]);
+
+            Assert.Contains("_composer.ComposeAsync", builder);
+            Assert.Contains("ContractDocumentFactory.FromQuote", signing);
         }
 
         // =================================================================== io

@@ -45,9 +45,17 @@ namespace WitcherHub.Application.Services.Contracts.Clauses
     /// </summary>
     public static class ClauseSelector
     {
+        /// <param name="approvedLibraryVersion">
+        /// The library version the owner has declared legally released. When it
+        /// matches <see cref="ContractClauseLibrary.LibraryVersion"/> exactly,
+        /// modules still marked <see cref="ClauseReviewStatus.PendingLegalReview"/>
+        /// are reported as a warning instead of blocking approval. Anything else
+        /// — null, empty, or a stale version — leaves them blocking.
+        /// </param>
         public static ClauseSelection Select(
             ContractGenerationPlan plan,
-            IReadOnlyDictionary<string, string?> structuredFields)
+            IReadOnlyDictionary<string, string?> structuredFields,
+            string? approvedLibraryVersion = null)
         {
             ArgumentNullException.ThrowIfNull(plan);
             ArgumentNullException.ThrowIfNull(structuredFields);
@@ -147,9 +155,29 @@ namespace WitcherHub.Application.Services.Contracts.Clauses
 
             if (unreviewed.Count > 0)
             {
-                blocking.Add(
-                    "Folgende Klauselmodule sind noch nicht anwaltlich freigegeben: " +
-                    string.Join(", ", unreviewed) + ".");
+                // Released means released for this exact wording. A version that
+                // no longer matches is not a release, it is a release of
+                // something else.
+                var released = !string.IsNullOrWhiteSpace(approvedLibraryVersion) &&
+                    string.Equals(
+                        approvedLibraryVersion!.Trim(),
+                        ContractClauseLibrary.LibraryVersion,
+                        StringComparison.Ordinal);
+
+                var ids = string.Join(", ", unreviewed);
+
+                if (released)
+                {
+                    warnings.Add(
+                        $"Klauselbibliothek {ContractClauseLibrary.LibraryVersion} ist als " +
+                        "freigegeben konfiguriert; folgende Module tragen im Code weiterhin den " +
+                        $"Status „zur Prüfung“: {ids}.");
+                }
+                else
+                {
+                    blocking.Add(
+                        $"Folgende Klauselmodule sind noch nicht anwaltlich freigegeben: {ids}.");
+                }
             }
 
             foreach (var item in plan.MissingInformation ?? [])

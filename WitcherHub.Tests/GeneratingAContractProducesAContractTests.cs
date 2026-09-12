@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using WitcherHub.Application.Interfaces;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Services.Contracts;
+using WitcherHub.Application.Services.Contracts.Clauses;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
 using WitcherHub.Infrastructure.ManageData.Contracts;
@@ -52,55 +53,23 @@ public class GeneratingAContractProducesAContractTests : IAsyncLifetime
     /// what happens to the result rather than about the model.
     ///
     /// Two generators are reachable and they want different answers. A contract
-    /// with positions goes through the Agenturvertrag generator, which asks for
-    /// the structured Anlage A as JSON; a contract with only pasted text goes
-    /// through the pipeline, which asks for clauses. The prompt says which.
+    /// with positions goes through the composer, which asks for a plan: how the
+    /// work is described and which clause modules apply. A contract with only
+    /// pasted text goes through the pipeline, which asks for clauses. The prompt
+    /// says which.
     /// </summary>
     private sealed class StubAi : IAiTextGenerator
     {
-        public int AnlageACalls { get; private set; }
+        public int PlannerCalls { get; private set; }
 
         public Task<string> GenerateTextAsync(string prompt)
         {
-            if (prompt.Contains("Anlage A", StringComparison.Ordinal) &&
-                prompt.Contains("Return JSON ONLY", StringComparison.Ordinal))
-            {
-                AnlageACalls++;
-                return Task.FromResult(AnlageAJson);
-            }
+            if (prompt.Contains("ERLAUBTE KLAUSELMODULE", StringComparison.Ordinal))
+                PlannerCalls++;
 
-            return Task.FromResult(AGeneratorAnswer.Complete);
+            return Task.FromResult(AGeneratorAnswer.For(prompt, AGeneratorAnswer.Complete));
         }
     }
-
-    /// <summary>One position's Anlage A, in the schema the prompt sets out.</summary>
-    private const string AnlageAJson = """
-        {
-          "version": "1.0",
-          "language": "de-DE",
-          "positions": [
-            {
-              "positionNo": 1,
-              "title": "Monatliche Betreuung",
-              "quantity": 1,
-              "unitNetPrice": 2000,
-              "lineNetPrice": 2000,
-              "taxRatePercent": 19,
-              "sections": {
-                "scope": "Laufende Betreuung der Vertriebskanäle des Auftraggebers.",
-                "deliverables": ["Monatlicher Report", "Laufende Optimierung"],
-                "outOfScope": ["Mediabudget"],
-                "customerResponsibilities": ["Zugänge bereitstellen"],
-                "acceptanceCriteria": ["Report liegt bis zum 5. Werktag vor"],
-                "timeline": "Monatlich",
-                "assumptions": "Die Zugänge stehen zur Verfügung.",
-                "revisions": "Eine Korrekturschleife je Report."
-              },
-              "customClauses": []
-            }
-          ]
-        }
-        """;
 
     /// <summary>
     /// An assistant that cannot be used at all — no key, no credit, no model.
@@ -177,7 +146,7 @@ public class GeneratingAContractProducesAContractTests : IAsyncLifetime
     // ======================================= the same document a signed quote makes
 
     [Fact]
-    public async Task AContractWithPositionsIsWrittenFromTheAgenturvertragTemplate()
+    public async Task AContractWithPositionsIsWrittenByTheComposer()
     {
         if (!Available) return;
 
@@ -188,24 +157,22 @@ public class GeneratingAContractProducesAContractTests : IAsyncLifetime
         var result = await sut.GenerateAsync(contractId, new GenerateDraftOptions());
 
         Assert.True(result.Succeeded, result.FailureReason);
-        Assert.Equal(1, ai.AnlageACalls);
+        Assert.Equal(1, ai.PlannerCalls);
 
         var document = result.Draft!.DocumentMarkdown;
 
-        // The template's own headings. This is what a contract created from a
-        // signed quote looks like, and until now the builder produced a
-        // "Dienstleistungsvertrag" of numbered paragraphs with no Anlage A at all.
+        // The composed document's own headings. Until now the builder produced a
+        // "Dienstleistungsvertrag" of numbered paragraphs with no service
+        // description and no general terms at all.
         Assert.Contains("# Agenturvertrag", document);
-        Assert.Contains("Vertragspartner", document);
-        Assert.Contains("Vertragsgegenstand", document);
-        Assert.Contains("Anlage A", document);
-        Assert.Contains("Preis", document);
-
-        Assert.DoesNotContain("Dienstleistungsvertrag", document);
+        Assert.Contains("## Vertragspartner", document);
+        Assert.Contains("## Anlage A", document);
+        Assert.Contains("## Preisübersicht", document);
+        Assert.Contains("## Unterschriften", document);
     }
 
     [Fact]
-    public async Task WhatTheModelWroteForAnlageAIsInTheDocument()
+    public async Task WhatTheModelWroteAboutTheWorkIsInTheDocument()
     {
         if (!Available) return;
 
@@ -215,10 +182,63 @@ public class GeneratingAContractProducesAContractTests : IAsyncLifetime
         var result = await sut.GenerateAsync(contractId, new GenerateDraftOptions());
         var document = result.Draft!.DocumentMarkdown;
 
-        // The structured answer is rendered into the services section rather than
-        // merely stored, which is the whole point of the one model call.
-        Assert.Contains("Laufende Betreuung der Vertriebskanäle", document);
+        // The plan is rendered into the services section rather than merely
+        // stored, which is the whole point of the one model call.
+        Assert.Contains("Laufende Betreuung der Vertriebskanaele", document);
         Assert.Contains("Monatlicher Report", document);
+
+        // And the exclusions, which are the half of a scope that stops an
+        // argument later.
+        Assert.Contains("Mediabudget", document);
+    }
+
+    [Fact]
+    public async Task TheGeneralTermsComeFromTheLibraryRatherThanTheModel()
+    {
+        if (!Available) return;
+
+        var sut = BuildService(new StubAi());
+        var contractId = await NewContractAsync(sut, withPositions: true, withPastedText: false);
+
+        var result = await sut.GenerateAsync(contractId, new GenerateDraftOptions());
+        var document = result.Draft!.DocumentMarkdown;
+
+        // The contract this replaced described a service and a price and
+        // stopped. Every one of these is a standing clause the model is not
+        // asked to write and cannot leave out.
+        foreach (var title in new[]
+                 {
+                     ContractClauseLibrary.Find("LIABILITY_B2B")!.Title,
+                     ContractClauseLibrary.Find("CONFIDENTIALITY")!.Title,
+                     ContractClauseLibrary.Find("GERMAN_LAW")!.Title
+                 })
+        {
+            Assert.Contains(title, document);
+        }
+
+        // And the one the model did choose, because the work is ongoing
+        // marketing rather than a deliverable.
+        Assert.Contains(
+            ContractClauseLibrary.Find("SERVICE_NO_SUCCESS_GUARANTEE")!.Title, document);
+    }
+
+    [Fact]
+    public async Task TheTotalsInTheDocumentAreTheOnesComputedFromThePositions()
+    {
+        if (!Available) return;
+
+        var sut = BuildService(new StubAi());
+        var contractId = await NewContractAsync(sut, withPositions: true, withPastedText: false);
+
+        var document = (await sut.GenerateAsync(contractId, new GenerateDraftOptions()))
+            .Draft!.DocumentMarkdown;
+
+        // 2.000,00 net, 19 % of it in tax, 2.380,00 gross. None of these three
+        // numbers is ever asked of the model — a figure it produced is a figure
+        // nobody agreed to.
+        Assert.Contains("2.000,00 EUR", document);
+        Assert.Contains("380,00 EUR", document);
+        Assert.Contains("2.380,00 EUR", document);
     }
 
     [Fact]
@@ -241,7 +261,7 @@ public class GeneratingAContractProducesAContractTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task AnlageAIsKeptAsDataBesideTheDocument()
+    public async Task ThePlanIsKeptAsDataBesideTheDocument()
     {
         if (!Available) return;
 
@@ -251,9 +271,44 @@ public class GeneratingAContractProducesAContractTests : IAsyncLifetime
         await sut.GenerateAsync(contractId, new GenerateDraftOptions());
 
         var contract = await Reload(contractId);
+        var stored = contract.TermsStructured!.RootElement.ToString();
 
         Assert.NotNull(contract.TermsStructured);
-        Assert.Contains("Monatliche Betreuung", contract.TermsStructured!.RootElement.ToString());
+
+        // The description as data, not only as prose in the document: what was
+        // classified, what was scoped, and what was excluded.
+        Assert.Contains("Laufende Betreuung der Vertriebskanaele", stored);
+        Assert.Contains("Mediabudget", stored);
+
+        // Including how it was classified, which is what decided the term and
+        // termination clauses and is not otherwise recoverable from the prose.
+        Assert.Contains("\"overallType\": \"service\"", stored);
+        Assert.Contains("\"recurrence\": \"recurring\"", stored);
+    }
+
+    [Fact]
+    public async Task HowTheVersionWasProducedIsRecordedWithIt()
+    {
+        if (!Available) return;
+
+        var sut = BuildService(new StubAi());
+        var contractId = await NewContractAsync(sut, withPositions: true, withPastedText: false);
+
+        var result = await sut.GenerateAsync(contractId, new GenerateDraftOptions());
+
+        var row = await _db!.Set<ContractDraft>().AsNoTracking()
+            .FirstAsync(d => d.Id == result.Draft!.Id);
+
+        Assert.Equal(ContractPlannerPrompt.Version, row.PromptVersion);
+
+        var report = row.GenerationReport!.RootElement.ToString();
+
+        // A year from now, which instructions and which wording produced this
+        // document has to still be answerable. Recorded at the time is the only
+        // moment it can be.
+        Assert.Contains(ContractPlannerPrompt.Version, report);
+        Assert.Contains(ContractClauseLibrary.LibraryVersion, report);
+        Assert.Contains("SERVICE_NO_SUCCESS_GUARANTEE", report);
     }
 
     [Fact]
@@ -417,6 +472,116 @@ public class GeneratingAContractProducesAContractTests : IAsyncLifetime
         Assert.Equal(proposed.DocumentMarkdown, (await Reload(contractId)).Terms);
     }
 
+    // ==================================== what stands between a draft and a contract
+
+    [Fact]
+    public async Task NothingIsApprovedUntilTheLibraryIsReleased()
+    {
+        if (!Available) return;
+
+        // Every module in the library ships as "pending legal review", which is
+        // the honest state for wording no lawyer has seen. On a default
+        // installation that is every module, so nothing auto-approves.
+        var template = ReleasedInstallation();
+        template.ClauseLibraryApprovedVersion = null;
+
+        var sut = BuildService(new StubAi(), template);
+        var contractId = await NewContractAsync(sut, withPositions: true, withPastedText: false);
+
+        var result = await sut.GenerateAsync(contractId, new GenerateDraftOptions());
+
+        // Written, stored and readable — and not the contract.
+        Assert.True(result.Succeeded, result.FailureReason);
+        Assert.False(string.IsNullOrWhiteSpace(result.Draft!.DocumentMarkdown));
+        Assert.False(result.BecameTheContract);
+
+        Assert.True(string.IsNullOrWhiteSpace((await Reload(contractId)).Terms));
+
+        // And it says so, rather than leaving somebody to wonder why the details
+        // page is still empty.
+        Assert.Contains(result.ReviewNotes, n => n.Contains("freigegeben", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AReleaseOfADifferentVersionIsNotARelease()
+    {
+        if (!Available) return;
+
+        // Legal released 0.9. The wording has changed since. Approving on the
+        // strength of a review of something else is the failure this guards.
+        var template = ReleasedInstallation();
+        template.ClauseLibraryApprovedVersion = "0.9.0";
+
+        var sut = BuildService(new StubAi(), template);
+        var contractId = await NewContractAsync(sut, withPositions: true, withPastedText: false);
+
+        Assert.False((await sut.GenerateAsync(contractId, new GenerateDraftOptions())).BecameTheContract);
+    }
+
+    [Fact]
+    public async Task AContractMissingItsAgreedTermsIsWrittenButNotPublished()
+    {
+        if (!Available) return;
+
+        // No payment term, no seat, no form requirement. The clauses that need
+        // them are standing clauses — every contract gets them — so a contract
+        // without those values is not a contract that is merely shorter.
+        var template = ReleasedInstallation();
+        template.PaymentDueDays = null;
+        template.ProviderSeat = null;
+        template.FormRequirement = null;
+
+        var sut = BuildService(new StubAi(), template);
+        var contractId = await NewContractAsync(sut, withPositions: true, withPastedText: false);
+
+        var result = await sut.GenerateAsync(contractId, new GenerateDraftOptions());
+
+        Assert.True(result.Succeeded, result.FailureReason);
+        Assert.False(result.BecameTheContract);
+
+        // The document states no payment term rather than a plausible one.
+        Assert.DoesNotContain("14 Tagen", result.Draft!.DocumentMarkdown);
+
+        // And each missing value is named, so "not approvable" comes with a list
+        // of what to do about it.
+        Assert.Contains(result.ReviewNotes, n => n.Contains("PaymentDueDays", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task APositionTheModelNeverDescribedStopsTheContract()
+    {
+        if (!Available) return;
+
+        // The model is required to echo back the id it was given, and the
+        // descriptions are matched to positions on it. An answer that echoes
+        // something else produces a priced line with no scope, no deliverables
+        // and no exclusions under it — a contract that does not say what is
+        // being bought, and that looks entirely normal.
+        var sut = BuildService(new AnswersAboutSomeOtherPosition());
+        var contractId = await NewContractAsync(sut, withPositions: true, withPastedText: false);
+
+        var result = await sut.GenerateAsync(contractId, new GenerateDraftOptions());
+
+        Assert.True(result.Succeeded, result.FailureReason);
+        Assert.False(result.BecameTheContract);
+
+        Assert.Contains(
+            result.ReviewNotes,
+            n => n.Contains("Leistungsbeschreibung", StringComparison.Ordinal) &&
+                 n.Contains("Monatliche Betreuung", StringComparison.Ordinal));
+    }
+
+    /// <summary>Answers the planner with a section for a position that is not there.</summary>
+    private sealed class AnswersAboutSomeOtherPosition : IAiTextGenerator
+    {
+        public Task<string> GenerateTextAsync(string prompt) =>
+            Task.FromResult(prompt.Contains("ERLAUBTE KLAUSELMODULE", StringComparison.Ordinal)
+                ? AGeneratorAnswer.Plan.Replace(
+                    "\"serviceItemId\": \"\"", "\"serviceItemId\": \"eine-andere-position\"",
+                    StringComparison.Ordinal)
+                : AGeneratorAnswer.Complete);
+    }
+
     // ============================================ when the assistant is unusable
 
     [Fact]
@@ -502,7 +667,32 @@ public class GeneratingAContractProducesAContractTests : IAsyncLifetime
             .ToListAsync();
     }
 
-    private ContractDraftService BuildService(IAiTextGenerator ai)
+    /// <summary>
+    /// A fully configured installation: the legal decisions made, and the clause
+    /// library released.
+    ///
+    /// Both halves are needed before a generated contract can become the
+    /// contract, and both are deliberately unset in the shipped defaults. A
+    /// contract that states a payment term or a Gerichtsstand nobody chose is
+    /// worse than one that states neither, so the standing clauses that need those
+    /// values stay out of the document and block approval until somebody
+    /// configures them — which is what <see cref="NothingIsApprovedUntilTheLibraryIsReleased"/>
+    /// and <see cref="AContractMissingItsAgreedTermsIsWrittenButNotPublished"/>
+    /// pin down.
+    /// </summary>
+    private ContractDraftService BuildService(IAiTextGenerator ai) =>
+        BuildService(ai, ReleasedInstallation());
+
+    private static ContractTemplateOptions ReleasedInstallation() => new()
+    {
+        ClauseLibraryApprovedVersion = ContractClauseLibrary.LibraryVersion,
+        ProviderSeat = "Berlin",
+        FormRequirement = "Textform",
+        DocumentPrecedence = "Vertrag, Anlage A, Angebot",
+        PaymentDueDays = 14
+    };
+
+    private ContractDraftService BuildService(IAiTextGenerator ai, ContractTemplateOptions template)
     {
         var openAi = Options.Create(new OpenAIOptions { ApiKey = "test", Model = "test-model" });
 
@@ -512,7 +702,7 @@ public class GeneratingAContractProducesAContractTests : IAsyncLifetime
             ai,
             new SemanticContractAnalyzer(ai, openAi, NullLogger<SemanticContractAnalyzer>.Instance),
             openAi,
-            Options.Create(new ContractTemplateOptions()),
+            Options.Create(template),
             NullLogger<ContractDraftService>.Instance);
     }
 
