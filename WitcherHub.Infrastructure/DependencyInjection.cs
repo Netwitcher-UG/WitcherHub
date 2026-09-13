@@ -191,6 +191,11 @@ namespace WitcherHub.Infrastructure
             // translation step can be replaced or stubbed without the composer
             // knowing which model is behind it.
             services.AddScoped<IContractLanguageNormalizer, OpenAiContractLanguageNormalizer>();
+
+            // Renders an approved German contract in the language the customer
+            // chose on the signing page. A reading aid: the German stays the
+            // agreement and is what gets signed.
+            services.AddScoped<IContractViewTranslator, OpenAiContractViewTranslator>();
             services.AddScoped<IDataSeeder, IdentityDataSeeder>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<ISignInDiagnostics, SignInDiagnostics>();

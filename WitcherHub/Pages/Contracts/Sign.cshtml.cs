@@ -17,6 +17,7 @@ using WitcherHub.Application.Interfaces.BackgroundTasks;
 using WitcherHub.Application.Interfaces.Email;
 using WitcherHub.Application.Models.DTO.Contracts;
 using WitcherHub.Application.Models.Email;
+using WitcherHub.Application.Services.Contracts.Language;
 using WitcherHub.Infrastructure.Data.Context;
 using WitcherHub.Infrastructure.Data.Models;
 using WitcherHub.Infrastructure.Services.Contracts;
@@ -38,6 +39,7 @@ namespace WitcherHub.Pages.Contracts
         private readonly IPdfGenerator _pdf;
         private readonly IBackgroundTaskQueue _bg;
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly IContractViewTranslator _viewTranslator;
 
         public SignModel(
     AppDbContext db,
@@ -46,8 +48,10 @@ namespace WitcherHub.Pages.Contracts
     IEmailTemplateRenderer templates,
     IEmailSender emailSender,
     ILogger<SignModel> logger,
-    IPdfGenerator pdf, IBackgroundTaskQueue bg, IServiceScopeFactory scopeFactory)
+    IPdfGenerator pdf, IBackgroundTaskQueue bg, IServiceScopeFactory scopeFactory,
+    IContractViewTranslator viewTranslator)
         {
+            _viewTranslator = viewTranslator;
             _db = db;
             _generator = generator;
             _opt = opt.Value;
@@ -86,6 +90,26 @@ namespace WitcherHub.Pages.Contracts
 
         public string? SignerNamePrefill { get; private set; }
         public string? SignerEmailPrefill { get; private set; }
+
+        /// <summary>
+        /// True when the contract on screen is a translation rather than the
+        /// German that was agreed.
+        ///
+        /// The page says so where the reader can see it. A customer who signs
+        /// after reading a translation has signed the German text, and telling
+        /// them that afterwards is too late.
+        /// </summary>
+        public bool IsTranslatedView { get; private set; }
+
+        /// <summary>The language the contract is being shown in.</summary>
+        public string ViewLanguage { get; private set; } = "de";
+
+        /// <summary>
+        /// Set when a translation was asked for and could not be produced. The
+        /// German is shown instead — never half a translation, because a reader
+        /// cannot tell which half.
+        /// </summary>
+        public string? TranslationUnavailable { get; private set; }
 
         /// <summary>
         /// Why a signing link stopped working, to the person holding it.
@@ -138,6 +162,89 @@ namespace WitcherHub.Pages.Contracts
                 ContentType = "text/html; charset=utf-8",
                 StatusCode = StatusCodes.Status410Gone
             };
+        }
+
+        /// <summary>
+        /// The contract in another language, from the cache or from the model.
+        ///
+        /// Cached on the fingerprint of the German it was made from, so it can
+        /// never be stale: a contract whose wording changed simply misses and is
+        /// translated again. Two visits therefore show the same words, which
+        /// matters more here than it sounds — a clause that reads slightly
+        /// differently on a second reading is the sort of thing somebody notices
+        /// after they have signed.
+        ///
+        /// Null when no usable translation could be produced. The caller shows
+        /// the German and says why, rather than showing a partial one.
+        /// </summary>
+        private async Task<string?> TranslatedTermsAsync(
+            Guid contractId, string german, string language, CancellationToken ct)
+        {
+            var fingerprint = TranslatableMarkdown.Fingerprint(german);
+
+            var cached = await _db.Set<ContractTermsTranslation>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    t => t.ContractId == contractId &&
+                         t.Language == language &&
+                         t.SourceHash == fingerprint, ct);
+
+            if (cached is not null) return cached.TranslatedMarkdown;
+
+            // The values a translation must not touch. The parties and the
+            // contract number are the ones that appear inside the prose; the
+            // figures never reach the model at all, because a table cell holding
+            // one is not sent.
+            var customer = await _db.Contracts
+                .Where(c => c.Id == contractId)
+                .Select(c => new { c.ContractNo, Name = c.Project.Customer.Name })
+                .FirstOrDefaultAsync(ct);
+
+            var vault = new ProtectedValueVault();
+
+            vault.Protect(
+                NormalizeNewLines(_opt.ProviderBlock ?? "")
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault()?.Trim() ?? "",
+                ProtectedValueKind.LegalCompanyName);
+            vault.Protect(customer?.Name ?? "", ProtectedValueKind.LegalCompanyName);
+            vault.Protect(customer?.ContractNo ?? "", ProtectedValueKind.Identifier);
+
+            var result = await _viewTranslator.TranslateAsync(german, language, vault.Values, ct);
+
+            if (!result.Succeeded || string.IsNullOrWhiteSpace(result.Markdown))
+            {
+                _logger.LogInformation(
+                    "No {Language} view of contract {ContractId} could be produced: {Reason}",
+                    language, contractId, result.FailureReason);
+
+                return null;
+            }
+
+            try
+            {
+                _db.Add(new ContractTermsTranslation
+                {
+                    Id = Guid.NewGuid(),
+                    ContractId = contractId,
+                    Language = language,
+                    SourceHash = fingerprint,
+                    TranslatedMarkdown = result.Markdown!,
+                    PromptVersion = ContractViewTranslationPrompt.Version,
+                    TranslatedAtUtc = DateTimeOffset.UtcNow
+                });
+
+                await _db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                // Two readers opened the link at once and both translated. The
+                // unique key rejected the second, which costs one wasted call and
+                // nothing else — the translation in hand is still good.
+                _db.ChangeTracker.Clear();
+            }
+
+            return result.Markdown;
         }
 
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
@@ -245,6 +352,43 @@ namespace WitcherHub.Pages.Contracts
                 }
 
                 await _db.SaveChangesAsync(ct);
+            }
+
+            // The contract in the language the reader chose.
+            //
+            // A reading aid, and nothing more. The German remains the agreement:
+            // it is what is stored, what the PDF contains and what a signature
+            // is given on. Producing a signable translation would mean two
+            // documents that can disagree and a dispute about which was agreed.
+            //
+            // The structure never goes to the model — headings keep their
+            // numbers, and a price-table cell containing a figure is not sent at
+            // all — so no translation can renumber a clause or reformat an
+            // amount. See TranslatableMarkdown.
+            ViewLanguage = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.ToLowerInvariant();
+
+            var germanTerms = contract.Terms ?? "";
+
+            if (!string.Equals(ViewLanguage, "de", StringComparison.Ordinal) &&
+                !string.IsNullOrWhiteSpace(germanTerms))
+            {
+                var translated = await TranslatedTermsAsync(contract.Id, germanTerms, ViewLanguage, ct);
+
+                if (translated is not null)
+                {
+                    contract.Terms = translated;
+                    IsTranslatedView = true;
+
+                    // Rendered from, never saved. The contract's stored wording
+                    // stays German whatever a reader is looking at.
+                    _db.Entry(contract).State = EntityState.Detached;
+                }
+                else
+                {
+                    TranslationUnavailable =
+                        "Eine Übersetzung ist derzeit nicht verfügbar. Der Vertrag wird in der " +
+                        "verbindlichen deutschen Fassung angezeigt.";
+                }
             }
 
             // Signed state

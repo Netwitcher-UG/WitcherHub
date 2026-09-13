@@ -39,7 +39,33 @@
     <div class="contractPage__container">
         <div class="contractPage__paper" id="paper">
 
-            <div class="contractPage__contractHtml contractPdfScope">
+            @* Which text the reader is looking at, said before they read it.
+               A customer who signs after reading a translation has signed the
+               German, and telling them that afterwards is too late. *@
+            @if (Model.IsTranslatedView)
+            {
+                <div class="contractPage__translationNotice" role="note">
+                    <strong>Übersetzung / Translation</strong>
+                    <p>
+                        Diese Fassung ist eine Übersetzung zur besseren Verständlichkeit.
+                        Verbindlich ist ausschließlich die deutsche Fassung des Vertrages,
+                        die auch unterzeichnet und als PDF archiviert wird.
+                    </p>
+                    <p>
+                        This version is a translation provided for your convenience. Only the
+                        German version of the contract is binding; it is the version that is
+                        signed and archived.
+                    </p>
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(Model.TranslationUnavailable))
+            {
+                <div class="contractPage__translationNotice" role="note">
+                    <p>@Model.TranslationUnavailable</p>
+                </div>
+            }
+
+            <div class="contractPage__contractHtml contractPdfScope" lang="@Model.ViewLanguage">
                 @Html.Raw(Model.ContractHtml)
             </div>
 

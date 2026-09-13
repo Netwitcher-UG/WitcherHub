@@ -71,6 +71,7 @@ namespace WitcherHub.Infrastructure.Data.Context
         public DbSet<Attachment> Attachments => Set<Attachment>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
         public DbSet<ContractAccessLink> ContractAccessLinks => Set<ContractAccessLink>();
+        public DbSet<ContractTermsTranslation> ContractTermsTranslations => Set<ContractTermsTranslation>();
 
 
         public DbSet<InvoiceAccessLink> InvoiceAccessLinks => Set<InvoiceAccessLink>();
@@ -346,6 +347,20 @@ namespace WitcherHub.Infrastructure.Data.Context
 
             b.Entity<ContractAccessLink>()
                 .HasIndex(x => new { x.ContractId, x.RecipientEmail });
+
+            // One translation per contract, language and source wording. The
+            // fingerprint is part of the key rather than a column beside it, so
+            // a contract whose wording changed cannot be served its old
+            // translation — the lookup simply misses.
+            b.Entity<ContractTermsTranslation>()
+                .HasIndex(x => new { x.ContractId, x.Language, x.SourceHash })
+                .IsUnique();
+
+            b.Entity<ContractTermsTranslation>()
+                .HasOne(x => x.Contract)
+                .WithMany()
+                .HasForeignKey(x => x.ContractId)
+                .OnDelete(DeleteBehavior.Cascade);
 
 
             b.Entity<PricingRule>()

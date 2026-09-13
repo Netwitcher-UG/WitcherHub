@@ -1591,6 +1591,21 @@
         margin: 0 !important;
     }
 
+    /* The translation notice prints — a printed translation with nothing on
+       it to say the German is the agreement is the whole hazard this notice
+       exists to prevent. It is set as text rather than as a panel, the same
+       treatment the administrator's notice above gets. */
+    .contractPage__translationNotice {
+        background: transparent !important;
+        border: 0 !important;
+        border-left: 0 !important;
+        border-radius: 0 !important;
+        padding: 0 0 6mm !important;
+        margin: 0 !important;
+        color: #444 !important;
+        font-size: 9pt !important;
+    }
+
     /* Nothing interactive belongs on paper. */
     .contractPage__langFab,
     .contractPage__toast,
@@ -1602,4 +1617,36 @@
     #appModal {
         display: none !important;
     }
+}
+
+/* ---- translation notice ------------------------------------------------
+ *
+ * Says which text is on screen, above the text. The German is the agreement
+ * whatever language the reader picked, and a reader who finds that out after
+ * signing has found out too late.
+ */
+.contractPage__translationNotice {
+    border: 1px solid rgba(0, 0, 0, .14);
+    border-left: 4px solid #6b7280;
+    background: #f8f9fb;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 0 0 18px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: #374151;
+}
+
+.contractPage__translationNotice strong {
+    display: block;
+    margin-bottom: 6px;
+    color: #111;
+}
+
+.contractPage__translationNotice p {
+    margin: 0 0 6px;
+}
+
+.contractPage__translationNotice p:last-child {
+    margin-bottom: 0;
 }
