@@ -223,6 +223,99 @@ public class AForeignLanguageServiceBecomesAGermanContractTests : IAsyncLifetime
         Assert.True(result.BecameTheContract, string.Join(" | ", result.ReviewNotes));
     }
 
+    // =============================================== the position's own name
+
+    [Fact]
+    public async Task APositionNamedInArabicIsNamedInGermanInTheContract()
+    {
+        if (!Available) return;
+
+        // Reported by the owner: a service entered as "البرمجة" was printed
+        // verbatim as its own section heading and again in the price table. The
+        // description around it was German and the thing it described was not.
+        var translator = new TranslatesTo(new Dictionary<string, string>
+        {
+            ["position.0.title"] = "Softwareentwicklung",
+            ["service.0.scope"] = "Entwicklung der vereinbarten Softwarekomponenten."
+        });
+
+        var result = await GenerateAsync(
+            "تطوير البرمجيات المتفق عليها", translator, positionTitle: "البرمجة");
+
+        var document = result.Draft!.DocumentMarkdown;
+
+        // The heading of its section …
+        Assert.Contains("### 1.1 Softwareentwicklung", document);
+
+        // … and the price table, which is the other place a reader looks first.
+        Assert.Contains("| 1 | Softwareentwicklung |", document);
+
+        // Nothing of the Arabic anywhere in the contract.
+        Assert.DoesNotContain("البرمجة", document);
+
+        Assert.True(result.BecameTheContract, string.Join(" | ", result.ReviewNotes));
+    }
+
+    [Fact]
+    public async Task ThePositionTitleIsOfferedForTranslationWithItsOwnId()
+    {
+        if (!Available) return;
+
+        var translator = new TranslatesTo(new Dictionary<string, string>());
+
+        await GenerateAsync("Scope.", translator, positionTitle: "البرمجة");
+
+        var title = Assert.Single(translator.Saw!, f => f.FieldId == "position.0.title");
+
+        Assert.Equal("البرمجة", title.SourceText);
+
+        // A heading, not a paragraph: it is set in the register a heading needs
+        // rather than as a sentence.
+        Assert.Equal(TranslatableContentType.Heading, title.ContentType);
+
+        // The project name travels with it, for the same reason.
+        Assert.Contains(translator.Saw!, f => f.FieldId == "project.title");
+    }
+
+    [Fact]
+    public async Task AnUntranslatedTitleStopsTheContract()
+    {
+        if (!Available) return;
+
+        // Translation ran and left the title in Arabic. Without this the
+        // document would carry an Arabic heading with no review note against it,
+        // because the language check used to look only at the plan's prose.
+        var translator = new TranslatesTo(new Dictionary<string, string>
+        {
+            ["service.0.scope"] = "Entwicklung der vereinbarten Softwarekomponenten."
+        });
+
+        var result = await GenerateAsync("Scope.", translator, positionTitle: "البرمجة");
+
+        Assert.False(result.BecameTheContract);
+
+        Assert.Contains(result.ReviewNotes, n =>
+            n.Contains("Leistungsbezeichnung", StringComparison.Ordinal) &&
+            n.Contains("Arabischer Text", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AGermanTitleIsLeftAlone()
+    {
+        if (!Available) return;
+
+        var translator = new TranslatesTo(new Dictionary<string, string>
+        {
+            ["service.0.scope"] = "Laufende Betreuung der Vertriebskanäle."
+        });
+
+        var result = await GenerateAsync(
+            "Laufende Betreuung.", translator, positionTitle: "Monatliche Betreuung");
+
+        Assert.Contains("### 1.1 Monatliche Betreuung", result.Draft!.DocumentMarkdown);
+        Assert.True(result.BecameTheContract, string.Join(" | ", result.ReviewNotes));
+    }
+
     // ============================================================ what is sent
 
     [Fact]
@@ -341,10 +434,12 @@ public class AForeignLanguageServiceBecomesAGermanContractTests : IAsyncLifetime
         }));
 
     private async Task<ContractDraftResult> GenerateAsync(
-        string sourceScope, IContractLanguageNormalizer normalizer)
+        string sourceScope,
+        IContractLanguageNormalizer normalizer,
+        string positionTitle = "Monatliche Betreuung")
     {
         var sut = BuildService(new PlansInSourceLanguage(sourceScope), normalizer);
-        var contractId = await NewContractAsync();
+        var contractId = await NewContractAsync(positionTitle);
 
         return await sut.GenerateAsync(contractId, new GenerateDraftOptions());
     }
@@ -373,7 +468,7 @@ public class AForeignLanguageServiceBecomesAGermanContractTests : IAsyncLifetime
             normalizer: normalizer);
     }
 
-    private async Task<Guid> NewContractAsync()
+    private async Task<Guid> NewContractAsync(string positionTitle = "Monatliche Betreuung")
     {
         var contract = new Contract
         {
@@ -395,7 +490,7 @@ public class AForeignLanguageServiceBecomesAGermanContractTests : IAsyncLifetime
             {
                 ClientId = Guid.NewGuid().ToString("n"),
                 Position = 1,
-                Title = "Monatliche Betreuung",
+                Title = positionTitle,
                 Description = "Laufende Betreuung der Vertriebskanäle.",
                 Quantity = 1,
                 UnitPrice = 2000m,

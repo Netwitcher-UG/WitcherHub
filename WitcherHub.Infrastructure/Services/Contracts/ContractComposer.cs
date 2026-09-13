@@ -104,16 +104,26 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             // stop — leaving the owner to retype the scope by hand. Translation
             // happens here instead, and the language check below now only sees
             // what translation could not fix.
-            var normalization = await NormalizeToGermanAsync(plan, parties, contract, ct);
+            var normalization = await NormalizeToGermanAsync(plan, positions, parties, contract, ct);
+
+            // The German titles, where translation produced any. Looked up by
+            // field id at render time rather than written back onto the position:
+            // the position belongs to the person who typed it and still reads in
+            // their language everywhere else in the application. Only the
+            // contract is German.
+            var german = normalization?.Succeeded == true
+                ? normalization.Text
+                : new Dictionary<string, string>(StringComparer.Ordinal);
 
             var selection = ClauseSelector.Select(
                 plan, structuredFields, _template.ClauseLibraryApprovedVersion);
 
             selection = WithUndescribedPositions(selection, positions, plan);
             selection = WithNormalizationOutcome(selection, normalization);
-            selection = WithUntranslatedContent(selection, plan, parties, contract);
+            selection = WithUntranslatedContent(selection, plan, positions, german, parties, contract);
 
-            var document = Render(contract, positions, totals, parties, plan, selection, structuredFields);
+            var document = Render(
+                contract, positions, totals, parties, plan, selection, structuredFields, german);
 
             selection = WithRemainingParagraphSigns(selection, document);
             selection = WithLeakedPlaceholders(selection, document);
@@ -189,13 +199,14 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         /// </summary>
         private async Task<ContractNormalizationResult?> NormalizeToGermanAsync(
             ContractGenerationPlan plan,
+            IReadOnlyList<ManualPositionDto> positions,
             PartyDetails parties,
             Contract contract,
             CancellationToken ct)
         {
             if (_normalizer is null) return null;
 
-            var fields = TranslatableFieldsOf(plan);
+            var fields = TranslatableFieldsOf(plan, positions, contract);
 
             if (fields.Count == 0) return null;
 
@@ -226,9 +237,34 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         /// back without matching anything up by position — which is the failure
         /// mode when a model reorders a list.
         /// </summary>
-        private static IReadOnlyList<TranslatableField> TranslatableFieldsOf(ContractGenerationPlan plan)
+        private static IReadOnlyList<TranslatableField> TranslatableFieldsOf(
+            ContractGenerationPlan plan,
+            IReadOnlyList<ManualPositionDto> positions,
+            Contract contract)
         {
             var fields = new List<TranslatableField>();
+
+            // The names the reader sees first.
+            //
+            // A position entered as "البرمجة" was printed verbatim as the
+            // heading of its own section and again in the price table, because
+            // the title is the one piece of position text the document takes
+            // straight from the record rather than from the plan. The service
+            // description around it was German and the thing it described was
+            // not, which is the sort of document that reads as unfinished
+            // whatever else is right about it.
+            //
+            // Indexed in the order the document renders them, so a title looks
+            // up by the same id in both places it appears.
+            var ordered = positions.OrderBy(p => p.Position).ToList();
+
+            for (var i = 0; i < ordered.Count; i++)
+            {
+                Add($"position.{i}.title", "Leistungsbezeichnung",
+                    ordered[i].Title, TranslatableContentType.Heading);
+            }
+
+            Add("project.title", "Projekt", contract.Project?.Title, TranslatableContentType.Heading);
 
             for (var i = 0; i < plan.ServiceSections.Count; i++)
             {
@@ -405,10 +441,30 @@ namespace WitcherHub.Infrastructure.Services.Contracts
         private static ClauseSelection WithUntranslatedContent(
             ClauseSelection selection,
             ContractGenerationPlan plan,
+            IReadOnlyList<ManualPositionDto> positions,
+            IReadOnlyDictionary<string, string> german,
             PartyDetails parties,
             Contract contract)
         {
             var described = new List<KeyValuePair<string, string?>>();
+
+            // The titles as the document will print them — the translation where
+            // there is one, the typed text where there is not. Checking the
+            // source instead would report a position that was translated
+            // perfectly well, and checking nothing at all would let an
+            // untranslated heading through, which is the case the owner
+            // reported.
+            var ordered = positions.OrderBy(p => p.Position).ToList();
+
+            for (var i = 0; i < ordered.Count; i++)
+            {
+                described.Add(new(
+                    $"Leistungsbezeichnung {i + 1}",
+                    german.TryGetValue($"position.{i}.title", out var title) ? title : ordered[i].Title));
+            }
+
+            described.Add(new("Projekt",
+                german.TryGetValue("project.title", out var project) ? project : contract.Project?.Title));
 
             var position = 0;
 
@@ -658,9 +714,19 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             PartyDetails parties,
             ContractGenerationPlan plan,
             ClauseSelection selection,
-            IReadOnlyDictionary<string, string?> fields)
+            IReadOnlyDictionary<string, string?> fields,
+            IReadOnlyDictionary<string, string> german)
         {
             var doc = new StringBuilder();
+
+            // The German for a field, or what was typed when translation did not
+            // run or could not produce one. A contract that falls back to the
+            // source still says so: the language check reports it and the
+            // approval gate stops it, so this cannot quietly ship Arabic.
+            string Display(string fieldId, string? original) =>
+                german.TryGetValue(fieldId, out var translated) && !string.IsNullOrWhiteSpace(translated)
+                    ? translated
+                    : (original ?? "").Trim();
 
             // ── Überschrift, Nummer und Datum ────────────────────────────────
             doc.AppendLine("# Agenturvertrag").AppendLine();
@@ -668,7 +734,7 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             doc.AppendLine($"**Vertragsdatum:** {DateTime.UtcNow.ToString("dd.MM.yyyy", De)}  ");
 
             if (!string.IsNullOrWhiteSpace(contract.Project?.Title))
-                doc.AppendLine($"**Projekt:** {contract.Project!.Title}  ");
+                doc.AppendLine($"**Projekt:** {Display("project.title", contract.Project!.Title)}  ");
 
             doc.AppendLine();
 
@@ -702,8 +768,13 @@ namespace WitcherHub.Infrastructure.Services.Contracts
 
                 index++;
 
+                // The service as the contract names it. A position entered as
+                // "البرمجة" is a heading nobody signing a German contract can
+                // read, and it was printed verbatim here and in the price table
+                // below — the two places a reader looks first.
                 doc.AppendLine(
-                    $"### {GermanLegalText.Heading(section, index, position.Title)}").AppendLine();
+                    $"### {GermanLegalText.Heading(section, index, Display($"position.{index - 1}.title", position.Title))}")
+                   .AppendLine();
 
                 if (!string.IsNullOrWhiteSpace(described?.Scope))
                     doc.AppendLine("**Leistungsumfang**").AppendLine().AppendLine(Clean(described!.Scope)).AppendLine();
@@ -733,7 +804,8 @@ namespace WitcherHub.Infrastructure.Services.Contracts
             foreach (var position in positions.OrderBy(p => p.Position))
             {
                 doc.AppendLine(
-                    $"| {row} | {position.Title} | {Money(position.NetTotal, contract.Currency)} |");
+                    $"| {row} | {Display($"position.{row - 1}.title", position.Title)} " +
+                    $"| {Money(position.NetTotal, contract.Currency)} |");
                 row++;
             }
 
