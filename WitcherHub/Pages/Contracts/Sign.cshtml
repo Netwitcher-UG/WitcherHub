@@ -43,75 +43,58 @@
                 @Html.Raw(Model.ContractHtml)
             </div>
 
-            @* Drawn only where the server says this request may be signed
-               against. An expired, cancelled, superseded or already-used link
-               renders the contract read-only, and the internal preview never
-               reaches this page at all. *@
-            @if (Model.ShowSignatureControls)
-            {
-                <div class="contractActions" id="contractActions">
-                        @* One sentence, two links.
-                
-                       It used to be assembled from five separate resource fragments
-                       joined without spaces — "</a>@T[...AgreeSuffix]" — so German
-                       rendered "Vertragzu." and any culture that is neither de nor
-                       en fell through to the neutral resource file, where most of
-                       these keys held their own key name as their value. The result
-                       was a consent sentence made of visible placeholders on the one
-                       page where a customer is asked to agree to something. *@
-                    <label class="contractActions__agree" for="acceptTerms">
-                        <input type="checkbox" id="acceptTerms" name="AcceptTerms" value="true" required />
+            <div class="contractActions" id="contractActions">
+                @* Two confirmations, each its own box.
 
-                        <span class="contractActions__agreeBody">
-                            <span class="contractActions__agreeLine">
-                                Ich habe die
-                                <a id="termsLink"
-                                   href="@Model.TermsUrl"
-                                   target="_blank"
-                                   rel="noopener noreferrer">Allgemeinen Geschäftsbedingungen</a>
-                                gelesen und akzeptiere diese sowie den
-                                <a id="contractLink" href="@Model.ContractTermsAnchor">vorliegenden Vertrag</a>
-                                verbindlich.
-                            </span>
+                   The second one used to be the sentence "Please review both
+                   documents carefully before signing" — advice, sitting where a
+                   decision belongs. Accepting the terms is now something the
+                   signer does rather than something they are told to do, and
+                   Sign & Accept stays disabled until both boxes are ticked. *@
+                <label class="contractActions__agree" for="chkAgree">
+                    <input type="checkbox" id="chkAgree" />
+
+                    <span class="contractActions__agreeBody">
+                        <span class="contractActions__agreeLine">
+                            @T["contractPage_AgreePrefix"]
+                            <a id="termsLink"
+                               href="https://netwitcher.com/de/agb-fuer-agenturen"
+                               target="_blank"
+                               rel="noopener noreferrer">
+                                @T["contractPage_AgreeTermsLink"]
+                            </a>
+                            @T["contractPage_AgreeMiddle"]
+                            @* Points at the contract's own clauses, above on this
+                               page. It used to open the public privacy policy in
+                               a new tab, under a link that says "Vertrag". *@
+                            <a id="contractLink" href="@Model.ContractTermsAnchor">
+                                @T["contractPage_AgreeContractLink"]
+                            </a>@T["contractPage_AgreeSuffix"]
                         </span>
-                    </label>
+                    </span>
+                </label>
 
-                    <div class="contractActions__right">
-                        <div class="contractActions__status">
-                            <span class="contractActions__statusLabel">Status:</span>
-                            <span class="contractActions__badge" id="signedBadge">@Model.StatusLabel</span>
-                        </div>
+                <label class="contractActions__agree" for="chkTerms">
+                    <input type="checkbox" id="chkTerms" />
 
-                        @* Three separate actions, spaced, and only drawn where the
-                           server says this visitor may sign. Hiding them in CSS
-                           would leave the endpoint open to anyone holding the link. *@
-                        <div class="signature-actions no-print">
-                            <button class="contractActions__btn contractActions__btn--primary"
-                                    type="button" id="btnOpen" disabled>
-                                Vertrag verbindlich unterzeichnen
-                            </button>
+                    <span class="contractActions__agreeBody">
+                        <span class="contractActions__agreeLine">
+                            @T["contractPage_AcceptTermsLine"]
+                        </span>
+                    </span>
+                </label>
 
-                            <button class="contractActions__btn" type="button" id="btnPrint">Drucken</button>
-                            <button class="contractActions__btn" type="button" id="btnReset">Zurücksetzen</button>
-                        </div>
-                    </div>
+                <div class="contractActions__right">
+                    <div class="contractActions__badge" id="signedBadge">@T["contractPage_Unsigned"]</div>
+
+                    <button class="contractActions__btn contractActions__btn--primary" type="button" id="btnOpen" disabled>
+                        @T["contractPage_SignAccept"]
+                    </button>
+
+                    <button class="contractActions__btn" type="button" id="btnPrint">@T["contractPage_Print"]</button>
+                    <button class="contractActions__btn" type="button" id="btnReset">@T["contractPage_Reset"]</button>
                 </div>
-            }
-            else
-            {
-                <div class="contractActions" id="contractActions">
-                    <div class="contractActions__right">
-                        <div class="contractActions__status">
-                            <span class="contractActions__statusLabel">Status:</span>
-                            <span class="contractActions__badge">@Model.StatusLabel</span>
-                        </div>
-
-                        <div class="signature-actions no-print">
-                            <button class="contractActions__btn" type="button" id="btnPrint">Drucken</button>
-                        </div>
-                    </div>
-                </div>
-            }
+            </div>
 
             <section class="contractSign" aria-label="@T["contractPage_SignaturesTitle"]">
                 <h2 class="contractSign__title">@T["contractPage_SignaturesTitle"]</h2>

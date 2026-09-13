@@ -58,21 +58,11 @@ namespace WitcherHub.Tests
         {
             var page = SigningPage();
 
-            // One box, not two. The second used to restate the first — "I have
-            // read the terms" beside "I accept the terms" — and the pair were
-            // assembled from five resource fragments joined without spaces, which
-            // is how a German customer was shown "Vertragzu.".
-            Assert.Contains("id=\"acceptTerms\"", page);
-            Assert.Contains("required", page);
+            Assert.Contains("id=\"chkTerms\"", page);
+            Assert.Contains("contractPage_AcceptTermsLine", page);
 
-            // One sentence, written out, with both links in it.
-            Assert.Contains("Allgemeinen Geschäftsbedingungen", page);
-            Assert.Contains("vorliegenden Vertrag", page);
-            Assert.Contains("verbindlich.", page);
-
-            // The advisory sentence it replaced, and the fragment keys.
+            // The sentence it replaced.
             Assert.DoesNotContain("contractPage_AgreeHelp", page);
-            Assert.DoesNotContain("contractPage_AgreeSuffix", page);
         }
 
         [Fact]

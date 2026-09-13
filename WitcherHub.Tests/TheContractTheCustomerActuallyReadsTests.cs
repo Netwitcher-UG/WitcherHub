@@ -397,25 +397,8 @@ Die Leistungen.
             Assert.DoesNotContain("datenschutzerklaerung", contractLink.Value);
             Assert.Contains("ContractTermsAnchor", contractLink.Value);
 
-            // The AGB link is a real external document and stays external. Its
-            // address now comes from the signature request rather than being
-            // written into the markup, so that the contract records which Terms
-            // the customer was actually shown — the default is unchanged.
-            var termsLink = Regex.Match(page, @"id=""termsLink""[\s\S]{0,200}?>");
-
-            Assert.True(termsLink.Success, "the consent line no longer has a terms link");
-            Assert.Contains("Model.TermsUrl", termsLink.Value);
-            Assert.Contains("target=\"_blank\"", termsLink.Value);
-            Assert.Contains("rel=\"noopener noreferrer\"", termsLink.Value);
-
-            var repository = RepositoryRoot();
-            Assert.NotNull(repository);
-
-            var deliveryOptions = File.ReadAllText(Path.Combine(
-                repository!.FullName,
-                "WitcherHub.Application", "Services", "Contracts", "Delivery", "ContractDelivery.cs"));
-
-            Assert.Contains("https://netwitcher.com/de/agb-fuer-agenturen", deliveryOptions);
+            // The AGB link is a real external document and stays external.
+            Assert.Contains("agb-fuer-agenturen", page);
         }
     }
 }

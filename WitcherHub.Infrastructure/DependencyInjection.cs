@@ -17,9 +17,7 @@ using WitcherHub.Application.Interfaces.Email;
 using WitcherHub.Application.Interfaces.ManageData;
 using WitcherHub.Application.Services.Email;
 using WitcherHub.Application.Services.Contracts.Language;
-using WitcherHub.Application.Services.Contracts.Delivery;
 using WitcherHub.Infrastructure.Services.Contracts.Language;
-using WitcherHub.Infrastructure.Services.Contracts.Delivery;
 using WitcherHub.Infrastructure.Authentication;
 using WitcherHub.Infrastructure.Common.Caching;
 using WitcherHub.Infrastructure.Data.Context;
@@ -193,10 +191,6 @@ namespace WitcherHub.Infrastructure
             // translation step can be replaced or stubbed without the composer
             // knowing which model is behind it.
             services.AddScoped<IContractLanguageNormalizer, OpenAiContractLanguageNormalizer>();
-
-            // Issues and tracks the links a customer signs through, and freezes
-            // the approved wording at the moment one is issued.
-            services.AddScoped<IContractDeliveryService, ContractDeliveryService>();
             services.AddScoped<IDataSeeder, IdentityDataSeeder>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<ISignInDiagnostics, SignInDiagnostics>();
@@ -219,9 +213,6 @@ namespace WitcherHub.Infrastructure
             // =========================================================
             // ✅ Email Sender + Templates + Background Queue (NEW)
             // =========================================================
-            services.Configure<ContractTermsOptions>(
-                configuration.GetSection(ContractTermsOptions.SectionName));
-
             services.Configure<SmtpOptions>(configuration.GetSection("Smtp"));
             services.Configure<BackgroundTaskOptions>(configuration.GetSection("BackgroundTasks"));
             services.Configure<EmailTemplateOptions>(configuration.GetSection("EmailTemplates"));

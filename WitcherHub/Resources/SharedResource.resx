@@ -124,22 +124,22 @@
     <value>I accept the terms and conditions of this contract.</value>
   </data>
   <data name="contractPage_AgreeContractLink" xml:space="preserve">
-    <value>Contract</value>
+    <value>AgreeContractLink</value>
   </data>
   <data name="contractPage_AgreeHelp" xml:space="preserve">
-    <value>Please review both documents carefully before signing.</value>
+    <value>AgreeHelp</value>
   </data>
   <data name="contractPage_AgreeMiddle" xml:space="preserve">
-    <value>and agree to the</value>
+    <value>AgreeMiddle</value>
   </data>
   <data name="contractPage_AgreePrefix" xml:space="preserve">
-    <value>I have read the</value>
+    <value>AgreePrefix</value>
   </data>
   <data name="contractPage_AgreeSuffix" xml:space="preserve">
-    <value>.</value>
+    <value>AgreeSuffix</value>
   </data>
   <data name="contractPage_AgreeTermsLink" xml:space="preserve">
-    <value>Terms</value>
+    <value>AgreeTermsLink</value>
   </data>
   <data name="contractPage_AgreeText" xml:space="preserve">
     <value>I have read and agree to the terms of this contract</value>
@@ -160,7 +160,7 @@
     <value>Signature pad cleared</value>
   </data>
   <data name="contractPage_CustomerParty" xml:space="preserve">
-    <value>Customer</value>
+    <value>CustomerParty</value>
   </data>
   <data name="contractPage_CustomerSignature" xml:space="preserve">
     <value>Customer Signature</value>
@@ -169,16 +169,16 @@
     <value>Please sign first (signature field is empty)</value>
   </data>
   <data name="contractPage_ErrFillEmail" xml:space="preserve">
-    <value>Please enter your email before signing.</value>
+    <value>ErrFillEmail</value>
   </data>
   <data name="contractPage_ErrFillFields" xml:space="preserve">
-    <value>Please fill in your name and email before signing.</value>
+    <value>ErrFillFields</value>
   </data>
   <data name="contractPage_ErrFillName" xml:space="preserve">
-    <value>Please enter your name before signing.</value>
+    <value>ErrFillName</value>
   </data>
   <data name="contractPage_ErrInvalidEmail" xml:space="preserve">
-    <value>Please enter a valid email address.</value>
+    <value>ErrInvalidEmail</value>
   </data>
   <data name="contractPage_ErrMustAcceptTerms" xml:space="preserve">
     <value>Please accept the terms and conditions before signing</value>
@@ -190,16 +190,16 @@
     <value>Review the contract, confirm agreement, then sign</value>
   </data>
   <data name="contractPage_LabelDate" xml:space="preserve">
-    <value>Date</value>
+    <value>LabelDate</value>
   </data>
   <data name="contractPage_LabelEmail" xml:space="preserve">
-    <value>Email</value>
+    <value>LabelEmail</value>
   </data>
   <data name="contractPage_LabelName" xml:space="preserve">
-    <value>Name</value>
+    <value>LabelName</value>
   </data>
   <data name="contractPage_LabelSignature" xml:space="preserve">
-    <value>Signature</value>
+    <value>LabelSignature</value>
   </data>
   <data name="contractPage_ModalHint" xml:space="preserve">
     <value>Draw your signature below, then click “Accept Signature"</value>
@@ -217,10 +217,10 @@
     <value>Provider</value>
   </data>
   <data name="contractPage_ProviderParty" xml:space="preserve">
-    <value>Provider</value>
+    <value>ProviderParty</value>
   </data>
   <data name="contractPage_ProviderSignsInternally" xml:space="preserve">
-    <value>Provider signature is handled internally</value>
+    <value>ProviderSignsInternally</value>
   </data>
   <data name="contractPage_Reset" xml:space="preserve">
     <value>Reset</value>
@@ -229,7 +229,7 @@
     <value>Sign &amp; Accept</value>
   </data>
   <data name="contractPage_SignaturesTitle" xml:space="preserve">
-    <value>Signatures</value>
+    <value>SignaturesTitle</value>
   </data>
   <data name="contractPage_SignatureWillAppear" xml:space="preserve">
     <value>Signature will appear here after acceptance</value>
@@ -241,7 +241,7 @@
     <value>Signed at</value>
   </data>
   <data name="contractPage_SignedAtLabel" xml:space="preserve">
-    <value>Signed on</value>
+    <value>SignedAtLabel</value>
   </data>
   <data name="contractPage_SignedOk" xml:space="preserve">
     <value>Signed successfully ✅</value>

@@ -1512,13 +1512,6 @@
         display: none !important;
     }
 
-    /* Nor do the controls. A printed contract with a "Zurücksetzen" button on
-       it is a contract that looks like a screenshot of a web page. */
-    .signature-actions,
-    .no-print {
-        display: none !important;
-    }
-
     /* ------------------------------------------------------------------
        What reaches the paper is the contract, and nothing else.
 
@@ -1609,30 +1602,4 @@
     #appModal {
         display: none !important;
     }
-}
-
-/* ---- status and actions -------------------------------------------------
- *
- * The three actions used to sit as bare siblings with no gap declared, so they
- * rendered — and, more to the point, read out and copied — as one run of text:
- * "Sign & AcceptPrintReset". The status was the badge alone, with no label, so
- * it read as a loose word beside them.
- */
-.contractActions__status {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-right: 12px;
-}
-
-.contractActions__statusLabel {
-    font-weight: 700;
-    color: #4b5563;
-}
-
-.signature-actions {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
 }
