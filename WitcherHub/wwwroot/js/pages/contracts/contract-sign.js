@@ -4,13 +4,15 @@
     const serverState = window.contractServerState || {};
     const $ = (id) => document.getElementById(id);
 
-    const chkAgree = $("chkAgree");
+    const chkAgree = $("acceptTerms");
 
     // The second confirmation: the signer accepts the contract's terms. It is
     // deliberately optional to find — this script also drives the quote signing
     // page, which asks for one confirmation, not two. A page without the box is
     // not a page whose box is unticked.
-    const chkTerms = $("chkTerms");
+    // The second checkbox is gone: it restated the first one. Kept as a
+    // null so the guards below read the same.
+    const chkTerms = null;
 
     const btnOpen = $("btnOpen");
     const btnPrint = $("btnPrint");

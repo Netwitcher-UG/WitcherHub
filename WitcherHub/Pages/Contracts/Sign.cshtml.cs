@@ -87,6 +87,31 @@ namespace WitcherHub.Pages.Contracts
         public string? SignerNamePrefill { get; private set; }
         public string? SignerEmailPrefill { get; private set; }
 
+        /// <summary>The approved version this link was issued for.</summary>
+        public int? SentVersion { get; private set; }
+
+        /// <summary>SHA-256 of the wording that was sent, verified before signing.</summary>
+        public string? SnapshotHash { get; private set; }
+
+        /// <summary>
+        /// Whether the signing form is drawn at all.
+        ///
+        /// Decided on the server and nowhere else. Hiding the form in the view
+        /// would leave the POST endpoint open to anyone who kept the link, which
+        /// is the whole population this page is shown to.
+        /// </summary>
+        public bool ShowSignatureControls { get; private set; }
+
+        /// <summary>The Terms the request was issued against.</summary>
+        public string TermsUrl { get; private set; } = "https://netwitcher.com/de/agb-fuer-agenturen";
+
+        /// <summary>
+        /// The status as a German sentence rather than an enum name. "Unsigned"
+        /// in a German contract page is the kind of detail a customer reads as
+        /// carelessness about everything else on the page.
+        /// </summary>
+        public string StatusLabel { get; private set; } = "Nicht unterzeichnet";
+
         /// <summary>
         /// Why a signing link stopped working, to the person holding it.
         ///
@@ -214,14 +239,29 @@ namespace WitcherHub.Pages.Contracts
             // ✅ enforce recipient email from link (strong)
             SignerEmailPrefill = link.RecipientEmail;
 
-            // The document that gets signed
+            // The document that gets signed is the document that was sent.
             //
-            // The approved version is the contract. It is used exactly as
-            // approved and never rebuilt from the current catalog — a service
-            // whose price changed after approval must not change what is being
-            // signed. Only a contract with no approved wording at all falls back
-            // to generating from positions.
-            if (string.IsNullOrWhiteSpace(contract.Terms))
+            // This used to read the contract's current wording and, when that was
+            // empty, write a rebuilt version back to the database — from an
+            // anonymous public page. So the text a customer saw was the text as
+            // it stood the moment they opened the link, not the text the link was
+            // issued for, and opening a link could change the contract.
+            //
+            // The wording is frozen onto the request when it is issued. That
+            // snapshot is what renders here, and nothing on this path writes.
+            if (!string.IsNullOrWhiteSpace(link.SnapshotMarkdown))
+            {
+                contract.Terms = NormalizeNewLines(link.SnapshotMarkdown);
+
+                // Rendered from, never saved. Detached so that no later
+                // SaveChanges on this request can carry the snapshot onto the
+                // contract row.
+                _db.Entry(contract).State = EntityState.Detached;
+
+                SentVersion = link.IssuedForDraftVersion;
+                SnapshotHash = link.SnapshotHash;
+            }
+            else if (string.IsNullOrWhiteSpace(contract.Terms))
             {
                 var approved = contract.Drafts
                     .Where(d => d.IsApproved)
@@ -273,6 +313,30 @@ namespace WitcherHub.Pages.Contracts
                 if (!string.IsNullOrWhiteSpace(sig.SignerName)) SignerNamePrefill = sig.SignerName;
                 if (!string.IsNullOrWhiteSpace(sig.SignerEmail)) SignerEmailPrefill = sig.SignerEmail;
             }
+
+            // Whether this visitor may actually sign.
+            //
+            // Every condition, on the server: the request is live, it was issued
+            // for wording that is still the approved wording, and the contract is
+            // not signed already. A link that is expired, cancelled, superseded
+            // or already used renders the contract read-only.
+            ShowSignatureControls =
+                link.AllowsSigning(DateTimeOffset.UtcNow) &&
+                !string.IsNullOrWhiteSpace(link.SnapshotMarkdown) &&
+                !IsSigned;
+
+            if (!string.IsNullOrWhiteSpace(link.TermsUrl)) TermsUrl = link.TermsUrl!;
+
+            StatusLabel = IsSigned
+                ? "Unterzeichnet"
+                : link.Status switch
+                {
+                    ContractSignatureRequestStatus.Expired => "Abgelaufen",
+                    ContractSignatureRequestStatus.Cancelled => "Storniert",
+                    ContractSignatureRequestStatus.Superseded => "Ersetzt",
+                    ContractSignatureRequestStatus.AwaitingSignature => "Signatur ausstehend",
+                    _ => "Nicht unterzeichnet"
+                };
 
             // Markdown -> HTML (sanitized)
             var model = ContractPdfDocument.Build(

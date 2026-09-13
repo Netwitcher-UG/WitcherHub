@@ -2,6 +2,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using WitcherHub.Application.Interfaces.ManageData;
+using WitcherHub.Infrastructure.Services.Contracts.Delivery;
+using WitcherHub.Infrastructure.Data.Models;
+using WitcherHub.Infrastructure.Authentication;
+using WitcherHub.Application.Services.Contracts.Delivery;
+using WitcherHub.Application.Models.Email;
+using WitcherHub.Application.Interfaces.Email;
 using WitcherHub.Application.Models.View.Project;
 using WitcherHub.Domain.Projects;
 using WitcherHub.Infrastructure.Data.Context;
@@ -18,19 +24,34 @@ namespace WitcherHub.Pages.Projects
         private readonly LexwareInvoiceSyncService _lexwareInvoiceSyncService;
         private readonly LexwareInvoiceStatusSyncService _lexwareInvoiceStatusSyncService;
         private readonly InvoicePublicLinkService _invoicePublicLinkService;
+        private readonly IContractDeliveryService _delivery;
+        private readonly IConfiguration _configuration;
+        private readonly IEmailTemplateRenderer _templates;
+        private readonly IEmailSender _email;
+        private readonly ILogger<WorkspaceModel> _logger;
 
         public WorkspaceModel(
       IProject projects,
       AppDbContext db,
       LexwareInvoiceSyncService lexwareInvoiceSyncService,
       LexwareInvoiceStatusSyncService lexwareInvoiceStatusSyncService,
-      InvoicePublicLinkService invoicePublicLinkService)
+      InvoicePublicLinkService invoicePublicLinkService,
+      IContractDeliveryService delivery,
+      IConfiguration configuration,
+      IEmailTemplateRenderer templates,
+      IEmailSender email,
+      ILogger<WorkspaceModel> logger)
         {
             _projects = projects;
             _db = db;
             _lexwareInvoiceSyncService = lexwareInvoiceSyncService;
             _lexwareInvoiceStatusSyncService = lexwareInvoiceStatusSyncService;
             _invoicePublicLinkService = invoicePublicLinkService;
+            _delivery = delivery;
+            _configuration = configuration;
+            _templates = templates;
+            _email = email;
+            _logger = logger;
         }
 
         [BindProperty(SupportsGet = true, Name = "id")]
@@ -61,6 +82,21 @@ namespace WitcherHub.Pages.Projects
         public Guid? CurrentContractId { get; private set; }
         public bool ShowManualInvoiceButton { get; private set; }
 
+        /// <summary>
+        /// Every contract in this project, with whether it may be sent, to whom,
+        /// and what its outstanding signing request is doing.
+        /// </summary>
+        public IReadOnlyList<ContractDeliveryState> Deliveries { get; private set; } = [];
+
+        /// <summary>
+        /// The signing URL from the action just performed, handed to the page
+        /// once so the browser can put it on the clipboard.
+        ///
+        /// Never stored, never logged, never rendered as visible text. It lives
+        /// for one response and then only the hash of its token remains.
+        /// </summary>
+        public string? CopiedSigningUrl { get; private set; }
+
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             if (ProjectId == Guid.Empty)
@@ -80,8 +116,199 @@ namespace WitcherHub.Pages.Projects
             Workflow = await _projects.GetWorkflowStateAsync(ProjectId, ct);
 
             await LoadContractStateAsync(ct);
+            await LoadDeliveryStatesAsync(ct);
 
             return Page();
+        }
+
+        /// <summary>
+        /// The delivery state of every contract in the project.
+        /// </summary>
+        private async Task LoadDeliveryStatesAsync(CancellationToken ct)
+        {
+            var contractIds = await _db.Contracts
+                .Where(c => c.ProjectId == ProjectId)
+                .OrderByDescending(c => c.CreatedAt)
+                .Select(c => c.Id)
+                .ToListAsync(ct);
+
+            var states = new List<ContractDeliveryState>(contractIds.Count);
+
+            foreach (var id in contractIds)
+                states.Add(await _delivery.DescribeAsync(id, ct));
+
+            Deliveries = states;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // Sending an approved contract to the customer
+        // ══════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Issues a signing link and hands it back once, for the clipboard.
+        ///
+        /// No e-mail is sent. The person copying it is the one delivering it,
+        /// which is a perfectly ordinary way to get a contract to somebody who
+        /// asked for it on the phone.
+        /// </summary>
+        public async Task<IActionResult> OnPostCreateSigningLinkAsync(Guid contractId, CancellationToken ct)
+        {
+            if (ProjectId == Guid.Empty || contractId == Guid.Empty) return NotFound();
+
+            var result = await _delivery.CreateLinkAsync(
+                contractId,
+                ContractDeliveryMethod.CopiedLink,
+                PublicBaseUrl.Resolve(_configuration) ?? "",
+                CurrentUserId(),
+                recipientEmail: null,
+                ct);
+
+            if (!result.Succeeded)
+                return await BackToContractsAsync("error", "Signaturlink nicht erstellt", result.Message, ct);
+
+            // Carried on TempData for exactly one redirect. It is put on the
+            // clipboard by script and never written into the page as text.
+            TempData["Delivery.CopiedUrl"] = result.SigningUrl;
+
+            return await BackToContractsAsync(
+                "success",
+                "Signaturlink erstellt",
+                $"Der sichere Signaturlink wurde kopiert. Er ist bis zum " +
+                $"{result.ExpiresAt:dd.MM.yyyy} gültig.",
+                ct);
+        }
+
+        /// <summary>
+        /// Sends the approved contract to the customer's stored address.
+        ///
+        /// The request is marked as sent only once the mail has actually gone
+        /// out. A failure leaves it unsent and revoked, so the page never tells
+        /// the owner a customer has been written to when nobody has.
+        /// </summary>
+        public async Task<IActionResult> OnPostSendContractEmailAsync(
+            Guid contractId, string? recipientEmail, CancellationToken ct)
+        {
+            if (ProjectId == Guid.Empty || contractId == Guid.Empty) return NotFound();
+
+            var created = await _delivery.CreateLinkAsync(
+                contractId,
+                ContractDeliveryMethod.Email,
+                PublicBaseUrl.Resolve(_configuration) ?? "",
+                CurrentUserId(),
+                recipientEmail,
+                ct);
+
+            if (!created.Succeeded)
+                return await BackToContractsAsync("error", "Vertrag nicht versendet", created.Message, ct);
+
+            var state = await _delivery.DescribeAsync(contractId, ct);
+
+            try
+            {
+                await SendSigningEmailAsync(state, created, recipientEmail, ct);
+                await _delivery.MarkSentAsync(created.RequestId!.Value, ct);
+            }
+            catch (Exception ex)
+            {
+                // The provider's words go to the log; the reader gets a sentence
+                // and a reference.
+                var reference = Guid.NewGuid().ToString("n")[..8];
+
+                _logger.LogError(ex,
+                    "Contract signing e-mail failed. Contract {ContractId} Request {RequestId} Reference {Reference}",
+                    contractId, created.RequestId, reference);
+
+                await _delivery.MarkDeliveryFailedAsync(created.RequestId!.Value, reference, ct);
+
+                return await BackToContractsAsync(
+                    "error",
+                    "Vertrag nicht versendet",
+                    $"Die E-Mail konnte nicht zugestellt werden. Es wurde nichts versendet. Referenz {reference}.",
+                    ct);
+            }
+
+            return await BackToContractsAsync(
+                "success",
+                "Vertrag versendet",
+                $"Der Vertrag {state.ContractNo} wurde an {state.LatestRequestRecipient} " +
+                "zur elektronischen Unterzeichnung gesendet.",
+                ct);
+        }
+
+        /// <summary>Withdraws an outstanding signing link.</summary>
+        public async Task<IActionResult> OnPostCancelSigningRequestAsync(
+            Guid contractId, Guid requestId, CancellationToken ct)
+        {
+            if (ProjectId == Guid.Empty || requestId == Guid.Empty) return NotFound();
+
+            var result = await _delivery.CancelAsync(requestId, CurrentUserId(), ct);
+
+            return await BackToContractsAsync(
+                result.Succeeded ? "success" : "error",
+                result.Succeeded ? "Versand storniert" : "Nicht storniert",
+                result.Succeeded
+                    ? "Der Signaturlink wurde deaktiviert und kann nicht mehr verwendet werden."
+                    : result.Message,
+                ct);
+        }
+
+        /// <summary>
+        /// The e-mail itself, from the project's own template and sender.
+        ///
+        /// The signing URL is interpolated into the template and into nothing
+        /// else — it is not logged, and the audit record keeps only the request
+        /// id and the snapshot hash.
+        /// </summary>
+        private async Task SendSigningEmailAsync(
+            ContractDeliveryState state,
+            ContractDeliveryResult created,
+            string? requestedRecipient,
+            CancellationToken ct)
+        {
+            var recipient = state.LatestRequestRecipient;
+
+            if (string.IsNullOrWhiteSpace(recipient))
+                throw new InvalidOperationException("No recipient was recorded for the signature request.");
+
+            var html = await _templates.RenderAsync("ContractReady.de", new
+            {
+                Subject = $"Vertrag {state.ContractNo} zur elektronischen Unterzeichnung",
+                UserName = state.CustomerName,
+                ContractNo = state.ContractNo,
+                ProjectTitle = ProjectTitle,
+                ActionUrl = created.SigningUrl,
+                ExpirationDate = created.ExpiresAt?.ToLocalTime().ToString("dd.MM.yyyy") ?? "",
+                TermsUrl = "https://netwitcher.com/de/agb-fuer-agenturen"
+            }, ct);
+
+            var from = _configuration["Smtp:From"] ?? _configuration["Smtp:User"] ?? "no-reply@netwitcher.de";
+
+            await _email.SendAsync(new EmailMessage
+            {
+                From = new EmailAddress(from, "Netwitcher"),
+                To = [new EmailAddress(recipient!, state.CustomerName)],
+                Subject = $"Vertrag {state.ContractNo} zur elektronischen Unterzeichnung",
+                HtmlBody = html
+            }, ct);
+        }
+
+        private Guid? CurrentUserId()
+        {
+            var raw = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            return Guid.TryParse(raw, out var id) ? id : null;
+        }
+
+        private async Task<IActionResult> BackToContractsAsync(
+            string type, string title, string? message, CancellationToken ct)
+        {
+            TempData["Toast.Type"] = type;
+            TempData["Toast.Title"] = title;
+            TempData["Toast.Message"] = message ?? "";
+
+            await Task.CompletedTask;
+
+            return RedirectToPage("/Projects/Workspace", new { id = ProjectId, tab = "contracts" });
         }
 
         public async Task<IActionResult> OnPostGenerateInvoiceAsync(Guid contractId, CancellationToken ct)
