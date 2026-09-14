@@ -253,11 +253,6 @@
         cursor: default;
     }
 
-/* Two confirmations, one under the other, each reading as its own decision. */
-.contractActions__agree + .contractActions__agree {
-    margin-top: -4px;
-}
-
 .contractActions__agreeBody {
     display: block;
     min-width: 0;

@@ -54,19 +54,48 @@ namespace WitcherHub.Tests
         // =================================== accepting the terms is a decision
 
         [Fact]
-        public void TheSignerAcceptsTheTermsInABoxRatherThanBeingToldToReadThem()
+        public void TheSignerAcceptsInABoxRatherThanBeingToldToReadTheDocuments()
         {
             var page = SigningPage();
 
-            Assert.Contains("id=\"chkTerms\"", page);
-            Assert.Contains("contractPage_AcceptTermsLine", page);
+            Assert.Contains("id=\"chkAgree\"", page);
 
-            // The sentence it replaced.
+            // One box, and it names both documents: the signer has read the
+            // Terms and agrees to the Contract, with a link to each.
+            Assert.Contains("contractPage_AgreeTermsLink", page);
+            Assert.Contains("contractPage_AgreeContractLink", page);
+
+            // The sentence of advice it replaced.
             Assert.DoesNotContain("contractPage_AgreeHelp", page);
         }
 
         [Fact]
-        public void SignAndAcceptStaysShutUntilBothBoxesAreTicked()
+        public void TheSameConsentIsNotAskedForTwice()
+        {
+            // A second box saying "I accept the terms and conditions of this
+            // contract" said nothing the line above it does not, and a consent
+            // asked twice reads as a formality to click past rather than as a
+            // decision. It is gone, and so is everything that served it —
+            // nothing should be left referring to a box that is not there.
+            var page = SigningPage();
+
+            Assert.DoesNotContain("chkTerms", page);
+            Assert.DoesNotContain("contractPage_AcceptTermsLine", page);
+
+            Assert.DoesNotContain("chkTerms", SigningScript());
+            Assert.DoesNotContain("termsAccepted", SigningScript());
+
+            foreach (var file in new[] { "SharedResource.resx", "SharedResource.en.resx", "SharedResource.de.resx" })
+            {
+                var resx = Read("WitcherHub", "Resources", file);
+
+                Assert.DoesNotContain("contractPage_AcceptTermsLine", resx);
+                Assert.DoesNotContain("contractPage_ErrMustAcceptTerms", resx);
+            }
+        }
+
+        [Fact]
+        public void SignAndAcceptStaysShutUntilTheBoxIsTicked()
         {
             var js = SigningScript();
 
@@ -74,21 +103,20 @@ namespace WitcherHub.Tests
             Assert.True(gate.Success, "the gate on Sign & Accept is gone");
 
             Assert.Contains("chkAgree.checked", gate.Groups["body"].Value);
-            Assert.Contains("termsAccepted()", gate.Groups["body"].Value);
         }
 
         [Fact]
-        public void TickingTheSecondBoxReleasesTheButtonWithoutAReload()
+        public void TickingTheBoxReleasesTheButtonWithoutAReload()
         {
             // Without a change listener the button stays disabled until something
             // else on the page happens to refresh it.
             Assert.Matches(
-                @"chkTerms\?\.addEventListener\(""change""",
+                @"chkAgree\.addEventListener\(""change""",
                 SigningScript());
         }
 
         [Fact]
-        public void PressingSignWithTheTermsUntickedIsRefused()
+        public void PressingSignWithTheBoxUntickedIsRefused()
         {
             var js = SigningScript();
 
@@ -97,46 +125,64 @@ namespace WitcherHub.Tests
             var open = Regex.Match(js, @"function openModal\(\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline);
             Assert.True(open.Success, "the signature pad no longer has an entry point");
 
-            Assert.Contains("termsAccepted()", open.Groups["body"].Value);
-            Assert.Contains("mustAcceptTerms", open.Groups["body"].Value);
+            Assert.Contains("chkAgree.checked", open.Groups["body"].Value);
+            Assert.Contains("mustAgree", open.Groups["body"].Value);
         }
 
         [Fact]
-        public void ThePageThatSharesThisScriptAndHasNoSecondBoxStillWorks()
+        public void TheOtherPagesThatShareThisScriptStillWork()
         {
-            // The quote signing page runs the same script and asks for one
-            // confirmation, not two. A page without the box must not be treated
-            // as a page whose box is unticked.
+            // The quote signing page and the demo page run the same script and
+            // ask for the same single confirmation. The script must not reach for
+            // an element none of the three pages has.
             var js = SigningScript();
 
-            var helper = Regex.Match(js, @"function termsAccepted\(\)\s*\{(?<body>[^}]*)\}");
-            Assert.True(helper.Success);
-            Assert.Contains("!chkTerms || chkTerms.checked", helper.Groups["body"].Value);
-
-            // And it must not be added to the hard guard that returns early.
             var guard = Regex.Match(js, @"if \(!chkAgree \|\|[^\n]*\) return;");
-            Assert.True(guard.Success);
-            Assert.DoesNotContain("chkTerms", guard.Value);
+            Assert.True(guard.Success, "the script no longer checks it has what it needs");
+
+            foreach (var page in new[]
+                     {
+                         Read("WitcherHub", "Pages", "Quotes", "Sign.cshtml"),
+                         Read("WitcherHub", "Pages", "Contracts", "SignDemo.cshtml")
+                     })
+            {
+                Assert.Contains("id=\"chkAgree\"", page);
+            }
         }
 
         [Fact]
-        public void ASignedContractShowsBothConfirmationsAsGivenAndLocked()
+        public void ASignedContractShowsTheConfirmationAsGivenAndLocked()
         {
             var js = SigningScript();
 
             var signed = Regex.Match(js, @"function setSignedUI\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline);
             Assert.True(signed.Success);
 
-            Assert.Contains("chkTerms.checked = true", signed.Groups["body"].Value);
-            Assert.Contains("chkTerms.disabled = true", signed.Groups["body"].Value);
+            Assert.Contains("chkAgree.checked = true", signed.Groups["body"].Value);
+            Assert.Contains("chkAgree.disabled = true", signed.Groups["body"].Value);
         }
 
         [Fact]
-        public void ResetClearsBothConfirmations()
+        public void ResetClearsTheConfirmation()
         {
-            Assert.Matches(
-                @"chkAgree\.checked = false;\s*\n\s*if \(chkTerms\) chkTerms\.checked = false;",
-                SigningScript());
+            Assert.Matches(@"chkAgree\.checked = false;", SigningScript());
+        }
+
+        [Fact]
+        public void TheWordingExistsInEveryLanguageThePageOffers()
+        {
+            foreach (var file in new[] { "SharedResource.resx", "SharedResource.en.resx", "SharedResource.de.resx" })
+            {
+                var resx = Read("WitcherHub", "Resources", file);
+
+                Assert.Contains("contractPage_AgreePrefix", resx);
+                Assert.Contains("contractPage_ErrMustAgree", resx);
+            }
+
+            // German is a language the customer switches to, not a fallback to
+            // English text under a German flag.
+            var de = Read("WitcherHub", "Resources", "SharedResource.de.resx");
+            Assert.Contains("Ich habe die", de);
         }
 
         [Fact]
@@ -153,23 +199,6 @@ namespace WitcherHub.Tests
             Assert.Contains("appearance: auto", rule.Groups["body"].Value);
             Assert.Matches(@"width:\s*\d+px", rule.Groups["body"].Value);
             Assert.Matches(@"height:\s*\d+px", rule.Groups["body"].Value);
-        }
-
-        [Fact]
-        public void TheNewWordingExistsInEveryLanguageThePageOffers()
-        {
-            foreach (var file in new[] { "SharedResource.resx", "SharedResource.en.resx", "SharedResource.de.resx" })
-            {
-                var resx = Read("WitcherHub", "Resources", file);
-
-                Assert.Contains("contractPage_AcceptTermsLine", resx);
-                Assert.Contains("contractPage_ErrMustAcceptTerms", resx);
-            }
-
-            // German is a language the customer switches to, not a fallback to
-            // English text under a German flag.
-            var de = Read("WitcherHub", "Resources", "SharedResource.de.resx");
-            Assert.Contains("Vertragsbedingungen dieses Vertrages", de);
         }
 
         // ================================== saving the position you just added

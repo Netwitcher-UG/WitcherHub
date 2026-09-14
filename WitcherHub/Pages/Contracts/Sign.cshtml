@@ -70,13 +70,13 @@
             </div>
 
             <div class="contractActions" id="contractActions">
-                @* Two confirmations, each its own box.
+                @* One confirmation, and it covers both documents: the signer has
+                   read the Terms and agrees to the Contract, with a link to each.
+                   Sign & Accept stays disabled until it is ticked.
 
-                   The second one used to be the sentence "Please review both
-                   documents carefully before signing" — advice, sitting where a
-                   decision belongs. Accepting the terms is now something the
-                   signer does rather than something they are told to do, and
-                   Sign & Accept stays disabled until both boxes are ticked. *@
+                   A second box asking the signer to accept the contract terms
+                   again said nothing this one does not, and a consent asked twice
+                   reads as a formality to click past rather than a decision. *@
                 <label class="contractActions__agree" for="chkAgree">
                     <input type="checkbox" id="chkAgree" />
 
@@ -96,16 +96,6 @@
                             <a id="contractLink" href="@Model.ContractTermsAnchor">
                                 @T["contractPage_AgreeContractLink"]
                             </a>@T["contractPage_AgreeSuffix"]
-                        </span>
-                    </span>
-                </label>
-
-                <label class="contractActions__agree" for="chkTerms">
-                    <input type="checkbox" id="chkTerms" />
-
-                    <span class="contractActions__agreeBody">
-                        <span class="contractActions__agreeLine">
-                            @T["contractPage_AcceptTermsLine"]
                         </span>
                     </span>
                 </label>
@@ -229,7 +219,6 @@
             invalidEmail: "@T["contractPage_ErrInvalidEmail"]",
             emptyCanvas: "@T["contractPage_ErrEmptyCanvas"]",
             mustAgree: "@T["contractPage_ErrMustAgree"]",
-            mustAcceptTerms: "@T["contractPage_ErrMustAcceptTerms"]",
             cleared: "@T["contractPage_Cleared"]",
             signedOk: "@T["contractPage_SignedOk"]",
             signed: "@T["contractPage_Signed"]",
